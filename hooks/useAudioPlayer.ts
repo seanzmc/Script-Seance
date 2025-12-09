@@ -1,40 +1,35 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
-import { generateSpeech } from '../services/gemini';
-
-interface QueueItem {
-  blockId: string;
-  audioBuffer: AudioBuffer;
-}
-
-// Internal cache for voice previews (maps voiceId:text key to decoded AudioBuffer)
-const previewBufferCache = new Map<string, AudioBuffer>();
+import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
 
 export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBlockId, setCurrentBlockId] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
-  // Audio Context
+  // --- Refs (State that doesn't trigger re-renders or is needed in callbacks) ---
+  const engineRef = useRef<ScriptEngine | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const nextStartTimeRef = useRef<number>(0);
   
-  // State refs for avoiding closure staleness
-  const isPlayingRef = useRef(false);
-  const voiceConfigsRef = useRef(voiceConfigs);
-
-  // Sync ref with prop
-  useEffect(() => {
-    voiceConfigsRef.current = voiceConfigs;
-  }, [voiceConfigs]);
+  const queueRef = useRef<ScriptBlock[]>([]);       // The full script to play
+  const currentIndexRef = useRef(0);                // Pointer to current block in queue
+  const audioDataMap = useRef<Map<string, AudioChunk>>(new Map()); // Buffer for arrived audio chunks
   
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const isPlayingRef = useRef(false); // Sync ref for callbacks
 
+  // Initialize Engine Singleton for this hook instance
+  if (!engineRef.current) {
+    engineRef.current = new ScriptEngine();
+  }
+
+  // Keep Sync Ref
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  const initAudioContext = useCallback(() => {
+  // Audio Context Singleton Lazy Loader
+  const getContext = () => {
     if (!audioContextRef.current) {
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new Ctx({ sampleRate: 24000 });
@@ -42,174 +37,168 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
     if (audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
     }
-  }, []);
-
-  const decodePCM = (buffer: ArrayBuffer, ctx: AudioContext): AudioBuffer => {
-    const numChannels = 1;
-    const sampleRate = 24000;
-    const dataInt16 = new Int16Array(buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const audioBuffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-    
-    for (let channel = 0; channel < numChannels; channel++) {
-      const channelData = audioBuffer.getChannelData(channel);
-      for (let i = 0; i < frameCount; i++) {
-        channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-      }
-    }
-    return audioBuffer;
+    return audioContextRef.current;
   };
 
-  const playBlock = async (block: ScriptBlock) => {
+  // --- Playback Logic ---
+
+  const stop = useCallback(() => {
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    setCurrentBlockId(null);
+    setIsLoadingAudio(false);
+    
+    // Stop Audio Source
+    if (activeSourceRef.current) {
+      try { activeSourceRef.current.stop(); } catch(e){}
+      activeSourceRef.current = null;
+    }
+    
+    // Stop Engine & Reset Pointers
+    engineRef.current?.stop();
+    audioDataMap.current.clear();
+    queueRef.current = [];
+    currentIndexRef.current = 0;
+  }, []);
+
+  const playNext = async () => {
     if (!isPlayingRef.current) return;
 
-    try {
-      setIsLoadingAudio(true);
-      
-      let config: VoiceConfig | undefined;
-      if (block.type === BlockType.DIALOGUE && block.character) {
-        const targetChar = block.character.toLowerCase().trim();
-        config = voiceConfigsRef.current.find(v => v.name.toLowerCase().trim() === targetChar);
-      } else {
-        config = voiceConfigsRef.current.find(v => v.name === 'Narrator');
-      }
+    const idx = currentIndexRef.current;
+    const script = queueRef.current;
 
-      const voiceId = config?.voiceId || 'Zephyr';
-      let textToSay = block.text;
-
-      const audioData = await generateSpeech(textToSay, voiceId);
-
-      if (!isPlayingRef.current) return;
-
-      initAudioContext();
-      if (!audioContextRef.current) return;
-
-      const audioBuffer = decodePCM(audioData, audioContextRef.current);
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
-      activeSourceRef.current = source;
-
-      const speed = config?.speed || 1;
-      const pitch = config?.pitch || 0; 
-      
-      source.playbackRate.value = speed;
-      source.detune.value = pitch * 100;
-
-      const detuneFactor = Math.pow(2, pitch / 12);
-      const effectiveRate = speed * detuneFactor;
-      const effectiveDuration = audioBuffer.duration / effectiveRate;
-
-      const currentTime = audioContextRef.current.currentTime;
-      if (nextStartTimeRef.current < currentTime) {
-        nextStartTimeRef.current = currentTime;
-      }
-      
-      const startTime = nextStartTimeRef.current;
-      source.start(startTime);
-      nextStartTimeRef.current = startTime + effectiveDuration;
-
-      const delayMs = (startTime - currentTime) * 1000;
-      setTimeout(() => {
-        if(isPlayingRef.current) setCurrentBlockId(block.id);
-      }, Math.max(0, delayMs));
-
-      return new Promise<void>((resolve) => {
-         source.onended = () => {
-           activeSourceRef.current = null;
-           resolve();
-         };
-         setTimeout(() => resolve(), (effectiveDuration * 1000) + 200); 
-      });
-
-    } catch (e) {
-      console.error("Error playing block:", e);
-    } finally {
-      if (isPlayingRef.current) {
-         setIsLoadingAudio(false);
-      }
+    // End of script?
+    if (idx >= script.length) {
+      stop();
+      return;
     }
+
+    const block = script[idx];
+    
+    // Skip silent blocks (headings)
+    if (![BlockType.DIALOGUE, BlockType.ACTION, BlockType.TRANSITION].includes(block.type)) {
+      currentIndexRef.current++;
+      playNext();
+      return;
+    }
+
+    // CHECK BUFFER: Do we have the audio for this block yet?
+    const chunk = audioDataMap.current.get(block.id);
+
+    if (chunk) {
+      // YES: Audio is ready. Play immediately.
+      setIsLoadingAudio(false);
+      setCurrentBlockId(block.id);
+      
+      const ctx = getContext();
+      // Decode raw PCM
+      const audioBuffer = await decodePCM(chunk.audioBuffer, ctx);
+      
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      
+      // Apply client-side modifiers
+      source.playbackRate.value = chunk.speed;
+      source.detune.value = chunk.pitch * 100;
+      
+      source.connect(ctx.destination);
+      activeSourceRef.current = source;
+      
+      source.onended = () => {
+        if (isPlayingRef.current) {
+           activeSourceRef.current = null;
+           // Advance pointer and loop
+           currentIndexRef.current++;
+           playNext();
+        }
+      };
+      
+      source.start();
+
+    } else {
+      // NO: Audio is still generating.
+      // Show loading and wait. The 'audio' event listener will re-trigger playNext() when it arrives.
+      setIsLoadingAudio(true);
+      setCurrentBlockId(block.id); // Visually focus the block so user knows where we are
+    }
+  };
+
+  // --- Event Bindings ---
+
+  useEffect(() => {
+    const engine = engineRef.current!;
+
+    const onAudio = (chunk: AudioChunk) => {
+      // 1. Store the chunk in buffer
+      audioDataMap.current.set(chunk.blockId, chunk);
+      
+      // 2. If we are currently stalled waiting for THIS specific block, resume playback
+      if (isPlayingRef.current) {
+        const currentBlock = queueRef.current[currentIndexRef.current];
+        if (currentBlock && currentBlock.id === chunk.blockId) {
+          playNext();
+        }
+      }
+    };
+
+    engine.on('audio', onAudio);
+    
+    return () => {
+      engine.off('audio', onAudio);
+    };
+  }, []); 
+
+  // --- Public Methods ---
+
+  const playScript = (blocks: ScriptBlock[]) => {
+    stop();
+    // Tiny delay to ensure stop cleanup finishes
+    setTimeout(() => {
+       setIsPlaying(true);
+       isPlayingRef.current = true;
+       queueRef.current = blocks;
+       currentIndexRef.current = 0;
+       audioDataMap.current.clear();
+       
+       // 1. Start Generator Pipeline (Sliding Window)
+       engineRef.current?.start(blocks, voiceConfigs);
+       
+       // 2. Start Playback Loop (will likely pause momentarily waiting for block 1)
+       playNext();
+    }, 10);
   };
 
   const playPreview = async (text: string, config: VoiceConfig) => {
-    stop(); 
-    initAudioContext();
-    if (!audioContextRef.current) return;
-
-    const cacheKey = `${config.voiceId}:${text}`;
-    let cachedBuffer = previewBufferCache.get(cacheKey);
-
+    stop();
+    setIsLoadingAudio(true);
+    
     try {
-      setIsLoadingAudio(!cachedBuffer); // Only show buffering if not in cache
+      // Use engine for preview to benefit from caching
+      const buffer = await engineRef.current?.generateSingle(text, config.voiceId);
+      if (!buffer) return;
 
-      let audioBuffer: AudioBuffer;
-
-      if (cachedBuffer) {
-        audioBuffer = cachedBuffer;
-      } else {
-        const audioData = await generateSpeech(text, config.voiceId);
-        audioBuffer = decodePCM(audioData, audioContextRef.current);
-        previewBufferCache.set(cacheKey, audioBuffer);
-      }
-
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
+      const ctx = getContext();
+      const audioBuffer = await decodePCM(buffer, ctx);
       
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
       source.playbackRate.value = config.speed || 1;
       source.detune.value = (config.pitch || 0) * 100;
-
+      
+      source.connect(ctx.destination);
       activeSourceRef.current = source;
-      source.start();
       
       source.onended = () => {
         setIsLoadingAudio(false);
         activeSourceRef.current = null;
       };
-
-    } catch (e) {
-      console.error("Preview failed", e);
+      
+      source.start();
+    } catch(e) {
+      console.error(e);
+    } finally {
       setIsLoadingAudio(false);
     }
-  };
-
-  const playScript = async (blocks: ScriptBlock[], startFromIndex: number = 0) => {
-    stop();
-    await new Promise(r => setTimeout(r, 0));
-
-    initAudioContext();
-    setIsPlaying(true);
-    isPlayingRef.current = true;
-    nextStartTimeRef.current = audioContextRef.current?.currentTime || 0;
-
-    for (let i = startFromIndex; i < blocks.length; i++) {
-      if (!isPlayingRef.current) break;
-      await playBlock(blocks[i]);
-    }
-    
-    if (isPlayingRef.current) {
-      setIsPlaying(false);
-      setCurrentBlockId(null);
-    }
-  };
-
-  const stop = () => {
-    setIsPlaying(false);
-    isPlayingRef.current = false;
-    
-    if (activeSourceRef.current) {
-      try {
-        activeSourceRef.current.stop();
-      } catch (e) { }
-      activeSourceRef.current = null;
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.suspend();
-      nextStartTimeRef.current = 0;
-    }
-    setCurrentBlockId(null);
-    setIsLoadingAudio(false);
   };
 
   return {
@@ -220,4 +209,25 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
     playPreview,
     stop
   };
+};
+
+// Helper: Decode Raw PCM from Gemini
+const decodePCM = async (buffer: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer> => {
+  // Defensive copy
+  const copy = buffer.slice(0);
+  
+  const numChannels = 1;
+  const sampleRate = 24000; // Gemini 2.5 TTS standard rate
+  const dataInt16 = new Int16Array(copy);
+  const frameCount = dataInt16.length / numChannels;
+  
+  const audioBuffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+  
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = audioBuffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return audioBuffer;
 };
