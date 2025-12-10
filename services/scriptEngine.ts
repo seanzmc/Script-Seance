@@ -165,9 +165,10 @@ export class ScriptEngine {
   // --- Gemini Integration & Caching ---
 
   private async fetchAudio(text: string, voiceId: string): Promise<ArrayBuffer> {
+    const safeText = text.trim();
     // Cache Key: VoiceID + Text. 
     // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
-    const cacheKey = `${voiceId}:${text}`;
+    const cacheKey = `${voiceId}:${safeText}`;
 
     if (AudioCache.has(cacheKey)) {
       return AudioCache.get(cacheKey)!;
@@ -175,7 +176,7 @@ export class ScriptEngine {
 
     const response = await this.client.models.generateContent({
       model: 'gemini-2.5-flash-preview-tts',
-      contents: [{ parts: [{ text: text }] }],
+      contents: [{ parts: [{ text: safeText }] }],
       config: {
         responseModalities: ['AUDIO' as any],
         speechConfig: {

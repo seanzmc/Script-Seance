@@ -140,13 +140,18 @@ export const generateScriptElement = async (
   return response.text?.trim() || "";
 };
 
-export const generateSurpriseSetup = async (): Promise<{ genre: string; premise: string; characters: string[] }> => {
+export const generateSurpriseSetup = async (targetGenre?: string): Promise<{ genre: string; premise: string; characters: string[] }> => {
   const ai = getAiClient();
+  
+  const genreInstruction = targetGenre 
+    ? `The genre MUST be "${targetGenre}".` 
+    : `Pick a genre from this list if suitable: ${GENRES.join(', ')}, otherwise choose a fitting one.`;
+
   const prompt = `
     Generate a creative, unique, and interesting movie premise. 
-    Pick a genre from this list if suitable: ${GENRES.join(', ')}, otherwise choose a fitting one.
+    ${genreInstruction}
     Return a JSON object with: 
-    'genre' (string), 
+    'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''}, 
     'premise' (string, 1-2 sentences), 
     'characters' (array of 3 character names with brief role description, e.g. "John (The Detective)").
   `;

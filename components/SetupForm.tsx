@@ -27,17 +27,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
   const handleSurpriseMe = async () => {
     setIsSurprising(true);
     try {
-      const data = await generateSurpriseSetup();
+      const data = await generateSurpriseSetup(genre);
       setGenre(data.genre);
       setPremise(data.premise);
       setCharacters(data.characters);
     } catch (e) {
       console.error("Surprise generation failed", e);
       // Fallback
-      const randomGenres = GENRES;
-      setGenre(randomGenres[Math.floor(Math.random() * randomGenres.length)]);
-      setPremise("A mysterious event forces two unlikely allies to work together to save their world from imminent destruction.");
-      setCharacters(["The Skeptic", "The Believer", "The AI"]);
+      setPremise(`A gripping ${genre} story with unexpected twists.`);
+      setCharacters(["Protagonist", "Antagonist", "The Catalyst"]);
     } finally {
       setIsSurprising(false);
     }

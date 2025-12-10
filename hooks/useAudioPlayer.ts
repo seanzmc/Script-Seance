@@ -4,6 +4,7 @@ import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
 
 export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [currentBlockId, setCurrentBlockId] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
@@ -44,6 +45,7 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
 
   const stop = useCallback(() => {
     setIsPlaying(false);
+    setIsPreviewPlaying(false);
     isPlayingRef.current = false;
     setCurrentBlockId(null);
     setIsLoadingAudio(false);
@@ -171,11 +173,15 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
   const playPreview = async (text: string, config: VoiceConfig) => {
     stop();
     setIsLoadingAudio(true);
+    // Note: isPreviewPlaying remains false during loading phase
     
     try {
       // Use engine for preview to benefit from caching
       const buffer = await engineRef.current?.generateSingle(text, config.voiceId);
-      if (!buffer) return;
+      if (!buffer) {
+         setIsLoadingAudio(false);
+         return;
+      }
 
       const ctx = getContext();
       const audioBuffer = await decodePCM(buffer, ctx);
@@ -190,19 +196,23 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
       
       source.onended = () => {
         setIsLoadingAudio(false);
+        setIsPreviewPlaying(false);
         activeSourceRef.current = null;
       };
       
+      setIsLoadingAudio(false);
+      setIsPreviewPlaying(true);
       source.start();
     } catch(e) {
       console.error(e);
-    } finally {
       setIsLoadingAudio(false);
+      setIsPreviewPlaying(false);
     }
   };
 
   return {
     isPlaying,
+    isPreviewPlaying,
     currentBlockId,
     isLoadingAudio,
     playScript,

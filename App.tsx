@@ -23,7 +23,8 @@ export default function App() {
 
   // Custom Hooks
   const { 
-    isPlaying, 
+    isPlaying,
+    isPreviewPlaying, // Added
     currentBlockId, 
     isLoadingAudio, 
     playScript, 
@@ -225,6 +226,22 @@ export default function App() {
     a.click();
   };
 
+  // Helper to find a sample line for the character to pre-cache it
+  const getPreviewText = (charName: string): string => {
+    if (!context) return "I am a ghost in the machine.";
+    
+    for (const scene of context.scenes) {
+      for (const block of scene.blocks) {
+        if (block.type === BlockType.DIALOGUE && 
+            block.character?.toLowerCase().trim() === charName.toLowerCase().trim()) {
+          // Return valid text or fallback if empty
+          return block.text || "I am speechless.";
+        }
+      }
+    }
+    return `I am ${charName}, ready for my closeup.`;
+  };
+
   if (!context) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
@@ -259,7 +276,7 @@ export default function App() {
         <div className="bg-gray-700/50 p-4 rounded-lg space-y-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-200">Playback</span>
-            {isLoadingAudio && <span className="text-xs text-indigo-300 animate-pulse">Buffering...</span>}
+            {isLoadingAudio && !isPlaying && <span className="text-xs text-indigo-300 animate-pulse">Buffering...</span>}
           </div>
           <div className="flex gap-2">
             {!isPlaying ? (
@@ -294,7 +311,10 @@ export default function App() {
                characters={context.characters} 
                voiceConfigs={voiceConfigs} 
                onUpdateConfig={updateVoiceConfig} 
-               onPreview={(config) => playPreview("I am a ghost in the machine.", config)}
+               onPreview={(config) => playPreview(getPreviewText(config.name), config)}
+               onStop={stop}
+               isAudioPlaying={isPreviewPlaying}
+               isLoading={isLoadingAudio && !isPlaying} // Only show loading if not playing main script (though isPlaying check in useAudioPlayer handles this separation usually, explicit is safe)
              />
            )}
         </div>
