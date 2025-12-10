@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { GENRES, AVAILABLE_VOICES } from '../types';
 import { Button } from './Button';
-import { Sparkles, Users, BookOpen } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Plus } from 'lucide-react';
 import { generateSurpriseSetup } from '../services/gemini';
 
 interface SetupFormProps {
@@ -14,6 +14,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
   const [premise, setPremise] = useState('');
   const [characters, setCharacters] = useState(['Hero', 'Villain']);
   const [isSurprising, setIsSurprising] = useState(false);
+  
+  // Refs for managing focus on new inputs
+  const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (focusIndex !== null && characterInputs.current[focusIndex]) {
+      characterInputs.current[focusIndex]?.focus();
+      characterInputs.current[focusIndex]?.select();
+      setFocusIndex(null);
+    }
+  }, [characters, focusIndex]);
 
   const handleCharacterChange = (index: number, value: string) => {
     const newChars = [...characters];
@@ -21,7 +33,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
     setCharacters(newChars);
   };
 
-  const addCharacter = () => setCharacters([...characters, 'New Character']);
+  const addCharacter = () => {
+    setCharacters([...characters, 'New Character']);
+    setFocusIndex(characters.length);
+  };
+  
   const removeCharacter = (index: number) => setCharacters(characters.filter((_, i) => i !== index));
 
   const handleSurpriseMe = async () => {
@@ -86,14 +102,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
 
         {/* Characters */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-2"><Users className="w-4 h-4" /> Characters</span>
-            <button onClick={addCharacter} className="text-xs text-indigo-400 hover:text-indigo-300">+ Add</button>
+          <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+            <Users className="w-4 h-4" /> Characters
           </label>
           <div className="space-y-2">
             {characters.map((char, idx) => (
               <div key={idx} className="flex gap-2">
                 <input
+                  ref={(el) => { characterInputs.current[idx] = el; }}
                   value={char}
                   onChange={(e) => handleCharacterChange(idx, e.target.value)}
                   className="flex-1 bg-gray-800 border-gray-700 rounded-lg p-2 text-white text-sm"
@@ -103,6 +119,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
                   <button 
                     onClick={() => removeCharacter(idx)}
                     className="text-red-400 hover:text-red-300 px-2"
+                    tabIndex={-1}
+                    aria-label="Remove character"
                   >
                     ×
                   </button>
@@ -110,6 +128,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
               </div>
             ))}
           </div>
+          <button 
+            type="button"
+            onClick={addCharacter} 
+            className="mt-3 w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-400 hover:text-indigo-400 hover:border-indigo-500/50 text-sm transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+          >
+            <Plus className="w-4 h-4" /> Add Character
+          </button>
         </div>
 
         {/* Actions */}
