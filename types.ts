@@ -1,3 +1,4 @@
+
 export enum BlockType {
   HEADING = 'heading',
   ACTION = 'action',
@@ -36,11 +37,16 @@ export interface VoiceConfig {
 }
 
 export const AVAILABLE_VOICES = [
-  'Puck',
-  'Charon',
+  'Aoede',
+  'Callirrhoe',
   'Kore',
+  'Sulafat',
+  'Zephyr',
+  'Charon',
   'Fenrir',
-  'Zephyr'
+  'Puck',
+  'Rasalgethi',
+  'Umbriel'
 ];
 
 export const GENRES = [

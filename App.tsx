@@ -4,6 +4,7 @@ import { ScriptDisplay } from './components/ScriptDisplay';
 import { VoiceManager } from './components/VoiceManager';
 import { ScriptEditor } from './components/ScriptEditor';
 import { Button } from './components/Button';
+import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { generateScene, suggestPlotTwist } from './services/gemini';
 import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
@@ -17,6 +18,10 @@ export default function App() {
   const [userInstruction, setUserInstruction] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showVoicePanel, setShowVoicePanel] = useState(false);
+  
+  // Casting Modal State
+  const [castingCharacter, setCastingCharacter] = useState<string | null>(null);
+  const [previewVoiceId, setPreviewVoiceId] = useState<string | null>(null);
 
   // Refs
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -24,13 +29,20 @@ export default function App() {
   // Custom Hooks
   const { 
     isPlaying,
-    isPreviewPlaying, // Added
+    isPreviewPlaying, 
     currentBlockId, 
     isLoadingAudio, 
     playScript, 
     playPreview, 
     stop 
   } = useAudioPlayer(voiceConfigs);
+
+  // Clear preview state when playback ends
+  useEffect(() => {
+    if (!isPreviewPlaying && !isLoadingAudio) {
+      setPreviewVoiceId(null);
+    }
+  }, [isPreviewPlaying, isLoadingAudio]);
 
   // Initialize Voices when characters change
   useEffect(() => {
@@ -189,7 +201,6 @@ export default function App() {
 
   const handlePlay = () => {
     if (!context) return;
-    // Flatten all blocks from all scenes
     const allBlocks: ScriptBlock[] = context.scenes.flatMap(s => s.blocks);
     playScript(allBlocks);
   };
@@ -220,26 +231,42 @@ export default function App() {
     const a = document.createElement('a');
     a.href = url;
     
-    // requested filename untitled_script if confirmed but generic
     const sanitizedTitle = isUntitled ? 'untitled_script' : context.title.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
     a.download = `${sanitizedTitle}.txt`;
     a.click();
   };
 
-  // Helper to find a sample line for the character to pre-cache it
   const getPreviewText = (charName: string): string => {
     if (!context) return "I am a ghost in the machine.";
-    
     for (const scene of context.scenes) {
       for (const block of scene.blocks) {
         if (block.type === BlockType.DIALOGUE && 
             block.character?.toLowerCase().trim() === charName.toLowerCase().trim()) {
-          // Return valid text or fallback if empty
           return block.text || "I am speechless.";
         }
       }
     }
     return `I am ${charName}, ready for my closeup.`;
+  };
+
+  const handleModalPreview = async (voiceId: string) => {
+    if (!castingCharacter) return;
+    
+    if (isPreviewPlaying && previewVoiceId === voiceId) {
+      stop();
+      return;
+    }
+    
+    setPreviewVoiceId(voiceId);
+    const text = getPreviewText(castingCharacter);
+    // Use default pitch/speed for casting previews to hear raw voice
+    const config: VoiceConfig = { 
+      name: castingCharacter, 
+      voiceId, 
+      speed: 1, 
+      pitch: 0 
+    };
+    await playPreview(text, config);
   };
 
   if (!context) {
@@ -256,10 +283,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col md:flex-row relative">
       
       {/* Left Sidebar: Controls */}
-      <div className="w-full md:w-80 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-6 overflow-y-auto h-screen sticky top-0">
+      <div className="w-full md:w-80 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-6 overflow-y-auto h-screen sticky top-0 z-40">
         <div className="space-y-2">
           <label className="text-[10px] uppercase font-bold text-gray-500 block tracking-widest">Script Title</label>
           <input
@@ -291,7 +318,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Script Editor (Granular Control) */}
+        {/* Script Editor */}
         <ScriptEditor 
           characters={context.characters}
           genre={context.genre}
@@ -300,7 +327,7 @@ export default function App() {
           disabled={isPlaying || isGenerating}
         />
 
-        {/* Voice Manager Toggle */}
+        {/* Voice Manager */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
            <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setShowVoicePanel(!showVoicePanel)}>
              <span className="text-sm font-medium">Character Voices</span>
@@ -310,16 +337,17 @@ export default function App() {
              <VoiceManager 
                characters={context.characters} 
                voiceConfigs={voiceConfigs} 
-               onUpdateConfig={updateVoiceConfig} 
+               onUpdateConfig={updateVoiceConfig}
+               onOpenCasting={setCastingCharacter}
                onPreview={(config) => playPreview(getPreviewText(config.name), config)}
                onStop={stop}
-               isAudioPlaying={isPreviewPlaying}
-               isLoading={isLoadingAudio && !isPlaying} // Only show loading if not playing main script (though isPlaying check in useAudioPlayer handles this separation usually, explicit is safe)
+               isAudioPlaying={isPreviewPlaying && !castingCharacter} // Only indicate playing in manager if NOT casting (approximate)
+               isLoading={isLoadingAudio && !isPlaying && !castingCharacter} 
              />
            )}
         </div>
 
-        {/* Next Scene Generator */}
+        {/* Generator */}
         <div className="bg-gray-700/50 p-4 rounded-lg flex-1 flex flex-col">
           <label className="text-sm font-medium mb-2 block">What happens next?</label>
           <textarea
@@ -366,6 +394,27 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* Voice Casting Modal - Rendered at root to escape sidebar clipping/stacking */}
+      {castingCharacter && (
+        <VoiceCastingModal 
+          isOpen={true}
+          onClose={() => {
+            stop(); // Stop any preview when closing
+            setCastingCharacter(null);
+          }}
+          characterName={castingCharacter}
+          currentVoiceId={voiceConfigs.find(c => c.name === castingCharacter)?.voiceId || AVAILABLE_VOICES[0]}
+          onSelect={(voiceId) => {
+             updateVoiceConfig(castingCharacter, { voiceId });
+             stop();
+             setCastingCharacter(null);
+          }}
+          onPreview={handleModalPreview}
+          isPreviewing={isPreviewPlaying || isLoadingAudio}
+          previewVoiceId={previewVoiceId}
+        />
+      )}
     </div>
   );
 }

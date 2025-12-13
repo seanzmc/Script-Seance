@@ -19,6 +19,12 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isPlayingRef = useRef(false); // Sync ref for callbacks
 
+  // Store latest configs in ref for real-time access during playback loop
+  const voiceConfigsRef = useRef(voiceConfigs);
+  useEffect(() => {
+    voiceConfigsRef.current = voiceConfigs;
+  }, [voiceConfigs]);
+
   // Initialize Engine Singleton for this hook instance
   if (!engineRef.current) {
     engineRef.current = new ScriptEngine();
@@ -99,9 +105,22 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       
-      // Apply client-side modifiers
-      source.playbackRate.value = chunk.speed;
-      source.detune.value = chunk.pitch * 100;
+      // Look up live client-side modifiers (Speed/Pitch)
+      // This allows sliders to affect ongoing playback without restarting
+      let charName = block.character;
+      if (!charName || block.type !== BlockType.DIALOGUE) {
+          charName = 'Narrator';
+      }
+
+      // Case-insensitive match for config
+      const config = voiceConfigsRef.current.find(c => c.name.toLowerCase().trim() === charName?.toLowerCase().trim()) 
+                  || voiceConfigsRef.current.find(c => c.name === 'Narrator');
+
+      const speed = config?.speed ?? chunk.speed; // Fallback to chunk's speed if config missing (unlikely)
+      const pitch = config?.pitch ?? chunk.pitch;
+
+      source.playbackRate.value = speed;
+      source.detune.value = pitch * 100;
       
       source.connect(ctx.destination);
       activeSourceRef.current = source;

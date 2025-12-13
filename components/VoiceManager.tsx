@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { VoiceConfig, AVAILABLE_VOICES } from '../types';
-import { Mic, Volume2, Loader, Square, CheckCircle2 } from 'lucide-react';
+import { Mic, Volume2, Loader, Square, CheckCircle2, Settings2 } from 'lucide-react';
 
 interface VoiceManagerProps {
   characters: string[];
   voiceConfigs: VoiceConfig[];
   onUpdateConfig: (character: string, updates: Partial<VoiceConfig>) => void;
+  onOpenCasting: (character: string) => void;
   onPreview: (config: VoiceConfig) => Promise<void>;
   onStop: () => void;
   isAudioPlaying: boolean;
@@ -16,12 +17,13 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   characters, 
   voiceConfigs, 
   onUpdateConfig,
+  onOpenCasting,
   onPreview,
   onStop,
   isAudioPlaying,
   isLoading
 }) => {
-  const [activeChar, setActiveChar] = useState<string | null>(null);
+  const [activeChar, setActiveChar] = useState<string | null>(null); // For previewing
   const [showSaved, setShowSaved] = useState(false);
 
   // Clear active char when playback stops
@@ -65,19 +67,24 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
     return (
       <div key={char} className={`bg-gray-800 rounded-lg p-3 border transition-colors ${isActive ? 'border-indigo-500 ring-1 ring-indigo-500/20' : 'border-gray-700'}`}>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm text-white font-medium truncate max-w-[100px]" title={char}>
-            {char}
-          </span>
+          <div className="flex items-center gap-2 overflow-hidden">
+            <span className="text-sm text-white font-medium truncate max-w-[100px]" title={char}>
+              {char}
+            </span>
+          </div>
+
           <div className="flex items-center gap-2">
-            <select
-              value={config.voiceId}
-              onChange={(e) => onUpdateConfig(char, { voiceId: e.target.value })}
-              className="bg-gray-900 border border-gray-600 text-gray-200 text-xs rounded px-2 py-1 focus:ring-1 focus:ring-indigo-500 min-w-[80px]"
+            {/* Voice Selection Trigger */}
+            <button
+              onClick={() => onOpenCasting(char)}
+              className="flex items-center gap-2 bg-gray-900 border border-gray-600 hover:border-indigo-500 text-gray-200 text-xs rounded px-3 py-1.5 transition-colors group"
+              title="Change Voice"
             >
-              {AVAILABLE_VOICES.map(v => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
+              <span className="group-hover:text-white transition-colors">{config.voiceId}</span>
+              <Settings2 className="w-3 h-3 text-gray-500 group-hover:text-indigo-400" />
+            </button>
+
+            {/* Quick Preview Button */}
             <button
               onClick={() => handlePreview(char, config)}
               className={`p-1.5 rounded-md transition-colors ${
@@ -85,7 +92,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
                   ? 'text-white bg-red-600 hover:bg-red-700' 
                   : 'text-indigo-400 hover:bg-gray-700'
               }`}
-              title={isThisPlaying ? "Stop Preview" : "Preview Voice"}
+              title={isThisPlaying ? "Stop Preview" : "Preview Current Voice"}
             >
               {isThisLoading ? (
                 <Loader className="w-4 h-4 animate-spin" />
@@ -108,7 +115,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             <input
               type="range"
               min="0.5"
-              max="2.0"
+              max="1.5"
               step="0.1"
               value={config.speed || 1}
               onChange={(e) => onUpdateConfig(char, { speed: parseFloat(e.target.value) })}
@@ -124,8 +131,8 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             </div>
             <input
               type="range"
-              min="-12"
-              max="12"
+              min="-5"
+              max="5"
               step="1"
               value={config.pitch || 0}
               onChange={(e) => onUpdateConfig(char, { pitch: parseFloat(e.target.value) })}
@@ -138,42 +145,44 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   };
 
   return (
-    <div className="space-y-3 relative">
-      <div className="flex items-center justify-between mb-4">
-         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-           <Mic className="w-4 h-4" />
-           Voice Casting
-         </h3>
-         {showSaved && (
-           <span className="text-xs text-emerald-400 flex items-center animate-fade-in-out">
-             <CheckCircle2 className="w-3 h-3 mr-1" />
-             Saved
-           </span>
-         )}
-      </div>
-
-      {/* Sticky Status Bar */}
-      {(isLoading || isAudioPlaying) && activeChar && (
-        <div className="sticky top-0 z-20 -mx-4 -mt-3 mb-3 bg-indigo-900/95 backdrop-blur-sm border-y border-indigo-500/30 p-2 flex items-center justify-between shadow-lg">
-           <div className="flex items-center gap-2 px-2">
-             {isLoading ? <Loader className="w-3 h-3 animate-spin text-indigo-300" /> : <Volume2 className="w-3 h-3 text-emerald-400" />}
-             <span className="text-xs font-medium text-white">
-               {isLoading ? `Generating ${activeChar}...` : `Playing ${activeChar}...`}
+    <>
+      <div className="space-y-3 relative">
+        <div className="flex items-center justify-between mb-4">
+           <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+             <Mic className="w-4 h-4" />
+             Voice Casting
+           </h3>
+           {showSaved && (
+             <span className="text-xs text-emerald-400 flex items-center animate-fade-in-out">
+               <CheckCircle2 className="w-3 h-3 mr-1" />
+               Saved
              </span>
-           </div>
-           <button 
-             onClick={onStop}
-             className="text-[10px] bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded uppercase font-bold tracking-wider mr-2"
-           >
-             Stop
-           </button>
+           )}
         </div>
-      )}
 
-      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-        {renderControlRow('Narrator')}
-        {characters.map(char => renderControlRow(char))}
+        {/* Sticky Status Bar */}
+        {(isLoading || isAudioPlaying) && activeChar && (
+          <div className="sticky top-0 z-20 -mx-4 -mt-3 mb-3 bg-indigo-900/95 backdrop-blur-sm border-y border-indigo-500/30 p-2 flex items-center justify-between shadow-lg">
+             <div className="flex items-center gap-2 px-2">
+               {isLoading ? <Loader className="w-3 h-3 animate-spin text-indigo-300" /> : <Volume2 className="w-3 h-3 text-emerald-400" />}
+               <span className="text-xs font-medium text-white">
+                 {isLoading ? `Generating ${activeChar}...` : `Playing ${activeChar}...`}
+               </span>
+             </div>
+             <button 
+               onClick={onStop}
+               className="text-[10px] bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded uppercase font-bold tracking-wider mr-2"
+             >
+               Stop
+             </button>
+          </div>
+        )}
+
+        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+          {renderControlRow('Narrator')}
+          {characters.map(char => renderControlRow(char))}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
