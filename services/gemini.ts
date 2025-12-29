@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Scene, StoryContext, BlockType, GENRES } from '../types';
+import { Scene, StoryContext, BlockType, GENRES, ScriptBlock } from '../types';
 
 const getAiClient = () => {
   let apiKey: string | undefined;
@@ -138,6 +138,38 @@ export const generateScriptElement = async (
   });
 
   return response.text?.trim() || "";
+};
+
+export const regenerateScriptBlock = async (
+  block: ScriptBlock,
+  genre: string,
+  premise: string
+): Promise<string> => {
+  const ai = getAiClient();
+
+  let prompt = '';
+  if (block.type === BlockType.DIALOGUE) {
+    prompt = `Rewrite this dialogue line for ${block.character} to be more impactful, witty, or dramatic, fitting the genre "${genre}". 
+    Premise: ${premise}.
+    Original line: "${block.text}".
+    Output ONLY the new dialogue text.`;
+  } else {
+    prompt = `Rewrite this screenplay ${block.type} block to be more descriptive and engaging. 
+    Genre: ${genre}.
+    Original text: "${block.text}".
+    Output ONLY the new text.`;
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-lite',
+    contents: prompt,
+    config: {
+      maxOutputTokens: 150,
+      temperature: 0.8,
+    }
+  });
+
+  return response.text?.trim() || block.text;
 };
 
 export const generateSurpriseSetup = async (targetGenre?: string): Promise<{ genre: string; premise: string; characters: string[] }> => {

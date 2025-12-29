@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GENRES, AVAILABLE_VOICES } from '../types';
+import { GENRES } from '../types';
 import { Button } from './Button';
-import { Sparkles, Users, BookOpen, Plus } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Plus, Trash2 } from 'lucide-react';
 import { generateSurpriseSetup } from '../services/gemini';
 
 interface SetupFormProps {
@@ -9,11 +9,21 @@ interface SetupFormProps {
   isLoading: boolean;
 }
 
+const STARTER_IDEAS = [
+  "Two rivals are forced to work together",
+  "A secret threatens to unravel everything",
+  "A normal day goes very wrong"
+];
+
 export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
   const [genre, setGenre] = useState(GENRES[0]);
   const [premise, setPremise] = useState('');
   const [characters, setCharacters] = useState(['Hero', 'Villain']);
+  
+  // Surprise State
   const [isSurprising, setIsSurprising] = useState(false);
+  const [lastSurprisedGenre, setLastSurprisedGenre] = useState<string | null>(null);
+  const [justSurprised, setJustSurprised] = useState(false);
   
   // Refs for managing focus on new inputs
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -42,24 +52,41 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
 
   const handleSurpriseMe = async () => {
     setIsSurprising(true);
+    const targetGenre = genre; // Capture current genre
+
     try {
-      const data = await generateSurpriseSetup(genre);
+      const data = await generateSurpriseSetup(targetGenre);
+      
+      // Update form directly (non-blocking)
       setGenre(data.genre);
       setPremise(data.premise);
       setCharacters(data.characters);
+      setLastSurprisedGenre(targetGenre);
+      
+      // Trigger visual feedback
+      setJustSurprised(true);
+      setTimeout(() => setJustSurprised(false), 1500);
+      
     } catch (e) {
       console.error("Surprise generation failed", e);
       // Fallback
-      setPremise(`A gripping ${genre} story with unexpected twists.`);
+      setPremise(`A gripping ${targetGenre} story with unexpected twists.`);
       setCharacters(["Protagonist", "Antagonist", "The Catalyst"]);
+      setLastSurprisedGenre(targetGenre);
+      
+      setJustSurprised(true);
+      setTimeout(() => setJustSurprised(false), 1500);
     } finally {
       setIsSurprising(false);
     }
   };
 
+  const genreChanged = lastSurprisedGenre && lastSurprisedGenre !== genre;
+
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl border border-gray-800 shadow-2xl">
-      <div className="text-center mb-8">
+    <div className="max-w-2xl mx-auto p-8 bg-gray-900 rounded-xl border border-gray-800 shadow-2xl relative overflow-hidden">
+      
+      <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
           <BookOpen className="w-8 h-8 text-indigo-500" />
           Script Seance
@@ -67,20 +94,23 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
         <p className="text-gray-400">Generate interactive screenplays with AI voice acting</p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-10">
         {/* Genre Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Genre</label>
+          <div className="mb-3">
+            <label className="block text-base font-semibold text-gray-200 mb-1">Genre</label>
+            <p className="text-xs text-gray-500">Sets the tone for the AI writer and performers.</p>
+          </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {GENRES.map((g) => (
               <button
                 key={g}
                 type="button"
                 onClick={() => setGenre(g)}
-                className={`px-3 py-2 text-sm rounded-lg transition-all ${
+                className={`px-3 py-2 text-xs font-medium rounded-md transition-all border ${
                   genre === g 
-                    ? 'bg-indigo-600 text-white ring-2 ring-indigo-400' 
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm' 
+                    : 'bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600'
                 }`}
               >
                 {g}
@@ -91,38 +121,65 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
 
         {/* Premise */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Premise</label>
+          <div className="mb-3">
+            <label className="block text-base font-semibold text-gray-200 mb-1">Premise</label>
+            <p className="text-xs text-gray-500">The core conflict or situation that kicks off the story.</p>
+          </div>
           <textarea
             value={premise}
             onChange={(e) => setPremise(e.target.value)}
-            className="w-full h-24 bg-gray-800 border-gray-700 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className={`w-full h-24 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-700 ${
+              justSurprised 
+                ? 'bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]' 
+                : 'bg-gray-800 border-gray-700'
+            }`}
             placeholder="e.g., A detective discovers his new partner is a ghost..."
           />
+          <div className="flex flex-wrap gap-2 mt-3">
+            {STARTER_IDEAS.map((idea) => (
+              <button
+                key={idea}
+                type="button"
+                onClick={() => setPremise(idea)}
+                className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500/30 rounded-full px-3 py-1 transition-all"
+              >
+                {idea}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Characters */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-            <Users className="w-4 h-4" /> Characters
-          </label>
-          <div className="space-y-2">
+          <div className="mb-3">
+            <label className="block text-base font-semibold text-gray-200 mb-1 flex items-center gap-2">
+              <Users className="w-4 h-4 text-indigo-400" /> Characters
+            </label>
+            <p className="text-xs text-gray-500">Define who is in the scene (add, remove, or rename anytime).</p>
+          </div>
+          <div className="space-y-3">
             {characters.map((char, idx) => (
-              <div key={idx} className="flex gap-2">
+              <div key={idx} className="relative group">
                 <input
                   ref={(el) => { characterInputs.current[idx] = el; }}
                   value={char}
                   onChange={(e) => handleCharacterChange(idx, e.target.value)}
-                  className="flex-1 bg-gray-800 border-gray-700 rounded-lg p-2 text-white text-sm"
+                  className={`w-full rounded-lg p-3 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
+                    justSurprised
+                      ? 'bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50' 
+                      : 'bg-gray-800 border-gray-700'
+                  }`}
                   placeholder={`Character ${idx + 1}`}
                 />
                 {characters.length > 1 && (
                   <button 
                     onClick={() => removeCharacter(idx)}
-                    className="text-red-400 hover:text-red-300 px-2"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
                     tabIndex={-1}
                     aria-label="Remove character"
+                    title="Remove character"
                   >
-                    ×
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -131,34 +188,58 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
           <button 
             type="button"
             onClick={addCharacter} 
-            className="mt-3 w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-400 hover:text-indigo-400 hover:border-indigo-500/50 text-sm transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+            className="mt-3 w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-xs font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
           >
-            <Plus className="w-4 h-4" /> Add Character
+            <Plus className="w-3.5 h-3.5" /> Add Character
           </button>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t border-gray-800">
-          <Button 
-            variant="secondary" 
-            onClick={handleSurpriseMe} 
-            className="flex-1"
-            type="button"
-            loading={isSurprising}
-            disabled={isLoading || isSurprising}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Surprise Me
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => onStart({ genre, premise, characters })}
-            className="flex-[2]"
-            loading={isLoading}
-            disabled={!premise.trim() || isLoading || isSurprising}
-          >
-            Start Writing
-          </Button>
+        <div className="flex flex-col gap-6 pt-8 border-t border-gray-800">
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            <div className="flex-1 w-full space-y-2">
+              <Button 
+                variant="secondary" 
+                onClick={handleSurpriseMe} 
+                className="w-full !bg-gray-800 !border-gray-700/50 border !text-gray-400 hover:!bg-gray-700 hover:!text-gray-200 transition-colors"
+                type="button"
+                loading={isSurprising}
+                disabled={isLoading || isSurprising}
+              >
+                <Sparkles className="w-4 h-4 mr-2 opacity-75" />
+                Surprise Me
+              </Button>
+              
+              <div className="text-[11px] leading-relaxed px-1 text-left flex flex-col gap-1">
+                <span className="text-gray-500">
+                  Fills in a random premise and starter characters.
+                </span>
+                
+                {genreChanged ? (
+                   <span className="text-indigo-400 font-medium animate-pulse">
+                     Genre changed — click Surprise Me to generate a new idea for {genre}.
+                   </span>
+                ) : (
+                   <span className="text-gray-600">
+                     Based on: <strong className="text-gray-400">{genre}</strong>
+                   </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex-[1.5] w-full">
+              <Button 
+                variant="primary" 
+                onClick={() => onStart({ genre, premise, characters })}
+                className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all transform hover:-translate-y-0.5"
+                loading={isLoading}
+                size="lg"
+                disabled={!premise.trim() || isLoading || isSurprising}
+              >
+                Start Writing
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

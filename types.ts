@@ -12,6 +12,7 @@ export interface ScriptBlock {
   text: string;
   character?: string;
   parenthetical?: string;
+  locked?: boolean;
 }
 
 export interface Scene {

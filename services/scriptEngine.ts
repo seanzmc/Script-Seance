@@ -26,7 +26,7 @@ export class ScriptEngine {
   private client: GoogleGenAI;
   private queue: QueueItem[] = [];
   private activeRequests = 0;
-  private concurrencyLimit = 3; // Process 3 lines ahead in parallel
+  private concurrencyLimit = 1; // Reduced to 1 to avoid hitting strict rate limits (10 RPM)
   private isRunning = false;
   private listeners: Map<string, EventHandler[]> = new Map();
 
@@ -164,7 +164,7 @@ export class ScriptEngine {
 
   // --- Gemini Integration & Caching ---
 
-  private async fetchAudio(text: string, voiceId: string): Promise<ArrayBuffer> {
+  private async fetchAudio(text: string, voiceId: string, retryCount = 0): Promise<ArrayBuffer> {
     const safeText = text.trim();
     // Cache Key: VoiceID + Text. 
     // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
@@ -174,33 +174,61 @@ export class ScriptEngine {
       return AudioCache.get(cacheKey)!;
     }
 
-    const response = await this.client.models.generateContent({
-      model: 'gemini-2.5-flash-preview-tts',
-      contents: [{ parts: [{ text: safeText }] }],
-      config: {
-        responseModalities: ['AUDIO' as any],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceId }
+    try {
+      const response = await this.client.models.generateContent({
+        model: 'gemini-2.5-flash-preview-tts',
+        contents: [{ parts: [{ text: safeText }] }],
+        config: {
+          responseModalities: ['AUDIO' as any],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voiceId }
+            }
           }
         }
+      });
+
+      const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!base64) throw new Error("No audio returned from Gemini");
+
+      // Decode Base64 to ArrayBuffer (Raw PCM)
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
-    });
+      const buffer = bytes.buffer;
+      
+      // Write to Cache
+      AudioCache.set(cacheKey, buffer);
+      return buffer;
+    } catch (e: any) {
+       // Handle Rate Limiting (429)
+       const isRateLimit = e.message?.includes('429') || e.status === 429 || e.code === 429 || e.message?.includes('RESOURCE_EXHAUSTED');
+       
+       if (isRateLimit && retryCount < 4) {
+         let delayMs = 3000 * Math.pow(2, retryCount); // Default: 3s, 6s, 12s, 24s
+         
+         // Extract specific retry delay if available from message "Please retry in X s."
+         const match = e.message?.match(/retry in ([\d\.]+)s/);
+         if (match && match[1]) {
+            delayMs = Math.ceil(parseFloat(match[1]) * 1000) + 1000; // +1s buffer
+         }
+ 
+         console.warn(`[ScriptEngine] Rate limit hit. Retrying in ${delayMs}ms... (Attempt ${retryCount + 1})`);
+         
+         await new Promise(resolve => setTimeout(resolve, delayMs));
+         
+         // If we are stopping, abort retries to prevent zombie requests
+         if (!this.isRunning && retryCount === 0) {
+            throw new Error("Engine stopped during retry backoff");
+         }
 
-    const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64) throw new Error("No audio returned from Gemini");
-
-    // Decode Base64 to ArrayBuffer (Raw PCM)
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+         return this.fetchAudio(text, voiceId, retryCount + 1);
+       }
+       
+       throw e;
     }
-    const buffer = bytes.buffer;
-    
-    // Write to Cache
-    AudioCache.set(cacheKey, buffer);
-    return buffer;
   }
 }
