@@ -127,6 +127,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
               Genre
             </label>
             <div className="flex items-center">
+              <span className="text-xs text-slate-400 mr-3 hidden sm:inline-block">
+                Generate a {genre} premise + characters
+              </span>
               <Button
                 variant="secondary"
                 onClick={handleSurpriseMe}
@@ -140,11 +143,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
                 <Shuffle className="w-3.5 h-3.5 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
                 Magic Shuffle
               </Button>
-              {justSurprised && (
-                <span className="ml-4 text-xs text-indigo-400 font-medium animate-pulse">
-                  New idea for {genre}
-                </span>
-              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
