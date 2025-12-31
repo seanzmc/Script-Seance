@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Script Seance
 
-# Run and deploy your AI Studio app
+Script Seance is an AI-powered screenwriting and storytelling assistant designed to help writers generate scenes, dialogue, and plot twists using Google's Gemini AI.
 
-This contains everything you need to run your app locally.
+## Tech Stack
 
-View your app in AI Studio: https://ai.studio/apps/drive/1cz585xg-Q9lb5YStDn-ndrAjUoxkQ372
+- **Framework**: [React 19](https://react.dev/)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **AI Integration**: [Google GenAI SDK](https://www.npmjs.com/package/@google/genai)
+- **Icons**: [Lucide React](https://lucide.dev/)
 
-## Run Locally
+## Configuration & Secrets
 
-**Prerequisites:**  Node.js
+To run this application, you need to configure your environment variables for the Google Gemini API.
 
+1.  Create a file named `.env` in the root directory of the project.
+2.  Add the following variable to the file:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```env
+GEMINI_API_KEY=your_google_ai_studio_api_key_here
+```
+
+> **Note**: The application internally maps `GEMINI_API_KEY` to `process.env.API_KEY` via Vite configuration. Ensure you use the exact key name `GEMINI_API_KEY` in your `.env` file.
+
+## Installation & Run Instructions
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (Latest LTS recommended)
+
+### Installation
+
+Install the dependencies:
+
+```bash
+npm install
+```
+
+### Running the App
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The application will typically start at `http://localhost:3000`.
