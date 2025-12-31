@@ -158,7 +158,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         </div>
       </div>
 
-      <div className="font-screenplay bg-[#f0f0f0] text-black p-8 md:p-16 min-h-[600px] shadow-lg max-w-4xl mx-auto rounded-sm relative overflow-hidden">
+      <div className="font-screenplay bg-[#f0f0f0] text-black p-8 md:p-16 min-h-[600px] shadow-2xl max-w-4xl mx-auto rounded-sm relative overflow-hidden">
         {/* Paper texture/look */}
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"></div>
         

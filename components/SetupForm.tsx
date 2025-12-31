@@ -141,7 +141,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
                 key={idea}
                 type="button"
                 onClick={() => setPremise(idea)}
-                className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500/30 rounded-full px-3 py-1 transition-all"
+                className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer"
               >
                 {idea}
               </button>

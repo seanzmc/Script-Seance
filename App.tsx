@@ -405,7 +405,7 @@ export default function App() {
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-3 px-2 text-xs font-bold uppercase tracking-wider flex flex-col items-center gap-1 transition-all border-b-2 ${
                 activeTab === tab 
-                  ? 'border-indigo-500 text-white bg-indigo-500/5' 
+                  ? 'border-indigo-500 !text-white bg-indigo-500/5' 
                   : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5'
               }`}
             >
@@ -422,7 +422,7 @@ export default function App() {
           
           {/* WRITE TAB */}
           {activeTab === 'write' && (
-            <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="flex flex-col gap-10 animate-in fade-in duration-300">
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">What happens next?</h3>
