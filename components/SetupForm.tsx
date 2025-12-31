@@ -126,19 +126,26 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
             <label className="block text-lg font-semibold text-gray-200">
               Genre
             </label>
-            <Button
-              variant="secondary"
-              onClick={handleSurpriseMe}
-              className="!bg-transparent hover:!bg-slate-800 !border-slate-700 hover:!border-indigo-500 border !text-gray-400 hover:!text-indigo-400 transition-colors text-xs py-1.5 h-auto group"
-              type="button"
-              loading={isSurprising}
-              disabled={isLoading || isSurprising}
-              size="sm"
-              title="Generate a random setup"
-            >
-              <Shuffle className="w-3.5 h-3.5 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
-              Magic Shuffle
-            </Button>
+            <div className="flex items-center">
+              <Button
+                variant="secondary"
+                onClick={handleSurpriseMe}
+                className="!bg-transparent hover:!bg-slate-800 !border-slate-700 hover:!border-indigo-500 border !text-gray-400 hover:!text-indigo-400 transition-colors text-xs py-1.5 h-auto group"
+                type="button"
+                loading={isSurprising}
+                disabled={isLoading || isSurprising}
+                size="sm"
+                title="Randomly generate a genre, premise, and cast"
+              >
+                <Shuffle className="w-3.5 h-3.5 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
+                Magic Shuffle
+              </Button>
+              {justSurprised && (
+                <span className="ml-4 text-xs text-indigo-400 font-medium animate-pulse">
+                  New idea for {genre}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {GENRES.map((g) => (
@@ -169,7 +176,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
               rows={3}
               value={premise}
               onChange={(e) => setPremise(e.target.value)}
-              className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-700 resize-y min-h-[80px] text-sm leading-relaxed ${
+              className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-y min-h-[80px] text-sm leading-relaxed ${
                 justSurprised
                   ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                   : "bg-gray-800 border-gray-700"
