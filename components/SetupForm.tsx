@@ -128,7 +128,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
             </label>
             <div className="flex items-center">
               <span className="text-xs text-slate-400 mr-3 hidden sm:inline-block">
-                Generate a {genre} premise + characters
+                Generate a{" "}
+                <span
+                  key={genre}
+                  className="inline-block font-semibold text-indigo-400 animate-pulse"
+                >
+                  {genre}
+                </span>{" "}
+                premise + characters
               </span>
               <Button
                 variant="secondary"
@@ -249,7 +256,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
         <Button
           variant="primary"
           onClick={() => onStart({ genre, premise, characters })}
-          className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all transform hover:-translate-y-0.5 text-sm font-medium"
+          className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all text-sm font-medium"
           loading={isLoading}
           size="lg"
           disabled={!premise.trim() || isLoading || isSurprising}
