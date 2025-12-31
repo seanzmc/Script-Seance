@@ -1,30 +1,36 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { GENRES } from '../types';
-import { Button } from './Button';
-import { Sparkles, Users, BookOpen, Plus, Trash2 } from 'lucide-react';
-import { generateSurpriseSetup } from '../services/gemini';
+import React, { useState, useRef, useEffect } from "react";
+import { GENRES } from "../types";
+import { Button } from "./Button";
+import { Sparkles, Users, BookOpen, Plus, Trash2 } from "lucide-react";
+import { generateSurpriseSetup } from "../services/gemini";
 
 interface SetupFormProps {
-  onStart: (data: { genre: string; premise: string; characters: string[] }) => void;
+  onStart: (data: {
+    genre: string;
+    premise: string;
+    characters: string[];
+  }) => void;
   isLoading: boolean;
 }
 
 const STARTER_IDEAS = [
   "Two rivals are forced to work together",
   "A secret threatens to unravel everything",
-  "A normal day goes very wrong"
+  "A normal day goes very wrong",
 ];
 
 export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
   const [genre, setGenre] = useState(GENRES[0]);
-  const [premise, setPremise] = useState('');
-  const [characters, setCharacters] = useState(['Hero', 'Villain']);
-  
+  const [premise, setPremise] = useState("");
+  const [characters, setCharacters] = useState(["Hero", "Villain"]);
+
   // Surprise State
   const [isSurprising, setIsSurprising] = useState(false);
-  const [lastSurprisedGenre, setLastSurprisedGenre] = useState<string | null>(null);
+  const [lastSurprisedGenre, setLastSurprisedGenre] = useState<string | null>(
+    null
+  );
   const [justSurprised, setJustSurprised] = useState(false);
-  
+
   // Refs for managing focus on new inputs
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -44,11 +50,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
   };
 
   const addCharacter = () => {
-    setCharacters([...characters, 'New Character']);
+    setCharacters([...characters, "New Character"]);
     setFocusIndex(characters.length);
   };
-  
-  const removeCharacter = (index: number) => setCharacters(characters.filter((_, i) => i !== index));
+
+  const removeCharacter = (index: number) =>
+    setCharacters(characters.filter((_, i) => i !== index));
 
   const handleSurpriseMe = async () => {
     setIsSurprising(true);
@@ -56,24 +63,23 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
 
     try {
       const data = await generateSurpriseSetup(targetGenre);
-      
+
       // Update form directly (non-blocking)
       setGenre(data.genre);
       setPremise(data.premise);
       setCharacters(data.characters);
       setLastSurprisedGenre(targetGenre);
-      
+
       // Trigger visual feedback
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
-      
     } catch (e) {
       console.error("Surprise generation failed", e);
       // Fallback
       setPremise(`A gripping ${targetGenre} story with unexpected twists.`);
       setCharacters(["Protagonist", "Antagonist", "The Catalyst"]);
       setLastSurprisedGenre(targetGenre);
-      
+
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
     } finally {
@@ -84,95 +90,114 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
   const genreChanged = lastSurprisedGenre && lastSurprisedGenre !== genre;
 
   return (
-    <div className="max-w-2xl mx-auto p-8 bg-gray-900 rounded-xl border border-gray-800 shadow-2xl relative overflow-hidden">
-      
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+    <div className="h-screen w-full bg-gray-900 overflow-hidden flex flex-col p-6">
+      {/* Top Bar */}
+      <div className="flex items-center justify-between mb-8 shrink-0">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <BookOpen className="w-8 h-8 text-indigo-500" />
           Script Seance
         </h1>
-        <p className="text-gray-400">Generate interactive screenplays with AI voice acting</p>
+
+        <div className="flex flex-col items-end">
+          <Button
+            variant="secondary"
+            onClick={handleSurpriseMe}
+            className="!bg-gray-800 !border-gray-700/50 border !text-gray-400 hover:!bg-gray-700 hover:!text-gray-200 transition-colors text-xs py-1.5 h-auto"
+            type="button"
+            loading={isSurprising}
+            disabled={isLoading || isSurprising}
+            size="sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 mr-2 opacity-75" />
+            Magic Shuffle
+          </Button>
+          {genreChanged && (
+            <span className="text-[10px] text-indigo-400 font-medium animate-pulse mt-1">
+              New idea for {genre}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-10">
-        {/* Genre Selection */}
-        <div>
-          <div className="mb-3">
-            <label className="block text-base font-semibold text-gray-200 mb-1">Genre</label>
-            <p className="text-xs text-gray-500">Sets the tone for the AI writer and performers.</p>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
+        {/* Left Column: Genre */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-200 mb-2">
+              Genre
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {GENRES.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGenre(g)}
+                  className={`px-2 py-1.5 text-[10px] font-medium rounded-md transition-all border ${
+                    genre === g
+                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm"
+                      : "bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {GENRES.map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGenre(g)}
-                className={`px-3 py-2 text-xs font-medium rounded-md transition-all border ${
-                  genre === g 
-                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm' 
-                    : 'bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                {g}
-              </button>
-            ))}
+
+          <div className="flex-1 flex flex-col min-h-0">
+            <label className="block text-sm font-semibold text-gray-200 mb-2">
+              Premise
+            </label>
+            <textarea
+              value={premise}
+              onChange={(e) => setPremise(e.target.value)}
+              className={`w-full flex-1 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-700 resize-none text-sm leading-relaxed ${
+                justSurprised
+                  ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+                  : "bg-gray-800 border-gray-700"
+              }`}
+              placeholder="e.g., A detective discovers his new partner is a ghost..."
+            />
+            <div className="flex flex-wrap gap-2 mt-3 shrink-0">
+              {STARTER_IDEAS.map((idea) => (
+                <button
+                  key={idea}
+                  type="button"
+                  onClick={() => setPremise(idea)}
+                  className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer"
+                >
+                  {idea}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Premise */}
-        <div>
-          <div className="mb-3">
-            <label className="block text-base font-semibold text-gray-200 mb-1">Premise</label>
-            <p className="text-xs text-gray-500">The core conflict or situation that kicks off the story.</p>
-          </div>
-          <textarea
-            value={premise}
-            onChange={(e) => setPremise(e.target.value)}
-            className={`w-full h-24 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-700 ${
-              justSurprised 
-                ? 'bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]' 
-                : 'bg-gray-800 border-gray-700'
-            }`}
-            placeholder="e.g., A detective discovers his new partner is a ghost..."
-          />
-          <div className="flex flex-wrap gap-2 mt-3">
-            {STARTER_IDEAS.map((idea) => (
-              <button
-                key={idea}
-                type="button"
-                onClick={() => setPremise(idea)}
-                className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer"
-              >
-                {idea}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Characters */}
-        <div>
-          <div className="mb-3">
-            <label className="block text-base font-semibold text-gray-200 mb-1 flex items-center gap-2">
+        {/* Right Column: Characters */}
+        <div className="flex flex-col h-full overflow-hidden">
+          <div className="mb-2 shrink-0">
+            <label className="block text-sm font-semibold text-gray-200 flex items-center gap-2">
               <Users className="w-4 h-4 text-indigo-400" /> Characters
             </label>
-            <p className="text-xs text-gray-500">Define who is in the scene (add, remove, or rename anytime).</p>
           </div>
-          <div className="space-y-3">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
             {characters.map((char, idx) => (
               <div key={idx} className="relative group">
                 <input
-                  ref={(el) => { characterInputs.current[idx] = el; }}
+                  ref={(el) => {
+                    characterInputs.current[idx] = el;
+                  }}
                   value={char}
                   onChange={(e) => handleCharacterChange(idx, e.target.value)}
                   className={`w-full rounded-lg p-3 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
                     justSurprised
-                      ? 'bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50' 
-                      : 'bg-gray-800 border-gray-700'
+                      ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
+                      : "bg-gray-800 border-gray-700"
                   }`}
                   placeholder={`Character ${idx + 1}`}
                 />
                 {characters.length > 1 && (
-                  <button 
+                  <button
                     onClick={() => removeCharacter(idx)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
                     tabIndex={-1}
@@ -184,63 +209,30 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
                 )}
               </div>
             ))}
-          </div>
-          <button 
-            type="button"
-            onClick={addCharacter} 
-            className="mt-3 w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-xs font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Character
-          </button>
-        </div>
 
-        {/* Actions */}
-        <div className="flex flex-col gap-6 pt-8 border-t border-gray-800">
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div className="flex-1 w-full space-y-2">
-              <Button 
-                variant="secondary" 
-                onClick={handleSurpriseMe} 
-                className="w-full !bg-gray-800 !border-gray-700/50 border !text-gray-400 hover:!bg-gray-700 hover:!text-gray-200 transition-colors"
-                type="button"
-                loading={isSurprising}
-                disabled={isLoading || isSurprising}
-              >
-                <Sparkles className="w-4 h-4 mr-2 opacity-75" />
-                Surprise Me
-              </Button>
-              
-              <div className="text-[11px] leading-relaxed px-1 text-left flex flex-col gap-1">
-                <span className="text-gray-500">
-                  Fills in a random premise and starter characters.
-                </span>
-                
-                {genreChanged ? (
-                   <span className="text-indigo-400 font-medium animate-pulse">
-                     Genre changed — click Surprise Me to generate a new idea for {genre}.
-                   </span>
-                ) : (
-                   <span className="text-gray-600">
-                     Based on: <strong className="text-gray-400">{genre}</strong>
-                   </span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex-[1.5] w-full">
-              <Button 
-                variant="primary" 
-                onClick={() => onStart({ genre, premise, characters })}
-                className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all transform hover:-translate-y-0.5"
-                loading={isLoading}
-                size="lg"
-                disabled={!premise.trim() || isLoading || isSurprising}
-              >
-                Start Writing
-              </Button>
-            </div>
+            <button
+              type="button"
+              onClick={addCharacter}
+              className="w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-xs font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Character
+            </button>
           </div>
         </div>
+      </div>
+
+      {/* Footer Action */}
+      <div className="mt-6 pt-6 border-t border-gray-800 shrink-0">
+        <Button
+          variant="primary"
+          onClick={() => onStart({ genre, premise, characters })}
+          className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all transform hover:-translate-y-0.5"
+          loading={isLoading}
+          size="lg"
+          disabled={!premise.trim() || isLoading || isSurprising}
+        >
+          Start Writing
+        </Button>
       </div>
     </div>
   );
