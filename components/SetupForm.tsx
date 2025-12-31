@@ -26,9 +26,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
 
   // Surprise State
   const [isSurprising, setIsSurprising] = useState(false);
-  const [lastSurprisedGenre, setLastSurprisedGenre] = useState<string | null>(
-    null
-  );
   const [justSurprised, setJustSurprised] = useState(false);
 
   // Refs for managing focus on new inputs
@@ -85,7 +82,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
       setGenre(data.genre);
       setPremise(data.premise);
       setCharacters(data.characters);
-      setLastSurprisedGenre(targetGenre);
+      // Update form directly (non-blocking)
+      setGenre(data.genre);
+      setPremise(data.premise);
+      setCharacters(data.characters);
 
       // Trigger visual feedback
       setJustSurprised(true);
@@ -95,7 +95,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
       // Fallback
       setPremise(`A gripping ${targetGenre} story with unexpected twists.`);
       setCharacters(["Protagonist", "Antagonist", "The Catalyst"]);
-      setLastSurprisedGenre(targetGenre);
 
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
@@ -110,8 +109,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
     }
   };
 
-  const genreChanged = lastSurprisedGenre && lastSurprisedGenre !== genre;
-
   return (
     <div className="h-screen w-full bg-gray-900 overflow-hidden flex flex-col p-6">
       {/* Top Bar */}
@@ -120,35 +117,29 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
           <BookOpen className="w-8 h-8 text-indigo-500" />
           Script Seance
         </h1>
-
-        <div className="flex flex-col items-end">
-          <Button
-            variant="secondary"
-            onClick={handleSurpriseMe}
-            className="!bg-slate-800 hover:!bg-slate-700 !border-slate-600 border !text-gray-300 hover:!text-white transition-colors text-xs py-1.5 h-auto group"
-            type="button"
-            loading={isSurprising}
-            disabled={isLoading || isSurprising}
-            size="sm"
-            title="Generate a random setup"
-          >
-            <Shuffle className="w-4 h-4 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
-            Magic Shuffle
-          </Button>
-          {genreChanged && (
-            <span className="text-[10px] text-indigo-400 font-medium animate-pulse mt-1">
-              New idea for {genre}
-            </span>
-          )}
-        </div>
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 gap-6">
         {/* Row 1: Genre (Full Width) */}
         <div className="shrink-0">
-          <label className="block text-lg font-semibold text-gray-200 mb-3">
-            Genre
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-lg font-semibold text-gray-200">
+              Genre
+            </label>
+            <Button
+              variant="secondary"
+              onClick={handleSurpriseMe}
+              className="!bg-transparent hover:!bg-slate-800 !border-slate-700 hover:!border-indigo-500 border !text-gray-400 hover:!text-indigo-400 transition-colors text-xs py-1.5 h-auto group"
+              type="button"
+              loading={isSurprising}
+              disabled={isLoading || isSurprising}
+              size="sm"
+              title="Generate a random setup"
+            >
+              <Shuffle className="w-3.5 h-3.5 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
+              Magic Shuffle
+            </Button>
+          </div>
           <div className="flex flex-wrap gap-2">
             {GENRES.map((g) => (
               <button
@@ -178,7 +169,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
               rows={3}
               value={premise}
               onChange={(e) => setPremise(e.target.value)}
-              className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-700 resize-y text-sm leading-relaxed ${
+              className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-700 resize-y min-h-[80px] text-sm leading-relaxed ${
                 justSurprised
                   ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                   : "bg-gray-800 border-gray-700"
