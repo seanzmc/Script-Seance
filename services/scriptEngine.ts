@@ -1,5 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
+import { generateSpeech } from './gemini';
 
 // Global Content-Addressable Cache (persists across plays)
 // Key: voiceId:text | Value: ArrayBuffer (Raw PCM)
@@ -23,26 +23,11 @@ export interface AudioChunk {
 type EventHandler = (data: any) => void;
 
 export class ScriptEngine {
-  private client: GoogleGenAI;
   private queue: QueueItem[] = [];
   private activeRequests = 0;
   private concurrencyLimit = 1; // Reduced to 1 to avoid hitting strict rate limits (10 RPM)
   private isRunning = false;
   private listeners: Map<string, EventHandler[]> = new Map();
-
-  constructor() {
-    let apiKey = '';
-    try {
-      apiKey = process.env.API_KEY || '';
-    } catch (e) {
-      console.warn("Env access failed");
-    }
-    
-    if (!apiKey) {
-      throw new Error("API_KEY is missing");
-    }
-    this.client = new GoogleGenAI({ apiKey });
-  }
 
   // --- Event System ---
 
@@ -175,37 +160,19 @@ export class ScriptEngine {
     }
 
     try {
-      const response = await this.client.models.generateContent({
-        model: 'gemini-2.5-flash-preview-tts',
-        contents: [{ parts: [{ text: safeText }] }],
-        config: {
-          responseModalities: ['AUDIO' as any],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voiceId }
-            }
-          }
-        }
-      });
+      const buffer = await generateSpeech(safeText, voiceId);
 
-      const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!base64) throw new Error("No audio returned from Gemini");
-
-      // Decode Base64 to ArrayBuffer (Raw PCM)
-      const binaryString = atob(base64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const buffer = bytes.buffer;
-      
       // Write to Cache
       AudioCache.set(cacheKey, buffer);
       return buffer;
     } catch (e: any) {
        // Handle Rate Limiting (429)
-       const isRateLimit = e.message?.includes('429') || e.status === 429 || e.code === 429 || e.message?.includes('RESOURCE_EXHAUSTED');
+       const isRateLimit =
+         e.message?.includes('429') ||
+         e.status === 429 ||
+         e.code === 429 ||
+         e.code === 'RATE_LIMITED' ||
+         e.message?.includes('RESOURCE_EXHAUSTED');
        
        if (isRateLimit && retryCount < 4) {
          let delayMs = 3000 * Math.pow(2, retryCount); // Default: 3s, 6s, 12s, 24s

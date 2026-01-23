@@ -21,7 +21,12 @@ To run this application, you need to configure your environment variables for th
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
 ```
 
-> **Note**: The application internally maps `GEMINI_API_KEY` to `process.env.API_KEY` via Vite configuration. Ensure you use the exact key name `GEMINI_API_KEY` in your `.env` file.
+## Production prerequisites
+
+- Server-side proxy for all Gemini/AI calls (no client-exposed keys).
+- Authentication and rate limiting on AI endpoints.
+- Request timeouts and retry handling.
+- CSP and security headers at the edge.
 
 ## Installation & Run Instructions
 
@@ -39,10 +44,16 @@ npm install
 
 ### Running the App
 
-Start the development server:
+Start the API server (used for Gemini calls):
+
+```bash
+npm run server
+```
+
+Start the Vite development server:
 
 ```bash
 npm run dev
 ```
 
-The application will typically start at `http://localhost:3000`.
+The API server runs on `http://localhost:3001` and the app will typically start at `http://localhost:3000`.
