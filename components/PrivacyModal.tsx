@@ -53,7 +53,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
             <ul className="list-disc pl-5 space-y-2 text-gray-400">
               <li>Drafts autosave to your browser&apos;s localStorage for recovery.</li>
               <li>This app does not store your drafts on the server.</li>
-              <li>Use "Clear draft" to remove the local copy at any time.</li>
+              <li>Use &quot;Clear draft&quot; to remove the local copy at any time.</li>
             </ul>
           </div>
         </div>
