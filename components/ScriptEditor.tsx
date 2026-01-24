@@ -9,6 +9,7 @@ interface ScriptEditorProps {
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
+  onError?: (error: unknown) => void;
   disabled?: boolean;
 }
 
@@ -17,6 +18,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
   genre, 
   onAddBlock,
   onUndo,
+  onError,
   disabled 
 }) => {
   const [mode, setMode] = useState<'write' | 'generate'>('write');
@@ -38,7 +40,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
         finalText = await generateScriptElement(elementType, selectedChar, content, genre);
       } catch (e) {
         console.error("Generation failed", e);
-        setIsGenerating(false);
+        onError?.(e);
         return; // Don't add if failed
       } finally {
         setIsGenerating(false);

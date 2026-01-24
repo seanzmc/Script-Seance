@@ -9,6 +9,7 @@ interface InsertBlockProps {
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
+  onError?: (error: unknown) => void;
   disabled?: boolean;
 }
 
@@ -24,6 +25,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   genre, 
   onAddBlock,
   onUndo,
+  onError,
   disabled 
 }) => {
   const [mode, setMode] = useState<'write' | 'generate'>('write');
@@ -45,7 +47,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         finalText = await generateScriptElement(elementType, selectedChar, content, genre);
       } catch (e) {
         console.error("Generation failed", e);
-        setIsGenerating(false);
+        onError?.(e);
         return; 
       } finally {
         setIsGenerating(false);

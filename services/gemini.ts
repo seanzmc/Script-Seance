@@ -13,6 +13,7 @@ const requestAi = async <T>(kind: string, context: unknown): Promise<T> => {
   const response = await fetch('/api/ai/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ kind, context })
   });
 
@@ -30,7 +31,13 @@ const requestAi = async <T>(kind: string, context: unknown): Promise<T> => {
 
   if (!response.ok || payload.error) {
     const apiError = payload.error;
-    const message = apiError?.message || 'AI request failed';
+    const statusMessage =
+      response.status === 401
+        ? 'Authentication required. Please log in to continue.'
+        : response.status === 429
+        ? 'Rate limit exceeded. Please wait and try again.'
+        : null;
+    const message = statusMessage || apiError?.message || 'AI request failed';
     const error = new Error(message);
     (error as any).code = apiError?.code;
     (error as any).status = response.status;

@@ -1,28 +1,211 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import express from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
 const BODY_LIMIT = '64kb';
 const PORT = process.env.PORT || 3001;
+const SESSION_COOKIE_NAME = 'ss_session';
+const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+const AI_RPM = parsePositiveInt(process.env.AI_RPM, 30);
+const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
+const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
 ];
 
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
+const sessions = new Map();
+const rateBuckets = new Map();
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isNonEmptyString = (value, max = 4000) => (
   typeof value === 'string' && value.trim().length > 0 && value.length <= max
 );
 
-const sendError = (res, status, message, code) =>
-  res.status(status).json({ error: { message, code } });
+const sendError = (res, status, message, code, details) =>
+  res.status(status).json({ error: { message, code, ...(details ? { details } : {}) } });
+
+const parseCookies = (cookieHeader = '') =>
+  cookieHeader.split(';').reduce((acc, pair) => {
+    const [rawKey, ...rest] = pair.trim().split('=');
+    if (!rawKey) return acc;
+    acc[rawKey] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
+
+const getClientIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+};
+
+const safeEqual = (left, right) => {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+};
+
+const createSession = () => {
+  const id = crypto.randomBytes(32).toString('hex');
+  sessions.set(id, { createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
+  return id;
+};
+
+const getSessionId = (req) => {
+  const cookies = parseCookies(req.headers.cookie || '');
+  const sessionId = cookies[SESSION_COOKIE_NAME];
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  if (!session || session.expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return sessionId;
+};
+
+const setSessionCookie = (res, sessionId) => {
+  res.cookie(SESSION_COOKIE_NAME, sessionId, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: SESSION_TTL_MS,
+    path: '/'
+  });
+};
+
+const clearSessionCookie = (res) => {
+  res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+};
+
+const ensurePromptSize = (res, size) => {
+  if (size > MAX_PROMPT_CHARS) {
+    sendError(res, 413, 'Prompt too large.', 'PROMPT_TOO_LARGE', { maxChars: MAX_PROMPT_CHARS });
+    return false;
+  }
+  return true;
+};
+
+const checkRateLimit = (key) => {
+  if (!key) return { allowed: true };
+  const now = Date.now();
+  const minuteWindow = 60 * 1000;
+  const dayWindow = 24 * 60 * 60 * 1000;
+  const bucket = rateBuckets.get(key) || {
+    minuteStart: now,
+    minuteCount: 0,
+    dayStart: now,
+    dayCount: 0
+  };
+
+  if (now - bucket.minuteStart >= minuteWindow) {
+    bucket.minuteStart = now;
+    bucket.minuteCount = 0;
+  }
+  if (now - bucket.dayStart >= dayWindow) {
+    bucket.dayStart = now;
+    bucket.dayCount = 0;
+  }
+
+  const nextMinuteCount = bucket.minuteCount + 1;
+  const nextDayCount = bucket.dayCount + 1;
+  const exceededMinute = AI_RPM > 0 && nextMinuteCount > AI_RPM;
+  const exceededDay = AI_RPD > 0 && nextDayCount > AI_RPD;
+
+  if (exceededMinute || exceededDay) {
+    const retryAfterMs = exceededMinute
+      ? bucket.minuteStart + minuteWindow - now
+      : bucket.dayStart + dayWindow - now;
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+      scope: exceededMinute ? 'minute' : 'day'
+    };
+  }
+
+  bucket.minuteCount = nextMinuteCount;
+  bucket.dayCount = nextDayCount;
+  rateBuckets.set(key, bucket);
+  return { allowed: true };
+};
+
+const requireSession = (req, res, next) => {
+  if (!ADMIN_PASSWORD) {
+    return sendError(res, 500, 'Server missing ADMIN_PASSWORD.', 'CONFIG_ERROR');
+  }
+  const sessionId = getSessionId(req);
+  if (!sessionId) {
+    return sendError(res, 401, 'Authentication required.', 'UNAUTHORIZED');
+  }
+  req.aiSessionId = sessionId;
+  return next();
+};
+
+const rateLimitAi = (req, res, next) => {
+  const key = req.aiSessionId || getClientIp(req);
+  const result = checkRateLimit(key);
+  if (!result.allowed) {
+    res.set('Retry-After', String(result.retryAfterSeconds));
+    return sendError(res, 429, 'Rate limit exceeded. Please wait and try again.', 'RATE_LIMITED', {
+      scope: result.scope,
+      retryAfterSeconds: result.retryAfterSeconds,
+      limit: result.scope === 'minute' ? AI_RPM : AI_RPD
+    });
+  }
+  return next();
+};
 
 app.use(express.json({ limit: BODY_LIMIT }));
+
+app.post('/api/auth/login', (req, res) => {
+  const password = req.body?.password;
+  if (!isNonEmptyString(password, 256)) {
+    return sendError(res, 400, 'Invalid login payload.', 'INVALID_REQUEST');
+  }
+  if (!ADMIN_PASSWORD) {
+    return sendError(res, 500, 'Server missing ADMIN_PASSWORD.', 'CONFIG_ERROR');
+  }
+  if (!safeEqual(password, ADMIN_PASSWORD)) {
+    return sendError(res, 401, 'Invalid password.', 'UNAUTHORIZED');
+  }
+  const sessionId = createSession();
+  setSessionCookie(res, sessionId);
+  return res.json({ data: { ok: true } });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const sessionId = getSessionId(req);
+  if (sessionId) {
+    sessions.delete(sessionId);
+  }
+  clearSessionCookie(res);
+  return res.json({ data: { ok: true } });
+});
+
+app.get('/api/auth/session', (req, res) => {
+  const sessionId = getSessionId(req);
+  if (!sessionId) {
+    return sendError(res, 401, 'Not authenticated.', 'UNAUTHORIZED');
+  }
+  return res.json({ data: { ok: true } });
+});
+
+app.use('/api/ai', requireSession, rateLimitAi);
 
 app.post('/api/ai/generate', async (req, res) => {
   const payload = req.body || {};
@@ -69,12 +252,24 @@ app.post('/api/ai/generate', async (req, res) => {
             .join('\n')
         : '';
 
+      const charactersList = characters.join(', ');
+      const promptSize = [
+        genre,
+        premise,
+        charactersList,
+        userInstruction,
+        previousScenesSummary
+      ].filter(Boolean).join('\n').length;
+      if (!ensurePromptSize(res, promptSize)) {
+        return;
+      }
+
       const prompt = `
     You are a professional screenwriter. Write the ${isFirstScene ? 'opening' : 'next'} scene for a screenplay.
     
     Genre: ${genre}
     Premise: ${premise}
-    Characters: ${characters.join(', ')}
+    Characters: ${charactersList}
     
     ${previousScenesSummary ? `Previous Story Context:\n${previousScenesSummary}` : ''}
     
@@ -156,6 +351,9 @@ app.post('/api/ai/generate', async (req, res) => {
       ) {
         return sendError(res, 400, 'Invalid generateScriptElement context.', 'INVALID_REQUEST');
       }
+      if (!ensurePromptSize(res, `${instruction}\n${styleContext}`.length)) {
+        return;
+      }
 
       const hasCharacter = character !== undefined && character !== null;
       if (
@@ -209,6 +407,10 @@ app.post('/api/ai/generate', async (req, res) => {
         (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
       ) {
         return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+      }
+
+      if (!ensurePromptSize(res, `${premise}\n${text}`.length)) {
+        return;
       }
 
       let prompt = '';
@@ -280,6 +482,9 @@ app.post('/api/ai/generate', async (req, res) => {
       const { text, voiceName } = context;
       if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
         return sendError(res, 400, 'Invalid generateSpeech context.', 'INVALID_REQUEST');
+      }
+      if (!ensurePromptSize(res, text.length)) {
+        return;
       }
 
       const response = await ai.models.generateContent({

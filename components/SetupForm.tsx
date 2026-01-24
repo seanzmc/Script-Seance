@@ -11,6 +11,7 @@ interface SetupFormProps {
     characters: string[];
   }) => void;
   isLoading: boolean;
+  onError?: (error: unknown, fallbackMessage: string) => boolean;
 }
 
 const STARTER_IDEAS = [
@@ -19,7 +20,7 @@ const STARTER_IDEAS = [
   "A normal day goes very wrong",
 ];
 
-export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
+export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading, onError }) => {
   const [genre, setGenre] = useState(GENRES[0]);
   const [premise, setPremise] = useState("");
   const [characters, setCharacters] = useState(["Hero", "Villain"]);
@@ -92,6 +93,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading }) => {
       setTimeout(() => setJustSurprised(false), 1500);
     } catch (e) {
       console.error("Surprise generation failed", e);
+      const handled = onError?.(e, 'Failed to generate a surprise setup.');
+      if (handled) {
+        return;
+      }
       // Fallback
       setPremise(`A gripping ${targetGenre} story with unexpected twists.`);
       setCharacters(["Protagonist", "Antagonist", "The Catalyst"]);

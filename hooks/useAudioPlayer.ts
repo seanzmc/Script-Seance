@@ -2,7 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
 import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
 
-export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
+export const useAudioPlayer = (
+  voiceConfigs: VoiceConfig[],
+  onError?: (error: unknown, fallbackMessage: string) => void
+) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [currentBlockId, setCurrentBlockId] = useState<string | null>(null);
@@ -163,11 +166,16 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
     };
 
     engine.on('audio', onAudio);
+    const onEngineError = (payload: { error: unknown }) => {
+      onError?.(payload.error, 'Audio generation failed.');
+    };
+    engine.on('error', onEngineError);
     
     return () => {
       engine.off('audio', onAudio);
+      engine.off('error', onEngineError);
     };
-  }, []); 
+  }, [onError]); 
 
   // --- Public Methods ---
 
@@ -224,6 +232,7 @@ export const useAudioPlayer = (voiceConfigs: VoiceConfig[]) => {
       source.start();
     } catch(e) {
       console.error(e);
+      onError?.(e, 'Preview audio failed.');
       setIsLoadingAudio(false);
       setIsPreviewPlaying(false);
     }

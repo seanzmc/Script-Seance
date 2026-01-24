@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SetupForm } from './components/SetupForm';
 import { ScriptDisplay } from './components/ScriptDisplay';
 import { VoiceManager } from './components/VoiceManager';
 import { InsertBlock } from './components/InsertBlock';
 import { Button } from './components/Button';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
+import { LoginModal } from './components/LoginModal';
 import { generateScene, suggestPlotTwist, regenerateScriptBlock } from './services/gemini';
+import { getSession, login } from './services/auth';
 import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { Play, Pause, Save, PlusCircle, Sparkles, Download, AlertCircle, PenTool, Mic2, PlayCircle, Loader2, MousePointer2, ScrollText, RotateCcw } from 'lucide-react';
@@ -26,6 +28,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('write');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -39,6 +44,22 @@ export default function App() {
   // Refs
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  const handleAiError = useCallback((err: any, fallbackMessage: string) => {
+    const status = err?.status;
+    if (status === 401) {
+      setAuthStatus('unauthenticated');
+      setAuthError('Session expired. Please log in again.');
+      setError('Authentication required. Please log in to continue.');
+      return true;
+    }
+    if (status === 429) {
+      setError('Rate limit exceeded. Please wait and try again.');
+      return true;
+    }
+    setError(err?.message || fallbackMessage);
+    return false;
+  }, []);
+
   // Custom Hooks
   const { 
     isPlaying,
@@ -48,7 +69,7 @@ export default function App() {
     playScript, 
     playPreview, 
     stop 
-  } = useAudioPlayer(voiceConfigs);
+  } = useAudioPlayer(voiceConfigs, handleAiError);
 
   // Clear preview state when playback ends
   useEffect(() => {
@@ -85,6 +106,45 @@ export default function App() {
     }
   }, [context?.characters]);
 
+  useEffect(() => {
+    let active = true;
+    const checkSession = async () => {
+      try {
+        await getSession();
+        if (active) {
+          setAuthStatus('authenticated');
+          setAuthError(null);
+        }
+      } catch (err) {
+        if (active) {
+          setAuthStatus('unauthenticated');
+        }
+      }
+    };
+    checkSession();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleLogin = async (password: string) => {
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      await login(password);
+      setAuthStatus('authenticated');
+      setError(null);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        setAuthError('Incorrect password.');
+      } else {
+        setAuthError(err?.message || 'Login failed.');
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
   // Handlers
   const handleStart = async (data: { genre: string; premise: string; characters: string[] }) => {
     setIsGenerating(true);
@@ -102,7 +162,7 @@ export default function App() {
         scenes: [firstScene]
       });
     } catch (e: any) {
-      setError(e.message || "Failed to generate story");
+      handleAiError(e, e?.message || "Failed to generate story");
     } finally {
       setIsGenerating(false);
     }
@@ -118,7 +178,7 @@ export default function App() {
       setContext(prev => prev ? { ...prev, scenes: [...prev.scenes, nextScene] } : null);
       setUserInstruction('');
     } catch (e: any) {
-      setError(e.message);
+      handleAiError(e, e?.message || 'Failed to generate scene.');
     } finally {
       setIsGenerating(false);
     }
@@ -132,6 +192,7 @@ export default function App() {
       setUserInstruction(`PLOT TWIST: ${twist}`);
     } catch (e) {
       console.error(e);
+      handleAiError(e, 'Failed to generate plot twist.');
     } finally {
       setIsGenerating(false);
     }
@@ -253,7 +314,7 @@ export default function App() {
 
     } catch (e) {
       console.error(e);
-      setError("Failed to regenerate block.");
+      handleAiError(e, "Failed to regenerate block.");
     } finally {
       setIsGenerating(false);
     }
@@ -360,12 +421,18 @@ export default function App() {
   if (!context) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <SetupForm onStart={handleStart} isLoading={isGenerating} />
+        <SetupForm onStart={handleStart} isLoading={isGenerating} onError={handleAiError} />
         {error && (
           <div className="absolute bottom-4 left-0 right-0 text-center text-red-400">
             Error: {error}
           </div>
         )}
+        <LoginModal
+          isOpen={authStatus === 'unauthenticated'}
+          isLoading={isAuthLoading}
+          error={authError}
+          onLogin={handleLogin}
+        />
       </div>
     );
   }
@@ -453,6 +520,7 @@ export default function App() {
                   genre={context.genre}
                   onAddBlock={handleAddBlock}
                   onUndo={handleUndo}
+                  onError={(err) => handleAiError(err, 'Failed to generate block.')}
                   disabled={isPlaying || isGenerating}
                 />
               </div>
@@ -621,6 +689,13 @@ export default function App() {
           previewVoiceId={previewVoiceId}
         />
       )}
+
+      <LoginModal
+        isOpen={authStatus === 'unauthenticated'}
+        isLoading={isAuthLoading}
+        error={authError}
+        onLogin={handleLogin}
+      />
     </div>
   );
 }

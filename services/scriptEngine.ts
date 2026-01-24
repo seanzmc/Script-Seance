@@ -143,6 +143,7 @@ export class ScriptEngine {
       }
     } catch (e) {
       console.error("Failed to generate block", item.block.id, e);
+      this.emit('error', { error: e, blockId: item.block.id });
       // We log but continue, effectively skipping the faulty block
     }
   }
