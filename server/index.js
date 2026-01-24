@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import cookie from 'cookie';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -23,6 +23,9 @@ const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
 const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
 const AI_UPSTREAM_TIMEOUT_MS = parsePositiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 30000);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const RATE_LIMIT_MINUTE_MS = 60 * 1000;
+const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = parsePositiveInt(process.env.MAP_CLEANUP_INTERVAL_MS, 20 * 60 * 1000);
 
 const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
@@ -31,6 +34,16 @@ const GENRES = [
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
 const sessions = new Map();
 const rateBuckets = new Map();
+const MAX_SCENE_HEADING_CHARS = 200;
+const MAX_SCENE_SUMMARY_CHARS = 2000;
+const MAX_SCENE_BLOCKS = 200;
+const MAX_BLOCK_TEXT_CHARS = 4000;
+const MAX_BLOCK_CHARACTER_CHARS = 120;
+const MAX_BLOCK_PARENTHETICAL_CHARS = 240;
+const MAX_PREMISE_CHARS = 4000;
+const MAX_GENRE_CHARS = 120;
+const MAX_CHARACTERS = 12;
+const MAX_AUDIO_BASE64_CHARS = 5 * 1024 * 1024;
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -41,6 +54,91 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const isNonEmptyString = (value, max = 4000) => (
   typeof value === 'string' && value.trim().length > 0 && value.length <= max
 );
+const isStringWithin = (value, max) => typeof value === 'string' && value.length <= max;
+
+const isValidBlock = (block) => {
+  if (!isObject(block)) return false;
+  if (!VALID_BLOCK_TYPES.has(block.type)) return false;
+  if (!isStringWithin(block.text, MAX_BLOCK_TEXT_CHARS)) return false;
+
+  if (block.character !== undefined && block.character !== null) {
+    if (!isStringWithin(block.character, MAX_BLOCK_CHARACTER_CHARS)) return false;
+  }
+
+  if (block.parenthetical !== undefined && block.parenthetical !== null) {
+    if (!isStringWithin(block.parenthetical, MAX_BLOCK_PARENTHETICAL_CHARS)) return false;
+  }
+
+  return true;
+};
+
+const validateAiResponse = (kind, data) => {
+  if (!isObject(data)) {
+    return { ok: false, reason: 'Response was not an object.' };
+  }
+
+  if (kind === 'generateScene') {
+    if (!isNonEmptyString(data.heading, MAX_SCENE_HEADING_CHARS)) {
+      return { ok: false, reason: 'Scene heading missing or too long.' };
+    }
+    if (!isNonEmptyString(data.summary, MAX_SCENE_SUMMARY_CHARS)) {
+      return { ok: false, reason: 'Scene summary missing or too long.' };
+    }
+    if (!Array.isArray(data.blocks) || data.blocks.length > MAX_SCENE_BLOCKS) {
+      return { ok: false, reason: 'Scene blocks missing or too many.' };
+    }
+    if (!data.blocks.every(isValidBlock)) {
+      return { ok: false, reason: 'Scene blocks invalid.' };
+    }
+    return { ok: true };
+  }
+
+  if (kind === 'generateSurpriseSetup') {
+    if (!isNonEmptyString(data.genre, MAX_GENRE_CHARS)) {
+      return { ok: false, reason: 'Genre missing or too long.' };
+    }
+    if (!isNonEmptyString(data.premise, MAX_PREMISE_CHARS)) {
+      return { ok: false, reason: 'Premise missing or too long.' };
+    }
+    if (!Array.isArray(data.characters) || data.characters.length === 0 || data.characters.length > MAX_CHARACTERS) {
+      return { ok: false, reason: 'Characters missing or invalid.' };
+    }
+    if (!data.characters.every((char) => isNonEmptyString(char, MAX_BLOCK_CHARACTER_CHARS))) {
+      return { ok: false, reason: 'Character list invalid.' };
+    }
+    return { ok: true };
+  }
+
+  if (kind === 'generateScriptElement' || kind === 'regenerateScriptBlock') {
+    if (!isStringWithin(data.text, MAX_BLOCK_TEXT_CHARS)) {
+      return { ok: false, reason: 'Script text missing or too long.' };
+    }
+    return { ok: true };
+  }
+
+  if (kind === 'generateSpeech') {
+    if (!isStringWithin(data.audioBase64, MAX_AUDIO_BASE64_CHARS)) {
+      return { ok: false, reason: 'Audio payload missing or too large.' };
+    }
+    return { ok: true };
+  }
+
+  if (kind === 'suggestPlotTwist') {
+    if (!isStringWithin(data.text, MAX_BLOCK_TEXT_CHARS)) {
+      return { ok: false, reason: 'Plot twist missing or too long.' };
+    }
+    return { ok: true };
+  }
+
+  return { ok: true };
+};
+
+const createAiValidationError = (kind, reason) => {
+  const error = new Error('AI response did not match expected format.');
+  error.code = 'INVALID_AI_RESPONSE';
+  error.details = { kind, reason };
+  throw error;
+};
 
 const sendError = (res, status, message, code, details) =>
   res.status(status).json({ error: { message, code, ...(details ? { details } : {}) } });
@@ -129,23 +227,23 @@ const withTimeout = async (promise, timeoutMs) => {
 const checkRateLimit = (key) => {
   if (!key) return { allowed: true };
   const now = Date.now();
-  const minuteWindow = 60 * 1000;
-  const dayWindow = 24 * 60 * 60 * 1000;
   const bucket = rateBuckets.get(key) || {
     minuteStart: now,
     minuteCount: 0,
     dayStart: now,
-    dayCount: 0
+    dayCount: 0,
+    lastSeen: now
   };
 
-  if (now - bucket.minuteStart >= minuteWindow) {
+  if (now - bucket.minuteStart >= RATE_LIMIT_MINUTE_MS) {
     bucket.minuteStart = now;
     bucket.minuteCount = 0;
   }
-  if (now - bucket.dayStart >= dayWindow) {
+  if (now - bucket.dayStart >= RATE_LIMIT_DAY_MS) {
     bucket.dayStart = now;
     bucket.dayCount = 0;
   }
+  bucket.lastSeen = now;
 
   const nextMinuteCount = bucket.minuteCount + 1;
   const nextDayCount = bucket.dayCount + 1;
@@ -154,8 +252,8 @@ const checkRateLimit = (key) => {
 
   if (exceededMinute || exceededDay) {
     const retryAfterMs = exceededMinute
-      ? bucket.minuteStart + minuteWindow - now
-      : bucket.dayStart + dayWindow - now;
+      ? bucket.minuteStart + RATE_LIMIT_MINUTE_MS - now
+      : bucket.dayStart + RATE_LIMIT_DAY_MS - now;
     return {
       allowed: false,
       retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
@@ -167,6 +265,32 @@ const checkRateLimit = (key) => {
   bucket.dayCount = nextDayCount;
   rateBuckets.set(key, bucket);
   return { allowed: true };
+};
+
+const pruneStaleEntries = (now = Date.now()) => {
+  for (const [sessionId, session] of sessions.entries()) {
+    if (!session || session.expiresAt <= now) {
+      sessions.delete(sessionId);
+    }
+  }
+
+  for (const [key, bucket] of rateBuckets.entries()) {
+    const lastSeen = bucket?.lastSeen ?? bucket?.dayStart ?? bucket?.minuteStart ?? 0;
+    if (!lastSeen || now - lastSeen > RATE_LIMIT_DAY_MS) {
+      rateBuckets.delete(key);
+    }
+  }
+};
+
+let cleanupTimer;
+const startCleanupTimer = () => {
+  if (cleanupTimer || CLEANUP_INTERVAL_MS <= 0) return;
+  cleanupTimer = setInterval(() => {
+    pruneStaleEntries();
+  }, CLEANUP_INTERVAL_MS);
+  if (typeof cleanupTimer.unref === 'function') {
+    cleanupTimer.unref();
+  }
 };
 
 const requireSession = (req, res, next) => {
@@ -353,7 +477,11 @@ app.post('/api/ai/generate', async (req, res) => {
         throw new Error('No response from AI');
       }
 
-      data = JSON.parse(text);
+      try {
+        data = JSON.parse(text);
+      } catch {
+        createAiValidationError(kind, 'Invalid JSON payload.');
+      }
     } else if (kind === 'suggestPlotTwist') {
       const { genre } = context;
       if (!isNonEmptyString(genre, 120)) {
@@ -502,7 +630,11 @@ app.post('/api/ai/generate', async (req, res) => {
         throw new Error('No response from AI');
       }
 
-      data = JSON.parse(text);
+      try {
+        data = JSON.parse(text);
+      } catch {
+        createAiValidationError(kind, 'Invalid JSON payload.');
+      }
     } else if (kind === 'generateSpeech') {
       const { text, voiceName } = context;
       if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
@@ -535,6 +667,11 @@ app.post('/api/ai/generate', async (req, res) => {
       return sendError(res, 400, 'Unknown request kind.', 'INVALID_REQUEST');
     }
 
+    const validation = validateAiResponse(kind, data);
+    if (!validation.ok) {
+      createAiValidationError(kind, validation.reason);
+    }
+
     return res.json({ data });
   } catch (error) {
     const message = error?.message || '';
@@ -543,13 +680,25 @@ app.post('/api/ai/generate', async (req, res) => {
       message.includes('RESOURCE_EXHAUSTED') ||
       message.includes('rate limit');
     const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
+    const isInvalidAi = error?.code === 'INVALID_AI_RESPONSE';
 
     console.error('[ai/generate] Failed', error);
     return sendError(
       res,
       isTimeout ? 504 : isRateLimit ? 429 : 502,
-      isTimeout ? 'AI request timed out.' : 'AI request failed.',
-      isTimeout ? 'UPSTREAM_TIMEOUT' : isRateLimit ? 'RATE_LIMITED' : 'UPSTREAM_ERROR'
+      isTimeout
+        ? 'AI request timed out.'
+        : isInvalidAi
+        ? 'AI response did not match expected format.'
+        : 'AI request failed.',
+      isTimeout
+        ? 'UPSTREAM_TIMEOUT'
+        : isRateLimit
+        ? 'RATE_LIMITED'
+        : isInvalidAi
+        ? 'INVALID_AI_RESPONSE'
+        : 'UPSTREAM_ERROR',
+      isInvalidAi ? error?.details : undefined
     );
   }
 });
@@ -575,6 +724,20 @@ app.use((err, req, res, next) => {
   return sendError(res, 500, 'Server error.', 'SERVER_ERROR');
 });
 
-app.listen(PORT, () => {
-  console.log(`[api] listening on http://localhost:${PORT}`);
-});
+const startServer = () => {
+  startCleanupTimer();
+  return app.listen(PORT, () => {
+    console.log(`[api] listening on http://localhost:${PORT}`);
+  });
+};
+
+const isMain =
+  typeof process !== 'undefined' &&
+  process.argv?.[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  startServer();
+}
+
+export { app, startServer, pruneStaleEntries, sessions, rateBuckets };

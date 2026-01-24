@@ -220,24 +220,38 @@ export const generateSpeech = async (
   voiceName: string,
   options?: RequestOptions
 ): Promise<ArrayBuffer> => {
-  const data = await requestAi<{ audioBase64: string }>(
+  const request = createGenerateSpeechRequest(text, voiceName, options);
+  return request.promise;
+};
+
+export const createGenerateSpeechRequest = (
+  text: string,
+  voiceName: string,
+  options?: RequestOptions
+): CancellableRequest<ArrayBuffer> => {
+  const request = createAiRequest<{ audioBase64: string }>(
     'generateSpeech',
     { text, voiceName },
     options
   );
-  const base64Audio = data.audioBase64;
 
-  if (!base64Audio) {
-    throw new Error('No audio data returned');
-  }
+  return {
+    cancel: request.cancel,
+    promise: request.promise.then((data) => {
+      const base64Audio = data.audioBase64;
+      if (!base64Audio) {
+        throw new Error('No audio data returned');
+      }
 
-  const binaryString = atob(base64Audio);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
+      const binaryString = atob(base64Audio);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    })
+  };
 };
 
 export const createGenerateSceneRequest = (

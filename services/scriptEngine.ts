@@ -1,5 +1,5 @@
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
-import { generateSpeech } from './gemini';
+import { createGenerateSpeechRequest } from './gemini';
 import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from './audioCache';
 
 // Global Content-Addressable Cache (persists across plays)
@@ -60,6 +60,7 @@ export class ScriptEngine {
   private maxBlockRetries = 1;
   private blockRetryCounts: Map<string, number> = new Map();
   private skippedBlocks: Set<string> = new Set();
+  private inflightCancels: Map<string, () => void> = new Map();
   private listeners: Map<string, EventHandler[]> = new Map();
 
   // --- Event System ---
@@ -92,6 +93,7 @@ export class ScriptEngine {
     this.queue = [];
     this.blockRetryCounts.clear();
     this.skippedBlocks.clear();
+    this.abortInflight();
     if (options?.clearCache) {
       this.clearAudioCache();
     }
@@ -144,7 +146,8 @@ export class ScriptEngine {
 
   // One-off generation for UI previews (uses same cache)
   public async generateSingle(text: string, voiceId: string): Promise<ArrayBuffer> {
-     return this.fetchAudio(text, voiceId);
+     const requestId = `preview:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+     return this.fetchAudio(text, voiceId, requestId);
   }
 
   // --- Core Processing Loop ---
@@ -176,7 +179,7 @@ export class ScriptEngine {
     if (!this.isRunning) return;
     try {
       // Check cache or fetch
-      const buffer = await this.fetchAudio(item.block.text, item.voiceId);
+      const buffer = await this.fetchAudio(item.block.text, item.voiceId, item.block.id);
       this.blockRetryCounts.delete(item.block.id);
 
       if (this.isRunning) {
@@ -190,7 +193,7 @@ export class ScriptEngine {
         } as AudioChunk);
       }
     } catch (error: unknown) {
-      if (!this.isRunning) return;
+      if (!this.isRunning || isAbortError(error)) return;
       const blockId = item.block.id;
       const retryCount = this.blockRetryCounts.get(blockId) ?? 0;
 
@@ -217,7 +220,12 @@ export class ScriptEngine {
 
   // --- Gemini Integration & Caching ---
 
-  private async fetchAudio(text: string, voiceId: string, retryCount = 0): Promise<ArrayBuffer> {
+  private async fetchAudio(
+    text: string,
+    voiceId: string,
+    requestId: string,
+    retryCount = 0
+  ): Promise<ArrayBuffer> {
     const safeText = text.trim();
     // Cache Key: VoiceID + Text. 
     // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
@@ -228,13 +236,19 @@ export class ScriptEngine {
       return cached;
     }
 
+    const request = createGenerateSpeechRequest(safeText, voiceId);
+    this.inflightCancels.set(requestId, request.cancel);
+
     try {
-      const buffer = await generateSpeech(safeText, voiceId);
+      const buffer = await request.promise;
 
       // Write to Cache
       AudioCache.set(cacheKey, buffer);
       return buffer;
     } catch (error: unknown) {
+       if (isAbortError(error)) {
+         throw error;
+       }
        // Handle Rate Limiting (429)
        const { message, status, code } = getErrorMeta(error);
        const isRateLimit =
@@ -262,10 +276,28 @@ export class ScriptEngine {
             throw new Error("Engine stopped during retry backoff");
          }
 
-         return this.fetchAudio(text, voiceId, retryCount + 1);
+         return this.fetchAudio(text, voiceId, requestId, retryCount + 1);
        }
        
        throw error;
+    } finally {
+      this.inflightCancels.delete(requestId);
     }
   }
+
+  private abortInflight() {
+    this.inflightCancels.forEach((cancel) => {
+      try {
+        cancel();
+      } catch {
+        // Ignore abort errors for already-completed requests.
+      }
+    });
+    this.inflightCancels.clear();
+  }
 }
+
+const isAbortError = (error: unknown) => {
+  const { code, message } = getErrorMeta(error);
+  return code === 'REQUEST_ABORTED' || message === 'Request canceled.';
+};
