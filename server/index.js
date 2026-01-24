@@ -26,14 +26,30 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const RATE_LIMIT_MINUTE_MS = 60 * 1000;
 const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = parsePositiveInt(process.env.MAP_CLEANUP_INTERVAL_MS, 20 * 60 * 1000);
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 8;
+const LOGIN_BUCKET_TTL_MS = LOGIN_WINDOW_MS * 2;
 
 const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
 ];
+const ALLOWED_VOICES = new Set([
+  'Aoede',
+  'Callirrhoe',
+  'Kore',
+  'Sulafat',
+  'Zephyr',
+  'Charon',
+  'Fenrir',
+  'Puck',
+  'Rasalgethi',
+  'Umbriel'
+]);
 
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
 const sessions = new Map();
 const rateBuckets = new Map();
+const loginBuckets = new Map();
 const MAX_SCENE_HEADING_CHARS = 200;
 const MAX_SCENE_SUMMARY_CHARS = 2000;
 const MAX_SCENE_BLOCKS = 200;
@@ -44,6 +60,33 @@ const MAX_PREMISE_CHARS = 4000;
 const MAX_GENRE_CHARS = 120;
 const MAX_CHARACTERS = 12;
 const MAX_AUDIO_BASE64_CHARS = 5 * 1024 * 1024;
+const CSP_HEADER = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "object-src 'none'"
+].join('; ');
+const SECURITY_HEADERS = {
+  'Content-Security-Policy': CSP_HEADER,
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Content-Type-Options': 'nosniff',
+  'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), payment=(), usb=()',
+  'X-Frame-Options': 'DENY'
+};
+
+if (IS_PROD) {
+  app.use((req, res, next) => {
+    for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+      res.setHeader(key, value);
+    }
+    next();
+  });
+}
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -267,6 +310,36 @@ const checkRateLimit = (key) => {
   return { allowed: true };
 };
 
+const checkLoginRateLimit = (key) => {
+  if (!key) return { allowed: true };
+  const now = Date.now();
+  const bucket = loginBuckets.get(key) || {
+    windowStart: now,
+    count: 0,
+    lastSeen: now
+  };
+
+  if (now - bucket.windowStart >= LOGIN_WINDOW_MS) {
+    bucket.windowStart = now;
+    bucket.count = 0;
+  }
+  bucket.lastSeen = now;
+
+  const nextCount = bucket.count + 1;
+  const exceeded = LOGIN_MAX_ATTEMPTS > 0 && nextCount > LOGIN_MAX_ATTEMPTS;
+  if (exceeded) {
+    const retryAfterMs = bucket.windowStart + LOGIN_WINDOW_MS - now;
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000))
+    };
+  }
+
+  bucket.count = nextCount;
+  loginBuckets.set(key, bucket);
+  return { allowed: true };
+};
+
 const pruneStaleEntries = (now = Date.now()) => {
   for (const [sessionId, session] of sessions.entries()) {
     if (!session || session.expiresAt <= now) {
@@ -278,6 +351,13 @@ const pruneStaleEntries = (now = Date.now()) => {
     const lastSeen = bucket?.lastSeen ?? bucket?.dayStart ?? bucket?.minuteStart ?? 0;
     if (!lastSeen || now - lastSeen > RATE_LIMIT_DAY_MS) {
       rateBuckets.delete(key);
+    }
+  }
+
+  for (const [key, bucket] of loginBuckets.entries()) {
+    const lastSeen = bucket?.lastSeen ?? bucket?.windowStart ?? 0;
+    if (!lastSeen || now - lastSeen > LOGIN_BUCKET_TTL_MS) {
+      loginBuckets.delete(key);
     }
   }
 };
@@ -319,9 +399,24 @@ const rateLimitAi = (req, res, next) => {
   return next();
 };
 
+const rateLimitLogin = (req, res, next) => {
+  const key = getClientIp(req);
+  const result = checkLoginRateLimit(key);
+  if (!result.allowed) {
+    res.set('Retry-After', String(result.retryAfterSeconds));
+    console.warn('[auth/login] Rate limited', { ip: key, retryAfterSeconds: result.retryAfterSeconds });
+    return sendError(res, 429, 'Too many login attempts. Please try again later.', 'LOGIN_RATE_LIMITED', {
+      retryAfterSeconds: result.retryAfterSeconds,
+      limit: LOGIN_MAX_ATTEMPTS,
+      windowSeconds: Math.ceil(LOGIN_WINDOW_MS / 1000)
+    });
+  }
+  return next();
+};
+
 app.use(express.json({ limit: BODY_LIMIT }));
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', rateLimitLogin, (req, res) => {
   const password = req.body?.password;
   if (!isNonEmptyString(password, 256)) {
     return sendError(res, 400, 'Invalid login payload.', 'INVALID_REQUEST');
@@ -330,6 +425,7 @@ app.post('/api/auth/login', (req, res) => {
     return sendError(res, 500, 'Server missing ADMIN_PASSWORD.', 'CONFIG_ERROR');
   }
   if (!safeEqual(password, ADMIN_PASSWORD)) {
+    console.warn('[auth/login] Invalid password', { ip: getClientIp(req) });
     return sendError(res, 401, 'Invalid password.', 'UNAUTHORIZED');
   }
   const sessionId = createSession();
@@ -639,6 +735,9 @@ app.post('/api/ai/generate', async (req, res) => {
       const { text, voiceName } = context;
       if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
         return sendError(res, 400, 'Invalid generateSpeech context.', 'INVALID_REQUEST');
+      }
+      if (!ALLOWED_VOICES.has(voiceName)) {
+        return sendError(res, 400, 'Invalid voice selection.', 'INVALID_VOICE');
       }
       if (!ensurePromptSize(res, text.length)) {
         return;
