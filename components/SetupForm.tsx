@@ -83,10 +83,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading, onErro
       setGenre(data.genre);
       setPremise(data.premise);
       setCharacters(data.characters);
-      // Update form directly (non-blocking)
-      setGenre(data.genre);
-      setPremise(data.premise);
-      setCharacters(data.characters);
 
       // Trigger visual feedback
       setJustSurprised(true);

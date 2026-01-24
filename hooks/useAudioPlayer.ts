@@ -81,6 +81,17 @@ export const useAudioPlayer = (
     currentIndexRef.current = 0;
   }, []);
 
+  useEffect(() => {
+    return () => {
+      stop();
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state !== 'closed') {
+        ctx.close().catch(() => {});
+      }
+      audioContextRef.current = null;
+    };
+  }, [stop]);
+
   const playNext = async () => {
     if (!isPlayingRef.current) return;
 

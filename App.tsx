@@ -68,6 +68,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('write');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -88,6 +89,7 @@ export default function App() {
   const draftSaveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const didHydrateDraftRef = useRef(false);
   const lastNonPrivacyPathRef = useRef('/');
+  const autosaveFailureNotifiedRef = useRef(false);
 
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
     const { code, status, message } = getErrorMeta(err);
@@ -289,8 +291,14 @@ export default function App() {
       };
       try {
         window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
+        autosaveFailureNotifiedRef.current = false;
+        setAutosaveError(null);
       } catch (err) {
         console.warn('Failed to save draft', err);
+        if (!autosaveFailureNotifiedRef.current) {
+          autosaveFailureNotifiedRef.current = true;
+          setAutosaveError('Autosave failed—consider exporting.');
+        }
       }
     }, DRAFT_DEBOUNCE_MS);
     return () => {
@@ -331,6 +339,8 @@ export default function App() {
     setActiveTab('write');
     setError(null);
     setToast(null);
+    setAutosaveError(null);
+    autosaveFailureNotifiedRef.current = false;
     try {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     } catch (err) {
@@ -594,6 +604,7 @@ export default function App() {
     const sanitizedTitle = isUntitled ? 'untitled_script' : context.title.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
     a.download = `${sanitizedTitle}.txt`;
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   const getPreviewText = (charName: string): string => {
@@ -696,6 +707,9 @@ export default function App() {
               Clear draft
             </button>
           </div>
+          {autosaveError && (
+            <p className="mt-2 text-[10px] text-amber-400">{autosaveError}</p>
+          )}
         </div>
 
         {/* Tab Bar */}

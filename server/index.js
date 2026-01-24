@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import cookie from 'cookie';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const app = express();
@@ -44,13 +45,7 @@ const isNonEmptyString = (value, max = 4000) => (
 const sendError = (res, status, message, code, details) =>
   res.status(status).json({ error: { message, code, ...(details ? { details } : {}) } });
 
-const parseCookies = (cookieHeader = '') =>
-  cookieHeader.split(';').reduce((acc, pair) => {
-    const [rawKey, ...rest] = pair.trim().split('=');
-    if (!rawKey) return acc;
-    acc[rawKey] = decodeURIComponent(rest.join('='));
-    return acc;
-  }, {});
+const parseCookies = (cookieHeader = '') => cookie.parse(cookieHeader);
 
 const getClientIp = (req) => {
   const forwarded = req.headers['x-forwarded-for'];
