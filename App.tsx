@@ -6,7 +6,12 @@ import { InsertBlock } from './components/InsertBlock';
 import { Button } from './components/Button';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
-import { generateScene, suggestPlotTwist, regenerateScriptBlock } from './services/gemini';
+import {
+  createGenerateSceneRequest,
+  createSuggestPlotTwistRequest,
+  createRegenerateScriptBlockRequest,
+  CancellableRequest
+} from './services/gemini';
 import { getSession, login } from './services/auth';
 import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
@@ -31,6 +36,7 @@ export default function App() {
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const activeAiRequestRef = useRef<CancellableRequest<unknown> | null>(null);
   
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -45,6 +51,15 @@ export default function App() {
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const handleAiError = useCallback((err: any, fallbackMessage: string) => {
+    const code = err?.code;
+    if (code === 'REQUEST_ABORTED') {
+      setError(null);
+      return true;
+    }
+    if (code === 'REQUEST_TIMEOUT' || code === 'UPSTREAM_TIMEOUT') {
+      setError('Request timed out. Please try again.');
+      return true;
+    }
     const status = err?.status;
     if (status === 401) {
       setAuthStatus('unauthenticated');
@@ -59,6 +74,31 @@ export default function App() {
     setError(err?.message || fallbackMessage);
     return false;
   }, []);
+
+  const startAiRequest = <T,>(request: CancellableRequest<T>) => {
+    if (activeAiRequestRef.current) {
+      activeAiRequestRef.current.cancel();
+    }
+    activeAiRequestRef.current = request as CancellableRequest<unknown>;
+    setIsGenerating(true);
+    setError(null);
+  };
+
+  const finishAiRequest = <T,>(request: CancellableRequest<T>) => {
+    if (activeAiRequestRef.current === request) {
+      activeAiRequestRef.current = null;
+      setIsGenerating(false);
+    }
+  };
+
+  const cancelAiRequest = () => {
+    if (activeAiRequestRef.current) {
+      activeAiRequestRef.current.cancel();
+      activeAiRequestRef.current = null;
+    }
+    setIsGenerating(false);
+    setError(null);
+  };
 
   // Custom Hooks
   const { 
@@ -147,15 +187,21 @@ export default function App() {
 
   // Handlers
   const handleStart = async (data: { genre: string; premise: string; characters: string[] }) => {
-    setIsGenerating(true);
-    setError(null);
+    if (isGenerating) return;
+    let request: CancellableRequest<Scene> | null = null;
     try {
       const initialContext: StoryContext = { 
         ...data, 
         title: 'Untitled Screenplay',
         scenes: [] 
       };
-      const firstScene = await generateScene(initialContext, "Write the opening scene setting the tone.", true);
+      request = createGenerateSceneRequest(
+        initialContext,
+        "Write the opening scene setting the tone.",
+        true
+      );
+      startAiRequest(request);
+      const firstScene = await request.promise;
       
       setContext({
         ...initialContext,
@@ -164,37 +210,46 @@ export default function App() {
     } catch (e: any) {
       handleAiError(e, e?.message || "Failed to generate story");
     } finally {
-      setIsGenerating(false);
+      if (request) {
+        finishAiRequest(request);
+      }
     }
   };
 
   const handleGenerateNext = async () => {
-    if (!context) return;
-    setIsGenerating(true);
-    setError(null);
+    if (!context || isGenerating) return;
+    let request: CancellableRequest<Scene> | null = null;
     try {
       const prompt = userInstruction || "Continue the story logically.";
-      const nextScene = await generateScene(context, prompt, false);
+      request = createGenerateSceneRequest(context, prompt, false);
+      startAiRequest(request);
+      const nextScene = await request.promise;
       setContext(prev => prev ? { ...prev, scenes: [...prev.scenes, nextScene] } : null);
       setUserInstruction('');
     } catch (e: any) {
       handleAiError(e, e?.message || 'Failed to generate scene.');
     } finally {
-      setIsGenerating(false);
+      if (request) {
+        finishAiRequest(request);
+      }
     }
   };
 
   const handleTwist = async () => {
-    if (!context) return;
-    setIsGenerating(true);
+    if (!context || isGenerating) return;
+    let request: CancellableRequest<string> | null = null;
     try {
-      const twist = await suggestPlotTwist(context.genre);
+      request = createSuggestPlotTwistRequest(context.genre);
+      startAiRequest(request);
+      const twist = await request.promise;
       setUserInstruction(`PLOT TWIST: ${twist}`);
     } catch (e) {
       console.error(e);
       handleAiError(e, 'Failed to generate plot twist.');
     } finally {
-      setIsGenerating(false);
+      if (request) {
+        finishAiRequest(request);
+      }
     }
   };
 
@@ -276,11 +331,13 @@ export default function App() {
 
     if (!block || block.locked) return;
 
-    setIsGenerating(true);
     const originalText = block.text;
 
+    let request: CancellableRequest<string> | null = null;
     try {
-      const newText = await regenerateScriptBlock(block, context.genre, context.premise);
+      request = createRegenerateScriptBlockRequest(block, context.genre, context.premise);
+      startAiRequest(request);
+      const newText = await request.promise;
       
       // Update state
       setContext(prev => {
@@ -316,7 +373,9 @@ export default function App() {
       console.error(e);
       handleAiError(e, "Failed to regenerate block.");
     } finally {
-      setIsGenerating(false);
+      if (request) {
+        finishAiRequest(request);
+      }
     }
   };
 
@@ -425,6 +484,13 @@ export default function App() {
         {error && (
           <div className="absolute bottom-4 left-0 right-0 text-center text-red-400">
             Error: {error}
+          </div>
+        )}
+        {isGenerating && (
+          <div className="absolute top-4 right-4">
+            <Button variant="ghost" size="sm" onClick={cancelAiRequest}>
+              Cancel
+            </Button>
           </div>
         )}
         <LoginModal
@@ -647,6 +713,9 @@ export default function App() {
               <div className="mt-8 text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
                 <span className="text-sm font-medium">Running writers room simulation...</span>
+                <Button variant="ghost" size="sm" onClick={cancelAiRequest}>
+                  Cancel
+                </Button>
               </div>
             )}
           </div>

@@ -14,6 +14,7 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 const AI_RPM = parsePositiveInt(process.env.AI_RPM, 30);
 const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
 const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
+const AI_UPSTREAM_TIMEOUT_MS = parsePositiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 30000);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 const GENRES = [
@@ -99,6 +100,29 @@ const ensurePromptSize = (res, size) => {
     return false;
   }
   return true;
+};
+
+const withTimeout = async (promise, timeoutMs) => {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promise;
+  }
+
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error('Upstream request timed out.');
+      error.code = 'UPSTREAM_TIMEOUT';
+      reject(error);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 };
 
 const checkRateLimit = (key) => {
@@ -294,7 +318,7 @@ app.post('/api/ai/generate', async (req, res) => {
     Ensure the output is valid JSON.
   `;
 
-      const response = await ai.models.generateContent({
+      const response = await withTimeout(ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
@@ -321,7 +345,7 @@ app.post('/api/ai/generate', async (req, res) => {
             required: ['heading', 'summary', 'blocks']
           }
         }
-      });
+      }), AI_UPSTREAM_TIMEOUT_MS);
 
       const text = response.text;
       if (!text) {
@@ -335,10 +359,10 @@ app.post('/api/ai/generate', async (req, res) => {
         return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
       }
 
-      const response = await ai.models.generateContent({
+      const response = await withTimeout(ai.models.generateContent({
         model: 'gemini-2.5-flash-lite',
         contents: `Give me a short, shocking, single-sentence plot twist idea for a ${genre} story.`
-      });
+      }), AI_UPSTREAM_TIMEOUT_MS);
 
       data = { text: response.text || 'Suddenly, everything changes.' };
     } else if (kind === 'generateScriptElement') {
@@ -374,7 +398,7 @@ app.post('/api/ai/generate', async (req, res) => {
         userPrompt = `Write a scene heading (slugline) like INT. HOUSE - DAY. Context: ${styleContext}. Instruction: ${instruction}`;
       }
 
-      const response = await ai.models.generateContent({
+      const response = await withTimeout(ai.models.generateContent({
         model: 'gemini-2.5-flash-lite',
         contents: userPrompt,
         config: {
@@ -383,7 +407,7 @@ app.post('/api/ai/generate', async (req, res) => {
           maxOutputTokens: 100,
           temperature: 0.7
         }
-      });
+      }), AI_UPSTREAM_TIMEOUT_MS);
 
       data = { text: response.text?.trim() || '' };
     } else if (kind === 'regenerateScriptBlock') {
@@ -426,14 +450,14 @@ app.post('/api/ai/generate', async (req, res) => {
     Output ONLY the new text.`;
       }
 
-      const response = await ai.models.generateContent({
+      const response = await withTimeout(ai.models.generateContent({
         model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           maxOutputTokens: 150,
           temperature: 0.8
         }
-      });
+      }), AI_UPSTREAM_TIMEOUT_MS);
 
       data = { text: response.text?.trim() || text };
     } else if (kind === 'generateSurpriseSetup') {
@@ -455,7 +479,7 @@ app.post('/api/ai/generate', async (req, res) => {
     'characters' (array of 3 character names with brief role description, e.g. "John (The Detective)").
   `;
 
-      const response = await ai.models.generateContent({
+      const response = await withTimeout(ai.models.generateContent({
         model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
@@ -470,7 +494,7 @@ app.post('/api/ai/generate', async (req, res) => {
             required: ['genre', 'premise', 'characters']
           }
         }
-      });
+      }), AI_UPSTREAM_TIMEOUT_MS);
 
       const text = response.text;
       if (!text) {
@@ -487,7 +511,7 @@ app.post('/api/ai/generate', async (req, res) => {
         return;
       }
 
-      const response = await ai.models.generateContent({
+      const response = await withTimeout(ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-tts',
         contents: [{ parts: [{ text: text }] }],
         config: {
@@ -498,7 +522,7 @@ app.post('/api/ai/generate', async (req, res) => {
             }
           }
         }
-      });
+      }), AI_UPSTREAM_TIMEOUT_MS);
 
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!base64Audio) {
@@ -517,13 +541,14 @@ app.post('/api/ai/generate', async (req, res) => {
       message.includes('429') ||
       message.includes('RESOURCE_EXHAUSTED') ||
       message.includes('rate limit');
+    const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
 
     console.error('[ai/generate] Failed', error);
     return sendError(
       res,
-      isRateLimit ? 429 : 502,
-      'AI request failed.',
-      isRateLimit ? 'RATE_LIMITED' : 'UPSTREAM_ERROR'
+      isTimeout ? 504 : isRateLimit ? 429 : 502,
+      isTimeout ? 'AI request timed out.' : 'AI request failed.',
+      isTimeout ? 'UPSTREAM_TIMEOUT' : isRateLimit ? 'RATE_LIMITED' : 'UPSTREAM_ERROR'
     );
   }
 });
