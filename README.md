@@ -57,3 +57,56 @@ npm run dev
 ```
 
 The API server runs on `http://localhost:3001` and the app will typically start at `http://localhost:3000`.
+
+## Deployment (Production)
+
+This project ships a static client plus a Node API server. In production, serve the `dist/` output and reverse-proxy `/api` to the Node server so the client and API share the same origin.
+
+1. Build the client:
+
+```bash
+npm run build
+```
+
+2. Start the API server with required env vars:
+
+```bash
+ADMIN_PASSWORD=your_admin_password \
+GEMINI_API_KEY=your_google_ai_studio_api_key_here \
+PORT=3001 \
+node server/index.js
+```
+
+3. Serve `dist/` from your web server and proxy `/api` to the API server.
+
+Example Nginx location block:
+
+```nginx
+location /api/ {
+  proxy_pass http://127.0.0.1:3001;
+  proxy_http_version 1.1;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+## Security Headers & CSP
+
+Apply security headers at your edge (CDN/reverse proxy/static host). Below is a recommended baseline for the client app.
+
+Recommended CSP (adjust `connect-src` if the API is on a separate origin):
+
+```text
+Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; upgrade-insecure-requests
+```
+
+Suggested security headers:
+
+```text
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+Cross-Origin-Resource-Policy: same-origin
+```
