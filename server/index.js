@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -11,6 +13,10 @@ const BODY_LIMIT = '64kb';
 const PORT = process.env.PORT || 3001;
 const SESSION_COOKIE_NAME = 'ss_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DIST_DIR = path.resolve(__dirname, '..', 'dist');
+const IS_PROD = process.env.NODE_ENV === 'production';
 const AI_RPM = parsePositiveInt(process.env.AI_RPM, 30);
 const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
 const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
@@ -552,6 +558,16 @@ app.post('/api/ai/generate', async (req, res) => {
     );
   }
 });
+
+if (IS_PROD) {
+  app.use(express.static(DIST_DIR));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    return res.sendFile(path.join(DIST_DIR, 'index.html'));
+  });
+}
 
 app.use((err, req, res, next) => {
   void next;
