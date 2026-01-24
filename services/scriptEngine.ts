@@ -1,9 +1,10 @@
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
 import { generateSpeech } from './gemini';
+import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from './audioCache';
 
 // Global Content-Addressable Cache (persists across plays)
 // Key: voiceId:text | Value: ArrayBuffer (Raw PCM)
-const AudioCache = new Map<string, ArrayBuffer>();
+const AudioCache = new LruAudioCache(AUDIO_CACHE_MAX_ENTRIES, AUDIO_CACHE_MAX_BYTES);
 
 interface QueueItem {
   block: ScriptBlock;
@@ -57,16 +58,26 @@ export class ScriptEngine {
 
   // --- Pipeline Control ---
 
-  public stop() {
+  public stop(options?: { clearCache?: boolean }) {
     this.isRunning = false;
     this.queue = [];
     this.blockRetryCounts.clear();
     this.skippedBlocks.clear();
-    // Note: We deliberately do NOT clear AudioCache so re-plays are instant
+    if (options?.clearCache) {
+      this.clearAudioCache();
+    }
   }
 
-  public async start(blocks: ScriptBlock[], voiceConfigs: VoiceConfig[]) {
-    this.stop();
+  public clearAudioCache() {
+    AudioCache.clear();
+  }
+
+  public async start(
+    blocks: ScriptBlock[],
+    voiceConfigs: VoiceConfig[],
+    options?: { clearCache?: boolean }
+  ) {
+    this.stop({ clearCache: options?.clearCache });
     this.isRunning = true;
 
     // 1. Filter: Only process blocks that need audio
@@ -183,8 +194,9 @@ export class ScriptEngine {
     // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
     const cacheKey = `${voiceId}:${safeText}`;
 
-    if (AudioCache.has(cacheKey)) {
-      return AudioCache.get(cacheKey)!;
+    const cached = AudioCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
     }
 
     try {
