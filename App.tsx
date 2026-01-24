@@ -75,6 +75,18 @@ export default function App() {
     return false;
   }, []);
 
+  const handleAudioSkip = useCallback((block: ScriptBlock) => {
+    const rawText = block.text.trim();
+    const snippet = rawText.length > 60 ? `${rawText.slice(0, 57)}...` : rawText;
+    const label = block.type === BlockType.DIALOGUE
+      ? (block.character ? block.character : 'Dialogue')
+      : block.type === BlockType.ACTION
+        ? 'Action'
+        : 'Transition';
+    const detail = snippet ? `: "${snippet}"` : '';
+    setToast({ message: `Skipped audio for ${label}${detail}` });
+  }, []);
+
   const startAiRequest = <T,>(request: CancellableRequest<T>) => {
     if (activeAiRequestRef.current) {
       activeAiRequestRef.current.cancel();
@@ -109,7 +121,7 @@ export default function App() {
     playScript, 
     playPreview, 
     stop 
-  } = useAudioPlayer(voiceConfigs, handleAiError);
+  } = useAudioPlayer(voiceConfigs, handleAiError, handleAudioSkip);
 
   // Clear preview state when playback ends
   useEffect(() => {

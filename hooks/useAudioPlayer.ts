@@ -4,7 +4,8 @@ import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
 
 export const useAudioPlayer = (
   voiceConfigs: VoiceConfig[],
-  onError?: (error: unknown, fallbackMessage: string) => void
+  onError?: (error: unknown, fallbackMessage: string) => void,
+  onSkip?: (block: ScriptBlock, error: unknown) => void
 ) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
@@ -18,6 +19,7 @@ export const useAudioPlayer = (
   const queueRef = useRef<ScriptBlock[]>([]);       // The full script to play
   const currentIndexRef = useRef(0);                // Pointer to current block in queue
   const audioDataMap = useRef<Map<string, AudioChunk>>(new Map()); // Buffer for arrived audio chunks
+  const skippedBlockIdsRef = useRef<Set<string>>(new Set());
   
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isPlayingRef = useRef(false); // Sync ref for callbacks
@@ -68,6 +70,7 @@ export const useAudioPlayer = (
     // Stop Engine & Reset Pointers
     engineRef.current?.stop();
     audioDataMap.current.clear();
+    skippedBlockIdsRef.current.clear();
     queueRef.current = [];
     currentIndexRef.current = 0;
   }, []);
@@ -88,6 +91,12 @@ export const useAudioPlayer = (
     
     // Skip silent blocks (headings)
     if (![BlockType.DIALOGUE, BlockType.ACTION, BlockType.TRANSITION].includes(block.type)) {
+      currentIndexRef.current++;
+      playNext();
+      return;
+    }
+
+    if (skippedBlockIdsRef.current.has(block.id)) {
       currentIndexRef.current++;
       playNext();
       return;
@@ -167,6 +176,26 @@ export const useAudioPlayer = (
 
     engine.on('audio', onAudio);
     const onEngineError = (payload: { error: unknown }) => {
+      const blockId = (payload as { blockId?: string }).blockId;
+      const skipped = (payload as { skipped?: boolean }).skipped;
+      if (skipped && blockId) {
+        if (!skippedBlockIdsRef.current.has(blockId)) {
+          skippedBlockIdsRef.current.add(blockId);
+          const skippedBlock = queueRef.current.find(block => block.id === blockId);
+          if (skippedBlock) {
+            onSkip?.(skippedBlock, payload.error);
+          }
+        }
+
+        if (isPlayingRef.current) {
+          const currentBlock = queueRef.current[currentIndexRef.current];
+          if (currentBlock && currentBlock.id === blockId) {
+            currentIndexRef.current++;
+            playNext();
+          }
+        }
+        return;
+      }
       onError?.(payload.error, 'Audio generation failed.');
     };
     engine.on('error', onEngineError);
@@ -175,7 +204,7 @@ export const useAudioPlayer = (
       engine.off('audio', onAudio);
       engine.off('error', onEngineError);
     };
-  }, [onError]); 
+  }, [onError, onSkip]); 
 
   // --- Public Methods ---
 
@@ -188,6 +217,7 @@ export const useAudioPlayer = (
        queueRef.current = blocks;
        currentIndexRef.current = 0;
        audioDataMap.current.clear();
+       skippedBlockIdsRef.current.clear();
        
        // 1. Start Generator Pipeline (Sliding Window)
        engineRef.current?.start(blocks, voiceConfigs);

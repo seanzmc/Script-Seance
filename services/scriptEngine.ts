@@ -27,6 +27,9 @@ export class ScriptEngine {
   private activeRequests = 0;
   private concurrencyLimit = 1; // Reduced to 1 to avoid hitting strict rate limits (10 RPM)
   private isRunning = false;
+  private maxBlockRetries = 1;
+  private blockRetryCounts: Map<string, number> = new Map();
+  private skippedBlocks: Set<string> = new Set();
   private listeners: Map<string, EventHandler[]> = new Map();
 
   // --- Event System ---
@@ -57,6 +60,8 @@ export class ScriptEngine {
   public stop() {
     this.isRunning = false;
     this.queue = [];
+    this.blockRetryCounts.clear();
+    this.skippedBlocks.clear();
     // Note: We deliberately do NOT clear AudioCache so re-plays are instant
   }
 
@@ -90,6 +95,8 @@ export class ScriptEngine {
         pitch: config?.pitch || 0
       };
     });
+    this.blockRetryCounts.clear();
+    this.skippedBlocks.clear();
 
     // 3. Start the sliding window
     this.processQueue();
@@ -130,7 +137,8 @@ export class ScriptEngine {
     try {
       // Check cache or fetch
       const buffer = await this.fetchAudio(item.block.text, item.voiceId);
-      
+      this.blockRetryCounts.delete(item.block.id);
+
       if (this.isRunning) {
         // Emit immediately for streaming playback
         this.emit('audio', {
@@ -142,8 +150,27 @@ export class ScriptEngine {
         } as AudioChunk);
       }
     } catch (e) {
-      console.error("Failed to generate block", item.block.id, e);
-      this.emit('error', { error: e, blockId: item.block.id });
+      if (!this.isRunning) return;
+      const blockId = item.block.id;
+      const retryCount = this.blockRetryCounts.get(blockId) ?? 0;
+
+      if (retryCount < this.maxBlockRetries) {
+        this.blockRetryCounts.set(blockId, retryCount + 1);
+        console.warn(`[ScriptEngine] Retry ${retryCount + 1}/${this.maxBlockRetries} for block ${blockId}`);
+        return this.fetchQueueItem(item);
+      }
+
+      this.blockRetryCounts.delete(blockId);
+      if (!this.skippedBlocks.has(blockId)) {
+        this.skippedBlocks.add(blockId);
+        console.error("Failed to generate block", blockId, e);
+        this.emit('error', {
+          error: e,
+          blockId,
+          skipped: true,
+          attempts: retryCount + 1
+        });
+      }
       // We log but continue, effectively skipping the faulty block
     }
   }
