@@ -561,10 +561,7 @@ app.post('/api/ai/generate', async (req, res) => {
 
 if (IS_PROD) {
   app.use(express.static(DIST_DIR));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
+  app.get(/^(?!\/api).*/, (req, res) => {
     return res.sendFile(path.join(DIST_DIR, 'index.html'));
   });
 }
