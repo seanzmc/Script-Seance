@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
-import { Sparkles, Users, BookOpen, Plus, Trash2, Shuffle } from "lucide-react";
+import { Users, BookOpen, Plus, Trash2, Shuffle } from "lucide-react";
 import { generateSurpriseSetup } from "../services/gemini";
 
 interface SetupFormProps {

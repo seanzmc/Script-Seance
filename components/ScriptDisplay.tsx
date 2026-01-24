@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Scene, BlockType } from '../types';
-import { Play, Square, ChevronDown, Check, MousePointer2, ScrollText, Zap, SlidersHorizontal, RefreshCw, Lock, Unlock } from 'lucide-react';
+import { Play, Square, ChevronDown, Check, ScrollText, Zap, RefreshCw, Lock, Unlock } from 'lucide-react';
 
 interface ScriptDisplayProps {
   scenes: Scene[];
@@ -163,7 +163,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"></div>
         
         <div className="relative z-10 space-y-6">
-          {scenes.map((scene, sceneIndex) => (
+          {scenes.map((scene) => (
             <div key={scene.id} id={`scene-${scene.id}`} className="mb-8">
               <div className="font-bold uppercase mb-4 text-lg border-b border-gray-300 pb-2">
                 {scene.heading}

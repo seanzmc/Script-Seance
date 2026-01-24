@@ -43,7 +43,9 @@ export const useAudioPlayer = (
   // Audio Context Singleton Lazy Loader
   const getContext = () => {
     if (!audioContextRef.current) {
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      const Ctx =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       audioContextRef.current = new Ctx({ sampleRate: 24000 });
     }
     if (audioContextRef.current.state === 'suspended') {
@@ -63,7 +65,11 @@ export const useAudioPlayer = (
     
     // Stop Audio Source
     if (activeSourceRef.current) {
-      try { activeSourceRef.current.stop(); } catch(e){}
+      try {
+        activeSourceRef.current.stop();
+      } catch {
+        // Ignore errors when stopping an already-stopped node.
+      }
       activeSourceRef.current = null;
     }
     
@@ -204,6 +210,7 @@ export const useAudioPlayer = (
       engine.off('audio', onAudio);
       engine.off('error', onEngineError);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onError, onSkip]); 
 
   // --- Public Methods ---
@@ -260,9 +267,9 @@ export const useAudioPlayer = (
       setIsLoadingAudio(false);
       setIsPreviewPlaying(true);
       source.start();
-    } catch(e) {
-      console.error(e);
-      onError?.(e, 'Preview audio failed.');
+    } catch (error: unknown) {
+      console.error(error);
+      onError?.(error, 'Preview audio failed.');
       setIsLoadingAudio(false);
       setIsPreviewPlaying(false);
     }

@@ -1,32 +1,36 @@
 import React, { forwardRef, useImperativeHandle } from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react-dom/test-utils';
+import { act, cleanup, render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { BlockType, ScriptBlock, VoiceConfig } from '../types';
 
-let lastEngine: any = null;
+type EngineLike = {
+  emit: (event: string, payload: unknown) => void;
+};
+
+let lastEngine: EngineLike | null = null;
 
 vi.mock('../services/scriptEngine', () => {
   class MockEngine {
-    private listeners = new Map<string, Set<(data: any) => void>>();
+    private listeners = new Map<string, Set<(data: unknown) => void>>();
 
     constructor() {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       lastEngine = this;
     }
 
-    on(event: string, handler: (data: any) => void) {
+    on(event: string, handler: (data: unknown) => void) {
       if (!this.listeners.has(event)) {
         this.listeners.set(event, new Set());
       }
       this.listeners.get(event)?.add(handler);
     }
 
-    off(event: string, handler: (data: any) => void) {
+    off(event: string, handler: (data: unknown) => void) {
       this.listeners.get(event)?.delete(handler);
     }
 
-    emit(event: string, payload: any) {
+    emit(event: string, payload: unknown) {
       this.listeners.get(event)?.forEach(handler => handler(payload));
     }
 
@@ -49,21 +53,15 @@ const Harness = forwardRef((props: HarnessProps, ref) => {
   useImperativeHandle(ref, () => player);
   return null;
 });
+Harness.displayName = 'Harness';
 
 describe('useAudioPlayer', () => {
-  let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
-
   beforeEach(() => {
     vi.useFakeTimers();
-    container = document.createElement('div');
-    root = createRoot(container);
   });
 
   afterEach(() => {
-    act(() => {
-      root.unmount();
-    });
+    cleanup();
     vi.useRealTimers();
     lastEngine = null;
   });
@@ -78,11 +76,9 @@ describe('useAudioPlayer', () => {
     ];
     const onError = vi.fn();
     const onSkip = vi.fn();
-    const ref = React.createRef<any>();
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
 
-    await act(async () => {
-      root.render(<Harness ref={ref} voiceConfigs={voiceConfigs} onError={onError} onSkip={onSkip} />);
-    });
+    render(<Harness ref={ref} voiceConfigs={voiceConfigs} onError={onError} onSkip={onSkip} />);
 
     await act(async () => {
       ref.current.playScript(blocks);
@@ -92,6 +88,9 @@ describe('useAudioPlayer', () => {
     expect(ref.current.currentBlockId).toBe('block-1');
 
     await act(async () => {
+      if (!lastEngine) {
+        throw new Error('Engine not initialized');
+      }
       lastEngine.emit('error', { error: new Error('fail'), blockId: 'block-1', skipped: true });
     });
 

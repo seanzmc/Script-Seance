@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { PenTool, Zap, Plus, Type, User, Undo2 } from 'lucide-react';
+import { PenTool, Zap, Plus, Undo2 } from 'lucide-react';
 
 interface ScriptEditorProps {
   characters: string[];
@@ -31,8 +31,8 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
     if (!content.trim()) return;
 
     let finalText = content;
-    let blockType = elementType;
-    let char = selectedChar;
+    const blockType = elementType;
+    const char = selectedChar;
 
     if (mode === 'generate') {
       setIsGenerating(true);

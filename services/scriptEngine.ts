@@ -21,7 +21,36 @@ export interface AudioChunk {
   pitch: number;
 }
 
-type EventHandler = (data: any) => void;
+type EventHandler = (data: unknown) => void;
+
+const getErrorMeta = (error: unknown) => {
+  let message: string | undefined;
+  let status: number | undefined;
+  let code: string | number | undefined;
+
+  if (error instanceof Error) {
+    message = error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const record = error as Record<string, unknown>;
+    const recordMessage = record.message;
+    const recordStatus = record.status;
+    const recordCode = record.code;
+
+    if (typeof recordMessage === 'string') {
+      message = recordMessage;
+    }
+    if (typeof recordStatus === 'number') {
+      status = recordStatus;
+    }
+    if (typeof recordCode === 'string' || typeof recordCode === 'number') {
+      code = recordCode;
+    }
+  }
+
+  return { message, status, code };
+};
 
 export class ScriptEngine {
   private queue: QueueItem[] = [];
@@ -49,7 +78,7 @@ export class ScriptEngine {
      }
   }
 
-  private emit(event: string, data: any) {
+  private emit(event: string, data: unknown) {
     const handlers = this.listeners.get(event);
     if (handlers) {
       handlers.forEach(h => h(data));
@@ -160,7 +189,7 @@ export class ScriptEngine {
           pitch: item.pitch
         } as AudioChunk);
       }
-    } catch (e) {
+    } catch (error: unknown) {
       if (!this.isRunning) return;
       const blockId = item.block.id;
       const retryCount = this.blockRetryCounts.get(blockId) ?? 0;
@@ -174,9 +203,9 @@ export class ScriptEngine {
       this.blockRetryCounts.delete(blockId);
       if (!this.skippedBlocks.has(blockId)) {
         this.skippedBlocks.add(blockId);
-        console.error("Failed to generate block", blockId, e);
+        console.error("Failed to generate block", blockId, error);
         this.emit('error', {
-          error: e,
+          error,
           blockId,
           skipped: true,
           attempts: retryCount + 1
@@ -205,20 +234,21 @@ export class ScriptEngine {
       // Write to Cache
       AudioCache.set(cacheKey, buffer);
       return buffer;
-    } catch (e: any) {
+    } catch (error: unknown) {
        // Handle Rate Limiting (429)
+       const { message, status, code } = getErrorMeta(error);
        const isRateLimit =
-         e.message?.includes('429') ||
-         e.status === 429 ||
-         e.code === 429 ||
-         e.code === 'RATE_LIMITED' ||
-         e.message?.includes('RESOURCE_EXHAUSTED');
+         message?.includes('429') ||
+         status === 429 ||
+         code === 429 ||
+         code === 'RATE_LIMITED' ||
+         message?.includes('RESOURCE_EXHAUSTED');
        
        if (isRateLimit && retryCount < 4) {
          let delayMs = 3000 * Math.pow(2, retryCount); // Default: 3s, 6s, 12s, 24s
          
          // Extract specific retry delay if available from message "Please retry in X s."
-         const match = e.message?.match(/retry in ([\d\.]+)s/);
+         const match = message?.match(/retry in ([\d.]+)s/);
          if (match && match[1]) {
             delayMs = Math.ceil(parseFloat(match[1]) * 1000) + 1000; // +1s buffer
          }
@@ -235,7 +265,7 @@ export class ScriptEngine {
          return this.fetchAudio(text, voiceId, retryCount + 1);
        }
        
-       throw e;
+       throw error;
     }
   }
 }

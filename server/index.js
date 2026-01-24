@@ -554,6 +554,7 @@ app.post('/api/ai/generate', async (req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  void next;
   if (err?.type === 'entity.too.large') {
     return sendError(res, 413, 'Request body too large.', 'REQUEST_TOO_LARGE');
   }

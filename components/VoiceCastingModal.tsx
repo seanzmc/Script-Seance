@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Play, Check, Mic, Activity, Volume2, User, Pause, Loader2, Info } from 'lucide-react';
+import { X, Play, Check, Mic, User, Pause, Info } from 'lucide-react';
 import { VoiceConfig } from '../types';
 
 interface VoiceCastingModalProps {
@@ -257,7 +257,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
         <div className="p-4 border-t border-gray-800 bg-gray-900/50 flex justify-between items-center">
            <div className="text-xs text-gray-500 flex items-center gap-2">
              <Info className="w-3.5 h-3.5" />
-             Previewing {characterName}'s existing lines.
+             Previewing {characterName}&apos;s existing lines.
            </div>
            <button 
              onClick={onClose}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { PenTool, Zap, Plus, Type, User, Undo2, Info } from 'lucide-react';
+import { Zap, Plus, Undo2, Info } from 'lucide-react';
 
 interface InsertBlockProps {
   characters: string[];
@@ -38,8 +38,8 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     if (!content.trim()) return;
 
     let finalText = content;
-    let blockType = elementType;
-    let char = selectedChar;
+    const blockType = elementType;
+    const char = selectedChar;
 
     if (mode === 'generate') {
       setIsGenerating(true);

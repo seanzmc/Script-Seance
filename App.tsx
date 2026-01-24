@@ -15,7 +15,7 @@ import {
 import { getSession, login } from './services/auth';
 import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { Play, Pause, Save, PlusCircle, Sparkles, Download, AlertCircle, PenTool, Mic2, PlayCircle, Loader2, MousePointer2, ScrollText, RotateCcw } from 'lucide-react';
+import { Play, Pause, PlusCircle, Sparkles, Download, AlertCircle, PenTool, Mic2, PlayCircle, Loader2, ScrollText, RotateCcw } from 'lucide-react';
 
 type TabType = 'write' | 'cast' | 'play';
 
@@ -23,6 +23,17 @@ interface ToastState {
   message: string;
   onUndo?: () => void;
 }
+
+const getErrorMeta = (err: unknown) => {
+  if (!err || typeof err !== 'object') {
+    return { code: undefined, status: undefined, message: undefined };
+  }
+  const record = err as Record<string, unknown>;
+  const code = typeof record.code === 'string' ? record.code : undefined;
+  const status = typeof record.status === 'number' ? record.status : undefined;
+  const message = typeof record.message === 'string' ? record.message : undefined;
+  return { code, status, message };
+};
 
 export default function App() {
   // State
@@ -50,8 +61,8 @@ export default function App() {
   // Refs
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAiError = useCallback((err: any, fallbackMessage: string) => {
-    const code = err?.code;
+  const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
+    const { code, status, message } = getErrorMeta(err);
     if (code === 'REQUEST_ABORTED') {
       setError(null);
       return true;
@@ -60,7 +71,6 @@ export default function App() {
       setError('Request timed out. Please try again.');
       return true;
     }
-    const status = err?.status;
     if (status === 401) {
       setAuthStatus('unauthenticated');
       setAuthError('Session expired. Please log in again.');
@@ -71,7 +81,7 @@ export default function App() {
       setError('Rate limit exceeded. Please wait and try again.');
       return true;
     }
-    setError(err?.message || fallbackMessage);
+    setError(message || fallbackMessage);
     return false;
   }, []);
 
@@ -156,6 +166,7 @@ export default function App() {
       });
       setVoiceConfigs(newConfigs);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context?.characters]);
 
   useEffect(() => {
@@ -167,7 +178,7 @@ export default function App() {
           setAuthStatus('authenticated');
           setAuthError(null);
         }
-      } catch (err) {
+      } catch {
         if (active) {
           setAuthStatus('unauthenticated');
         }
@@ -186,11 +197,12 @@ export default function App() {
       await login(password);
       setAuthStatus('authenticated');
       setError(null);
-    } catch (err: any) {
-      if (err?.status === 401) {
+    } catch (err: unknown) {
+      const { status, message } = getErrorMeta(err);
+      if (status === 401) {
         setAuthError('Incorrect password.');
       } else {
-        setAuthError(err?.message || 'Login failed.');
+        setAuthError(message || 'Login failed.');
       }
     } finally {
       setIsAuthLoading(false);
@@ -219,8 +231,8 @@ export default function App() {
         ...initialContext,
         scenes: [firstScene]
       });
-    } catch (e: any) {
-      handleAiError(e, e?.message || "Failed to generate story");
+    } catch (err: unknown) {
+      handleAiError(err, "Failed to generate story");
     } finally {
       if (request) {
         finishAiRequest(request);
@@ -238,8 +250,8 @@ export default function App() {
       const nextScene = await request.promise;
       setContext(prev => prev ? { ...prev, scenes: [...prev.scenes, nextScene] } : null);
       setUserInstruction('');
-    } catch (e: any) {
-      handleAiError(e, e?.message || 'Failed to generate scene.');
+    } catch (err: unknown) {
+      handleAiError(err, 'Failed to generate scene.');
     } finally {
       if (request) {
         finishAiRequest(request);
@@ -255,9 +267,9 @@ export default function App() {
       startAiRequest(request);
       const twist = await request.promise;
       setUserInstruction(`PLOT TWIST: ${twist}`);
-    } catch (e) {
-      console.error(e);
-      handleAiError(e, 'Failed to generate plot twist.');
+    } catch (err: unknown) {
+      console.error(err);
+      handleAiError(err, 'Failed to generate plot twist.');
     } finally {
       if (request) {
         finishAiRequest(request);
@@ -381,9 +393,9 @@ export default function App() {
         }
       });
 
-    } catch (e) {
-      console.error(e);
-      handleAiError(e, "Failed to regenerate block.");
+    } catch (err: unknown) {
+      console.error(err);
+      handleAiError(err, "Failed to regenerate block.");
     } finally {
       if (request) {
         finishAiRequest(request);

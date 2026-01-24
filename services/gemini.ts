@@ -10,6 +10,17 @@ type ApiResponse<T> =
   | { data: T; error?: never }
   | { data?: never; error: ApiError };
 
+const getErrorName = (error: unknown): string | undefined => {
+  if (error instanceof Error) {
+    return error.name;
+  }
+  if (typeof error === 'object' && error !== null) {
+    const name = (error as Record<string, unknown>).name;
+    return typeof name === 'string' ? name : undefined;
+  }
+  return undefined;
+};
+
 export type RequestOptions = {
   timeoutMs?: number;
 };
@@ -62,7 +73,7 @@ const createAiRequest = <T>(
     let payload: ApiResponse<T>;
     try {
       payload = JSON.parse(text) as ApiResponse<T>;
-    } catch (error) {
+    } catch {
       throw new Error('Invalid JSON response from server');
     }
 
@@ -75,22 +86,30 @@ const createAiRequest = <T>(
           ? 'Rate limit exceeded. Please wait and try again.'
           : null;
       const message = statusMessage || apiError?.message || 'AI request failed';
-      const error = new Error(message);
-      (error as any).code = apiError?.code;
-      (error as any).status = response.status;
-      (error as any).details = apiError?.details;
+      const error = new Error(message) as Error & {
+        code?: string;
+        status?: number;
+        details?: Record<string, unknown>;
+      };
+      if (apiError?.code) {
+        error.code = apiError.code;
+      }
+      error.status = response.status;
+      if (apiError?.details) {
+        error.details = apiError.details;
+      }
       throw error;
     }
 
     return payload.data as T;
   })();
 
-  const wrappedPromise = promise.catch((error: any) => {
-    if (error?.name === 'AbortError') {
+  const wrappedPromise = promise.catch((error: unknown) => {
+    if (getErrorName(error) === 'AbortError') {
       const message =
         abortReason === 'timeout' ? 'Request timed out.' : 'Request canceled.';
-      const abortError = new Error(message);
-      (abortError as any).code =
+      const abortError = new Error(message) as Error & { code?: string };
+      abortError.code =
         abortReason === 'timeout' ? 'REQUEST_TIMEOUT' : 'REQUEST_ABORTED';
       throw abortError;
     }

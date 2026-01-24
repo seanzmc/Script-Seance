@@ -22,16 +22,18 @@ const requestAuth = async <T>(path: string, options: RequestInit): Promise<T> =>
   let payload: ApiResponse<T>;
   try {
     payload = JSON.parse(text) as ApiResponse<T>;
-  } catch (error) {
+  } catch {
     throw new Error('Invalid JSON response from server');
   }
 
   if (!response.ok || payload.error) {
     const apiError = payload.error;
     const message = apiError?.message || 'Auth request failed';
-    const error = new Error(message);
-    (error as any).code = apiError?.code;
-    (error as any).status = response.status;
+    const error = new Error(message) as Error & { code?: string; status?: number };
+    if (apiError?.code) {
+      error.code = apiError.code;
+    }
+    error.status = response.status;
     throw error;
   }
 
