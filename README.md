@@ -33,13 +33,14 @@ GEMINI_API_KEY=your_google_ai_studio_api_key_here
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (Latest LTS recommended)
+- [pnpm](https://pnpm.io/) (install via Corepack or package manager of choice)
 
 ### Installation
 
 Install the dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Running the App
@@ -47,13 +48,13 @@ npm install
 Start the API server (used for Gemini calls):
 
 ```bash
-npm run server
+pnpm run server
 ```
 
 Start the Vite development server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 The API server runs on `http://localhost:3001` and the app will typically start at `http://localhost:3000`.
@@ -65,7 +66,7 @@ This project ships a static client plus a Node API server. In production, serve 
 1. Build the client:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 2. Start the API server with required env vars:
