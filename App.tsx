@@ -6,6 +6,7 @@ import { InsertBlock } from './components/InsertBlock';
 import { Button } from './components/Button';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
+import { PrivacyModal } from './components/PrivacyModal';
 import {
   createGenerateSceneRequest,
   createSuggestPlotTwistRequest,
@@ -23,6 +24,29 @@ interface ToastState {
   message: string;
   onUndo?: () => void;
 }
+
+interface DraftPayload {
+  context: StoryContext;
+  userInstruction: string;
+  savedAt: string;
+}
+
+const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
+const DRAFT_DEBOUNCE_MS = 800;
+
+const isStoryContext = (value: unknown): value is StoryContext => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.title === 'string' &&
+    typeof record.genre === 'string' &&
+    typeof record.premise === 'string' &&
+    Array.isArray(record.characters) &&
+    Array.isArray(record.scenes)
+  );
+};
 
 const getErrorMeta = (err: unknown) => {
   if (!err || typeof err !== 'object') {
@@ -47,6 +71,7 @@ export default function App() {
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const activeAiRequestRef = useRef<CancellableRequest<unknown> | null>(null);
   
   // Playback Settings
@@ -60,6 +85,9 @@ export default function App() {
 
   // Refs
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const didHydrateDraftRef = useRef(false);
+  const lastNonPrivacyPathRef = useRef('/');
 
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
     const { code, status, message } = getErrorMeta(err);
@@ -120,6 +148,24 @@ export default function App() {
     }
     setIsGenerating(false);
     setError(null);
+  };
+
+  const openPrivacy = () => {
+    if (typeof window === 'undefined') return;
+    if (window.location.pathname !== '/privacy') {
+      lastNonPrivacyPathRef.current = window.location.pathname || '/';
+      window.history.pushState({}, '', '/privacy');
+    }
+    setIsPrivacyOpen(true);
+  };
+
+  const closePrivacy = () => {
+    if (typeof window === 'undefined') return;
+    if (window.location.pathname === '/privacy') {
+      const targetPath = lastNonPrivacyPathRef.current || '/';
+      window.history.pushState({}, '', targetPath);
+    }
+    setIsPrivacyOpen(false);
   };
 
   // Custom Hooks
@@ -190,6 +236,70 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const currentPath = window.location.pathname;
+    lastNonPrivacyPathRef.current = currentPath === '/privacy' ? '/' : currentPath;
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path !== '/privacy') {
+        lastNonPrivacyPathRef.current = path || '/';
+      }
+      setIsPrivacyOpen(path === '/privacy');
+    };
+    setIsPrivacyOpen(currentPath === '/privacy');
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!storedDraft) {
+      didHydrateDraftRef.current = true;
+      return;
+    }
+    try {
+      const parsed = JSON.parse(storedDraft) as DraftPayload;
+      if (parsed && isStoryContext(parsed.context)) {
+        setContext(parsed.context);
+        if (typeof parsed.userInstruction === 'string') {
+          setUserInstruction(parsed.userInstruction);
+        }
+      } else {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } finally {
+      didHydrateDraftRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!context || !didHydrateDraftRef.current || typeof window === 'undefined') return;
+    if (draftSaveTimerRef.current) {
+      window.clearTimeout(draftSaveTimerRef.current);
+    }
+    draftSaveTimerRef.current = window.setTimeout(() => {
+      const payload: DraftPayload = {
+        context,
+        userInstruction,
+        savedAt: new Date().toISOString()
+      };
+      try {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn('Failed to save draft', err);
+      }
+    }, DRAFT_DEBOUNCE_MS);
+    return () => {
+      if (draftSaveTimerRef.current) {
+        window.clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [context, userInstruction]);
+
   const handleLogin = async (password: string) => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -206,6 +316,25 @@ export default function App() {
       }
     } finally {
       setIsAuthLoading(false);
+    }
+  };
+
+  const handleClearDraft = () => {
+    if (!context) return;
+    const proceed = window.confirm('Clear the saved draft from this browser?');
+    if (!proceed) return;
+    cancelAiRequest();
+    stop();
+    setContext(null);
+    setUserInstruction('');
+    setVoiceConfigs([]);
+    setActiveTab('write');
+    setError(null);
+    setToast(null);
+    try {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (err) {
+      console.warn('Failed to clear draft', err);
     }
   };
 
@@ -501,6 +630,10 @@ export default function App() {
     await playPreview(text, config);
   };
 
+  const privacyModal = (
+    <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
+  );
+
   if (!context) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
@@ -523,6 +656,7 @@ export default function App() {
           error={authError}
           onLogin={handleLogin}
         />
+        {privacyModal}
       </div>
     );
   }
@@ -552,6 +686,16 @@ export default function App() {
             className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 text-white font-medium outline-none transition-shadow"
           />
           <p className="text-[10px] text-gray-400 mt-1">{context.genre} • {context.scenes.length} Scenes</p>
+          <div className="mt-2 flex items-center justify-between text-[10px] text-gray-500">
+            <span>Draft autosaves locally.</span>
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300"
+            >
+              Clear draft
+            </button>
+          </div>
         </div>
 
         {/* Tab Bar */}
@@ -591,6 +735,16 @@ export default function App() {
                   placeholder="Suggest an action, or leave empty for AI to decide..."
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm h-32 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
                 />
+                <p className="text-[11px] text-gray-500">
+                  Prompts are sent to a third-party AI service. Avoid sensitive data.{' '}
+                  <button
+                    type="button"
+                    onClick={openPrivacy}
+                    className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                  >
+                    Privacy
+                  </button>
+                </p>
                 
                 <div className="grid grid-cols-2 gap-2">
                    <Button onClick={handleTwist} variant="secondary" size="sm" disabled={isGenerating}>
@@ -789,6 +943,7 @@ export default function App() {
         error={authError}
         onLogin={handleLogin}
       />
+      {privacyModal}
     </div>
   );
 }
