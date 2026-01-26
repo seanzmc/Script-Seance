@@ -1,17 +1,25 @@
 import React, { useState, useRef, useEffect } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
-import { Users, BookOpen, Plus, Trash2, Shuffle } from "lucide-react";
+import { Users, Plus, Trash2, Shuffle } from "lucide-react";
 import { generateSurpriseSetup } from "../services/gemini";
 
+export type SetupFormState = {
+  genre: string;
+  premise: string;
+  characters: string[];
+  style: string;
+  length: string;
+};
+
 interface SetupFormProps {
-  onStart: (data: {
-    genre: string;
-    premise: string;
-    characters: string[];
-  }) => void;
+  value: SetupFormState;
+  onChange: (next: Partial<SetupFormState>) => void;
+  onStart?: () => void;
   isLoading: boolean;
   onError?: (error: unknown, fallbackMessage: string) => boolean;
+  isLocked?: boolean;
+  showSubmit?: boolean;
 }
 
 const STARTER_IDEAS = [
@@ -20,16 +28,21 @@ const STARTER_IDEAS = [
   "A normal day goes very wrong",
 ];
 
-export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading, onError }) => {
-  const [genre, setGenre] = useState(GENRES[0]);
-  const [premise, setPremise] = useState("");
-  const [characters, setCharacters] = useState(["Hero", "Villain"]);
+const LENGTH_OPTIONS = ["Short", "Medium", "Long"];
 
-  // Surprise State
+export const SetupForm: React.FC<SetupFormProps> = ({
+  value,
+  onChange,
+  onStart,
+  isLoading,
+  onError,
+  isLocked,
+  showSubmit = false,
+}) => {
+  const { genre, premise, characters, style, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
   const [justSurprised, setJustSurprised] = useState(false);
 
-  // Refs for managing focus on new inputs
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
@@ -41,19 +54,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading, onErro
     }
   }, [characters, focusIndex]);
 
-  const handleCharacterChange = (index: number, value: string) => {
+  const updateValue = (next: Partial<SetupFormState>) => {
+    if (isLocked) return;
+    onChange(next);
+  };
+
+  const handleCharacterChange = (index: number, charValue: string) => {
     const newChars = [...characters];
-    newChars[index] = value;
-    setCharacters(newChars);
+    newChars[index] = charValue;
+    updateValue({ characters: newChars });
   };
 
   const addCharacter = () => {
-    setCharacters([...characters, "New Character"]);
+    updateValue({ characters: [...characters, "New Character"] });
     setFocusIndex(characters.length);
   };
 
   const removeCharacter = (index: number) =>
-    setCharacters(characters.filter((_, i) => i !== index));
+    updateValue({ characters: characters.filter((_, i) => i !== index) });
 
   const checkSafety = () => {
     if (
@@ -71,31 +89,32 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading, onErro
   };
 
   const handleSurpriseMe = async () => {
+    if (isLocked) return;
     if (!checkSafety()) return;
 
     setIsSurprising(true);
-    const targetGenre = genre; // Capture current genre
+    const targetGenre = genre;
 
     try {
       const data = await generateSurpriseSetup(targetGenre);
+      updateValue({
+        genre: data.genre,
+        premise: data.premise,
+        characters: data.characters,
+      });
 
-      // Update form directly (non-blocking)
-      setGenre(data.genre);
-      setPremise(data.premise);
-      setCharacters(data.characters);
-
-      // Trigger visual feedback
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
     } catch (e) {
       console.error("Surprise generation failed", e);
-      const handled = onError?.(e, 'Failed to generate a surprise setup.');
+      const handled = onError?.(e, "Failed to generate a surprise setup.");
       if (handled) {
         return;
       }
-      // Fallback
-      setPremise(`A gripping ${targetGenre} story with unexpected twists.`);
-      setCharacters(["Protagonist", "Antagonist", "The Catalyst"]);
+      updateValue({
+        premise: `A gripping ${targetGenre} story with unexpected twists.`,
+        characters: ["Protagonist", "Antagonist", "The Catalyst"],
+      });
 
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
@@ -105,166 +124,188 @@ export const SetupForm: React.FC<SetupFormProps> = ({ onStart, isLoading, onErro
   };
 
   const handlePillClick = (idea: string) => {
+    if (isLocked) return;
     if (checkSafety()) {
-      setPremise(idea);
+      updateValue({ premise: idea });
     }
   };
 
   return (
-    <div className="h-screen w-full bg-gray-900 overflow-hidden flex flex-col p-6">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between mb-6 shrink-0">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <BookOpen className="w-8 h-8 text-indigo-500" />
-          Script Seance
-        </h1>
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+            Genre
+          </label>
+          <Button
+            variant="secondary"
+            onClick={handleSurpriseMe}
+            className="!bg-transparent hover:!bg-slate-800 !border-slate-700 hover:!border-indigo-500 border !text-gray-400 hover:!text-indigo-400 transition-colors text-[11px] py-1 h-auto group"
+            type="button"
+            loading={isSurprising}
+            disabled={isLoading || isSurprising || isLocked}
+            size="sm"
+            title="Randomly generate a genre, premise, and cast"
+          >
+            <Shuffle className="w-3 h-3 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
+            Surprise Me
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {GENRES.map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => updateValue({ genre: g })}
+              disabled={isLocked}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all border ${
+                genre === g
+                  ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm"
+                  : "bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
+              } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 gap-6">
-        {/* Row 1: Genre (Full Width) */}
-        <div className="shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-lg font-semibold text-gray-200">
-              Genre
-            </label>
-            <div className="flex items-center">
-              <span className="text-xs text-slate-400 mr-3 hidden sm:inline-block">
-                Generate a{" "}
-                <span
-                  key={genre}
-                  className="inline-block font-semibold text-indigo-400 animate-pulse"
-                >
-                  {genre}
-                </span>{" "}
-                premise + characters
-              </span>
-              <Button
-                variant="secondary"
-                onClick={handleSurpriseMe}
-                className="!bg-transparent hover:!bg-slate-800 !border-slate-700 hover:!border-indigo-500 border !text-gray-400 hover:!text-indigo-400 transition-colors text-xs py-1.5 h-auto group"
-                type="button"
-                loading={isSurprising}
-                disabled={isLoading || isSurprising}
-                size="sm"
-                title="Randomly generate a genre, premise, and cast"
-              >
-                <Shuffle className="w-3.5 h-3.5 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
-                Magic Shuffle
-              </Button>
-            </div>
-          </div>
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+            Premise
+          </label>
+          <textarea
+            rows={3}
+            value={premise}
+            onChange={(e) => updateValue({ premise: e.target.value })}
+            className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-y min-h-[80px] text-sm leading-relaxed ${
+              justSurprised
+                ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+                : "bg-gray-800 border-gray-700"
+            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+            placeholder="e.g., A detective discovers his new partner is a ghost..."
+            disabled={isLocked}
+          />
           <div className="flex flex-wrap gap-2">
-            {GENRES.map((g) => (
+            {STARTER_IDEAS.map((idea) => (
               <button
-                key={g}
+                key={idea}
                 type="button"
-                onClick={() => setGenre(g)}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all border ${
-                  genre === g
-                    ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm"
-                    : "bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
-                }`}
+                onClick={() => handlePillClick(idea)}
+                disabled={isLocked}
+                className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {g}
+                {idea}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Row 2: Split Columns */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-          {/* Col 1: Premise */}
-          <div className="flex flex-col min-h-0">
-            <label className="block text-lg font-semibold text-gray-200 mb-3">
-              Premise
+        <div className="grid grid-cols-1 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+              Style
             </label>
-            <textarea
-              rows={3}
-              value={premise}
-              onChange={(e) => setPremise(e.target.value)}
-              className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-y min-h-[80px] text-sm leading-relaxed ${
+            <input
+              value={style}
+              onChange={(e) => updateValue({ style: e.target.value })}
+              className={`w-full rounded-lg p-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm ${
                 justSurprised
-                  ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+                  ? "bg-indigo-900/20 border-indigo-500"
                   : "bg-gray-800 border-gray-700"
-              }`}
-              placeholder="e.g., A detective discovers his new partner is a ghost..."
+              } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+              placeholder="e.g., Witty noir with crisp dialogue"
+              disabled={isLocked}
             />
-            <div className="flex flex-wrap gap-2 mt-3 shrink-0">
-              {STARTER_IDEAS.map((idea) => (
-                <button
-                  key={idea}
-                  type="button"
-                  onClick={() => handlePillClick(idea)}
-                  className="text-xs text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer"
-                >
-                  {idea}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Col 2: Characters */}
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="mb-3 shrink-0">
-              <label className="block text-lg font-semibold text-gray-200 flex items-center gap-2">
-                <Users className="w-5 h-5 text-indigo-400" /> Characters
-              </label>
-            </div>
-            <div className="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
-              {characters.map((char, idx) => (
-                <div key={idx} className="relative group">
-                  <input
-                    ref={(el) => {
-                      characterInputs.current[idx] = el;
-                    }}
-                    value={char}
-                    onChange={(e) => handleCharacterChange(idx, e.target.value)}
-                    className={`w-full rounded-lg p-3 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
-                      justSurprised
-                        ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
-                        : "bg-gray-800 border-gray-700"
-                    }`}
-                    placeholder={`Character ${idx + 1}`}
-                  />
-                  {characters.length > 1 && (
-                    <button
-                      onClick={() => removeCharacter(idx)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                      tabIndex={-1}
-                      aria-label="Remove character"
-                      title="Remove character"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+              Length
+            </label>
+            <select
+              value={length}
+              onChange={(e) => updateValue({ length: e.target.value })}
+              className={`w-full rounded-lg p-2.5 text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                justSurprised
+                  ? "bg-indigo-900/20 border-indigo-500"
+                  : "bg-gray-800 border-gray-700"
+              } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+              disabled={isLocked}
+            >
+              {LENGTH_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
               ))}
-
-              <button
-                type="button"
-                onClick={addCharacter}
-                className="w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-xs font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Character
-              </button>
-            </div>
+            </select>
+            <p className="text-[10px] text-gray-500">
+              Length influences pacing, not format.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Footer Action */}
-      <div className="mt-6 pt-6 border-t border-gray-800 shrink-0">
+      <div className="space-y-3">
+        <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+          <Users className="w-3.5 h-3.5 text-indigo-400" /> Characters
+        </label>
+        <div className="space-y-2">
+          {characters.map((char, idx) => (
+            <div key={idx} className="relative group">
+              <input
+                ref={(el) => {
+                  characterInputs.current[idx] = el;
+                }}
+                value={char}
+                onChange={(e) => handleCharacterChange(idx, e.target.value)}
+                className={`w-full rounded-lg p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
+                  justSurprised
+                    ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
+                    : "bg-gray-800 border-gray-700"
+                } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                placeholder={`Character ${idx + 1}`}
+                disabled={isLocked}
+              />
+              {characters.length > 1 && !isLocked && (
+                <button
+                  onClick={() => removeCharacter(idx)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                  tabIndex={-1}
+                  aria-label="Remove character"
+                  title="Remove character"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addCharacter}
+            disabled={isLocked}
+            className="w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Character
+          </button>
+        </div>
+      </div>
+
+      {showSubmit && onStart && (
         <Button
           variant="primary"
-          onClick={() => onStart({ genre, premise, characters })}
+          onClick={onStart}
           className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all text-sm font-medium"
           loading={isLoading}
           size="lg"
-          disabled={!premise.trim() || isLoading || isSurprising}
+          disabled={!premise.trim() || isLoading || isSurprising || isLocked}
+          title="Generate your opening scene"
         >
-          Start Writing
+          Generate Script
         </Button>
-      </div>
+      )}
     </div>
   );
 };

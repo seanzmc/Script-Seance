@@ -27,5 +27,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-Untitled-1.json
-EXECUTIVE_SUMMARY.md
+improve/
+improve/*

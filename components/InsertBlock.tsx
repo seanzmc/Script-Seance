@@ -11,6 +11,7 @@ interface InsertBlockProps {
   onUndo?: () => void;
   onError?: (error: unknown) => void;
   disabled?: boolean;
+  insertTarget?: { sceneId: string; blockId: string } | null;
 }
 
 const HINTS: Record<BlockType, string> = {
@@ -26,7 +27,8 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   onAddBlock,
   onUndo,
   onError,
-  disabled 
+  disabled,
+  insertTarget
 }) => {
   const [mode, setMode] = useState<'write' | 'generate'>('write');
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
@@ -104,6 +106,11 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
       </div>
 
       <div className="space-y-3">
+        {insertTarget && (
+          <p className="text-[10px] text-indigo-300">
+            Inserting after the selected block.
+          </p>
+        )}
         <div className="space-y-1.5">
           <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Block Type</label>
           <div className="grid grid-cols-2 gap-2">
@@ -150,6 +157,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
           size="md"
           variant={mode === 'generate' ? 'accent' : 'primary'}
           loading={isGenerating}
+          title={mode === 'write' ? 'Insert the block into your script' : 'Generate and insert the block'}
         >
           {mode === 'write' ? (
             <><Plus className="w-4 h-4 mr-2" /> Add Block</>

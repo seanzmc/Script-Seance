@@ -11,6 +11,9 @@ export const useAudioPlayer = (
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [currentBlockId, setCurrentBlockId] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [bufferedCount, setBufferedCount] = useState(0);
+  const [totalBufferedCount, setTotalBufferedCount] = useState(0);
+  const [isBuffering, setIsBuffering] = useState(false);
 
   // --- Refs (State that doesn't trigger re-renders or is needed in callbacks) ---
   const engineRef = useRef<ScriptEngine | null>(null);
@@ -20,6 +23,8 @@ export const useAudioPlayer = (
   const currentIndexRef = useRef(0);                // Pointer to current block in queue
   const audioDataMap = useRef<Map<string, AudioChunk>>(new Map()); // Buffer for arrived audio chunks
   const skippedBlockIdsRef = useRef<Set<string>>(new Set());
+  const totalCountRef = useRef(0);
+  const bufferedScriptKeyRef = useRef<string | null>(null);
   
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isPlayingRef = useRef(false); // Sync ref for callbacks
@@ -54,9 +59,29 @@ export const useAudioPlayer = (
     return audioContextRef.current;
   };
 
+  const getPlayableBlocks = (blocks: ScriptBlock[]) =>
+    blocks.filter(b => [BlockType.DIALOGUE, BlockType.ACTION, BlockType.TRANSITION].includes(b.type));
+
+  const updateBufferProgress = useCallback((nextTotal?: number) => {
+    const total = typeof nextTotal === 'number' ? nextTotal : totalCountRef.current;
+    const ready = audioDataMap.current.size + skippedBlockIdsRef.current.size;
+    totalCountRef.current = total;
+    setTotalBufferedCount(total);
+    setBufferedCount(ready);
+    setIsBuffering(total > 0 && ready < total);
+  }, []);
+
+  const resetBuffer = useCallback(() => {
+    audioDataMap.current.clear();
+    skippedBlockIdsRef.current.clear();
+    bufferedScriptKeyRef.current = null;
+    updateBufferProgress(0);
+  }, [updateBufferProgress]);
+
   // --- Playback Logic ---
 
-  const stop = useCallback(() => {
+  const stop = useCallback((options?: { clearBuffer?: boolean }) => {
+    const clearBuffer = options?.clearBuffer ?? false;
     setIsPlaying(false);
     setIsPreviewPlaying(false);
     isPlayingRef.current = false;
@@ -75,15 +100,16 @@ export const useAudioPlayer = (
     
     // Stop Engine & Reset Pointers
     engineRef.current?.stop();
-    audioDataMap.current.clear();
-    skippedBlockIdsRef.current.clear();
     queueRef.current = [];
     currentIndexRef.current = 0;
-  }, []);
+    if (clearBuffer) {
+      resetBuffer();
+    }
+  }, [resetBuffer]);
 
   useEffect(() => {
     return () => {
-      stop();
+      stop({ clearBuffer: true });
       const ctx = audioContextRef.current;
       if (ctx && ctx.state !== 'closed') {
         ctx.close().catch(() => {});
@@ -181,6 +207,7 @@ export const useAudioPlayer = (
     const onAudio = (chunk: AudioChunk) => {
       // 1. Store the chunk in buffer
       audioDataMap.current.set(chunk.blockId, chunk);
+      updateBufferProgress();
       
       // 2. If we are currently stalled waiting for THIS specific block, resume playback
       if (isPlayingRef.current) {
@@ -203,6 +230,7 @@ export const useAudioPlayer = (
             onSkip?.(skippedBlock, payload.error);
           }
         }
+        updateBufferProgress();
 
         if (isPlayingRef.current) {
           const currentBlock = queueRef.current[currentIndexRef.current];
@@ -227,15 +255,22 @@ export const useAudioPlayer = (
   // --- Public Methods ---
 
   const playScript = (blocks: ScriptBlock[]) => {
-    stop();
+    const playableBlocks = getPlayableBlocks(blocks);
+    const bufferKey = playableBlocks.map(block => block.id).join('|');
+    const canReuseBuffer =
+      bufferKey.length > 0 &&
+      bufferKey === bufferedScriptKeyRef.current &&
+      audioDataMap.current.size > 0;
+
+    stop({ clearBuffer: !canReuseBuffer });
     // Tiny delay to ensure stop cleanup finishes
     setTimeout(() => {
        setIsPlaying(true);
        isPlayingRef.current = true;
        queueRef.current = blocks;
        currentIndexRef.current = 0;
-       audioDataMap.current.clear();
-       skippedBlockIdsRef.current.clear();
+       bufferedScriptKeyRef.current = bufferKey || null;
+       updateBufferProgress(playableBlocks.length);
        
        // 1. Start Generator Pipeline (Sliding Window)
        engineRef.current?.start(blocks, voiceConfigs);
@@ -245,8 +280,18 @@ export const useAudioPlayer = (
     }, 10);
   };
 
+  const bufferScript = (blocks: ScriptBlock[]) => {
+    const playableBlocks = getPlayableBlocks(blocks);
+    stop({ clearBuffer: true });
+    queueRef.current = blocks;
+    currentIndexRef.current = 0;
+    bufferedScriptKeyRef.current = playableBlocks.map(block => block.id).join('|') || null;
+    updateBufferProgress(playableBlocks.length);
+    engineRef.current?.start(blocks, voiceConfigs);
+  };
+
   const playPreview = async (text: string, config: VoiceConfig) => {
-    stop();
+    stop({ clearBuffer: false });
     setIsLoadingAudio(true);
     // Note: isPreviewPlaying remains false during loading phase
     
@@ -291,7 +336,11 @@ export const useAudioPlayer = (
     isPreviewPlaying,
     currentBlockId,
     isLoadingAudio,
+    bufferedCount,
+    totalBufferedCount,
+    isBuffering,
     playScript,
+    bufferScript,
     playPreview,
     stop
   };

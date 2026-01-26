@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { SetupForm } from './components/SetupForm';
-import { ScriptDisplay } from './components/ScriptDisplay';
-import { VoiceManager } from './components/VoiceManager';
-import { InsertBlock } from './components/InsertBlock';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { SetupForm, SetupFormState } from './components/SetupForm';
 import { Button } from './components/Button';
+import { ControlPanel } from './components/ControlPanel';
+import { PrimaryActionButton } from './components/PrimaryActionButton';
+import { ScriptPane } from './components/ScriptPane';
+import { VoicesPanel } from './components/VoicesPanel';
+import { PlaybackPanel } from './components/PlaybackPanel';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
 import { PrivacyModal } from './components/PrivacyModal';
@@ -14,11 +16,9 @@ import {
   CancellableRequest
 } from './services/gemini';
 import { getSession, login } from './services/auth';
-import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType } from './types';
+import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType, GENRES } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { Play, Pause, PlusCircle, Sparkles, Download, AlertCircle, PenTool, Mic2, PlayCircle, Loader2, ScrollText, RotateCcw } from 'lucide-react';
-
-type TabType = 'write' | 'cast' | 'play';
+import { Download, RotateCcw } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -33,6 +33,13 @@ interface DraftPayload {
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
+const DEFAULT_SETUP_STATE: SetupFormState = {
+  genre: GENRES[0],
+  premise: '',
+  characters: ['Hero', 'Villain'],
+  style: '',
+  length: 'Medium'
+};
 
 const isStoryContext = (value: unknown): value is StoryContext => {
   if (!value || typeof value !== 'object') {
@@ -66,7 +73,6 @@ export default function App() {
   const [voiceConfigs, setVoiceConfigs] = useState<VoiceConfig[]>([]);
   const [userInstruction, setUserInstruction] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('write');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -74,7 +80,16 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const activeAiRequestRef = useRef<CancellableRequest<unknown> | null>(null);
-  
+
+  const [setupState, setSetupState] = useState<SetupFormState>(DEFAULT_SETUP_STATE);
+  const [openPanels, setOpenPanels] = useState({
+    setup: true,
+    voices: false,
+    playback: false
+  });
+  const [hasReviewedVoices, setHasReviewedVoices] = useState(false);
+  const [insertTarget, setInsertTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -90,6 +105,13 @@ export default function App() {
   const didHydrateDraftRef = useRef(false);
   const lastNonPrivacyPathRef = useRef('/');
   const autosaveFailureNotifiedRef = useRef(false);
+
+  const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
+    setSetupState(prev => ({ ...prev, ...next }));
+  }, []);
+  const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
+    setInsertTarget(target);
+  }, []);
 
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
     const { code, status, message } = getErrorMeta(err);
@@ -127,30 +149,30 @@ export default function App() {
     setToast({ message: `Skipped audio for ${label}${detail}` });
   }, []);
 
-  const startAiRequest = <T,>(request: CancellableRequest<T>) => {
+  const startAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
     if (activeAiRequestRef.current) {
       activeAiRequestRef.current.cancel();
     }
     activeAiRequestRef.current = request as CancellableRequest<unknown>;
     setIsGenerating(true);
     setError(null);
-  };
+  }, []);
 
-  const finishAiRequest = <T,>(request: CancellableRequest<T>) => {
+  const finishAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
     if (activeAiRequestRef.current === request) {
       activeAiRequestRef.current = null;
       setIsGenerating(false);
     }
-  };
+  }, []);
 
-  const cancelAiRequest = () => {
+  const cancelAiRequest = useCallback(() => {
     if (activeAiRequestRef.current) {
       activeAiRequestRef.current.cancel();
       activeAiRequestRef.current = null;
     }
     setIsGenerating(false);
     setError(null);
-  };
+  }, []);
 
   const openPrivacy = () => {
     if (typeof window === 'undefined') return;
@@ -176,7 +198,11 @@ export default function App() {
     isPreviewPlaying, 
     currentBlockId, 
     isLoadingAudio, 
+    bufferedCount,
+    totalBufferedCount,
+    isBuffering,
     playScript, 
+    bufferScript,
     playPreview, 
     stop 
   } = useAudioPlayer(voiceConfigs, handleAiError, handleAudioSkip);
@@ -216,6 +242,21 @@ export default function App() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context?.characters]);
+
+  useEffect(() => {
+    if (context) {
+      setSetupState(prev => ({
+        ...prev,
+        genre: context.genre,
+        premise: context.premise,
+        characters: context.characters
+      }));
+    }
+  }, [context]);
+
+  useEffect(() => {
+    setInsertTarget(null);
+  }, [context]);
 
   useEffect(() => {
     let active = true;
@@ -297,7 +338,7 @@ export default function App() {
         console.warn('Failed to save draft', err);
         if (!autosaveFailureNotifiedRef.current) {
           autosaveFailureNotifiedRef.current = true;
-          setAutosaveError('Autosave failed—consider exporting.');
+          setAutosaveError('Autosave failed; consider exporting.');
         }
       }
     }, DRAFT_DEBOUNCE_MS);
@@ -332,11 +373,14 @@ export default function App() {
     const proceed = window.confirm('Clear the saved draft from this browser?');
     if (!proceed) return;
     cancelAiRequest();
-    stop();
+    stop({ clearBuffer: true });
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
-    setActiveTab('write');
+    setSetupState(DEFAULT_SETUP_STATE);
+    setOpenPanels({ setup: true, voices: false, playback: false });
+    setHasReviewedVoices(false);
+    setInsertTarget(null);
     setError(null);
     setToast(null);
     setAutosaveError(null);
@@ -349,18 +393,28 @@ export default function App() {
   };
 
   // Handlers
-  const handleStart = async (data: { genre: string; premise: string; characters: string[] }) => {
+  const handleStart = async () => {
     if (isGenerating) return;
     let request: CancellableRequest<Scene> | null = null;
     try {
+      const setupNotes: string[] = [];
+      if (setupState.style.trim()) {
+        setupNotes.push(`Style: ${setupState.style.trim()}.`);
+      }
+      if (setupState.length.trim()) {
+        setupNotes.push(`Target length: ${setupState.length.trim()}.`);
+      }
+      const instruction = `${setupNotes.join(' ')} Write the opening scene setting the tone.`.trim();
       const initialContext: StoryContext = { 
-        ...data, 
+        genre: setupState.genre,
+        premise: setupState.premise,
+        characters: setupState.characters,
         title: 'Untitled Screenplay',
         scenes: [] 
       };
       request = createGenerateSceneRequest(
         initialContext,
-        "Write the opening scene setting the tone.",
+        instruction,
         true
       );
       startAiRequest(request);
@@ -370,6 +424,7 @@ export default function App() {
         ...initialContext,
         scenes: [firstScene]
       });
+      setHasReviewedVoices(false);
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
     } finally {
@@ -452,6 +507,35 @@ export default function App() {
     });
   };
 
+  const handleInsertAfter = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
+    setContext(prev => {
+      if (!prev) return null;
+      const sceneIndex = prev.scenes.findIndex(scene => scene.id === target.sceneId);
+      if (sceneIndex === -1) return prev;
+
+      const newScenes = [...prev.scenes];
+      if (block.type === BlockType.HEADING) {
+        const newScene: Scene = {
+          id: crypto.randomUUID(),
+          heading: block.text.toUpperCase(),
+          summary: 'New user created scene',
+          blocks: []
+        };
+        newScenes.splice(sceneIndex + 1, 0, newScene);
+        return { ...prev, scenes: newScenes };
+      }
+
+      const scene = newScenes[sceneIndex];
+      const blockIndex = scene.blocks.findIndex(b => b.id === target.blockId);
+      const insertIndex = blockIndex === -1 ? scene.blocks.length : blockIndex + 1;
+      const updatedBlocks = [...scene.blocks];
+      updatedBlocks.splice(insertIndex, 0, block);
+      newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
+      return { ...prev, scenes: newScenes };
+    });
+    setInsertTarget(null);
+  }, []);
+
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
 
@@ -471,8 +555,7 @@ export default function App() {
     });
   };
 
-  const handleToggleLock = (sceneId: string, blockId: string) => {
-    if (!context) return;
+  const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
     setContext(prev => {
       if (!prev) return null;
       const newScenes = prev.scenes.map(scene => {
@@ -484,9 +567,22 @@ export default function App() {
       });
       return { ...prev, scenes: newScenes };
     });
-  };
+  }, []);
 
-  const handleRegenerateBlock = async (sceneId: string, blockId: string) => {
+  const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
+    setContext(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        scenes: prev.scenes.map(scene => scene.id === sceneId ? {
+          ...scene,
+          blocks: scene.blocks.map(block => block.id === blockId ? { ...block, character } : block)
+        } : scene)
+      };
+    });
+  }, []);
+
+  const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string) => {
     if (!context || isGenerating) return;
 
     const scene = context.scenes.find(s => s.id === sceneId);
@@ -540,7 +636,7 @@ export default function App() {
         finishAiRequest(request);
       }
     }
-  };
+  }, [context, isGenerating, handleAiError, startAiRequest, finishAiRequest]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     setVoiceConfigs(prev => {
@@ -570,8 +666,7 @@ export default function App() {
   };
 
   const handlePlay = () => {
-    if (!context) return;
-    const allBlocks: ScriptBlock[] = context.scenes.flatMap(s => s.blocks);
+    if (!context || allBlocks.length === 0) return;
     playScript(allBlocks);
   };
 
@@ -641,309 +736,278 @@ export default function App() {
     await playPreview(text, config);
   };
 
+  const blockLookup = useMemo(() => {
+    if (!context) return new Map<string, ScriptBlock>();
+    const lookup = new Map<string, ScriptBlock>();
+    context.scenes.forEach(scene => {
+      scene.blocks.forEach(block => lookup.set(block.id, block));
+    });
+    return lookup;
+  }, [context]);
+
+  const currentBlock = currentBlockId ? blockLookup.get(currentBlockId) : null;
+  const currentSpeaker = currentBlock
+    ? currentBlock.type === BlockType.DIALOGUE
+      ? currentBlock.character || 'Narrator'
+      : 'Narrator'
+    : 'None';
+
+  const allBlocks = useMemo(
+    () => (context ? context.scenes.flatMap(scene => scene.blocks) : []),
+    [context]
+  );
+
+  const expectedVoices = context ? context.characters.length + 1 : 0;
+  const voicesReady = context ? voiceConfigs.length >= expectedVoices : false;
+  const voicesAssigned = Boolean(context) && voicesReady && hasReviewedVoices;
+  const bufferedBlocks = bufferedCount;
+  const totalBufferedBlocks = totalBufferedCount;
+  const audioBuffered = totalBufferedBlocks > 0 && bufferedBlocks >= totalBufferedBlocks;
+
+  const handlePanelToggle = (panel: 'setup' | 'voices' | 'playback') =>
+    (event: React.SyntheticEvent<HTMLDetailsElement>) => {
+      const isOpen = (event.currentTarget as HTMLDetailsElement).open;
+      setOpenPanels(prev => ({ ...prev, [panel]: isOpen }));
+      if (panel === 'voices' && isOpen) {
+        setHasReviewedVoices(true);
+      }
+    };
+
+  const openVoicesPanel = () => {
+    setOpenPanels(prev => ({ ...prev, voices: true }));
+    setHasReviewedVoices(true);
+  };
+
+  const openPlaybackPanel = () => {
+    setOpenPanels(prev => ({ ...prev, playback: true }));
+  };
+
+  const primaryAction = (() => {
+    if (!context) {
+      return {
+        label: 'Generate Script',
+        helperText: 'Start with your premise to create the opening scene.',
+        onClick: handleStart,
+        disabled: isGenerating || !setupState.premise.trim(),
+        loading: isGenerating
+      };
+    }
+    if (!voicesAssigned) {
+      return {
+        label: 'Assign Voices',
+        helperText: 'Map each character to a voice.',
+        onClick: openVoicesPanel,
+        disabled: false,
+        loading: false
+      };
+    }
+    if (isPlaying) {
+      return {
+        label: 'Stop',
+        helperText: 'Playback is running.',
+        onClick: stop,
+        disabled: false,
+        loading: false
+      };
+    }
+    if (!audioBuffered) {
+      return {
+        label: isBuffering ? 'Buffering Audio...' : 'Generate Audio',
+        helperText: 'Preload audio for smoother playback.',
+        onClick: () => {
+          openPlaybackPanel();
+          if (allBlocks.length > 0) {
+            bufferScript(allBlocks);
+          }
+        },
+        disabled: isBuffering || !context || allBlocks.length === 0,
+        loading: isBuffering
+      };
+    }
+    return {
+      label: isPlaying ? 'Stop' : 'Play',
+      helperText: 'Audio is ready for performance.',
+      onClick: isPlaying ? stop : handlePlay,
+      disabled: false,
+      loading: false
+    };
+  })();
+
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
   );
 
-  if (!context) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <SetupForm onStart={handleStart} isLoading={isGenerating} onError={handleAiError} />
-        {error && (
-          <div className="absolute bottom-4 left-0 right-0 text-center text-red-400">
-            Error: {error}
-          </div>
-        )}
-        {isGenerating && (
-          <div className="absolute top-4 right-4">
-            <Button variant="ghost" size="sm" onClick={cancelAiRequest}>
-              Cancel
-            </Button>
-          </div>
-        )}
-        <LoginModal
-          isOpen={authStatus === 'unauthenticated'}
-          isLoading={isAuthLoading}
-          error={authError}
-          onLogin={handleLogin}
-        />
-        {privacyModal}
-      </div>
-    );
-  }
-
   return (
-    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col xl:flex-row overflow-hidden relative">
-      
-      {/* Sidebar Controls */}
-      <div className="
-        w-full 
-        xl:w-[380px] xl:min-w-[340px] xl:max-w-[420px]
-        h-[45vh] xl:h-full
-        bg-gray-800 border-b xl:border-b-0 xl:border-r border-gray-700 
-        flex flex-col 
-        z-40 shrink-0 
-        shadow-2xl xl:shadow-none
-      ">
-        
-        {/* Title Section */}
-        <div className="p-4 border-b border-gray-700 bg-gray-800/50 shrink-0">
-          <label className="text-[10px] uppercase font-bold text-gray-500 block tracking-widest mb-2">Script Title</label>
-          <input
-            ref={titleInputRef}
-            value={context.title}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Title of your masterpiece..."
-            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 text-white font-medium outline-none transition-shadow"
-          />
-          <p className="text-[10px] text-gray-400 mt-1">{context.genre} • {context.scenes.length} Scenes</p>
-          <div className="mt-2 flex items-center justify-between text-[10px] text-gray-500">
-            <span>Draft autosaves locally.</span>
-            <button
-              type="button"
-              onClick={handleClearDraft}
-              className="text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300"
-            >
-              Clear draft
-            </button>
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col lg:flex-row overflow-hidden relative">
+      <ScriptPane
+        context={context}
+        titleInputRef={titleInputRef}
+        onTitleChange={handleTitleChange}
+        onClearDraft={handleClearDraft}
+        autosaveError={autosaveError}
+        error={error}
+        userInstruction={userInstruction}
+        onInstructionChange={setUserInstruction}
+        onGenerateNext={handleGenerateNext}
+        onPlotTwist={handleTwist}
+        onAddBlock={handleAddBlock}
+        onUndo={handleUndo}
+        insertTarget={insertTarget}
+        onInsertAfter={handleInsertAfter}
+        onCancelInsertTarget={() => setInsertTarget(null)}
+        onSelectInsertTarget={handleSelectInsertTarget}
+        onChangeSpeaker={handleChangeSpeaker}
+        onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
+        onRegenerate={handleRegenerateBlock}
+        onToggleLock={handleToggleLock}
+        isGenerating={isGenerating}
+        isPlaying={isPlaying}
+        isRegenerating={isGenerating}
+        onCancelGenerate={cancelAiRequest}
+        currentBlockId={currentBlockId}
+        showHighlights={showHighlights}
+        autoScroll={autoScroll}
+        onOpenPrivacy={openPrivacy}
+      />
+
+      <ControlPanel
+        header={(
+          <div className="space-y-3">
+            <div className="text-[11px] uppercase tracking-[0.3em] text-gray-500">Flow</div>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span className="px-2 py-1 rounded-full border border-gray-700">Setup</span>
+              <span className="text-gray-600">-&gt;</span>
+              <span className="px-2 py-1 rounded-full border border-gray-700">Script</span>
+              <span className="text-gray-600">-&gt;</span>
+              <span className="px-2 py-1 rounded-full border border-gray-700">Voices</span>
+              <span className="text-gray-600">-&gt;</span>
+              <span className="px-2 py-1 rounded-full border border-gray-700">Playback</span>
+            </div>
+            <PrimaryActionButton
+              label={primaryAction.label}
+              onClick={primaryAction.onClick}
+              helperText={primaryAction.helperText}
+              disabled={primaryAction.disabled}
+              loading={primaryAction.loading}
+            />
           </div>
-          {autosaveError && (
-            <p className="mt-2 text-[10px] text-amber-400">{autosaveError}</p>
-          )}
-        </div>
-
-        {/* Tab Bar */}
-        <div className="flex border-b border-gray-700 bg-gray-900/20 shrink-0">
-          {(['write', 'cast', 'play'] as TabType[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 px-2 text-xs font-bold uppercase tracking-wider flex flex-col items-center gap-1 transition-all border-b-2 ${
-                activeTab === tab 
-                  ? 'border-indigo-500 !text-white bg-indigo-500/5' 
-                  : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5'
-              }`}
-            >
-              {tab === 'write' && <PenTool className="w-4 h-4" />}
-              {tab === 'cast' && <Mic2 className="w-4 h-4" />}
-              {tab === 'play' && <PlayCircle className="w-4 h-4" />}
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-8 scroll-smooth custom-scrollbar">
-          
-          {/* WRITE TAB */}
-          {activeTab === 'write' && (
-            <div className="flex flex-col gap-10 animate-in fade-in duration-300">
-              <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">What happens next?</h3>
-                  <div className="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded text-[10px] font-bold">Scene {context.scenes.length + 1}</div>
-                </div>
-                <textarea
-                  value={userInstruction}
-                  onChange={(e) => setUserInstruction(e.target.value)}
-                  placeholder="Suggest an action, or leave empty for AI to decide..."
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm h-32 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
-                />
-                <p className="text-[11px] text-gray-500">
-                  Prompts are sent to a third-party AI service. Avoid sensitive data.{' '}
-                  <button
-                    type="button"
-                    onClick={openPrivacy}
-                    className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
-                  >
-                    Privacy
-                  </button>
-                </p>
-                
-                <div className="grid grid-cols-2 gap-2">
-                   <Button onClick={handleTwist} variant="secondary" size="sm" disabled={isGenerating}>
-                      <Sparkles className="w-3 h-3 mr-2" />
-                      Plot Twist
-                   </Button>
-                   <Button onClick={handleGenerateNext} loading={isGenerating} disabled={isPlaying} className="shadow-lg shadow-indigo-500/20">
-                      <PlusCircle className="w-4 h-4 mr-2" />
-                      Generate
-                   </Button>
-                </div>
-              </section>
-
-              <div className="border-t border-gray-700 pt-8">
-                <InsertBlock 
-                  characters={context.characters}
-                  genre={context.genre}
-                  onAddBlock={handleAddBlock}
-                  onUndo={handleUndo}
-                  onError={(err) => handleAiError(err, 'Failed to generate block.')}
-                  disabled={isPlaying || isGenerating}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* CAST TAB */}
-          {activeTab === 'cast' && (
-            <div className="animate-in fade-in duration-300">
-               <VoiceManager 
-                 characters={context.characters} 
-                 voiceConfigs={voiceConfigs} 
-                 onUpdateConfig={updateVoiceConfig}
-                 onOpenCasting={setCastingCharacter}
-                 onPreview={(config) => playPreview(getPreviewText(config.name), config)}
-                 onStop={stop}
-                 isAudioPlaying={isPreviewPlaying && !castingCharacter} 
-                 isLoading={isLoadingAudio && !isPlaying && !castingCharacter} 
-                 globalSpeed={playbackSpeed}
-                 onGlobalSpeedChange={handleGlobalSpeedChange}
-               />
-            </div>
-          )}
-
-          {/* PLAY TAB */}
-          {activeTab === 'play' && (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              <section className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Script Performance</h3>
-                <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-700 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isPlaying ? 'bg-red-600 animate-pulse' : 'bg-indigo-600'}`}>
-                    {isPlaying ? <Pause className="w-8 h-8 text-white fill-current" /> : <Play className="w-8 h-8 text-white fill-current ml-1" />}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="font-bold text-white text-base">{isPlaying ? 'Reading Script...' : 'Ready to Perform'}</p>
-                    <p className="text-xs text-gray-400">Current scene count: {context.scenes.length}</p>
-                  </div>
-
-                  <div className="w-full pt-2">
-                    {!isPlaying ? (
-                      <Button onClick={handlePlay} className="w-full" variant="accent" size="lg">
-                        <Play className="w-4 h-4 mr-2" /> Start Reading
-                      </Button>
-                    ) : (
-                      <Button onClick={stop} className="w-full" variant="danger" size="lg">
-                        <Pause className="w-4 h-4 mr-2" /> Stop Playback
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-3 bg-gray-900/30 p-4 rounded-lg border border-gray-800">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Quick Settings</h3>
-                <div className="flex items-center justify-between group cursor-pointer" onClick={() => setAutoScroll(!autoScroll)}>
-                  <div className="flex items-center gap-2">
-                    <ScrollText className={`w-3.5 h-3.5 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
-                    <span className="text-xs text-gray-300">Auto-scroll script</span>
-                  </div>
-                  <div className={`w-8 h-4 rounded-full flex items-center px-0.5 transition-colors ${autoScroll ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${autoScroll ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between group cursor-pointer" onClick={() => setShowHighlights(!showHighlights)}>
-                  <div className="flex items-center gap-2">
-                    <HighlightingIcon className={`w-3.5 h-3.5 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />
-                    <span className="text-xs text-gray-300">Highlight active line</span>
-                  </div>
-                  <div className={`w-8 h-4 rounded-full flex items-center px-0.5 transition-colors ${showHighlights ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${showHighlights ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
-
-        </div>
-
-        {/* Export Footer */}
-        <div className="p-4 border-t border-gray-700 bg-gray-800/80 mt-auto shrink-0">
-          <Button variant="ghost" onClick={handleDownload} className="w-full text-xs py-2 h-auto hover:bg-gray-700">
+        )}
+        footer={(
+          <Button
+            variant="ghost"
+            onClick={handleDownload}
+            className="w-full text-xs py-2 h-auto hover:bg-gray-700"
+            disabled={!context}
+            title="Export script as a .txt file"
+          >
             <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
           </Button>
-        </div>
-      </div>
-
-      {/* Main Content: Script */}
-      <div className="
-        flex-1 
-        bg-[#1a1a1a] 
-        relative 
-        overflow-y-auto 
-        overflow-x-hidden
-        h-[55vh] xl:h-full
-      ">
-        <div className="min-h-full p-4 md:p-8 xl:p-12 flex flex-col">
-          <div className="w-full xl:min-w-[720px] max-w-5xl mx-auto flex-1 transition-all duration-300">
-            {error && (
-              <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg mb-4 flex items-center animate-in fade-in slide-in-from-top-2">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                {error}
-              </div>
-            )}
-            
-            <ScriptDisplay 
-              scenes={context.scenes} 
-              currentBlockId={currentBlockId} 
-              isPlaying={isPlaying}
-              onPlay={handlePlay}
-              onStop={stop}
-              playbackSpeed={playbackSpeed}
-              onPlaybackSpeedChange={handleGlobalSpeedChange}
-              showHighlights={showHighlights}
-              onToggleHighlights={() => setShowHighlights(!showHighlights)}
-              autoScroll={autoScroll}
-              onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
-              onRegenerate={handleRegenerateBlock}
-              onToggleLock={handleToggleLock}
-              isRegenerating={isGenerating}
-            />
-            
-            {isGenerating && (
-              <div className="mt-8 text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-                <span className="text-sm font-medium">Running writers room simulation...</span>
-                <Button variant="ghost" size="sm" onClick={cancelAiRequest}>
-                  Cancel
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Toast Notification */}
-        {toast && (
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5 fade-in z-50">
-            <span className="text-sm font-medium">{toast.message}</span>
-            {toast.onUndo && (
-              <button 
-                onClick={toast.onUndo}
-                className="text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-1 rounded flex items-center gap-1 transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" /> Undo
-              </button>
-            )}
-          </div>
         )}
-      </div>
+      >
+        <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">
+          <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg bg-gray-900/40 border border-gray-700 px-4 py-3 text-sm font-semibold text-gray-200">
+            <span>Setup</span>
+            <span className="text-[10px] text-gray-500">Premise / Style / Cast</span>
+          </summary>
+          <div className="mt-4 space-y-3">
+            {context && (
+              <p className="text-[11px] text-gray-500">
+                Setup is locked for this draft. Clear the draft to start over.
+              </p>
+            )}
+            <SetupForm
+              value={setupState}
+              onChange={updateSetupState}
+              onStart={handleStart}
+              isLoading={isGenerating}
+              onError={handleAiError}
+              isLocked={Boolean(context)}
+              showSubmit={false}
+            />
+          </div>
+        </details>
 
-      {/* Voice Casting Modal */}
+        <details open={openPanels.voices} onToggle={handlePanelToggle('voices')} className="group">
+          <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg bg-gray-900/40 border border-gray-700 px-4 py-3 text-sm font-semibold text-gray-200">
+            <span>Voices</span>
+            <span className="text-[10px] text-gray-500">{voicesAssigned ? 'Ready' : 'Assign'}</span>
+          </summary>
+          <div className="mt-4">
+            {context ? (
+              <VoicesPanel
+                characters={context.characters}
+                voiceConfigs={voiceConfigs}
+                onUpdateConfig={updateVoiceConfig}
+                onOpenCasting={setCastingCharacter}
+                onPreview={(config) => playPreview(getPreviewText(config.name), config)}
+                onStop={stop}
+                isAudioPlaying={isPreviewPlaying && !castingCharacter}
+                isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
+                onReviewed={() => setHasReviewedVoices(true)}
+              />
+            ) : (
+              <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
+            )}
+          </div>
+        </details>
+
+        <details open={openPanels.playback} onToggle={handlePanelToggle('playback')} className="group">
+          <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg bg-gray-900/40 border border-gray-700 px-4 py-3 text-sm font-semibold text-gray-200">
+            <span>Playback</span>
+            <span className="text-[10px] text-gray-500">{audioBuffered ? 'Ready' : 'Buffering'}</span>
+          </summary>
+          <div className="mt-4">
+            {context ? (
+              <PlaybackPanel
+                isPlaying={isPlaying}
+                isLoadingAudio={isLoadingAudio}
+                onPlay={handlePlay}
+                onStop={stop}
+                bufferedCount={bufferedBlocks}
+                totalCount={totalBufferedBlocks}
+                currentSpeaker={currentSpeaker}
+                playbackSpeed={playbackSpeed}
+                onPlaybackSpeedChange={handleGlobalSpeedChange}
+                showHighlights={showHighlights}
+                onToggleHighlights={() => setShowHighlights(!showHighlights)}
+                autoScroll={autoScroll}
+                onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
+              />
+            ) : (
+              <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
+            )}
+          </div>
+        </details>
+      </ControlPanel>
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5 fade-in z-50">
+          <span className="text-sm font-medium">{toast.message}</span>
+          {toast.onUndo && (
+            <button
+              onClick={toast.onUndo}
+              className="text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-1 rounded flex items-center gap-1 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" /> Undo
+            </button>
+          )}
+        </div>
+      )}
+
       {castingCharacter && (
-        <VoiceCastingModal 
+        <VoiceCastingModal
           isOpen={true}
           onClose={() => {
-            stop(); 
+            stop();
             setCastingCharacter(null);
           }}
           characterName={castingCharacter}
           currentVoiceId={voiceConfigs.find(c => c.name === castingCharacter)?.voiceId || AVAILABLE_VOICES[0]}
           voiceConfigs={voiceConfigs}
           onSelect={(voiceId) => {
-             updateVoiceConfig(castingCharacter, { voiceId });
-             stop();
-             setCastingCharacter(null);
+            updateVoiceConfig(castingCharacter, { voiceId });
+            stop();
+            setCastingCharacter(null);
           }}
           onPreview={handleModalPreview}
           isPreviewing={isPreviewPlaying || isLoadingAudio}
@@ -961,21 +1025,3 @@ export default function App() {
     </div>
   );
 }
-
-const HighlightingIcon = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="m9 11-6 6v3h9l3-3" />
-    <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />
-  </svg>
-);
