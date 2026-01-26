@@ -3,6 +3,7 @@ import { SetupForm, SetupFormState } from './components/SetupForm';
 import { Button } from './components/Button';
 import { ControlPanel, ControlStep, resolveStep } from './components/ControlPanel';
 import { ScriptPane } from './components/ScriptPane';
+import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
 import { VoicesPanel } from './components/VoicesPanel';
 import { PlaybackPanel } from './components/PlaybackPanel';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
@@ -12,12 +13,13 @@ import {
   createGenerateSceneRequest,
   createSuggestPlotTwistRequest,
   createRegenerateScriptBlockRequest,
-  CancellableRequest
+  CancellableRequest,
+  generateScriptElement
 } from './services/gemini';
 import { getSession, login } from './services/auth';
 import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType, GENRES } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { ChevronDown, Download, RotateCcw } from 'lucide-react';
+import { ChevronDown, Download, FileDown, RotateCcw } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -32,6 +34,7 @@ interface DraftPayload {
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
+const DEFAULT_TITLE = 'Untitled Screenplay';
 const DEFAULT_SETUP_STATE: SetupFormState = {
   genre: GENRES[0],
   premise: '',
@@ -65,6 +68,42 @@ const getErrorMeta = (err: unknown) => {
   return { code, status, message };
 };
 
+const isUntitledTitle = (title: string) => !title.trim() || title.trim() === DEFAULT_TITLE;
+
+const sanitizeSuggestedTitle = (rawTitle: string) => {
+  if (!rawTitle) return '';
+  const firstLine = rawTitle.split('\n').map(line => line.trim()).find(Boolean) || '';
+  const withoutLabel = firstLine.replace(/^title\s*[:\-]\s*/i, '');
+  const withoutQuotes = withoutLabel.replace(/^["'“”]+|["'“”]+$/g, '');
+  const collapsed = withoutQuotes.replace(/\s+/g, ' ').trim();
+  if (!collapsed) return '';
+  if (/^(int|ext)\./i.test(collapsed)) return '';
+  return collapsed.length > 120 ? collapsed.slice(0, 120).replace(/[,\s]+$/g, '') : collapsed;
+};
+
+const buildFallbackTitle = (premise: string, genre: string) => {
+  const words = premise
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4);
+  if (words.length === 0) {
+    return genre ? `${genre} Story` : '';
+  }
+  return words.map(word => word[0]?.toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
+const buildTitleContext = (setup: SetupFormState) => {
+  const parts = [
+    setup.genre ? `Genre: ${setup.genre}.` : '',
+    setup.premise.trim() ? `Premise: ${setup.premise.trim()}` : '',
+    setup.characters.length ? `Characters: ${setup.characters.filter(char => char.trim()).join(', ')}.` : '',
+    setup.style.trim() ? `Style: ${setup.style.trim()}.` : '',
+    setup.length.trim() ? `Length: ${setup.length.trim()}.` : ''
+  ].filter(Boolean);
+  return parts.join(' ');
+};
+
 export default function App() {
   // State
   const [context, setContext] = useState<StoryContext | null>(null);
@@ -78,7 +117,12 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [suggestedTitle, setSuggestedTitle] = useState<string | null>(null);
+  const [isSuggestingTitle, setIsSuggestingTitle] = useState(false);
+  const [suggestedTitleDismissed, setSuggestedTitleDismissed] = useState(false);
   const activeAiRequestRef = useRef<CancellableRequest<unknown> | null>(null);
+  const titleSuggestionTokenRef = useRef(0);
+  const hasManualTitleRef = useRef(false);
 
   const [setupState, setSetupState] = useState<SetupFormState>(DEFAULT_SETUP_STATE);
   const [openPanels, setOpenPanels] = useState({
@@ -380,6 +424,13 @@ export default function App() {
     };
   }, [context, userInstruction]);
 
+  useEffect(() => {
+    if (!context || !suggestedTitle || suggestedTitleDismissed) return;
+    if (hasManualTitleRef.current) return;
+    if (!isUntitledTitle(context.title)) return;
+    setContext(prev => prev ? { ...prev, title: suggestedTitle } : prev);
+  }, [context, suggestedTitle, suggestedTitleDismissed]);
+
   const handleLogin = async (password: string) => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -405,6 +456,7 @@ export default function App() {
     if (!proceed) return;
     cancelAiRequest();
     stop({ clearBuffer: true });
+    resetTitleSuggestionState();
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
@@ -428,6 +480,7 @@ export default function App() {
     if (!context) return;
     cancelAiRequest();
     stop({ clearBuffer: true });
+    resetTitleSuggestionState();
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
@@ -446,11 +499,47 @@ export default function App() {
     }
   };
 
+  const requestTitleSuggestion = useCallback(async (setup: SetupFormState) => {
+    if (!setup.premise.trim()) return;
+    const token = titleSuggestionTokenRef.current + 1;
+    titleSuggestionTokenRef.current = token;
+    setIsSuggestingTitle(true);
+    try {
+      const contextText = buildTitleContext(setup);
+      const instruction = [
+        'Create a concise, evocative screenplay title (2-6 words).',
+        'Return only the title text, no quotes.',
+        'Avoid scene headings like INT./EXT.'
+      ].join(' ');
+      const rawTitle = await generateScriptElement(BlockType.ACTION, undefined, instruction, contextText);
+      if (titleSuggestionTokenRef.current !== token) return;
+      const cleanedTitle = sanitizeSuggestedTitle(rawTitle);
+      const finalTitle = cleanedTitle || buildFallbackTitle(setup.premise, setup.genre);
+      if (!finalTitle || finalTitle === DEFAULT_TITLE) return;
+      setSuggestedTitle(finalTitle);
+      setSuggestedTitleDismissed(false);
+      if (!hasManualTitleRef.current) {
+        setContext(prev => {
+          if (!prev || !isUntitledTitle(prev.title)) return prev;
+          return { ...prev, title: finalTitle };
+        });
+      }
+    } catch (err) {
+      console.error('Title suggestion failed', err);
+    } finally {
+      if (titleSuggestionTokenRef.current === token) {
+        setIsSuggestingTitle(false);
+      }
+    }
+  }, []);
+
   // Handlers
   const handleStart = async () => {
     if (isGenerating) return;
     let request: CancellableRequest<Scene> | null = null;
     try {
+      resetTitleSuggestionState();
+      void requestTitleSuggestion(setupState);
       const setupNotes: string[] = [];
       if (setupState.style.trim()) {
         setupNotes.push(`Style: ${setupState.style.trim()}.`);
@@ -463,7 +552,7 @@ export default function App() {
         genre: setupState.genre,
         premise: setupState.premise,
         characters: setupState.characters,
-        title: 'Untitled Screenplay',
+        title: DEFAULT_TITLE,
         scenes: [] 
       };
       request = createGenerateSceneRequest(
@@ -637,6 +726,14 @@ export default function App() {
     });
   }, []);
 
+  const resetTitleSuggestionState = useCallback(() => {
+    titleSuggestionTokenRef.current += 1;
+    hasManualTitleRef.current = false;
+    setSuggestedTitle(null);
+    setSuggestedTitleDismissed(false);
+    setIsSuggestingTitle(false);
+  }, []);
+
   const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string) => {
     if (!context || isGenerating) return;
 
@@ -716,9 +813,26 @@ export default function App() {
     setVoiceConfigs(prev => prev.map(config => ({ ...config, speed })));
   };
 
-  const handleTitleChange = (newTitle: string) => {
+  const applyTitle = useCallback((newTitle: string, source: 'auto' | 'user') => {
     setContext(prev => prev ? { ...prev, title: newTitle } : null);
+    if (source === 'user') {
+      hasManualTitleRef.current = true;
+    }
+  }, []);
+
+  const handleTitleChange = (newTitle: string) => {
+    applyTitle(newTitle, 'user');
   };
+
+  const handleUseSuggestedTitle = useCallback(() => {
+    if (!suggestedTitle) return;
+    applyTitle(suggestedTitle, 'user');
+    setSuggestedTitleDismissed(true);
+  }, [applyTitle, suggestedTitle]);
+
+  const handleDismissSuggestedTitle = useCallback(() => {
+    setSuggestedTitleDismissed(true);
+  }, []);
 
   const handlePlay = () => {
     if (!context || allBlocks.length === 0) return;
@@ -726,10 +840,10 @@ export default function App() {
     playScript(allBlocks);
   };
 
-  const handleDownload = () => {
+  const getExportMeta = () => {
     if (!context) return;
 
-    const isUntitled = !context.title.trim() || context.title === 'Untitled Screenplay';
+    const isUntitled = isUntitledTitle(context.title);
     
     if (isUntitled) {
       const proceed = window.confirm("You haven't given your masterpiece a title yet. Export as \"Untitled Script\"?");
@@ -738,6 +852,18 @@ export default function App() {
         return;
       }
     }
+    const trimmedTitle = context.title.trim();
+    const displayTitle = isUntitled ? 'Untitled Script' : trimmedTitle;
+    const fileStem = isUntitled
+      ? 'untitled_script'
+      : trimmedTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    return { displayTitle, fileStem };
+  };
+
+  const handleDownload = () => {
+    if (!context) return;
+    const exportMeta = getExportMeta();
+    if (!exportMeta) return;
 
     const text = context.scenes.map(s => {
       return s.blocks.map(b => {
@@ -751,11 +877,25 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
-    const sanitizedTitle = isUntitled ? 'untitled_script' : context.title.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    a.download = `${sanitizedTitle}.txt`;
+
+    a.download = `${exportMeta.fileStem}.txt`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const handleExportPdf = () => {
+    if (!context) return;
+    const exportMeta = getExportMeta();
+    if (!exportMeta) return;
+    const scriptRoot = document.querySelector(SCRIPT_EXPORT_ROOT_SELECTOR) as HTMLElement | null;
+    if (!scriptRoot) {
+      window.alert('Unable to locate the script preview for export. Try switching to the script tab and retry.');
+      return;
+    }
+    const opened = openScriptExportWindow(scriptRoot.outerHTML, exportMeta.displayTitle);
+    if (!opened) {
+      window.alert('Pop-up blocked. Allow pop-ups for this site to export the PDF.');
+    }
   };
 
   const getPreviewText = (charName: string): string => {
@@ -979,6 +1119,11 @@ export default function App() {
         context={context}
         titleInputRef={titleInputRef}
         onTitleChange={handleTitleChange}
+        suggestedTitle={suggestedTitle}
+        isSuggestingTitle={isSuggestingTitle}
+        suggestedTitleDismissed={suggestedTitleDismissed}
+        onUseSuggestedTitle={handleUseSuggestedTitle}
+        onDismissSuggestedTitle={handleDismissSuggestedTitle}
         onClearDraft={handleClearDraft}
         autosaveError={autosaveError}
         error={error}
@@ -1013,15 +1158,26 @@ export default function App() {
         onStepChange={handleStepChange}
         primaryAction={primaryAction}
         footer={(
-          <Button
-            variant="ghost"
-            onClick={handleDownload}
-            className="w-full text-xs py-2 h-auto hover:bg-gray-700"
-            disabled={!context}
-            title="Export script as a .txt file"
-          >
-            <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              onClick={handleDownload}
+              className="w-full text-xs py-2 h-auto hover:bg-gray-700"
+              disabled={!context}
+              title="Export script as a .txt file"
+            >
+              <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleExportPdf}
+              className="w-full text-xs py-2 h-auto hover:bg-gray-700"
+              disabled={!context}
+              title="Export script as a PDF via print dialog"
+            >
+              <FileDown className="w-3 h-3 mr-2" /> Export PDF
+            </Button>
+          </>
         )}
       >
         <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">

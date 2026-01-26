@@ -22,6 +22,191 @@ interface ScriptDisplayProps {
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
 const ERROR_CLASSES = 'border border-red-300/70 bg-red-50/60';
+export const SCRIPT_EXPORT_ROOT_SELECTOR = '[data-script-export-root="true"]';
+
+const SCRIPT_EXPORT_STYLES = `
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: "Courier Prime", monospace;
+    background: #111827;
+    color: #111111;
+    line-height: 1.5;
+  }
+
+  .font-screenplay {
+    font-family: "Courier Prime", monospace;
+  }
+
+  .script-export-root {
+    position: relative;
+    max-width: 900px;
+    margin: 24px auto;
+    padding: 72px 72px;
+    background: #f6f1e7;
+    color: #111111;
+    border: 1px solid #d6cdbd;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+    overflow: visible !important;
+  }
+
+  .script-export-content {
+    position: relative;
+    z-index: 1;
+    overflow: visible !important;
+  }
+
+  .script-export-texture {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.03;
+    background-repeat: repeat;
+    background-image: url('/textures/cream-paper.svg');
+  }
+
+  .script-scene {
+    margin-bottom: 32px;
+  }
+
+  .script-scene-heading {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 17px;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid #d1d5db;
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+  }
+
+  .script-block {
+    margin: 0 0 18px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .script-block[data-block-type="action"] {
+    line-height: 1.55;
+  }
+
+  .script-block[data-block-type="dialogue"] {
+    max-width: 4.2in;
+    margin: 12px auto 20px;
+    text-align: center;
+  }
+
+  .script-dialogue-character {
+    margin-top: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .script-dialogue-parenthetical {
+    font-style: italic;
+    font-size: 0.92rem;
+    margin: 2px 0;
+  }
+
+  .script-dialogue-text {
+    white-space: pre-wrap;
+    margin: 2px 0 14px;
+  }
+
+  .script-block[data-block-type="transition"] {
+    text-align: right;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding-right: 8px;
+  }
+
+  .script-export-chrome {
+    display: none !important;
+  }
+
+  .script-block-active {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  @media print {
+    body {
+      background: #ffffff;
+    }
+
+    .script-export-root {
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      max-width: none;
+      background: #ffffff;
+    }
+
+    .script-export-texture {
+      display: none !important;
+    }
+
+    @page {
+      size: letter;
+      margin: 0.9in 0.8in 0.9in 1in;
+    }
+  }
+`;
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+export const buildScriptExportDocument = (scriptMarkup: string, title: string) => {
+  const safeTitle = escapeHtml(title);
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${safeTitle}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+      <style>${SCRIPT_EXPORT_STYLES}</style>
+    </head>
+    <body>
+      ${scriptMarkup}
+      <script>
+        window.addEventListener('load', () => {
+          const ready = document.fonts ? document.fonts.ready : Promise.resolve();
+          ready.then(() => {
+            setTimeout(() => window.print(), 60);
+          });
+        });
+      </script>
+    </body>
+  </html>`;
+};
+
+export const openScriptExportWindow = (scriptMarkup: string, title: string) => {
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+  if (!printWindow) return false;
+  printWindow.document.open();
+  printWindow.document.write(buildScriptExportDocument(scriptMarkup, title));
+  printWindow.document.close();
+  printWindow.focus();
+  return true;
+};
 
 export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   scenes,
@@ -100,8 +285,8 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     if (scenes.length === 0) return null;
 
     return scenes.map((scene) => (
-      <div key={scene.id} id={`scene-${scene.id}`} className="mb-8">
-        <div className="font-bold uppercase mb-4 text-lg border-b border-gray-300 pb-2">
+      <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-8">
+        <div className="script-scene-heading font-bold uppercase mb-4 text-lg border-b border-gray-300 pb-2">
           {scene.heading}
         </div>
 
@@ -122,25 +307,25 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
             if (block.type === BlockType.ACTION) {
               content = (
-                <div className="mb-4 leading-relaxed">
+                <div className="script-block-action mb-4 leading-relaxed">
                   {block.text}
                 </div>
               );
             } else if (block.type === BlockType.DIALOGUE) {
               content = (
-                <div className="max-w-md mx-auto text-center">
-                  <div className="uppercase mt-4 mb-0 font-bold tracking-wider">{block.character}</div>
+                <div className="script-block-dialogue max-w-md mx-auto text-center">
+                  <div className="script-dialogue-character uppercase mt-4 mb-0 font-bold tracking-wider">{block.character}</div>
                   {block.parenthetical && (
-                    <div className="text-sm italic lowercase mb-0">{block.parenthetical}</div>
+                    <div className="script-dialogue-parenthetical text-sm italic lowercase mb-0">{block.parenthetical}</div>
                   )}
-                  <div className="mt-0 mb-4 whitespace-pre-wrap">
+                  <div className="script-dialogue-text mt-0 mb-4 whitespace-pre-wrap">
                     {block.text}
                   </div>
                 </div>
               );
             } else if (block.type === BlockType.TRANSITION) {
               content = (
-                <div className="text-right uppercase font-bold pr-4">
+                <div className="script-block-transition text-right uppercase font-bold pr-4">
                   {block.text}
                 </div>
               );
@@ -152,14 +337,15 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               <div
                 key={block.id}
                 id={`block-${block.id}`}
-                className={`${blockWrapperClasses} ${blockStatusClasses}`}
+                className={`${blockWrapperClasses} ${blockStatusClasses} script-block`}
+                data-block-type={block.type}
               >
                 {isError && (
-                  <span className="absolute left-2 top-2 text-[9px] uppercase tracking-widest text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
+                  <span className="script-export-chrome absolute left-2 top-2 text-[9px] uppercase tracking-widest text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
                     Audio error
                   </span>
                 )}
-                <div className="absolute right-0 top-1 flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="script-export-chrome absolute right-0 top-1 flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="relative" data-menu-root={block.id}>
                     <button
                       onClick={() => setOpenMenuId(openMenuId === block.id ? null : block.id)}
@@ -242,18 +428,19 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   if (scenes.length === 0) return null;
 
-  const containerClasses = `font-screenplay bg-[#f6f1e7] text-black p-8 md:p-16 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] max-w-4xl mx-auto rounded-md relative ${
+  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-8 md:p-16 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] max-w-4xl mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
   } ${className}`.trim();
   const contentClasses = scrollable
-    ? 'relative z-10 h-full overflow-y-auto space-y-6'
-    : 'relative z-10 space-y-6';
+    ? 'script-export-content relative z-10 h-full overflow-y-auto space-y-6'
+    : 'script-export-content relative z-10 space-y-6';
 
   return (
     <div
       className={containerClasses}
+      data-script-export-root="true"
     >
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('/textures/cream-paper.svg')]" />
+      <div className="script-export-texture absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('/textures/cream-paper.svg')]" />
       <div className={contentClasses}>
         {renderedScenes}
       </div>

@@ -120,7 +120,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {footer && (
         <div className="p-4 border-t border-gray-700 bg-gray-900/60 shrink-0">
-          {footer}
+          <div className="flex flex-col gap-2">{footer}</div>
         </div>
       )}
     </aside>

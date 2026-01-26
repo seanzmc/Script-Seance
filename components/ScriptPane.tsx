@@ -15,6 +15,11 @@ interface ScriptPaneProps {
   context: StoryContext | null;
   titleInputRef: React.RefObject<HTMLInputElement>;
   onTitleChange: (title: string) => void;
+  suggestedTitle: string | null;
+  isSuggestingTitle: boolean;
+  suggestedTitleDismissed: boolean;
+  onUseSuggestedTitle: () => void;
+  onDismissSuggestedTitle: () => void;
   onClearDraft: () => void;
   autosaveError: string | null;
   error: string | null;
@@ -64,6 +69,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
   titleInputRef,
   onTitleChange,
+  suggestedTitle,
+  isSuggestingTitle,
+  suggestedTitleDismissed,
+  onUseSuggestedTitle,
+  onDismissSuggestedTitle,
   onClearDraft,
   autosaveError,
   error,
@@ -99,6 +109,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
   const isSplitView = viewMode === 'split';
+  const titleMatchesSuggestion = Boolean(context && suggestedTitle && context.title.trim() === suggestedTitle);
+  const showSuggestedTitle = Boolean(context && suggestedTitle && !suggestedTitleDismissed);
+  const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
   const insertHandler = insertTarget ? (block: ScriptBlock) => onInsertAfter(insertTarget, block) : onAddBlock;
   const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
   const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
@@ -258,6 +271,34 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 className="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 text-white font-medium outline-none transition-shadow disabled:opacity-60"
                 disabled={!context}
               />
+              {showSuggestedTitle && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                  <span>
+                    Suggested title:{' '}
+                    <span className="text-gray-200 font-medium">{suggestedTitle}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onUseSuggestedTitle}
+                    disabled={titleMatchesSuggestion}
+                    className="text-indigo-400 hover:text-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Use
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDismissSuggestedTitle}
+                    className="text-gray-500 hover:text-gray-300"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+              {showSuggestingTitle && (
+                <div className="mt-2 text-[11px] text-gray-500">
+                  Generating a suggested title...
+                </div>
+              )}
               <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
                 <span>Draft autosaves locally.</span>
                 {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
