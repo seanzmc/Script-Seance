@@ -14,6 +14,7 @@ interface ScriptDisplayProps {
   characters: string[];
   insertTarget?: { sceneId: string; blockId: string } | null;
   isRegenerating: boolean;
+  className?: string;
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
@@ -29,7 +30,8 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   onChangeSpeaker,
   characters,
   insertTarget,
-  isRegenerating
+  isRegenerating,
+  className = ''
 }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const speakerOptions = useMemo(
@@ -212,7 +214,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   if (scenes.length === 0) return null;
 
   return (
-    <div className="font-screenplay bg-[#f0f0f0] text-black p-8 md:p-16 min-h-[600px] shadow-2xl max-w-4xl mx-auto rounded-sm relative overflow-visible">
+    <div
+      className={`font-screenplay bg-[#f6f1e7] text-black p-8 md:p-16 min-h-[600px] shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] max-w-4xl mx-auto rounded-md relative overflow-visible ${className}`}
+    >
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('/textures/cream-paper.svg')]" />
       <div className="relative z-10 space-y-6">
         {renderedScenes}
