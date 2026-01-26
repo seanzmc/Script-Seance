@@ -1,7 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { PrimaryActionButton } from './PrimaryActionButton';
 
-type ControlStep = 'setup' | 'script' | 'voices' | 'playback';
+export type ControlStep = 'setup' | 'script' | 'voices' | 'playback';
+
+interface StepResolutionState {
+  requestedStep: ControlStep;
+  hasScript: boolean;
+  hasConfirmedSetup: boolean;
+}
+
+export const resolveStep = ({
+  requestedStep,
+  hasScript,
+  hasConfirmedSetup
+}: StepResolutionState): ControlStep => {
+  if (!hasScript || !hasConfirmedSetup) {
+    return 'setup';
+  }
+  return requestedStep;
+};
 
 const FLOW_STEPS: Array<{ id: ControlStep; label: string; instruction: string }> = [
   { id: 'setup', label: 'Setup', instruction: 'Pick your premise and cast.' },
@@ -20,6 +37,7 @@ interface PrimaryActionConfig {
 
 interface ControlPanelProps {
   currentStep: ControlStep;
+  onStepChange?: (step: ControlStep) => void;
   primaryAction: PrimaryActionConfig;
   header?: React.ReactNode;
   children: React.ReactNode;
@@ -28,18 +46,13 @@ interface ControlPanelProps {
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
   currentStep,
+  onStepChange,
   primaryAction,
   header,
   children,
   footer
 }) => {
-  const [activeStep, setActiveStep] = useState<ControlStep>(currentStep);
-
-  useEffect(() => {
-    setActiveStep(currentStep);
-  }, [currentStep]);
-
-  const activeMeta = FLOW_STEPS.find(step => step.id === activeStep) || FLOW_STEPS[0];
+  const activeMeta = FLOW_STEPS.find(step => step.id === currentStep) || FLOW_STEPS[0];
 
   return (
     <aside
@@ -52,15 +65,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             <p className="text-[11px] uppercase tracking-[0.35em] text-gray-500">Flow</p>
             <div className="mt-3 space-y-2">
               {FLOW_STEPS.map((step, index) => {
-                const isActive = step.id === activeStep;
+                const isActive = step.id === currentStep;
                 return (
-                  <div
+                  <button
                     key={step.id}
-                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
+                    type="button"
+                    onClick={() => onStepChange?.(step.id)}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left w-full ${
                       isActive
                         ? 'border-indigo-400/40 bg-indigo-500/15 text-white'
                         : 'border-gray-800 bg-gray-900/40 text-gray-500'
                     }`}
+                    aria-current={isActive ? 'step' : undefined}
                   >
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold ${
@@ -81,7 +97,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

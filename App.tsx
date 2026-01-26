@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SetupForm, SetupFormState } from './components/SetupForm';
 import { Button } from './components/Button';
-import { ControlPanel } from './components/ControlPanel';
+import { ControlPanel, ControlStep, resolveStep } from './components/ControlPanel';
 import { ScriptPane } from './components/ScriptPane';
 import { VoicesPanel } from './components/VoicesPanel';
 import { PlaybackPanel } from './components/PlaybackPanel';
@@ -29,8 +29,6 @@ interface DraftPayload {
   userInstruction: string;
   savedAt: string;
 }
-
-type ControlStep = 'setup' | 'script' | 'voices' | 'playback';
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
@@ -88,6 +86,8 @@ export default function App() {
     voices: false,
     playback: false
   });
+  const [currentStep, setCurrentStep] = useState<ControlStep>('setup');
+  const [hasConfirmedSetup, setHasConfirmedSetup] = useState(false);
   const [hasReviewedVoices, setHasReviewedVoices] = useState(false);
   const [insertTarget, setInsertTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
 
@@ -106,6 +106,23 @@ export default function App() {
   const didHydrateDraftRef = useRef(false);
   const lastNonPrivacyPathRef = useRef('/');
   const autosaveFailureNotifiedRef = useRef(false);
+
+  const hasScript = Boolean(context?.scenes.some(scene => scene.blocks.length > 0));
+
+  const applyStep = (
+    requestedStep: ControlStep,
+    overrides?: { hasScript?: boolean; confirmSetup?: boolean }
+  ) => {
+    const resolvedHasScript = overrides?.hasScript ?? hasScript;
+    const confirmedSetup =
+      overrides?.confirmSetup ?? (hasConfirmedSetup || requestedStep !== 'setup');
+    setHasConfirmedSetup(confirmedSetup);
+    setCurrentStep(resolveStep({
+      requestedStep,
+      hasScript: resolvedHasScript,
+      hasConfirmedSetup: confirmedSetup
+    }));
+  };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
     setSetupState(prev => ({ ...prev, ...next }));
@@ -319,6 +336,10 @@ export default function App() {
         if (typeof parsed.userInstruction === 'string') {
           setUserInstruction(parsed.userInstruction);
         }
+        const hydratedHasScript = parsed.context.scenes.some(scene => scene.blocks.length > 0);
+        if (hydratedHasScript) {
+          applyStep('script', { hasScript: true, confirmSetup: true });
+        }
       } else {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY);
       }
@@ -395,6 +416,7 @@ export default function App() {
     setToast(null);
     setAutosaveError(null);
     autosaveFailureNotifiedRef.current = false;
+    applyStep('setup', { hasScript: false, confirmSetup: false });
     try {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     } catch (err) {
@@ -416,6 +438,7 @@ export default function App() {
     setToast(null);
     setAutosaveError(null);
     autosaveFailureNotifiedRef.current = false;
+    applyStep('setup', { hasScript: false, confirmSetup: false });
     try {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     } catch (err) {
@@ -456,6 +479,7 @@ export default function App() {
         scenes: [firstScene]
       });
       setHasReviewedVoices(false);
+      applyStep('script', { hasScript: true, confirmSetup: true });
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
     } finally {
@@ -698,6 +722,7 @@ export default function App() {
 
   const handlePlay = () => {
     if (!context || allBlocks.length === 0) return;
+    applyStep('playback', { hasScript: true, confirmSetup: true });
     playScript(allBlocks);
   };
 
@@ -798,18 +823,11 @@ export default function App() {
   const readyOrErrorBlocks = bufferedBlocks + errorBlocks;
   const pendingBlocks = Math.max(totalBufferedBlocks - readyOrErrorBlocks, 0);
   const audioBuffered = totalBufferedBlocks > 0 && readyOrErrorBlocks >= totalBufferedBlocks;
-  const hasScript = allBlocks.length > 0;
   const setupReady = setupState.premise.trim().length > 0 && setupState.characters.some(char => char.trim().length > 0);
 
-  const currentStep: ControlStep = (() => {
-    if (!hasScript) {
-      return setupReady ? 'script' : 'setup';
-    }
-    if (!voicesAssigned) {
-      return 'voices';
-    }
-    return 'playback';
-  })();
+  const handleStepChange = (step: ControlStep) => {
+    applyStep(step);
+  };
 
   useEffect(() => {
     const nextPanels = {
@@ -833,17 +851,27 @@ export default function App() {
     (event: React.SyntheticEvent<HTMLDetailsElement>) => {
       const isOpen = (event.currentTarget as HTMLDetailsElement).open;
       setOpenPanels(prev => ({ ...prev, [panel]: isOpen }));
-      if (panel === 'voices' && isOpen) {
-        setHasReviewedVoices(true);
+      if (!isOpen) return;
+      if (panel === 'setup') {
+        applyStep('setup');
+        return;
       }
+      if (panel === 'voices') {
+        applyStep('voices');
+        setHasReviewedVoices(true);
+        return;
+      }
+      applyStep('playback');
     };
 
   const openVoicesPanel = () => {
+    applyStep('voices');
     setOpenPanels({ setup: false, voices: true, playback: false });
     setHasReviewedVoices(true);
   };
 
   const openPlaybackPanel = () => {
+    applyStep('playback');
     setOpenPanels({ setup: false, voices: false, playback: true });
   };
 
@@ -982,6 +1010,7 @@ export default function App() {
 
       <ControlPanel
         currentStep={currentStep}
+        onStepChange={handleStepChange}
         primaryAction={primaryAction}
         footer={(
           <Button
