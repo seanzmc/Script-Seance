@@ -9,6 +9,7 @@ interface InsertBlockProps {
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
+  onCancelInsertTarget?: () => void;
   onError?: (error: unknown) => void;
   disabled?: boolean;
   insertTarget?: { sceneId: string; blockId: string } | null;
@@ -26,6 +27,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   genre, 
   onAddBlock,
   onUndo,
+  onCancelInsertTarget,
   onError,
   disabled,
   insertTarget
@@ -91,6 +93,15 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         </h3>
         
         <div className="flex gap-2">
+          {insertTarget && onCancelInsertTarget && (
+            <button
+              type="button"
+              onClick={onCancelInsertTarget}
+              className="text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300"
+            >
+              Cancel insert
+            </button>
+          )}
           {onUndo && (
              <button
               onClick={onUndo}

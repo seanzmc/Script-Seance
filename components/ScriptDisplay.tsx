@@ -17,6 +17,7 @@ interface ScriptDisplayProps {
   insertTarget?: { sceneId: string; blockId: string } | null;
   isRegenerating: boolean;
   className?: string;
+  scrollable?: boolean;
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
@@ -36,7 +37,8 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   characters,
   insertTarget,
   isRegenerating,
-  className = ''
+  className = '',
+  scrollable = false
 }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const speakerOptions = useMemo(
@@ -240,12 +242,19 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   if (scenes.length === 0) return null;
 
+  const containerClasses = `font-screenplay bg-[#f6f1e7] text-black p-8 md:p-16 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] max-w-4xl mx-auto rounded-md relative ${
+    scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
+  } ${className}`.trim();
+  const contentClasses = scrollable
+    ? 'relative z-10 h-full overflow-y-auto space-y-6'
+    : 'relative z-10 space-y-6';
+
   return (
     <div
-      className={`font-screenplay bg-[#f6f1e7] text-black p-8 md:p-16 min-h-[600px] shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] max-w-4xl mx-auto rounded-md relative overflow-visible ${className}`}
+      className={containerClasses}
     >
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('/textures/cream-paper.svg')]" />
-      <div className="relative z-10 space-y-6">
+      <div className={contentClasses}>
         {renderedScenes}
       </div>
     </div>

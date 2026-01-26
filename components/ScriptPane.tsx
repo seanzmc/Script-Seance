@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { ScriptEditor } from './ScriptEditor';
@@ -93,11 +93,16 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onOpenPrivacy
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerOffset, setHeaderOffset] = useState(0);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
+  const isSplitView = viewMode === 'split';
   const insertHandler = insertTarget ? (block: ScriptBlock) => onInsertAfter(insertTarget, block) : onAddBlock;
   const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
+  const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
+  const previewClassName = `${previewWidthClass} ${previewLayoutClass}`.trim();
   const generationIndicator = isGenerating ? (
     <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
       <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
@@ -169,23 +174,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       />
 
       <section className="bg-gray-900/30 border border-gray-800 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Insert Block</h3>
-          {insertTarget && (
-            <button
-              type="button"
-              onClick={onCancelInsertTarget}
-              className="text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300"
-            >
-              Cancel insert
-            </button>
-          )}
-        </div>
         <InsertBlock
           characters={context.characters}
           genre={context.genre}
           onAddBlock={insertHandler}
           onUndo={onUndo}
+          onCancelInsertTarget={onCancelInsertTarget}
           onError={onInsertError}
           disabled={isPlaying || isGenerating}
           insertTarget={insertTarget}
@@ -208,13 +202,32 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       characters={context.characters}
       insertTarget={insertTarget}
       isRegenerating={isRegenerating}
-      className={previewWidthClass}
+      className={previewClassName}
+      scrollable={isSplitView}
     />
   ) : null;
 
+  useEffect(() => {
+    const updateHeaderOffset = () => {
+      if (!headerRef.current) return;
+      setHeaderOffset(headerRef.current.getBoundingClientRect().height);
+    };
+
+    updateHeaderOffset();
+    window.addEventListener('resize', updateHeaderOffset);
+    return () => window.removeEventListener('resize', updateHeaderOffset);
+  }, []);
+
+  const splitContainerStyle = isSplitView && headerOffset
+    ? { height: `calc(100vh - ${headerOffset}px)` }
+    : undefined;
+  const contentWrapperClassName = isSplitView
+    ? 'max-w-6xl mx-auto px-6 py-6 h-full flex flex-col gap-6'
+    : 'max-w-6xl mx-auto px-6 py-6 space-y-6';
+
   return (
     <section className="flex-1 flex flex-col overflow-hidden bg-[#1a1a1a]">
-      <div className="border-b border-gray-800 bg-gray-900/40">
+      <div ref={headerRef} className="border-b border-gray-800 bg-gray-900/40">
         <div className="max-w-6xl mx-auto px-6 py-4 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
@@ -280,8 +293,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+      <div
+        className={`flex-1 min-h-0 ${isSplitView ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        style={splitContainerStyle}
+      >
+        <div className={contentWrapperClassName}>
           {error && (
             <div className="bg-red-900/40 border border-red-500/60 text-red-200 p-4 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-5 h-5 mt-0.5" />
@@ -315,12 +331,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           )}
 
           {context && viewMode === 'split' && (
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 items-start">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,40%)_minmax(0,60%)] gap-6 flex-1 min-h-0">
+              <div className="min-h-0 h-full overflow-y-auto pr-2 space-y-6">
                 {writeSections}
                 {generationIndicator}
               </div>
-              <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] overflow-y-auto pr-2">
+              <div className="min-h-0 h-full overflow-hidden">
                 {previewSection}
               </div>
             </div>
