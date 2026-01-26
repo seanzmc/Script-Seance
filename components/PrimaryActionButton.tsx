@@ -23,7 +23,7 @@ export const PrimaryActionButton: React.FC<PrimaryActionButtonProps> = ({
         loading={loading}
         disabled={disabled}
         size="lg"
-        className="w-full text-base font-semibold tracking-wide shadow-[0_0_30px_rgba(79,70,229,0.4)] hover:shadow-[0_0_45px_rgba(79,70,229,0.6)]"
+        className="w-full text-base font-semibold tracking-wide shadow-[0_0_30px_rgba(79,70,229,0.4)] hover:shadow-[0_0_45px_rgba(79,70,229,0.6)] disabled:shadow-none transition-shadow"
         title={label}
       >
         {label}

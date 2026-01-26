@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { SetupForm, SetupFormState } from './components/SetupForm';
 import { Button } from './components/Button';
 import { ControlPanel } from './components/ControlPanel';
-import { PrimaryActionButton } from './components/PrimaryActionButton';
 import { ScriptPane } from './components/ScriptPane';
 import { VoicesPanel } from './components/VoicesPanel';
 import { PlaybackPanel } from './components/PlaybackPanel';
@@ -18,7 +17,7 @@ import {
 import { getSession, login } from './services/auth';
 import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType, GENRES } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { Download, RotateCcw } from 'lucide-react';
+import { ChevronDown, Download, RotateCcw } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -30,6 +29,8 @@ interface DraftPayload {
   userInstruction: string;
   savedAt: string;
 }
+
+type ControlStep = 'setup' | 'script' | 'voices' | 'playback';
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
@@ -378,6 +379,27 @@ export default function App() {
     setUserInstruction('');
     setVoiceConfigs([]);
     setSetupState(DEFAULT_SETUP_STATE);
+    setOpenPanels({ setup: true, voices: false, playback: false });
+    setHasReviewedVoices(false);
+    setInsertTarget(null);
+    setError(null);
+    setToast(null);
+    setAutosaveError(null);
+    autosaveFailureNotifiedRef.current = false;
+    try {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (err) {
+      console.warn('Failed to clear draft', err);
+    }
+  };
+
+  const handleEditSetup = () => {
+    if (!context) return;
+    cancelAiRequest();
+    stop({ clearBuffer: true });
+    setContext(null);
+    setUserInstruction('');
+    setVoiceConfigs([]);
     setOpenPanels({ setup: true, voices: false, playback: false });
     setHasReviewedVoices(false);
     setInsertTarget(null);
@@ -760,9 +782,40 @@ export default function App() {
   const expectedVoices = context ? context.characters.length + 1 : 0;
   const voicesReady = context ? voiceConfigs.length >= expectedVoices : false;
   const voicesAssigned = Boolean(context) && voicesReady && hasReviewedVoices;
+  const voiceReviewPending = Boolean(context) && voicesReady && !hasReviewedVoices;
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
   const audioBuffered = totalBufferedBlocks > 0 && bufferedBlocks >= totalBufferedBlocks;
+  const hasScript = allBlocks.length > 0;
+  const setupReady = setupState.premise.trim().length > 0 && setupState.characters.some(char => char.trim().length > 0);
+
+  const currentStep: ControlStep = (() => {
+    if (!hasScript) {
+      return setupReady ? 'script' : 'setup';
+    }
+    if (!voicesAssigned) {
+      return 'voices';
+    }
+    return 'playback';
+  })();
+
+  useEffect(() => {
+    const nextPanels = {
+      setup: currentStep === 'setup' || currentStep === 'script',
+      voices: currentStep === 'voices',
+      playback: currentStep === 'playback'
+    };
+    setOpenPanels(prev => {
+      if (
+        prev.setup === nextPanels.setup &&
+        prev.voices === nextPanels.voices &&
+        prev.playback === nextPanels.playback
+      ) {
+        return prev;
+      }
+      return nextPanels;
+    });
+  }, [currentStep]);
 
   const handlePanelToggle = (panel: 'setup' | 'voices' | 'playback') =>
     (event: React.SyntheticEvent<HTMLDetailsElement>) => {
@@ -774,19 +827,23 @@ export default function App() {
     };
 
   const openVoicesPanel = () => {
-    setOpenPanels(prev => ({ ...prev, voices: true }));
+    setOpenPanels({ setup: false, voices: true, playback: false });
     setHasReviewedVoices(true);
   };
 
   const openPlaybackPanel = () => {
-    setOpenPanels(prev => ({ ...prev, playback: true }));
+    setOpenPanels({ setup: false, voices: false, playback: true });
   };
 
+  const isGeneratingAudio = isBuffering || isLoadingAudio;
+
   const primaryAction = (() => {
-    if (!context) {
+    if (!hasScript) {
       return {
-        label: 'Generate Script',
-        helperText: 'Start with your premise to create the opening scene.',
+        label: 'Generate First Scene',
+        helperText: setupReady
+          ? 'Generate the opening scene to start the draft.'
+          : 'Pick a premise and cast to begin.',
         onClick: handleStart,
         disabled: isGenerating || !setupState.premise.trim(),
         loading: isGenerating
@@ -795,43 +852,71 @@ export default function App() {
     if (!voicesAssigned) {
       return {
         label: 'Assign Voices',
-        helperText: 'Map each character to a voice.',
+        helperText: 'Assign a voice to each character.',
         onClick: openVoicesPanel,
-        disabled: false,
-        loading: false
-      };
-    }
-    if (isPlaying) {
-      return {
-        label: 'Stop',
-        helperText: 'Playback is running.',
-        onClick: stop,
         disabled: false,
         loading: false
       };
     }
     if (!audioBuffered) {
       return {
-        label: isBuffering ? 'Buffering Audio...' : 'Generate Audio',
-        helperText: 'Preload audio for smoother playback.',
+        label: isGeneratingAudio ? 'Generating Audio...' : 'Generate Audio',
+        helperText: 'Generate audio so playback is ready.',
         onClick: () => {
           openPlaybackPanel();
           if (allBlocks.length > 0) {
             bufferScript(allBlocks);
           }
         },
-        disabled: isBuffering || !context || allBlocks.length === 0,
-        loading: isBuffering
+        disabled: isGeneratingAudio || allBlocks.length === 0,
+        loading: isGeneratingAudio
+      };
+    }
+    if (isPlaying) {
+      return {
+        label: 'Pause',
+        helperText: 'Playback is running.',
+        onClick: stop,
+        disabled: false,
+        loading: false
       };
     }
     return {
-      label: isPlaying ? 'Stop' : 'Play',
+      label: 'Play',
       helperText: 'Audio is ready for performance.',
-      onClick: isPlaying ? stop : handlePlay,
+      onClick: handlePlay,
       disabled: false,
       loading: false
     };
   })();
+
+  const unassignedVoices = voiceReviewPending
+    ? expectedVoices
+    : Math.max(expectedVoices - voiceConfigs.length, 0);
+  const setupBadge = context ? 'Locked' : setupReady ? 'Ready' : 'Start';
+  const voicesBadge = context
+    ? (voicesAssigned ? 'Ready' : `Unassigned: ${unassignedVoices}`)
+    : 'Locked';
+  const totalAudioBlocks = Math.max(totalBufferedBlocks, allBlocks.length);
+  const playbackBadge = !context
+    ? 'Not generated'
+    : audioBuffered
+      ? `Audio ready ${bufferedBlocks}/${totalBufferedBlocks}`
+      : isGeneratingAudio
+        ? `Generating ${bufferedBlocks}/${totalAudioBlocks || 0}`
+        : 'Not generated';
+
+  const summaryBase = 'cursor-pointer list-none flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-colors';
+  const summaryActive = 'bg-gray-900/70 border-indigo-500/40 text-white shadow-[0_0_20px_rgba(79,70,229,0.15)]';
+  const summaryInactive = 'bg-gray-900/30 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200';
+  const isSetupActive = currentStep === 'setup' || currentStep === 'script';
+  const isVoicesActive = currentStep === 'voices';
+  const isPlaybackActive = currentStep === 'playback';
+  const setupMetaParts = [setupState.genre, setupState.length, setupState.style.trim()].filter(Boolean);
+  const setupMetaLine = setupMetaParts.join(' / ');
+  const setupCastCount = setupState.characters.filter(char => char.trim().length > 0).length;
+  const setupPremiseText = setupState.premise.trim();
+  const setupPremiseSnippet = setupPremiseText.length > 60 ? `${setupPremiseText.slice(0, 60)}...` : setupPremiseText;
 
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
@@ -871,27 +956,8 @@ export default function App() {
       />
 
       <ControlPanel
-        header={(
-          <div className="space-y-3">
-            <div className="text-[11px] uppercase tracking-[0.3em] text-gray-500">Flow</div>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <span className="px-2 py-1 rounded-full border border-gray-700">Setup</span>
-              <span className="text-gray-600">-&gt;</span>
-              <span className="px-2 py-1 rounded-full border border-gray-700">Script</span>
-              <span className="text-gray-600">-&gt;</span>
-              <span className="px-2 py-1 rounded-full border border-gray-700">Voices</span>
-              <span className="text-gray-600">-&gt;</span>
-              <span className="px-2 py-1 rounded-full border border-gray-700">Playback</span>
-            </div>
-            <PrimaryActionButton
-              label={primaryAction.label}
-              onClick={primaryAction.onClick}
-              helperText={primaryAction.helperText}
-              disabled={primaryAction.disabled}
-              loading={primaryAction.loading}
-            />
-          </div>
-        )}
+        currentStep={currentStep}
+        primaryAction={primaryAction}
         footer={(
           <Button
             variant="ghost"
@@ -905,16 +971,35 @@ export default function App() {
         )}
       >
         <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">
-          <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg bg-gray-900/40 border border-gray-700 px-4 py-3 text-sm font-semibold text-gray-200">
-            <span>Setup</span>
-            <span className="text-[10px] text-gray-500">Premise / Style / Cast</span>
+          <summary className={`${summaryBase} ${isSetupActive ? summaryActive : summaryInactive}`}>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-3">
+                <span>Setup</span>
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                    isSetupActive
+                      ? 'border-indigo-500/40 text-indigo-200 bg-indigo-500/10'
+                      : 'border-gray-700/70 text-gray-500 bg-gray-900/40'
+                  }`}
+                >
+                  {setupBadge}
+                </span>
+              </div>
+              {context && (
+                <div className="mt-1 text-[10px] text-gray-500">
+                  <span>
+                    {setupMetaLine ? `${setupMetaLine} / ` : ''}
+                    Cast: {setupCastCount}
+                  </span>
+                  {setupPremiseSnippet && (
+                    <span className="text-gray-600"> - "{setupPremiseSnippet}"</span>
+                  )}
+                </div>
+              )}
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
           </summary>
           <div className="mt-4 space-y-3">
-            {context && (
-              <p className="text-[11px] text-gray-500">
-                Setup is locked for this draft. Clear the draft to start over.
-              </p>
-            )}
             <SetupForm
               value={setupState}
               onChange={updateSetupState}
@@ -923,14 +1008,27 @@ export default function App() {
               onError={handleAiError}
               isLocked={Boolean(context)}
               showSubmit={false}
+              onEditSetup={handleEditSetup}
+              onClearDraft={handleClearDraft}
             />
           </div>
         </details>
 
         <details open={openPanels.voices} onToggle={handlePanelToggle('voices')} className="group">
-          <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg bg-gray-900/40 border border-gray-700 px-4 py-3 text-sm font-semibold text-gray-200">
-            <span>Voices</span>
-            <span className="text-[10px] text-gray-500">{voicesAssigned ? 'Ready' : 'Assign'}</span>
+          <summary className={`${summaryBase} ${isVoicesActive ? summaryActive : summaryInactive}`}>
+            <div className="flex items-center gap-3">
+              <span>Voices</span>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  isVoicesActive
+                    ? 'border-indigo-500/40 text-indigo-200 bg-indigo-500/10'
+                    : 'border-gray-700/70 text-gray-500 bg-gray-900/40'
+                }`}
+              >
+                {voicesBadge}
+              </span>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
           </summary>
           <div className="mt-4">
             {context ? (
@@ -952,9 +1050,20 @@ export default function App() {
         </details>
 
         <details open={openPanels.playback} onToggle={handlePanelToggle('playback')} className="group">
-          <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg bg-gray-900/40 border border-gray-700 px-4 py-3 text-sm font-semibold text-gray-200">
-            <span>Playback</span>
-            <span className="text-[10px] text-gray-500">{audioBuffered ? 'Ready' : 'Buffering'}</span>
+          <summary className={`${summaryBase} ${isPlaybackActive ? summaryActive : summaryInactive}`}>
+            <div className="flex items-center gap-3">
+              <span>Playback</span>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  isPlaybackActive
+                    ? 'border-indigo-500/40 text-indigo-200 bg-indigo-500/10'
+                    : 'border-gray-700/70 text-gray-500 bg-gray-900/40'
+                }`}
+              >
+                {playbackBadge}
+              </span>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
           </summary>
           <div className="mt-4">
             {context ? (

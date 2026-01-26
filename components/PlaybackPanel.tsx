@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Loader2, ScrollText } from 'lucide-react';
+import { Play, Pause, Loader2, ScrollText, ChevronDown } from 'lucide-react';
 
 interface PlaybackPanelProps {
   isPlaying: boolean;
@@ -34,6 +34,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
 }) => {
   const progress = totalCount > 0 ? Math.min(bufferedCount / totalCount, 1) : 0;
   const isBuffering = totalCount > 0 && bufferedCount < totalCount;
+  const hasAudio = totalCount > 0;
 
   return (
     <div className="space-y-5">
@@ -68,13 +69,13 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
                 {isPlaying ? 'Playback running' : 'Ready to perform'}
               </p>
               <p className="text-[11px] text-gray-400">
-                {isBuffering ? 'Buffering audio...' : 'Audio buffer ready.'}
+                {isBuffering ? 'Generating audio...' : hasAudio ? 'Audio is ready.' : 'Audio not generated yet.'}
               </p>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[11px] text-gray-400">
-              <span>Buffer status</span>
+              <span>Audio generation</span>
               <span>{bufferedCount}/{totalCount || 0} blocks</span>
             </div>
             <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -93,61 +94,69 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-          Playback Speed
-        </h4>
-        <div className="bg-gray-900/40 p-4 rounded-xl border border-gray-700/50 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] text-gray-500 uppercase font-bold">Speed</span>
-            <span className="text-xs text-indigo-300 font-bold">{playbackSpeed.toFixed(1)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0.5"
-            max="1.5"
-            step="0.1"
-            value={playbackSpeed}
-            onChange={(e) => onPlaybackSpeedChange(parseFloat(e.target.value))}
-            className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            title="Playback speed"
-          />
-        </div>
-      </section>
+      <details className="group">
+        <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm font-semibold text-gray-300">
+          <span>Advanced / Playback options</span>
+          <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-4 space-y-4">
+          <section className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
+              Playback Speed
+            </h4>
+            <div className="bg-gray-900/40 p-4 rounded-xl border border-gray-700/50 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-gray-500 uppercase font-bold">Speed</span>
+                <span className="text-xs text-indigo-300 font-bold">{playbackSpeed.toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="1.5"
+                step="0.1"
+                value={playbackSpeed}
+                onChange={(e) => onPlaybackSpeedChange(parseFloat(e.target.value))}
+                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                title="Playback speed"
+              />
+            </div>
+          </section>
 
-      <section className="space-y-3">
-        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-          Focus & Scroll
-        </h4>
-        <div className="space-y-2 bg-gray-900/40 p-4 rounded-xl border border-gray-700/50">
-          <button
-            onClick={onToggleAutoScroll}
-            className="w-full flex items-center justify-between text-left text-sm text-gray-300"
-            title="Auto-scroll script with playback"
-          >
-            <span className="flex items-center gap-2">
-              <ScrollText className={`w-4 h-4 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
-              Auto-scroll script
-            </span>
-            <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${autoScroll ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-              <span className={`w-4 h-4 bg-white rounded-full transition-transform ${autoScroll ? 'translate-x-4' : ''}`} />
-            </span>
-          </button>
-          <button
-            onClick={onToggleHighlights}
-            className="w-full flex items-center justify-between text-left text-sm text-gray-300"
-            title="Highlight the active line during playback"
-          >
-            <span className="flex items-center gap-2">
-              <HighlightIcon className={`w-4 h-4 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />
-              Highlight active line
-            </span>
-            <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${showHighlights ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-              <span className={`w-4 h-4 bg-white rounded-full transition-transform ${showHighlights ? 'translate-x-4' : ''}`} />
-            </span>
-          </button>
+          <section className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
+              Focus & Scroll
+            </h4>
+            <div className="space-y-2 bg-gray-900/40 p-4 rounded-xl border border-gray-700/50">
+              <button
+                onClick={onToggleAutoScroll}
+                className="w-full flex items-center justify-between text-left text-sm text-gray-300"
+                title="Auto-scroll script with playback"
+              >
+                <span className="flex items-center gap-2">
+                  <ScrollText className={`w-4 h-4 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
+                  Auto-scroll script
+                </span>
+                <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${autoScroll ? 'bg-indigo-600' : 'bg-gray-700'}`}>
+                  <span className={`w-4 h-4 bg-white rounded-full transition-transform ${autoScroll ? 'translate-x-4' : ''}`} />
+                </span>
+              </button>
+              <button
+                onClick={onToggleHighlights}
+                className="w-full flex items-center justify-between text-left text-sm text-gray-300"
+                title="Highlight the active line during playback"
+              >
+                <span className="flex items-center gap-2">
+                  <HighlightIcon className={`w-4 h-4 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />
+                  Highlight active line
+                </span>
+                <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${showHighlights ? 'bg-indigo-600' : 'bg-gray-700'}`}>
+                  <span className={`w-4 h-4 bg-white rounded-full transition-transform ${showHighlights ? 'translate-x-4' : ''}`} />
+                </span>
+              </button>
+            </div>
+          </section>
         </div>
-      </section>
+      </details>
     </div>
   );
 };

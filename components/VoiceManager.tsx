@@ -61,28 +61,37 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
     await onPreview(config);
   };
 
-  const renderRow = (char: string) => {
+  const renderRow = (char: string, options?: { variant?: 'narrator' | 'cast'; index?: number }) => {
     const config = getConfig(char);
     const isActive = activeChar === char;
     const isThisLoading = isActive && isLoading;
     const isThisPlaying = isActive && isAudioPlaying;
     const isExpanded = expandedChars[char];
+    const isNarrator = options?.variant === 'narrator';
+    const isEvenRow = typeof options?.index === 'number' && options.index % 2 === 0;
+    const rowTone = isNarrator
+      ? 'border-indigo-500/30 bg-indigo-500/10'
+      : isEvenRow
+        ? 'border-gray-800/60 bg-gray-900/50'
+        : 'border-gray-800/60 bg-gray-900/40';
 
     return (
       <div key={char} className="space-y-2">
-        <div className={`grid grid-cols-[1.4fr_1fr_auto_auto] items-center gap-3 rounded-lg border px-3 py-2 ${
-          isActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-700/60 bg-gray-900/40'
+        <div className={`grid grid-cols-[1.6fr_1fr_auto_auto] items-center gap-3 rounded-lg border px-3 py-2 ${rowTone} ${
+          isActive ? 'ring-1 ring-indigo-500/40' : ''
         }`}>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate" title={char}>{char}</p>
-            <p className="text-[10px] text-indigo-300">{config.voiceId}</p>
+            <p className={`text-[11px] ${isNarrator ? 'text-indigo-200' : 'text-gray-400'}`}>
+              Voice: <span className="text-gray-200">{config.voiceId}</span>
+            </p>
           </div>
           <div className="text-[11px] text-gray-400">
-            {config.speed?.toFixed(1) || '1.0'}x / {config.pitch || 0}
+            {config.speed?.toFixed(1) || '1.0'}x / Pitch {config.pitch || 0}
           </div>
           <button
             onClick={() => handlePreview(char, config)}
-            className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-colors ${
+            className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
               (isThisLoading || isThisPlaying)
                 ? 'bg-red-600 text-white'
                 : 'bg-gray-800 text-gray-300 hover:text-white hover:bg-indigo-600'
@@ -96,6 +105,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             ) : (
               <Volume2 className="w-3.5 h-3.5" />
             )}
+            <span>{isThisPlaying ? 'Stop' : 'Preview'}</span>
           </button>
           <div className="flex items-center gap-1">
             <button
@@ -165,9 +175,26 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
         )}
       </div>
 
-      <div className="space-y-3">
-        {renderRow('Narrator')}
-        {characters.map(char => renderRow(char))}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-gray-500">
+            <span>Narrator</span>
+            <span className="text-gray-600">Voice lead</span>
+          </div>
+          {renderRow('Narrator', { variant: 'narrator' })}
+        </div>
+
+        <div className="h-px bg-gray-800/60" />
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-gray-500">
+            <span>Cast</span>
+            <span className="text-gray-600">{characters.length} characters</span>
+          </div>
+          <div className="space-y-2">
+            {characters.map((char, index) => renderRow(char, { variant: 'cast', index }))}
+          </div>
+        </div>
       </div>
     </div>
   );

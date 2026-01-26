@@ -20,6 +20,8 @@ interface SetupFormProps {
   onError?: (error: unknown, fallbackMessage: string) => boolean;
   isLocked?: boolean;
   showSubmit?: boolean;
+  onEditSetup?: () => void;
+  onClearDraft?: () => void;
 }
 
 const STARTER_IDEAS = [
@@ -38,6 +40,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   onError,
   isLocked,
   showSubmit = false,
+  onEditSetup,
+  onClearDraft,
 }) => {
   const { genre, premise, characters, style, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
@@ -130,8 +134,57 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
   };
 
+  const handleEditSetup = () => {
+    if (!onEditSetup) return;
+    const proceed = window.confirm('Editing setup will clear the current draft and regenerate the script. Continue?');
+    if (!proceed) return;
+    onEditSetup();
+  };
+
+  const trimmedPremise = premise.trim();
+  const premiseSnippet = trimmedPremise.length > 140
+    ? `${trimmedPremise.slice(0, 140)}...`
+    : trimmedPremise || 'No premise yet.';
+  const castCount = characters.filter(char => char.trim().length > 0).length;
+  const summaryParts = [genre, length, style.trim()].filter(Boolean);
+  const summaryLine = summaryParts.join(' / ');
+
   return (
     <div className="space-y-6">
+      {isLocked && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-3">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500">
+              {summaryLine || 'Setup summary'}
+            </p>
+            <p className="text-xs text-gray-300">
+              "{premiseSnippet}"
+            </p>
+            <p className="text-[11px] text-gray-500">Cast: {castCount}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleEditSetup}
+              disabled={!onEditSetup || isLoading}
+              title="Edit setup and regenerate the script"
+            >
+              Edit setup (regenerates script)
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearDraft}
+              disabled={!onClearDraft || isLoading}
+              title="Clear the current draft"
+            >
+              Clear draft
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
@@ -183,7 +236,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               justSurprised
                 ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                 : "bg-gray-800 border-gray-700"
-            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+            } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
             placeholder="e.g., A detective discovers his new partner is a ghost..."
             disabled={isLocked}
           />
@@ -214,7 +267,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 justSurprised
                   ? "bg-indigo-900/20 border-indigo-500"
                   : "bg-gray-800 border-gray-700"
-              } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+              } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
               placeholder="e.g., Witty noir with crisp dialogue"
               disabled={isLocked}
             />
@@ -231,7 +284,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 justSurprised
                   ? "bg-indigo-900/20 border-indigo-500"
                   : "bg-gray-800 border-gray-700"
-              } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+              } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
               disabled={isLocked}
             >
               {LENGTH_OPTIONS.map((option) => (
@@ -264,7 +317,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   justSurprised
                     ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
                     : "bg-gray-800 border-gray-700"
-                } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
                 placeholder={`Character ${idx + 1}`}
                 disabled={isLocked}
               />
