@@ -5,6 +5,8 @@ import { MoreVertical, RefreshCw, Lock, Unlock, PlusCircle } from 'lucide-react'
 interface ScriptDisplayProps {
   scenes: Scene[];
   currentBlockId: string | null;
+  currentBlockIndex: number;
+  blockStatuses: Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>;
   showHighlights: boolean;
   autoScroll: boolean;
   onRegenerate: (sceneId: string, blockId: string) => void;
@@ -18,10 +20,13 @@ interface ScriptDisplayProps {
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
+const ERROR_CLASSES = 'border border-red-300/70 bg-red-50/60';
 
 export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   scenes,
   currentBlockId,
+  currentBlockIndex,
+  blockStatuses,
   showHighlights,
   autoScroll,
   onRegenerate,
@@ -38,27 +43,42 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     () => ['Narrator', ...characters.filter(char => char !== 'Narrator')],
     [characters]
   );
+  const playableBlockIds = useMemo(() => {
+    const ids: string[] = [];
+    scenes.forEach(scene => {
+      scene.blocks.forEach(block => {
+        if (block.type !== BlockType.HEADING) {
+          ids.push(block.id);
+        }
+      });
+    });
+    return ids;
+  }, [scenes]);
+  const activeBlockId =
+    currentBlockIndex >= 0 && currentBlockIndex < playableBlockIds.length
+      ? playableBlockIds[currentBlockIndex]
+      : currentBlockId;
 
   useEffect(() => {
-    if (autoScroll && currentBlockId) {
-      const el = document.getElementById(`block-${currentBlockId}`);
+    if (autoScroll && activeBlockId) {
+      const el = document.getElementById(`block-${activeBlockId}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
-  }, [currentBlockId, autoScroll]);
+  }, [activeBlockId, autoScroll]);
 
   useEffect(() => {
     const activeClasses = ACTIVE_CLASSES.split(' ');
     document.querySelectorAll('.script-block-active').forEach((node) => {
       node.classList.remove('script-block-active', ...activeClasses);
     });
-    if (!showHighlights || !currentBlockId) return;
-    const el = document.getElementById(`block-${currentBlockId}`);
+    if (!showHighlights || !activeBlockId) return;
+    const el = document.getElementById(`block-${activeBlockId}`);
     if (el) {
       el.classList.add('script-block-active', ...activeClasses);
     }
-  }, [currentBlockId, showHighlights]);
+  }, [activeBlockId, showHighlights]);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -90,9 +110,11 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             }
 
             const isInsertTarget = insertTarget?.blockId === block.id;
+            const isError = blockStatuses[block.id] === 'error';
             const blockWrapperClasses = `group relative rounded transition-colors ${
               isInsertTarget ? 'ring-1 ring-indigo-500/50 bg-indigo-100/30' : ''
             }`;
+            const blockStatusClasses = isError ? ERROR_CLASSES : '';
 
             let content = null;
 
@@ -128,8 +150,13 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               <div
                 key={block.id}
                 id={`block-${block.id}`}
-                className={blockWrapperClasses}
+                className={`${blockWrapperClasses} ${blockStatusClasses}`}
               >
+                {isError && (
+                  <span className="absolute left-2 top-2 text-[9px] uppercase tracking-widest text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
+                    Audio error
+                  </span>
+                )}
                 <div className="absolute right-0 top-1 flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="relative" data-menu-root={block.id}>
                     <button
@@ -209,7 +236,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         </div>
       </div>
     ));
-  }, [insertTarget, isRegenerating, onChangeSpeaker, onRegenerate, onSelectInsertTarget, onToggleLock, openMenuId, scenes, speakerOptions]);
+  }, [blockStatuses, insertTarget, isRegenerating, onChangeSpeaker, onRegenerate, onSelectInsertTarget, onToggleLock, openMenuId, scenes, speakerOptions]);
 
   if (scenes.length === 0) return null;
 

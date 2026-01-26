@@ -37,6 +37,8 @@ interface ScriptPaneProps {
   isRegenerating: boolean;
   onCancelGenerate: () => void;
   currentBlockId: string | null;
+  currentBlockIndex: number;
+  blockStatuses: Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>;
   showHighlights: boolean;
   autoScroll: boolean;
   onOpenPrivacy: () => void;
@@ -84,6 +86,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   isRegenerating,
   onCancelGenerate,
   currentBlockId,
+  currentBlockIndex,
+  blockStatuses,
   showHighlights,
   autoScroll,
   onOpenPrivacy
@@ -193,6 +197,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <ScriptDisplay
       scenes={context.scenes}
       currentBlockId={currentBlockId}
+      currentBlockIndex={currentBlockIndex}
+      blockStatuses={blockStatuses}
       showHighlights={showHighlights}
       autoScroll={autoScroll}
       onRegenerate={onRegenerate}

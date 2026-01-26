@@ -1,11 +1,21 @@
-import React from 'react';
-import { Play, Pause, Loader2, ScrollText, ChevronDown } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, ChevronDown, AlertTriangle } from 'lucide-react';
 
 interface PlaybackPanelProps {
   isPlaying: boolean;
+  isPaused: boolean;
   isLoadingAudio: boolean;
+  currentBlockId: string | null;
+  currentBlockIndex: number;
+  blockStatuses: Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>;
   onPlay: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onStop: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onRetry: () => void;
+  onSkip: () => void;
   bufferedCount: number;
   totalCount: number;
   currentSpeaker: string;
@@ -19,9 +29,19 @@ interface PlaybackPanelProps {
 
 export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   isPlaying,
+  isPaused,
   isLoadingAudio,
+  currentBlockId,
+  currentBlockIndex,
+  blockStatuses,
   onPlay,
+  onPause,
+  onResume,
   onStop,
+  onPrev,
+  onNext,
+  onRetry,
+  onSkip,
   bufferedCount,
   totalCount,
   currentSpeaker,
@@ -32,9 +52,88 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   autoScroll,
   onToggleAutoScroll
 }) => {
-  const progress = totalCount > 0 ? Math.min(bufferedCount / totalCount, 1) : 0;
-  const isBuffering = totalCount > 0 && bufferedCount < totalCount;
+  const [playbackState, setPlaybackState] = useState<'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error'>('idle');
+  const statusValues = useMemo(() => Object.values(blockStatuses), [blockStatuses]);
+  const readyCount = statusValues.filter(status => status === 'ready').length;
+  const errorCount = statusValues.filter(status => status === 'error').length;
+  const progressCount = Math.min(Math.max(readyCount + errorCount, bufferedCount), totalCount);
+  const progress = totalCount > 0 ? Math.min(progressCount / totalCount, 1) : 0;
   const hasAudio = totalCount > 0;
+  const currentStatus = currentBlockId ? blockStatuses[currentBlockId] : undefined;
+  const activeBlockNumber = totalCount > 0
+    ? (currentBlockIndex >= 0 ? currentBlockIndex + 1 : Math.min(readyCount + 1, totalCount))
+    : 0;
+  const canNavigate = totalCount > 0;
+  const atStart = currentBlockIndex <= 0;
+  const atEnd = currentBlockIndex >= totalCount - 1;
+
+  useEffect(() => {
+    if (!hasAudio) {
+      setPlaybackState('idle');
+      return;
+    }
+    if (currentStatus === 'error') {
+      setPlaybackState('error');
+      return;
+    }
+    if (isPaused) {
+      setPlaybackState('paused');
+      return;
+    }
+    if (isLoadingAudio || (!isPlaying && progressCount < totalCount)) {
+      setPlaybackState('generating');
+      return;
+    }
+    if (isPlaying) {
+      setPlaybackState('playing');
+      return;
+    }
+    if (progressCount >= totalCount) {
+      setPlaybackState('ready');
+      return;
+    }
+    setPlaybackState('idle');
+  }, [currentStatus, hasAudio, isLoadingAudio, isPaused, isPlaying, progressCount, totalCount]);
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      onPause();
+      return;
+    }
+    if (isPaused) {
+      onResume();
+      return;
+    }
+    onPlay();
+  };
+
+  const statusHeadline = (() => {
+    if (playbackState === 'playing') return 'Playback running';
+    if (playbackState === 'paused') return 'Playback paused';
+    if (playbackState === 'error') return 'Audio error';
+    if (playbackState === 'ready') return 'Ready to perform';
+    if (playbackState === 'generating') return 'Generating audio';
+    return 'Ready to perform';
+  })();
+
+  const statusDetail = (() => {
+    if (playbackState === 'generating') {
+      return `Generating audio (block ${activeBlockNumber}/${totalCount})...`;
+    }
+    if (playbackState === 'ready') {
+      return `Audio ready (${totalCount}/${totalCount})`;
+    }
+    if (playbackState === 'paused') {
+      return 'Playback paused';
+    }
+    if (playbackState === 'error') {
+      return `Audio failed on block ${activeBlockNumber}/${totalCount}`;
+    }
+    if (playbackState === 'playing') {
+      return `Playing block ${activeBlockNumber}/${totalCount}`;
+    }
+    return 'Audio not generated yet.';
+  })();
 
   return (
     <div className="space-y-5">
@@ -48,35 +147,85 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
           </span>
         </div>
         <div className="bg-gray-900/40 p-4 rounded-xl border border-gray-700/50 space-y-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={isPlaying ? onStop : onPlay}
-              className={`flex items-center justify-center w-11 h-11 rounded-full transition-all ${
-                isPlaying
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40'
-              }`}
-              title={isPlaying ? 'Stop playback' : 'Play script'}
-            >
-              {isPlaying ? (
-                <Pause className="w-5 h-5 fill-current" />
-              ) : (
-                <Play className="w-5 h-5 fill-current ml-0.5" />
-              )}
-            </button>
-            <div>
-              <p className="text-sm font-semibold text-white">
-                {isPlaying ? 'Playback running' : 'Ready to perform'}
-              </p>
-              <p className="text-[11px] text-gray-400">
-                {isBuffering ? 'Generating audio...' : hasAudio ? 'Audio is ready.' : 'Audio not generated yet.'}
-              </p>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onPrev}
+                  disabled={!canNavigate || atStart}
+                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Previous block"
+                >
+                  <SkipBack className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handlePlayPause}
+                  className={`flex items-center justify-center w-11 h-11 rounded-full transition-all ${
+                    isPlaying
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/40'
+                  }`}
+                  title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-5 h-5 fill-current" />
+                  ) : (
+                    <Play className="w-5 h-5 fill-current ml-0.5" />
+                  )}
+                </button>
+                <button
+                  onClick={onStop}
+                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Stop playback"
+                >
+                  <Square className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={onNext}
+                  disabled={!canNavigate || atEnd}
+                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Next block"
+                >
+                  <SkipForward className="w-4 h-4" />
+                </button>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">{statusHeadline}</p>
+                <p className="text-[11px] text-gray-400">{statusDetail}</p>
+              </div>
             </div>
+            {currentStatus === 'error' && (
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-300">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Audio failed for this block.
+                </div>
+                <button
+                  onClick={onRetry}
+                  className="flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Retry block
+                </button>
+                <button
+                  onClick={onSkip}
+                  className="flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
+                >
+                  <SkipForward className="w-3 h-3" />
+                  Skip block
+                </button>
+              </div>
+            )}
+            {errorCount > 0 && currentStatus !== 'error' && (
+              <div className="text-[10px] text-amber-300">
+                {errorCount} block{errorCount === 1 ? '' : 's'} need attention. Jump back to retry or skip.
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[11px] text-gray-400">
               <span>Audio generation</span>
-              <span>{bufferedCount}/{totalCount || 0} blocks</span>
+              <span>{progressCount}/{totalCount || 0} blocks</span>
             </div>
             <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
               <div
@@ -87,7 +236,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
             {isLoadingAudio && (
               <div className="flex items-center gap-2 text-[10px] text-emerald-400">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Generating audio in the background.
+                Waiting for current block audio.
               </div>
             )}
           </div>

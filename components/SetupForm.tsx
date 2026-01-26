@@ -158,7 +158,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               {summaryLine || 'Setup summary'}
             </p>
             <p className="text-xs text-gray-300">
-              "{premiseSnippet}"
+              &quot;{premiseSnippet}&quot;
             </p>
             <p className="text-[11px] text-gray-500">Cast: {castCount}</p>
           </div>

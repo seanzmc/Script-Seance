@@ -147,7 +147,7 @@ export default function App() {
         ? 'Action'
         : 'Transition';
     const detail = snippet ? `: "${snippet}"` : '';
-    setToast({ message: `Skipped audio for ${label}${detail}` });
+    setToast({ message: `Audio failed for ${label}${detail}` });
   }, []);
 
   const startAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
@@ -196,16 +196,25 @@ export default function App() {
   // Custom Hooks
   const { 
     isPlaying,
+    isPaused,
     isPreviewPlaying, 
     currentBlockId, 
+    currentBlockIndex,
     isLoadingAudio, 
     bufferedCount,
     totalBufferedCount,
     isBuffering,
+    blockStatuses,
     playScript, 
     bufferScript,
     playPreview, 
-    stop 
+    stop,
+    pause,
+    resume,
+    goToNext,
+    goToPrevious,
+    retryCurrentBlock,
+    skipCurrentBlock
   } = useAudioPlayer(voiceConfigs, handleAiError, handleAudioSkip);
 
   // Clear preview state when playback ends
@@ -785,7 +794,10 @@ export default function App() {
   const voiceReviewPending = Boolean(context) && voicesReady && !hasReviewedVoices;
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
-  const audioBuffered = totalBufferedBlocks > 0 && bufferedBlocks >= totalBufferedBlocks;
+  const errorBlocks = Object.values(blockStatuses).filter(status => status === 'error').length;
+  const readyOrErrorBlocks = bufferedBlocks + errorBlocks;
+  const pendingBlocks = Math.max(totalBufferedBlocks - readyOrErrorBlocks, 0);
+  const audioBuffered = totalBufferedBlocks > 0 && readyOrErrorBlocks >= totalBufferedBlocks;
   const hasScript = allBlocks.length > 0;
   const setupReady = setupState.premise.trim().length > 0 && setupState.characters.some(char => char.trim().length > 0);
 
@@ -835,7 +847,7 @@ export default function App() {
     setOpenPanels({ setup: false, voices: false, playback: true });
   };
 
-  const isGeneratingAudio = isBuffering || isLoadingAudio;
+  const isGeneratingAudio = (pendingBlocks > 0 && isBuffering) || isLoadingAudio;
 
   const primaryAction = (() => {
     if (!hasScript) {
@@ -876,7 +888,16 @@ export default function App() {
       return {
         label: 'Pause',
         helperText: 'Playback is running.',
-        onClick: stop,
+        onClick: pause,
+        disabled: false,
+        loading: false
+      };
+    }
+    if (isPaused) {
+      return {
+        label: 'Resume',
+        helperText: 'Playback is paused.',
+        onClick: resume,
         disabled: false,
         loading: false
       };
@@ -901,9 +922,11 @@ export default function App() {
   const playbackBadge = !context
     ? 'Not generated'
     : audioBuffered
-      ? `Audio ready ${bufferedBlocks}/${totalBufferedBlocks}`
+      ? errorBlocks > 0
+        ? `Audio ready ${readyOrErrorBlocks}/${totalBufferedBlocks} (${errorBlocks} errors)`
+        : `Audio ready ${readyOrErrorBlocks}/${totalBufferedBlocks}`
       : isGeneratingAudio
-        ? `Generating ${bufferedBlocks}/${totalAudioBlocks || 0}`
+        ? `Generating ${readyOrErrorBlocks}/${totalAudioBlocks || 0}`
         : 'Not generated';
 
   const summaryBase = 'cursor-pointer list-none flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-colors';
@@ -950,6 +973,8 @@ export default function App() {
         isRegenerating={isGenerating}
         onCancelGenerate={cancelAiRequest}
         currentBlockId={currentBlockId}
+        currentBlockIndex={currentBlockIndex}
+        blockStatuses={blockStatuses}
         showHighlights={showHighlights}
         autoScroll={autoScroll}
         onOpenPrivacy={openPrivacy}
@@ -992,7 +1017,7 @@ export default function App() {
                     Cast: {setupCastCount}
                   </span>
                   {setupPremiseSnippet && (
-                    <span className="text-gray-600"> - "{setupPremiseSnippet}"</span>
+                    <span className="text-gray-600"> - &quot;{setupPremiseSnippet}&quot;</span>
                   )}
                 </div>
               )}
@@ -1069,9 +1094,19 @@ export default function App() {
             {context ? (
               <PlaybackPanel
                 isPlaying={isPlaying}
+                isPaused={isPaused}
                 isLoadingAudio={isLoadingAudio}
+                currentBlockId={currentBlockId}
+                currentBlockIndex={currentBlockIndex}
+                blockStatuses={blockStatuses}
                 onPlay={handlePlay}
+                onPause={pause}
+                onResume={resume}
                 onStop={stop}
+                onPrev={goToPrevious}
+                onNext={goToNext}
+                onRetry={retryCurrentBlock}
+                onSkip={skipCurrentBlock}
                 bufferedCount={bufferedBlocks}
                 totalCount={totalBufferedBlocks}
                 currentSpeaker={currentSpeaker}

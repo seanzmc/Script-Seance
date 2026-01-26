@@ -66,7 +66,7 @@ describe('useAudioPlayer', () => {
     lastEngine = null;
   });
 
-  it('advances to the next block when the current block is skipped', async () => {
+  it('pauses on the current block when audio generation fails', async () => {
     const blocks: ScriptBlock[] = [
       { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' },
       { id: 'block-2', type: BlockType.DIALOGUE, text: 'World', character: 'B' }
@@ -94,7 +94,8 @@ describe('useAudioPlayer', () => {
       lastEngine.emit('error', { error: new Error('fail'), blockId: 'block-1', skipped: true });
     });
 
-    expect(ref.current.currentBlockId).toBe('block-2');
+    expect(ref.current.currentBlockId).toBe('block-1');
+    expect(ref.current.isPaused).toBe(true);
     expect(onSkip).toHaveBeenCalledTimes(1);
     expect(onSkip).toHaveBeenCalledWith(blocks[0], expect.any(Error));
     expect(onError).not.toHaveBeenCalled();
