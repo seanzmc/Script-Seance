@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { Zap, Plus, Undo2, Info } from 'lucide-react';
+import { Undo2 } from 'lucide-react';
 
 interface InsertBlockProps {
   characters: string[];
@@ -30,48 +30,63 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   disabled,
   insertTarget
 }) => {
-  const [mode, setMode] = useState<'write' | 'generate'>('write');
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!content.trim()) return;
+  const handleAddBlock = () => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) return;
 
-    let finalText = content;
     const blockType = elementType;
-    const char = selectedChar;
-
-    if (mode === 'generate') {
-      setIsGenerating(true);
-      try {
-        finalText = await generateScriptElement(elementType, selectedChar, content, genre);
-      } catch (e) {
-        console.error("Generation failed", e);
-        onError?.(e);
-        return; 
-      } finally {
-        setIsGenerating(false);
-      }
-    }
-
     const newBlock: ScriptBlock = {
       id: crypto.randomUUID(),
       type: blockType,
-      text: finalText,
-      character: blockType === BlockType.DIALOGUE ? char : undefined
+      text: trimmedContent,
+      character: blockType === BlockType.DIALOGUE ? selectedChar : undefined
     };
 
     onAddBlock(newBlock);
     setContent(''); 
   };
 
+  const handleSurpriseMe = async () => {
+    if (disabled || isGenerating) return;
+    setIsGenerating(true);
+    const instruction =
+      content.trim() || `Surprise me with a ${elementType} block.`;
+
+    try {
+      const generatedText = await generateScriptElement(
+        elementType,
+        selectedChar,
+        instruction,
+        genre
+      );
+      if (!generatedText.trim()) return;
+
+      const newBlock: ScriptBlock = {
+        id: crypto.randomUUID(),
+        type: elementType,
+        text: generatedText,
+        character: elementType === BlockType.DIALOGUE ? selectedChar : undefined
+      };
+
+      onAddBlock(newBlock);
+      setContent('');
+    } catch (e) {
+      console.error("Generation failed", e);
+      onError?.(e);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-          <Plus className="w-3 h-3" />
+        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
           Insert Block
         </h3>
         
@@ -87,21 +102,6 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
              </button>
           )}
 
-          <div className="flex bg-gray-900 border border-gray-700 rounded-md p-1">
-            <button
-              onClick={() => setMode('write')}
-              className={`px-3 py-1 text-[10px] font-bold uppercase rounded transition-colors ${mode === 'write' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
-            >
-              Write
-            </button>
-            <button
-              onClick={() => setMode('generate')}
-              className={`px-3 py-1 text-[10px] font-bold uppercase rounded transition-colors flex items-center gap-1 ${mode === 'generate' ? 'bg-indigo-900 text-indigo-100 shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
-            >
-              <Zap className="w-2.5 h-2.5" />
-              AI
-            </button>
-          </div>
         </div>
       </div>
 
@@ -135,8 +135,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
               </select>
             )}
           </div>
-          <p className="text-[10px] text-gray-500 italic flex items-center gap-1.5 px-1">
-            <Info className="w-3 h-3" />
+          <p className="text-[10px] text-gray-500 italic px-1">
             {HINTS[elementType]}
           </p>
         </div>
@@ -145,26 +144,39 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder={mode === 'write' ? "Type content here..." : "Describe what should happen..."}
+            placeholder="Type your block content here..."
             className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm h-24 focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner"
           />
         </div>
 
-        <Button 
-          onClick={handleSubmit} 
-          disabled={disabled || isGenerating || !content.trim()} 
-          className="w-full shadow-lg"
-          size="md"
-          variant={mode === 'generate' ? 'accent' : 'primary'}
-          loading={isGenerating}
-          title={mode === 'write' ? 'Insert the block into your script' : 'Generate and insert the block'}
-        >
-          {mode === 'write' ? (
-            <><Plus className="w-4 h-4 mr-2" /> Add Block</>
-          ) : (
-            <><Zap className="w-4 h-4 mr-2" /> AI Generate & Add</>
-          )}
-        </Button>
+        <div className="space-y-2">
+          <p className="text-[10px] text-gray-500">
+            Add Block inserts what you wrote. Surprise me generates a new block using the selected type and genre (text optional).
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button 
+              onClick={handleAddBlock} 
+              disabled={disabled || isGenerating || !content.trim()} 
+              className="w-full shadow-lg sm:flex-1"
+              size="md"
+              variant="primary"
+              title="Insert the block into your script"
+            >
+              Add Block
+            </Button>
+            <Button
+              onClick={handleSurpriseMe}
+              disabled={disabled || isGenerating}
+              className="w-full sm:w-auto"
+              size="sm"
+              variant="secondary"
+              loading={isGenerating}
+              title="Generate a new block and insert it"
+            >
+              Surprise me
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

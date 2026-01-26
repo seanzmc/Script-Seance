@@ -148,6 +148,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const castCount = characters.filter(char => char.trim().length > 0).length;
   const summaryParts = [genre, length, style.trim()].filter(Boolean);
   const summaryLine = summaryParts.join(' / ');
+  const isStyleBlank = !style.trim();
+  const isLengthBlank = !length;
 
   return (
     <div className="space-y-6">
@@ -258,7 +260,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         <div className="grid grid-cols-1 gap-3">
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-              Style
+              Style (optional)
             </label>
             <input
               value={style}
@@ -271,11 +273,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               placeholder="e.g., Witty noir with crisp dialogue"
               disabled={isLocked}
             />
+            {isStyleBlank && (
+              <p className="text-[10px] text-gray-500">Using defaults.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-              Length
+              Length (optional)
             </label>
             <select
               value={length}
@@ -287,6 +292,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
               disabled={isLocked}
             >
+              <option value="">Using defaults</option>
               {LENGTH_OPTIONS.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -294,7 +300,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               ))}
             </select>
             <p className="text-[10px] text-gray-500">
-              Length influences pacing, not format.
+              {isLengthBlank ? "Using defaults." : "Length influences pacing, not format."}
             </p>
           </div>
         </div>
