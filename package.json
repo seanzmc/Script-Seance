@@ -7,7 +7,7 @@
   "scripts": {
     "server": "node server/index.js",
     "dev": "vite",
-    "start": "pnpm server & pnpm dev",
+    "start": "concurrently -k -n server,client -c green,cyan \"pnpm run server\" \"pnpm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
@@ -32,6 +32,7 @@
     "@typescript-eslint/parser": "^8.53.1",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.23",
+    "concurrently": "^9.0.1",
     "eslint": "^9.39.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
