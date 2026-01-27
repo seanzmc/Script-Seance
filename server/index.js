@@ -416,7 +416,7 @@ const rateLimitLogin = (req, res, next) => {
 
 app.use(express.json({ limit: BODY_LIMIT }));
 
-app.post('/api/auth/login', rateLimitLogin, (req, res) => {
+const handleLogin = (req, res) => {
   const password = req.body?.password;
   if (!isNonEmptyString(password, 256)) {
     return sendError(res, 400, 'Invalid login payload.', 'INVALID_REQUEST');
@@ -431,7 +431,9 @@ app.post('/api/auth/login', rateLimitLogin, (req, res) => {
   const sessionId = createSession();
   setSessionCookie(res, sessionId);
   return res.json({ data: { ok: true } });
-});
+};
+
+app.post('/api/auth/login', rateLimitLogin, handleLogin);
 
 app.post('/api/auth/logout', (req, res) => {
   const sessionId = getSessionId(req);
@@ -452,7 +454,7 @@ app.get('/api/auth/session', (req, res) => {
 
 app.use('/api/ai', requireSession, rateLimitAi);
 
-app.post('/api/ai/generate', async (req, res) => {
+const handleAiGenerate = async (req, res) => {
   const payload = req.body || {};
   const kind = payload.kind;
   const context = payload.context;
@@ -800,7 +802,9 @@ app.post('/api/ai/generate', async (req, res) => {
       isInvalidAi ? error?.details : undefined
     );
   }
-});
+};
+
+app.post('/api/ai/generate', handleAiGenerate);
 
 if (IS_PROD) {
   app.use(express.static(DIST_DIR));
@@ -839,4 +843,4 @@ if (isMain) {
   startServer();
 }
 
-export { app, startServer, pruneStaleEntries, sessions, rateBuckets };
+export { app, startServer, pruneStaleEntries, sessions, rateBuckets, handleLogin, handleAiGenerate };

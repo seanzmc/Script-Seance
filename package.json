@@ -7,7 +7,7 @@
   "scripts": {
     "server": "node server/index.js",
     "dev": "vite",
-    "start": "NODE_ENV=production node server/index.js",
+    "start": "pnpm server & pnpm dev",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",

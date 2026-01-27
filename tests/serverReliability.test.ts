@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import request from 'supertest';
 
-let app: typeof import('../server/index.js').app;
+let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
 let pruneStaleEntries: typeof import('../server/index.js').pruneStaleEntries;
 let sessions: typeof import('../server/index.js').sessions;
 let rateBuckets: typeof import('../server/index.js').rateBuckets;
@@ -22,7 +21,7 @@ beforeAll(async () => {
   process.env.GEMINI_API_KEY = 'test-key';
 
   const serverModule = await import('../server/index.js');
-  app = serverModule.app;
+  handleAiGenerate = serverModule.handleAiGenerate;
   pruneStaleEntries = serverModule.pruneStaleEntries;
   sessions = serverModule.sessions;
   rateBuckets = serverModule.rateBuckets;
@@ -36,34 +35,53 @@ beforeEach(() => {
 
 describe('server reliability', () => {
   it('returns 502 when AI response fails schema validation', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify({ heading: 'INT. OFFICE - DAY', blocks: [] })
-    });
-
-    const server = app.listen(0, '127.0.0.1');
-    const agent = request.agent(server);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      await agent.post('/api/auth/login').send({ password: 'test-password' });
-
-      const response = await agent.post('/api/ai/generate').send({
-        kind: 'generateScene',
-        context: {
-          storyContext: {
-            title: 'Test',
-            genre: 'Noir',
-            premise: 'A mystery unfolds.',
-            characters: ['Alex'],
-            scenes: []
-          },
-          userInstruction: 'Begin.',
-          isFirstScene: true
-        }
+      mockGenerateContent.mockResolvedValue({
+        text: JSON.stringify({ heading: 'INT. OFFICE - DAY', blocks: [] })
       });
 
-      expect(response.status).toBe(502);
-      expect(response.body.error?.code).toBe('INVALID_AI_RESPONSE');
+      const req = {
+        body: {
+          kind: 'generateScene',
+          context: {
+            storyContext: {
+              title: 'Test',
+              genre: 'Noir',
+              premise: 'A mystery unfolds.',
+              characters: ['Alex'],
+              scenes: []
+            },
+            userInstruction: 'Begin.',
+            isFirstScene: true
+          }
+        }
+      } as any;
+
+      const res = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(req, res);
+
+      expect(res.statusCode).toBe(502);
+      expect(res.body?.error?.code).toBe('INVALID_AI_RESPONSE');
     } finally {
-      await new Promise((resolve) => server.close(resolve));
+      consoleError.mockRestore();
     }
   });
 

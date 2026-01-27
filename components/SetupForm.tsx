@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { Users, Plus, Trash2, Shuffle } from "lucide-react";
@@ -63,10 +63,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
   }, [characters, focusIndex]);
 
-  const updateValue = (next: Partial<SetupFormState>) => {
+  const updateValue = useCallback((next: Partial<SetupFormState>) => {
     if (isLocked) return;
     onChange(next);
-  };
+  }, [isLocked, onChange]);
 
   const handleCharacterChange = (index: number, charValue: string) => {
     const newChars = [...characters];
@@ -82,7 +82,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const removeCharacter = (index: number) =>
     updateValue({ characters: characters.filter((_, i) => i !== index) });
 
-  const checkSafety = () => {
+  const checkSafety = useCallback(() => {
     if (
       premise.trim().length > 0 ||
       (characters.length > 0 &&
@@ -95,9 +95,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       );
     }
     return true;
-  };
+  }, [characters, premise]);
 
-  const handleSurpriseMe = async () => {
+  const handleSurpriseMe = useCallback(async () => {
     if (isLocked) return;
     if (!checkSafety()) return;
 
@@ -130,7 +130,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     } finally {
       setIsSurprising(false);
     }
-  };
+  }, [checkSafety, genre, isLocked, onError, updateValue]);
 
   const handlePillClick = (idea: string) => {
     if (isLocked) return;
@@ -154,7 +154,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     if (autoSurpriseRef.current || isSurprising || isLocked) return;
     autoSurpriseRef.current = true;
     void handleSurpriseMe();
-  }, [autoSurprise, isSurprising, isLocked]);
+  }, [autoSurprise, handleSurpriseMe, isLocked, isSurprising]);
 
   const trimmedPremise = premise.trim();
   const premiseSnippet = trimmedPremise.length > 140
