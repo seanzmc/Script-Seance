@@ -134,6 +134,8 @@ export default function App() {
   const [hasConfirmedSetup, setHasConfirmedSetup] = useState(false);
   const [hasReviewedVoices, setHasReviewedVoices] = useState(false);
   const [insertTarget, setInsertTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const [setupMode, setSetupMode] = useState<'manual' | 'surprise'>('manual');
 
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -166,6 +168,21 @@ export default function App() {
       hasScript: resolvedHasScript,
       hasConfirmedSetup: confirmedSetup
     }));
+  };
+
+  const openManualSetup = () => {
+    setSetupMode('manual');
+    setIsSetupOpen(true);
+  };
+
+  const openSurpriseSetup = () => {
+    setSetupMode('surprise');
+    setIsSetupOpen(true);
+  };
+
+  const closeSetup = () => {
+    setIsSetupOpen(false);
+    setSetupMode('manual');
   };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
@@ -459,6 +476,7 @@ export default function App() {
     if (!context) return;
     const proceed = window.confirm('Clear the saved draft from this browser?');
     if (!proceed) return;
+    closeSetup();
     cancelAiRequest();
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
@@ -497,6 +515,7 @@ export default function App() {
     setAutosaveError(null);
     autosaveFailureNotifiedRef.current = false;
     applyStep('setup', { hasScript: false, confirmSetup: false });
+    openManualSetup();
     try {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     } catch (err) {
@@ -543,6 +562,7 @@ export default function App() {
     if (isGenerating) return;
     let request: CancellableRequest<Scene> | null = null;
     try {
+      closeSetup();
       resetTitleSuggestionState();
       void requestTitleSuggestion(setupState);
       const setupNotes: string[] = [];
@@ -1021,6 +1041,8 @@ export default function App() {
   };
 
   const isGeneratingAudio = (pendingBlocks > 0 && isBuffering) || isLoadingAudio;
+  const isSidebarDisabled = !context || isSetupOpen;
+  const showPrimaryAction = Boolean(context) && !isSetupOpen;
 
   const primaryAction = (() => {
     if (!hasScript) {
@@ -1156,12 +1178,23 @@ export default function App() {
         showHighlights={showHighlights}
         autoScroll={autoScroll}
         onOpenPrivacy={openPrivacy}
+        onOpenSetup={openManualSetup}
+        onSurpriseSetup={openSurpriseSetup}
+        isSetupOpen={isSetupOpen}
+        onCloseSetup={closeSetup}
+        setupState={setupState}
+        onSetupChange={updateSetupState}
+        onStartSetup={handleStart}
+        setupAutoSurprise={setupMode === 'surprise'}
+        onSetupError={handleAiError}
       />
 
       <ControlPanel
         currentStep={currentStep}
         onStepChange={handleStepChange}
         primaryAction={primaryAction}
+        isDisabled={isSidebarDisabled}
+        showPrimaryAction={showPrimaryAction}
         footer={(
           <>
             <Button
@@ -1215,17 +1248,23 @@ export default function App() {
             <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
           </summary>
           <div className="mt-4 space-y-3">
-            <SetupForm
-              value={setupState}
-              onChange={updateSetupState}
-              onStart={handleStart}
-              isLoading={isGenerating}
-              onError={handleAiError}
-              isLocked={Boolean(context)}
-              showSubmit={false}
-              onEditSetup={handleEditSetup}
-              onClearDraft={handleClearDraft}
-            />
+            {context ? (
+              <SetupForm
+                value={setupState}
+                onChange={updateSetupState}
+                isLoading={isGenerating}
+                onError={handleAiError}
+                isLocked
+                showSubmit={false}
+                onEditSetup={handleEditSetup}
+                onClearDraft={handleClearDraft}
+                variant="summary"
+              />
+            ) : (
+              <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 text-[11px] text-gray-500">
+                Start from the center to set your premise and cast.
+              </div>
+            )}
           </div>
         </details>
 

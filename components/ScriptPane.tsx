@@ -4,7 +4,8 @@ import { ScriptDisplay } from './ScriptDisplay';
 import { ScriptEditor } from './ScriptEditor';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
-import { AlertCircle, Loader2, Sparkles, PlusCircle } from 'lucide-react';
+import { SetupForm, SetupFormState } from './SetupForm';
+import { AlertCircle, Loader2, Sparkles, PlusCircle, X } from 'lucide-react';
 
 interface InsertTarget {
   sceneId: string;
@@ -47,6 +48,15 @@ interface ScriptPaneProps {
   showHighlights: boolean;
   autoScroll: boolean;
   onOpenPrivacy: () => void;
+  onOpenSetup: () => void;
+  onSurpriseSetup: () => void;
+  isSetupOpen: boolean;
+  onCloseSetup: () => void;
+  setupState: SetupFormState;
+  onSetupChange: (next: Partial<SetupFormState>) => void;
+  onStartSetup: () => void;
+  setupAutoSurprise: boolean;
+  onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
 }
 
 type ViewMode = 'write' | 'preview' | 'split';
@@ -100,7 +110,16 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   blockStatuses,
   showHighlights,
   autoScroll,
-  onOpenPrivacy
+  onOpenPrivacy,
+  onOpenSetup,
+  onSurpriseSetup,
+  isSetupOpen,
+  onCloseSetup,
+  setupState,
+  onSetupChange,
+  onStartSetup,
+  setupAutoSurprise,
+  onSetupError
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +146,64 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </Button>
     </div>
   ) : null;
+  const showStartScreen = !context && !isGenerating;
+  const showInitialGeneration = !context && isGenerating;
+  const errorBanner = error ? (
+    <div className="bg-red-900/40 border border-red-500/60 text-red-200 p-4 rounded-lg flex items-start gap-2">
+      <AlertCircle className="w-5 h-5 mt-0.5" />
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{error}</p>
+        {rateLimitHint && (
+          <p className="text-[11px] text-red-200/70">Rate limits reset after a short wait. Try again in ~30s.</p>
+        )}
+      </div>
+    </div>
+  ) : null;
+  const startScreenCard = (
+    <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]">
+      <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
+      <div className="relative space-y-5">
+        <div className="space-y-3">
+          <p className="text-[11px] uppercase tracking-[0.6em] text-gray-500">Start Screen</p>
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white">SCRIPT SEANCE</h1>
+          <p className="text-sm md:text-base text-gray-400">
+            Summon a writers room to draft cinematic scenes, one beat at a time.
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          <Button
+            onClick={onOpenSetup}
+            size="lg"
+            className="w-full sm:w-auto px-8 text-base shadow-[0_0_35px_rgba(79,70,229,0.45)] hover:shadow-[0_0_50px_rgba(79,70,229,0.6)]"
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Start a New Script
+          </Button>
+          <Button
+            onClick={onSurpriseSetup}
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-white"
+          >
+            <Sparkles className="w-3.5 h-3.5 mr-2" />
+            Surprise Me
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+  const startGenerationCard = (
+    <div className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto" />
+      <div className="space-y-2">
+        <p className="text-lg font-semibold text-white">Generating your opening scene...</p>
+        <p className="text-sm text-indigo-100/70">Gathering the writers room and shaping the first beat.</p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
+        Cancel
+      </Button>
+    </div>
+  );
   const writeSections = context ? (
     <>
       <section className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 space-y-4">
@@ -224,14 +301,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
 
   useEffect(() => {
     const updateHeaderOffset = () => {
-      if (!headerRef.current) return;
+      if (!headerRef.current) {
+        setHeaderOffset(0);
+        return;
+      }
       setHeaderOffset(headerRef.current.getBoundingClientRect().height);
     };
 
     updateHeaderOffset();
     window.addEventListener('resize', updateHeaderOffset);
     return () => window.removeEventListener('resize', updateHeaderOffset);
-  }, []);
+  }, [context]);
 
   const splitContainerStyle = isSplitView && headerOffset
     ? { height: `calc(100vh - ${headerOffset}px)` }
@@ -239,158 +319,192 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const contentWrapperClassName = isSplitView
     ? 'max-w-6xl mx-auto px-6 py-6 h-full flex flex-col gap-6'
     : 'max-w-6xl mx-auto px-6 py-6 space-y-6';
+  const setupModal = isSetupOpen ? (
+    <div className="fixed inset-0 z-[70] flex">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCloseSetup} />
+      <div
+        className="relative ml-auto h-full w-full max-w-xl border-l border-gray-800 bg-gray-950 shadow-2xl animate-in slide-in-from-right-8 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Setup"
+      >
+        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-5">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Setup</p>
+            <h2 className="text-xl font-semibold text-white">Start a new script</h2>
+            <p className="text-xs text-gray-400">Define the premise, cast, and tone before we write.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCloseSetup}
+            className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            aria-label="Close setup"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="h-full overflow-y-auto p-6 pb-10">
+          <SetupForm
+            value={setupState}
+            onChange={onSetupChange}
+            onStart={onStartSetup}
+            isLoading={isGenerating}
+            onError={onSetupError}
+            isLocked={false}
+            showSubmit
+            autoSurprise={setupAutoSurprise}
+          />
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <section className="flex-1 flex flex-col overflow-hidden bg-[#1a1a1a]">
-      <div ref={headerRef} className="border-b border-gray-800 bg-gray-900/40">
-        <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-            <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.45em] text-gray-500">SCRIPT SEANCE</p>
-              <h1 className="text-2xl md:text-3xl font-semibold text-white">Script Workspace</h1>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
-                <span>{genreLabel}</span>
-                <span className="text-gray-600">•</span>
-                <span>{sceneCountLabel}</span>
-                <span className="text-gray-600">•</span>
-                <button
-                  type="button"
-                  onClick={onClearDraft}
-                  disabled={!context}
-                  className="uppercase tracking-widest text-[10px] text-gray-500 hover:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
+      {context && (
+        <div ref={headerRef} className="border-b border-gray-800 bg-gray-900/40">
+          <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-[0.45em] text-gray-500">SCRIPT SEANCE</p>
+                <h1 className="text-2xl md:text-3xl font-semibold text-white">Script Workspace</h1>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+                  <span>{genreLabel}</span>
+                  <span className="text-gray-600">•</span>
+                  <span>{sceneCountLabel}</span>
+                  <span className="text-gray-600">•</span>
+                  <button
+                    type="button"
+                    onClick={onClearDraft}
+                    disabled={!context}
+                    className="uppercase tracking-widest text-[10px] text-gray-500 hover:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Clear Draft
+                  </button>
+                </div>
+              </div>
+              <div className="flex lg:justify-end">
+                <div
+                  className="inline-flex items-center bg-gray-950/70 border border-gray-800 rounded-lg p-1"
+                  role="group"
+                  aria-label="Script view"
                 >
-                  Clear Draft
-                </button>
+                  {VIEW_OPTIONS.map((option) => {
+                    const isActive = viewMode === option.mode;
+                    return (
+                      <button
+                        key={option.mode}
+                        type="button"
+                        onClick={() => setViewMode(option.mode)}
+                        aria-pressed={isActive}
+                        className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                          isActive
+                            ? 'bg-gray-700 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/70'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-            <div className="flex lg:justify-end">
-              <div
-                className="inline-flex items-center bg-gray-950/70 border border-gray-800 rounded-lg p-1"
-                role="group"
-                aria-label="Script view"
-              >
-                {VIEW_OPTIONS.map((option) => {
-                  const isActive = viewMode === option.mode;
-                  return (
-                    <button
-                      key={option.mode}
-                      type="button"
-                      onClick={() => setViewMode(option.mode)}
-                      aria-pressed={isActive}
-                      className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
-                        isActive
-                          ? 'bg-gray-700 text-white shadow-sm'
-                          : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/70'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
-            <div>
-              <label className="text-[10px] uppercase font-semibold text-gray-500 block tracking-[0.28em] mb-1">
-                Draft Title
-              </label>
-              <input
-                ref={titleInputRef}
-                value={context?.title ?? ''}
-                onChange={(e) => onTitleChange(e.target.value)}
-                placeholder="Untitled Screenplay"
-                className="w-full bg-gray-950/80 border border-gray-700 rounded-lg px-4 py-2.5 text-lg md:text-xl focus:ring-1 focus:ring-indigo-500 text-white font-semibold outline-none transition-shadow disabled:opacity-60"
-                disabled={!context}
-              />
-              {showSuggestedTitle && (
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                  <span>
-                    Suggested title:{' '}
-                    <span className="text-gray-200 font-medium">{suggestedTitle}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onUseSuggestedTitle}
-                    disabled={titleMatchesSuggestion}
-                    className="text-indigo-400 hover:text-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    Use
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onDismissSuggestedTitle}
-                    className="text-gray-500 hover:text-gray-300"
-                  >
-                    Dismiss
-                  </button>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+              <div>
+                <label className="text-[10px] uppercase font-semibold text-gray-500 block tracking-[0.28em] mb-1">
+                  Draft Title
+                </label>
+                <input
+                  ref={titleInputRef}
+                  value={context?.title ?? ''}
+                  onChange={(e) => onTitleChange(e.target.value)}
+                  placeholder="Untitled Screenplay"
+                  className="w-full bg-gray-950/80 border border-gray-700 rounded-lg px-4 py-2.5 text-lg md:text-xl focus:ring-1 focus:ring-indigo-500 text-white font-semibold outline-none transition-shadow disabled:opacity-60"
+                  disabled={!context}
+                />
+                {showSuggestedTitle && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                    <span>
+                      Suggested title:{' '}
+                      <span className="text-gray-200 font-medium">{suggestedTitle}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onUseSuggestedTitle}
+                      disabled={titleMatchesSuggestion}
+                      className="text-indigo-400 hover:text-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Use
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onDismissSuggestedTitle}
+                      className="text-gray-500 hover:text-gray-300"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+                {showSuggestingTitle && (
+                  <div className="mt-2 text-[11px] text-gray-500">
+                    Generating a suggested title...
+                  </div>
+                )}
+                <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
+                  <span>Draft autosaves locally.</span>
+                  {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
                 </div>
-              )}
-              {showSuggestingTitle && (
-                <div className="mt-2 text-[11px] text-gray-500">
-                  Generating a suggested title...
-                </div>
-              )}
-              <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
-                <span>Draft autosaves locally.</span>
-                {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div
-        className={`flex-1 min-h-0 ${isSplitView ? 'overflow-hidden' : 'overflow-y-auto'}`}
-        style={splitContainerStyle}
+        className={`flex-1 min-h-0 ${context && isSplitView ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        style={context ? splitContainerStyle : undefined}
       >
-        <div className={contentWrapperClassName}>
-          {error && (
-            <div className="bg-red-900/40 border border-red-500/60 text-red-200 p-4 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{error}</p>
-                {rateLimitHint && (
-                  <p className="text-[11px] text-red-200/70">Rate limits reset after a short wait. Try again in ~30s.</p>
-                )}
-              </div>
-            </div>
-          )}
+        {context ? (
+          <div className={contentWrapperClassName}>
+            {errorBanner}
 
-          {!context && (
-            <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
-              <p className="text-lg font-semibold text-white">Your script will appear here.</p>
-              <p className="text-sm text-gray-500">Start in Setup to generate the opening scene.</p>
-            </div>
-          )}
-
-          {context && viewMode === 'write' && (
-            <div className="space-y-6">
-              {writeSections}
-              {generationIndicator}
-            </div>
-          )}
-
-          {context && viewMode === 'preview' && (
-            <div className="space-y-6">
-              {previewSection}
-            </div>
-          )}
-
-          {context && viewMode === 'split' && (
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,40%)_minmax(0,60%)] gap-6 flex-1 min-h-0">
-              <div className="min-h-0 h-full overflow-y-auto pr-2 space-y-6">
+            {context && viewMode === 'write' && (
+              <div className="space-y-6">
                 {writeSections}
                 {generationIndicator}
               </div>
-              <div className="min-h-0 h-full overflow-hidden">
+            )}
+
+            {context && viewMode === 'preview' && (
+              <div className="space-y-6">
                 {previewSection}
               </div>
+            )}
+
+            {context && viewMode === 'split' && (
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,40%)_minmax(0,60%)] gap-6 flex-1 min-h-0">
+                <div className="min-h-0 h-full overflow-y-auto pr-2 space-y-6">
+                  {writeSections}
+                  {generationIndicator}
+                </div>
+                <div className="min-h-0 h-full overflow-hidden">
+                  {previewSection}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center px-6 py-10">
+            <div className="w-full max-w-2xl space-y-6">
+              {errorBanner}
+              {showInitialGeneration ? startGenerationCard : showStartScreen ? startScreenCard : null}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+      {setupModal}
     </section>
   );
 };
