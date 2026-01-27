@@ -116,6 +116,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
   const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
   const previewClassName = `${previewWidthClass} ${previewLayoutClass}`.trim();
+  const genreLabel = context?.genre ?? 'Genre';
+  const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const generationIndicator = isGenerating ? (
     <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
       <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
@@ -241,34 +243,65 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   return (
     <section className="flex-1 flex flex-col overflow-hidden bg-[#1a1a1a]">
       <div ref={headerRef} className="border-b border-gray-800 bg-gray-900/40">
-        <div className="max-w-6xl mx-auto px-6 py-4 space-y-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">Script Seance</p>
-              <h1 className="text-xl font-semibold text-white">Script Workspace</h1>
+        <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-[0.45em] text-gray-500">SCRIPT SEANCE</p>
+              <h1 className="text-2xl md:text-3xl font-semibold text-white">Script Workspace</h1>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+                <span>{genreLabel}</span>
+                <span className="text-gray-600">•</span>
+                <span>{sceneCountLabel}</span>
+                <span className="text-gray-600">•</span>
+                <button
+                  type="button"
+                  onClick={onClearDraft}
+                  disabled={!context}
+                  className="uppercase tracking-widest text-[10px] text-gray-500 hover:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Clear Draft
+                </button>
+              </div>
             </div>
-            <div className="text-[11px] text-gray-400 flex items-center gap-3">
-              <span>{context ? `${context.genre} / ${context.scenes.length} scenes` : 'No script yet'}</span>
-              <button
-                type="button"
-                onClick={onClearDraft}
-                disabled={!context}
-                className="text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
+            <div className="flex lg:justify-end">
+              <div
+                className="inline-flex items-center bg-gray-950/70 border border-gray-800 rounded-lg p-1"
+                role="group"
+                aria-label="Script view"
               >
-                Clear draft
-              </button>
+                {VIEW_OPTIONS.map((option) => {
+                  const isActive = viewMode === option.mode;
+                  return (
+                    <button
+                      key={option.mode}
+                      type="button"
+                      onClick={() => setViewMode(option.mode)}
+                      aria-pressed={isActive}
+                      className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                        isActive
+                          ? 'bg-gray-700 text-white shadow-sm'
+                          : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/70'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
             <div>
-              <label className="text-[10px] uppercase font-bold text-gray-500 block tracking-widest mb-1">Script Title</label>
+              <label className="text-[10px] uppercase font-semibold text-gray-500 block tracking-[0.28em] mb-1">
+                Draft Title
+              </label>
               <input
                 ref={titleInputRef}
                 value={context?.title ?? ''}
                 onChange={(e) => onTitleChange(e.target.value)}
-                placeholder="Title of your masterpiece..."
-                className="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 text-white font-medium outline-none transition-shadow disabled:opacity-60"
+                placeholder="Untitled Screenplay"
+                className="w-full bg-gray-950/80 border border-gray-700 rounded-lg px-4 py-2.5 text-lg md:text-xl focus:ring-1 focus:ring-indigo-500 text-white font-semibold outline-none transition-shadow disabled:opacity-60"
                 disabled={!context}
               />
               {showSuggestedTitle && (
@@ -302,32 +335,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
                 <span>Draft autosaves locally.</span>
                 {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
-              </div>
-            </div>
-            <div className="flex md:justify-end">
-              <div
-                className="inline-flex items-center bg-gray-950/70 border border-gray-800 rounded-lg p-1"
-                role="group"
-                aria-label="Script view"
-              >
-                {VIEW_OPTIONS.map((option) => {
-                  const isActive = viewMode === option.mode;
-                  return (
-                    <button
-                      key={option.mode}
-                      type="button"
-                      onClick={() => setViewMode(option.mode)}
-                      aria-pressed={isActive}
-                      className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
-                        isActive
-                          ? 'bg-gray-700 text-white shadow-sm'
-                          : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/70'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
               </div>
             </div>
           </div>

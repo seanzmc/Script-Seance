@@ -73,7 +73,7 @@ const isUntitledTitle = (title: string) => !title.trim() || title.trim() === DEF
 const sanitizeSuggestedTitle = (rawTitle: string) => {
   if (!rawTitle) return '';
   const firstLine = rawTitle.split('\n').map(line => line.trim()).find(Boolean) || '';
-  const withoutLabel = firstLine.replace(/^title\s*[:\-]\s*/i, '');
+  const withoutLabel = firstLine.replace(/^title\s*[:-]\s*/i, '');
   const withoutQuotes = withoutLabel.replace(/^["'“”]+|["'“”]+$/g, '');
   const collapsed = withoutQuotes.replace(/\s+/g, ' ').trim();
   if (!collapsed) return '';
@@ -382,7 +382,12 @@ export default function App() {
         }
         const hydratedHasScript = parsed.context.scenes.some(scene => scene.blocks.length > 0);
         if (hydratedHasScript) {
-          applyStep('script', { hasScript: true, confirmSetup: true });
+          setHasConfirmedSetup(true);
+          setCurrentStep(resolveStep({
+            requestedStep: 'script',
+            hasScript: true,
+            hasConfirmedSetup: true
+          }));
         }
       } else {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY);
