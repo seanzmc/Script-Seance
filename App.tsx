@@ -17,7 +17,17 @@ import {
   generateScriptElement
 } from './services/gemini';
 import { getSession, login } from './services/auth';
-import { Scene, StoryContext, VoiceConfig, AVAILABLE_VOICES, ScriptBlock, BlockType, GENRES } from './types';
+import {
+  Scene,
+  StoryContext,
+  VoiceConfig,
+  AVAILABLE_VOICES,
+  ScriptBlock,
+  BlockType,
+  GENRES,
+  INSERT_TOP_ID,
+  INSERT_BOTTOM_ID
+} from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { ChevronDown, Download, FileDown, RotateCcw } from 'lucide-react';
 
@@ -134,6 +144,9 @@ export default function App() {
   const [hasConfirmedSetup, setHasConfirmedSetup] = useState(false);
   const [hasReviewedVoices, setHasReviewedVoices] = useState(false);
   const [insertTarget, setInsertTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [insertModeActive, setInsertModeActive] = useState(false);
+  const [pendingInsertBlock, setPendingInsertBlock] = useState<ScriptBlock | null>(null);
+  const [insertCompleteToken, setInsertCompleteToken] = useState(0);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [setupMode, setSetupMode] = useState<'manual' | 'surprise'>('manual');
 
@@ -189,7 +202,20 @@ export default function App() {
     setSetupState(prev => ({ ...prev, ...next }));
   }, []);
   const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
+    if (!insertModeActive) return;
     setInsertTarget(target);
+  }, [insertModeActive]);
+
+  const handleStartInsertMode = useCallback((block: ScriptBlock) => {
+    setPendingInsertBlock(block);
+    setInsertTarget(null);
+    setInsertModeActive(true);
+  }, []);
+
+  const handleCancelInsertMode = useCallback(() => {
+    setInsertModeActive(false);
+    setPendingInsertBlock(null);
+    setInsertTarget(null);
   }, []);
 
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
@@ -487,6 +513,8 @@ export default function App() {
     setOpenPanels({ setup: true, voices: false, playback: false });
     setHasReviewedVoices(false);
     setInsertTarget(null);
+    setInsertModeActive(false);
+    setPendingInsertBlock(null);
     setError(null);
     setToast(null);
     setAutosaveError(null);
@@ -510,6 +538,8 @@ export default function App() {
     setOpenPanels({ setup: true, voices: false, playback: false });
     setHasReviewedVoices(false);
     setInsertTarget(null);
+    setInsertModeActive(false);
+    setPendingInsertBlock(null);
     setError(null);
     setToast(null);
     setAutosaveError(null);
@@ -690,13 +720,18 @@ export default function App() {
           summary: 'New user created scene',
           blocks: []
         };
-        newScenes.splice(sceneIndex + 1, 0, newScene);
+        const insertIndex = target.blockId === INSERT_TOP_ID ? sceneIndex : sceneIndex + 1;
+        newScenes.splice(insertIndex, 0, newScene);
         return { ...prev, scenes: newScenes };
       }
 
       const scene = newScenes[sceneIndex];
       const blockIndex = scene.blocks.findIndex(b => b.id === target.blockId);
-      const insertIndex = blockIndex === -1 ? scene.blocks.length : blockIndex + 1;
+      const insertIndex = target.blockId === INSERT_TOP_ID
+        ? 0
+        : blockIndex === -1 || target.blockId === INSERT_BOTTOM_ID
+          ? scene.blocks.length
+          : blockIndex + 1;
       const updatedBlocks = [...scene.blocks];
       updatedBlocks.splice(insertIndex, 0, block);
       newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
@@ -704,6 +739,14 @@ export default function App() {
     });
     setInsertTarget(null);
   }, []);
+
+  const handleConfirmInsert = useCallback(() => {
+    if (!pendingInsertBlock || !insertTarget) return;
+    handleInsertAfter(insertTarget, pendingInsertBlock);
+    setPendingInsertBlock(null);
+    setInsertModeActive(false);
+    setInsertCompleteToken(token => token + 1);
+  }, [handleInsertAfter, insertTarget, pendingInsertBlock]);
 
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
@@ -1041,7 +1084,7 @@ export default function App() {
   };
 
   const isGeneratingAudio = (pendingBlocks > 0 && isBuffering) || isLoadingAudio;
-  const isSidebarDisabled = !context || isSetupOpen;
+  const isSidebarDisabled = !context || isSetupOpen || insertModeActive;
   const showPrimaryAction = Boolean(context) && !isSetupOpen;
 
   const primaryAction = (() => {
@@ -1161,8 +1204,12 @@ export default function App() {
         onAddBlock={handleAddBlock}
         onUndo={handleUndo}
         insertTarget={insertTarget}
-        onInsertAfter={handleInsertAfter}
-        onCancelInsertTarget={() => setInsertTarget(null)}
+        insertModeActive={insertModeActive}
+        pendingInsertBlock={pendingInsertBlock}
+        onStartInsertMode={handleStartInsertMode}
+        onCancelInsertMode={handleCancelInsertMode}
+        onConfirmInsertMode={handleConfirmInsert}
+        insertCompleteToken={insertCompleteToken}
         onSelectInsertTarget={handleSelectInsertTarget}
         onChangeSpeaker={handleChangeSpeaker}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}

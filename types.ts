@@ -37,6 +37,9 @@ export interface VoiceConfig {
   speed?: number;
 }
 
+export const INSERT_TOP_ID = '__insert-top__';
+export const INSERT_BOTTOM_ID = '__insert-bottom__';
+
 export const AVAILABLE_VOICES = [
   'Aoede',
   'Callirrhoe',

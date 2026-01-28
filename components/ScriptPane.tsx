@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
-import { ScriptEditor } from './ScriptEditor';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
@@ -31,8 +30,12 @@ interface ScriptPaneProps {
   onAddBlock: (block: ScriptBlock) => void;
   onUndo: () => void;
   insertTarget: InsertTarget | null;
-  onInsertAfter: (target: InsertTarget, block: ScriptBlock) => void;
-  onCancelInsertTarget: () => void;
+  insertModeActive: boolean;
+  pendingInsertBlock: ScriptBlock | null;
+  onStartInsertMode: (block: ScriptBlock) => void;
+  onCancelInsertMode: () => void;
+  onConfirmInsertMode: () => void;
+  insertCompleteToken: number;
   onSelectInsertTarget: (target: InsertTarget) => void;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   onInsertError: (error: unknown) => void;
@@ -94,8 +97,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onAddBlock,
   onUndo,
   insertTarget,
-  onInsertAfter,
-  onCancelInsertTarget,
+  insertModeActive,
+  pendingInsertBlock,
+  onStartInsertMode,
+  onCancelInsertMode,
+  onConfirmInsertMode,
+  insertCompleteToken,
   onSelectInsertTarget,
   onChangeSpeaker,
   onInsertError,
@@ -128,13 +135,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
   const isSplitView = viewMode === 'split';
+  const isInsertModeView = insertModeActive && Boolean(context);
+  const insertModeAvailable = viewMode !== 'preview';
+  const canConfirmInsert = Boolean(isInsertModeView && insertTarget && pendingInsertBlock);
   const titleMatchesSuggestion = Boolean(context && suggestedTitle && context.title.trim() === suggestedTitle);
   const showSuggestedTitle = Boolean(context && suggestedTitle && !suggestedTitleDismissed);
   const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
-  const insertHandler = insertTarget ? (block: ScriptBlock) => onInsertAfter(insertTarget, block) : onAddBlock;
   const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
   const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
-  const previewClassName = `${previewWidthClass} ${previewLayoutClass}`.trim();
+  const previewClassName = `${previewWidthClass} ${previewLayoutClass} ${
+    isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
+  }`.trim();
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const generationIndicator = isGenerating ? (
@@ -256,27 +267,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       </section>
 
-      <ScriptEditor
+      <InsertBlock
         characters={context.characters}
         genre={context.genre}
         onAddBlock={onAddBlock}
         onUndo={onUndo}
+        onStartInsertMode={onStartInsertMode}
+        insertModeActive={isInsertModeView}
+        insertModeAvailable={insertModeAvailable}
+        insertCompleteToken={insertCompleteToken}
         onError={onInsertError}
         disabled={isPlaying || isGenerating}
+        insertTarget={insertTarget}
       />
-
-      <section className="bg-gray-900/30 border border-gray-800 rounded-2xl p-5">
-        <InsertBlock
-          characters={context.characters}
-          genre={context.genre}
-          onAddBlock={insertHandler}
-          onUndo={onUndo}
-          onCancelInsertTarget={onCancelInsertTarget}
-          onError={onInsertError}
-          disabled={isPlaying || isGenerating}
-          insertTarget={insertTarget}
-        />
-      </section>
     </>
   ) : null;
   const previewSection = context ? (
@@ -293,6 +296,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onChangeSpeaker={onChangeSpeaker}
       characters={context.characters}
       insertTarget={insertTarget}
+      insertModeActive={isInsertModeView}
+      pendingInsertBlock={pendingInsertBlock}
       isRegenerating={isRegenerating}
       className={previewClassName}
       scrollable={isSplitView}
@@ -313,12 +318,59 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return () => window.removeEventListener('resize', updateHeaderOffset);
   }, [context]);
 
+  useEffect(() => {
+    if (!insertModeActive) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onCancelInsertMode();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [insertModeActive, onCancelInsertMode]);
+
+  useEffect(() => {
+    if (viewMode === 'preview' && insertModeActive) {
+      onCancelInsertMode();
+    }
+  }, [insertModeActive, onCancelInsertMode, viewMode]);
+
   const splitContainerStyle = isSplitView && headerOffset
     ? { height: `calc(100vh - ${headerOffset}px)` }
     : undefined;
   const contentWrapperClassName = isSplitView
     ? 'max-w-6xl mx-auto px-6 py-6 h-full flex flex-col gap-6'
     : 'max-w-6xl mx-auto px-6 py-6 space-y-6';
+  const writePanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
+    isInsertModeView ? 'max-h-0 opacity-0 -translate-y-2 pointer-events-none' : 'max-h-[2000px] opacity-100 translate-y-0'
+  }`;
+  const insertPanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
+    isInsertModeView ? 'max-h-[2000px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 translate-y-2 pointer-events-none'
+  }`;
+  const splitGridClassName = `grid grid-cols-1 ${
+    isInsertModeView ? 'lg:grid-cols-[minmax(0,0)_minmax(0,100%)]' : 'lg:grid-cols-[minmax(0,40%)_minmax(0,60%)]'
+  } gap-6 flex-1 min-h-0 transition-all duration-300 ease-out`;
+  const insertModeToolbar = isInsertModeView ? (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-[0.4em] text-indigo-200">Insert Mode</p>
+        <p className="text-xs text-indigo-100/80">Select where to place the new block.</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancelInsertMode}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={onConfirmInsertMode}
+          disabled={!canConfirmInsert}
+          title={canConfirmInsert ? 'Insert the block here' : 'Select an insertion point'}
+        >
+          Insert Here
+        </Button>
+      </div>
+    </div>
+  ) : null;
   const setupModal = isSetupOpen ? (
     <div className="fixed inset-0 z-[70] flex">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCloseSetup} />
@@ -362,7 +414,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   return (
     <section className="flex-1 flex flex-col overflow-hidden bg-[#1a1a1a]">
       {context && (
-        <div ref={headerRef} className="border-b border-gray-800 bg-gray-900/40">
+        <div
+          ref={headerRef}
+          className={`border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
+        >
           <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
               <div className="space-y-2">
@@ -397,7 +452,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                         type="button"
                         onClick={() => setViewMode(option.mode)}
                         aria-pressed={isActive}
-                        className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                        disabled={insertModeActive}
+                        aria-disabled={insertModeActive}
+                        className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed ${
                           isActive
                             ? 'bg-gray-700 text-white shadow-sm'
                             : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/70'
@@ -472,8 +529,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
 
             {context && viewMode === 'write' && (
               <div className="space-y-6">
-                {writeSections}
-                {generationIndicator}
+                <div className={writePanelClassName}>
+                  <div className={`space-y-6 ${isInsertModeView ? 'pointer-events-none opacity-40' : ''}`}>
+                    {writeSections}
+                    {generationIndicator}
+                  </div>
+                </div>
+                <div className={insertPanelClassName}>
+                  <div className="space-y-4">
+                    {insertModeToolbar}
+                    {previewSection}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -484,12 +551,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             )}
 
             {context && viewMode === 'split' && (
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,40%)_minmax(0,60%)] gap-6 flex-1 min-h-0">
-                <div className="min-h-0 h-full overflow-y-auto pr-2 space-y-6">
+              <div className={splitGridClassName}>
+                <div
+                  className={`min-h-0 h-full overflow-y-auto pr-2 space-y-6 transition-all duration-300 ease-out ${
+                    isInsertModeView ? 'opacity-0 -translate-x-2 pointer-events-none' : 'opacity-100 translate-x-0'
+                  }`}
+                >
                   {writeSections}
                   {generationIndicator}
                 </div>
-                <div className="min-h-0 h-full overflow-hidden">
+                <div className="min-h-0 h-full overflow-hidden space-y-4">
+                  {insertModeToolbar}
                   {previewSection}
                 </div>
               </div>

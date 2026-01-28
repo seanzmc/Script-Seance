@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { Undo2 } from 'lucide-react';
+import { PenTool, Undo2 } from 'lucide-react';
 
 interface InsertBlockProps {
   characters: string[];
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
-  onCancelInsertTarget?: () => void;
+  onStartInsertMode: (block: ScriptBlock) => void;
+  insertModeActive: boolean;
+  insertModeAvailable: boolean;
+  insertCompleteToken: number;
   onError?: (error: unknown) => void;
   disabled?: boolean;
   insertTarget?: { sceneId: string; blockId: string } | null;
@@ -27,7 +30,10 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   genre, 
   onAddBlock,
   onUndo,
-  onCancelInsertTarget,
+  onStartInsertMode,
+  insertModeActive,
+  insertModeAvailable,
+  insertCompleteToken,
   onError,
   disabled,
   insertTarget
@@ -36,21 +42,56 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [tooltip, setTooltip] = useState<{ message: string; anchor: 'add' | 'insert' } | null>(null);
+
+  useEffect(() => {
+    if (!tooltip) return;
+    const timer = setTimeout(() => setTooltip(null), 1600);
+    return () => clearTimeout(timer);
+  }, [tooltip]);
+
+  useEffect(() => {
+    if (insertCompleteToken > 0) {
+      setContent('');
+    }
+  }, [insertCompleteToken]);
+
+  const showTooltip = (message: string, anchor: 'add' | 'insert') => {
+    setTooltip({ message, anchor });
+  };
+
+  const buildBlock = (trimmedContent: string): ScriptBlock => ({
+    id: crypto.randomUUID(),
+    type: elementType,
+    text: trimmedContent,
+    character: elementType === BlockType.DIALOGUE ? selectedChar : undefined
+  });
 
   const handleAddBlock = () => {
     const trimmedContent = content.trim();
-    if (!trimmedContent) return;
+    if (!trimmedContent) {
+      showTooltip('Add content first', 'add');
+      return;
+    }
+    if (disabled || isGenerating) return;
 
-    const blockType = elementType;
-    const newBlock: ScriptBlock = {
-      id: crypto.randomUUID(),
-      type: blockType,
-      text: trimmedContent,
-      character: blockType === BlockType.DIALOGUE ? selectedChar : undefined
-    };
-
-    onAddBlock(newBlock);
+    onAddBlock(buildBlock(trimmedContent));
     setContent(''); 
+  };
+
+  const handleInsertMode = () => {
+    if (!insertModeAvailable) {
+      showTooltip('Insert Mode is unavailable in Preview view', 'insert');
+      return;
+    }
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      showTooltip('Add content first', 'insert');
+      return;
+    }
+    if (disabled || isGenerating || insertModeActive) return;
+
+    onStartInsertMode(buildBlock(trimmedContent));
   };
 
   const handleSurpriseMe = async () => {
@@ -86,22 +127,14 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-          Insert Block
+    <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 space-y-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+          <PenTool className="w-4 h-4" />
+          Script Editor
         </h3>
-        
-        <div className="flex gap-2">
-          {insertTarget && onCancelInsertTarget && (
-            <button
-              type="button"
-              onClick={onCancelInsertTarget}
-              className="text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300"
-            >
-              Cancel insert
-            </button>
-          )}
+
+        <div className="flex items-center gap-2">
           {onUndo && (
              <button
               onClick={onUndo}
@@ -112,14 +145,23 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
                <Undo2 className="w-4 h-4" />
              </button>
           )}
-
+          <Button
+            onClick={handleSurpriseMe}
+            disabled={disabled || isGenerating}
+            size="sm"
+            variant="secondary"
+            loading={isGenerating}
+            title="Generate a new block and insert it"
+          >
+            Surprise me
+          </Button>
         </div>
       </div>
 
       <div className="space-y-3">
         {insertTarget && (
           <p className="text-[10px] text-indigo-300">
-            Inserting after the selected block.
+            Insertion point selected.
           </p>
         )}
         <div className="space-y-1.5">
@@ -165,27 +207,40 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
             Add Block inserts what you wrote. Surprise me generates a new block using the selected type and genre (text optional).
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button 
-              onClick={handleAddBlock} 
-              disabled={disabled || isGenerating || !content.trim()} 
-              className="w-full shadow-lg sm:flex-1"
-              size="md"
-              variant="primary"
-              title="Insert the block into your script"
-            >
-              Add Block
-            </Button>
-            <Button
-              onClick={handleSurpriseMe}
-              disabled={disabled || isGenerating}
-              className="w-full sm:w-auto"
-              size="sm"
-              variant="secondary"
-              loading={isGenerating}
-              title="Generate a new block and insert it"
-            >
-              Surprise me
-            </Button>
+            <div className="relative w-full sm:flex-1">
+              {tooltip?.anchor === 'add' && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] text-white bg-gray-900 border border-gray-700 px-2 py-1 rounded shadow-lg pointer-events-none">
+                  {tooltip.message}
+                </div>
+              )}
+              <Button 
+                onClick={handleAddBlock} 
+                disabled={disabled || isGenerating} 
+                className="w-full shadow-lg"
+                size="md"
+                variant="primary"
+                title="Add the block to the end of your script"
+              >
+                Add Block
+              </Button>
+            </div>
+            <div className="relative w-full sm:w-auto">
+              {tooltip?.anchor === 'insert' && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] text-white bg-gray-900 border border-gray-700 px-2 py-1 rounded shadow-lg pointer-events-none">
+                  {tooltip.message}
+                </div>
+              )}
+              <Button
+                onClick={handleInsertMode}
+                disabled={disabled || isGenerating || insertModeActive}
+                className="w-full"
+                size="md"
+                variant="secondary"
+                title="Pick an insertion point in the script"
+              >
+                Insert Block
+              </Button>
+            </div>
           </div>
         </div>
       </div>
