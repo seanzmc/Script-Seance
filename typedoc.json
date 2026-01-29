@@ -1,0 +1,14 @@
+{
+  "name": "Script Seance",
+  "entryPointStrategy": "expand",
+  "entryPoints": ["./"],
+  "tsconfig": "./tsconfig.json",
+  "out": "docs/typedoc",
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/coverage/**"
+  ]
+}
