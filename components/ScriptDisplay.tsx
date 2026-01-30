@@ -220,8 +220,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   onRegenerate,
   onToggleLock,
   onSelectInsertTarget,
-  onChangeSpeaker,
-  characters,
   insertTarget,
   insertModeActive = false,
   pendingInsertBlock = null,
@@ -230,10 +228,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   scrollable = false
 }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const speakerOptions = useMemo(
-    () => ['Narrator', ...characters.filter(char => char !== 'Narrator')],
-    [characters]
-  );
   const playableBlockIds = useMemo(() => {
     const ids: string[] = [];
     scenes.forEach(scene => {
@@ -475,25 +469,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                                   Regenerate block
                                 </button>
                               )}
-                              {block.type === BlockType.DIALOGUE && (
-                                <div className="px-2 py-2 space-y-1">
-                                  <label className="text-[10px] uppercase tracking-widest text-gray-400">Speaker</label>
-                                  <select
-                                    value={block.character || 'Narrator'}
-                                    onChange={(e) => {
-                                      onChangeSpeaker(scene.id, block.id, e.target.value);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="w-full text-xs border border-gray-200 rounded px-2 py-1"
-                                  >
-                                    {speakerOptions.map(char => (
-                                      <option key={char} value={char}>
-                                        {char}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              )}
                               <button
                                 onClick={() => {
                                   setOpenMenuId(null);
@@ -535,7 +510,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         </div>
       );
     });
-  }, [blockStatuses, hasPendingPreview, insertTarget, isInsertMode, isRegenerating, onChangeSpeaker, onRegenerate, onToggleLock, openMenuId, pendingInsertBlock, renderInsertTarget, scenes, speakerOptions]);
+  }, [blockStatuses, hasPendingPreview, insertTarget, isInsertMode, isRegenerating, onRegenerate, onToggleLock, openMenuId, pendingInsertBlock, renderInsertTarget, scenes]);
 
   if (scenes.length === 0) return null;
 

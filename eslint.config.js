@@ -12,7 +12,7 @@ const sharedGlobals = {
 
 export default [
   {
-    ignores: ["dist", "node_modules"],
+    ignores: ["dist", "node_modules", "docs/typedoc"],
   },
   js.configs.recommended,
   {
