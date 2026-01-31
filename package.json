@@ -15,8 +15,10 @@
         "lint": "eslint . --ext .js,.ts,.tsx",
         "lint:fix": "pnpm run lint -- --fix",
         "docs:typedoc": "typedoc --options typedoc.json",
-        "docs:graph:mermaid": "mkdir -p docs && npx depcruise --no-config --include-only \"^(components|hooks|services|server|tests|App\\.tsx|index\\.tsx|types\\.ts)\" . --output-type mermaid > docs/dependency-graph.mmd",
-        "docs:graph:svg": "npx mmdc -i docs/dependency-graph.mmd -o docs/dependency-graph.svg",
+        "docs:typedoc:watch": "typedoc --options typedoc.json --watch",
+        "docs:serve": "pnpm dlx serve docs/typedoc",
+        "docs:graph:mermaid": "mkdir -p docs && pnpm exec depcruise --no-config --include-only \"^(components|hooks|services|server|tests|App\\.tsx|index\\.tsx|types\\.ts)\" . --output-type mermaid > docs/dependency-graph.mmd",
+        "docs:graph:svg": "bash -lc 'CHROME=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"; if [ -x \"$CHROME\" ]; then PUPPETEER_EXECUTABLE_PATH=\"$CHROME\" pnpm dlx @mermaid-js/mermaid-cli -i docs/dependency-graph.mmd -o docs/dependency-graph.svg; else pnpm dlx @puppeteer/browsers install chrome-headless-shell && pnpm dlx @mermaid-js/mermaid-cli -i docs/dependency-graph.mmd -o docs/dependency-graph.svg; fi'",
         "docs:all": "pnpm docs:typedoc && pnpm docs:graph:mermaid"
     },
     "dependencies": {

@@ -4,7 +4,7 @@ import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
 import { PenTool, Undo2 } from 'lucide-react';
 
-interface InsertBlockProps {
+export interface InsertBlockProps {
   characters: string[];
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;

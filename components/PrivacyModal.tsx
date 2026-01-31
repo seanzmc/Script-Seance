@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle, Shield, X } from 'lucide-react';
 import { Button } from './Button';
 
-interface PrivacyModalProps {
+export interface PrivacyModalProps {
   isOpen: boolean;
   onClose: () => void;
 }

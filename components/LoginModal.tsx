@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 
-interface LoginModalProps {
+export interface LoginModalProps {
   isOpen: boolean;
   isLoading?: boolean;
   error?: string | null;

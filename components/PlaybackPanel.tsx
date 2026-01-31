@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, ChevronDown, AlertTriangle } from 'lucide-react';
 
-interface PlaybackPanelProps {
+export interface PlaybackPanelProps {
   isPlaying: boolean;
   isPaused: boolean;
   isLoadingAudio: boolean;

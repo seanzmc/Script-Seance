@@ -6,12 +6,12 @@ import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
 import { AlertCircle, Loader2, Sparkles, PlusCircle, X } from 'lucide-react';
 
-interface InsertTarget {
+export interface InsertTarget {
   sceneId: string;
   blockId: string;
 }
 
-interface ScriptPaneProps {
+export interface ScriptPaneProps {
   context: StoryContext | null;
   titleInputRef: React.RefObject<HTMLInputElement>;
   onTitleChange: (title: string) => void;

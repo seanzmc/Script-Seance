@@ -21,7 +21,7 @@ export interface AudioChunk {
   pitch: number;
 }
 
-type EventHandler = (data: unknown) => void;
+export type EventHandler = (data: unknown) => void;
 
 const getErrorMeta = (error: unknown) => {
   let message: string | undefined;

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { X, Play, Check, Mic, User, Pause, Info } from 'lucide-react';
 import { VoiceConfig } from '../types';
 
-interface VoiceCastingModalProps {
+export interface VoiceCastingModalProps {
   isOpen: boolean;
   onClose: () => void;
   characterName: string;

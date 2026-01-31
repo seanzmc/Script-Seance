@@ -17,7 +17,7 @@ To run this application, you need to configure your environment variables for th
 1.  Create a file named `.env` in the root directory of the project.
 2.  Add the following variable to the file:
 
-```env
+```bash
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
 ```
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { VoiceConfig } from '../types';
 import { VoiceManager } from './VoiceManager';
 
-interface VoicesPanelProps {
+export interface VoicesPanelProps {
   characters: string[];
   voiceConfigs: VoiceConfig[];
   onUpdateConfig: (character: string, updates: Partial<VoiceConfig>) => void;

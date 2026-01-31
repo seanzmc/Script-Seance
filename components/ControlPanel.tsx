@@ -3,7 +3,7 @@ import { PrimaryActionButton } from './PrimaryActionButton';
 
 export type ControlStep = 'setup' | 'script' | 'voices' | 'playback';
 
-interface StepResolutionState {
+export interface StepResolutionState {
   requestedStep: ControlStep;
   hasScript: boolean;
   hasConfirmedSetup: boolean;
@@ -27,7 +27,7 @@ const FLOW_STEPS: Array<{ id: ControlStep; label: string; instruction: string }>
   { id: 'playback', label: 'Playback', instruction: 'Generate audio and play.' }
 ];
 
-interface PrimaryActionConfig {
+export interface PrimaryActionConfig {
   label: string;
   onClick: () => void;
   helperText?: string;
@@ -35,7 +35,7 @@ interface PrimaryActionConfig {
   loading?: boolean;
 }
 
-interface ControlPanelProps {
+export interface ControlPanelProps {
   currentStep: ControlStep;
   onStepChange?: (step: ControlStep) => void;
   primaryAction: PrimaryActionConfig;

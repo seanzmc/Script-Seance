@@ -1,14 +1,47 @@
 {
+  "$schema": "./node_modules/typedoc/typedoc-config.schema.json",
   "name": "Script Seance",
   "entryPointStrategy": "expand",
-  "entryPoints": ["./"],
+  "entryPoints": [
+    "App.tsx",
+    "index.tsx",
+    "types.ts",
+    "components",
+    "hooks",
+    "services",
+    "server"
+  ],
   "tsconfig": "./tsconfig.json",
   "out": "docs/typedoc",
+  "readme": "README.md",
+  "includeVersion": true,
   "exclude": [
     "**/node_modules/**",
     "**/dist/**",
-    "**/build/**",
-    "**/.next/**",
-    "**/coverage/**"
+    "**/docs/**",
+    "**/public/**",
+    "**/improve/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
+  "excludeExternals": true,
+  "excludeInternal": true,
+  "excludeProtected": true,
+  "categorizeByGroup": true,
+  "cleanOutputDir": true,
+  "highlightLanguages": [
+    "bash",
+    "console",
+    "css",
+    "html",
+    "javascript",
+    "json",
+    "jsonc",
+    "json5",
+    "nginx",
+    "yaml",
+    "tsx",
+    "typescript"
   ]
 }

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Scene, BlockType, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
 import { MoreVertical, RefreshCw, Lock, Unlock, PlusCircle } from 'lucide-react';
 
-interface ScriptDisplayProps {
+export interface ScriptDisplayProps {
   scenes: Scene[];
   currentBlockId: string | null;
   currentBlockIndex: number;

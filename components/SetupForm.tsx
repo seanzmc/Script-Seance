@@ -12,7 +12,7 @@ export type SetupFormState = {
   length: string;
 };
 
-interface SetupFormProps {
+export interface SetupFormProps {
   value: SetupFormState;
   onChange: (next: Partial<SetupFormState>) => void;
   onStart?: () => void;

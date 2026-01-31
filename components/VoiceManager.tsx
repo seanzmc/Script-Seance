@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { VoiceConfig, AVAILABLE_VOICES } from '../types';
 import { Volume2, Loader, Square, Settings2, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 
-interface VoiceManagerProps {
+export interface VoiceManagerProps {
   characters: string[];
   voiceConfigs: VoiceConfig[];
   onUpdateConfig: (character: string, updates: Partial<VoiceConfig>) => void;

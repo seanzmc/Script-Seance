@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from './Button';
 
-interface PrimaryActionButtonProps {
+export interface PrimaryActionButtonProps {
   label: string;
   onClick: () => void;
   helperText?: string;
