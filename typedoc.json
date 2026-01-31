@@ -43,5 +43,7 @@
     "yaml",
     "tsx",
     "typescript"
-  ]
+  ],
+  "emit": "both",
+  "json": "docs/typedoc/typedoc.json"
 }
