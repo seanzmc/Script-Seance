@@ -410,10 +410,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     [insertTarget, onCancelInsertMode, onConfirmInsertMode, onSelectInsertTarget, pendingInsertBlock]
   );
 
-  const renderedScenes = useMemo(() => {
-    if (scenes.length === 0) return null;
-
-    return scenes.map((scene, sceneIndex) => {
+  const renderedScenes = scenes.length === 0 ? null : scenes.map((scene, sceneIndex) => {
       const blocks = scene.blocks.filter(block => block.type !== BlockType.HEADING);
       const isFirstScene = sceneIndex === 0;
       const isLastScene = sceneIndex === scenes.length - 1;
@@ -551,7 +548,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         </div>
       );
     });
-  }, [blockStatuses, getDisplayCharacter, hasPendingPreview, insertTarget, isInsertMode, isRegenerating, onRegenerate, onToggleLock, openMenuId, pendingInsertBlock, renderInsertTarget, scenes]);
 
   if (scenes.length === 0) return null;
 

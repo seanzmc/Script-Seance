@@ -229,7 +229,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </div>
             {surprisePrompt && (
               <div className="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-[11px] text-indigo-100">
-                Pick a genre first, then click "Surprise Me" to generate a setup.
+                Pick a genre first, then click &quot;Surprise Me&quot; to generate a setup.
               </div>
             )}
             <div className="flex flex-wrap gap-2">

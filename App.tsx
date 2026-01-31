@@ -232,13 +232,13 @@ export default function App() {
     setPendingInsertBlock(block);
     setInsertTarget(null);
     setInsertModeActive(true);
-  }, [clearRedo]);
+  }, []);
 
   const handleCancelInsertMode = useCallback(() => {
     setInsertModeActive(false);
     setPendingInsertBlock(null);
     setInsertTarget(null);
-  }, [clearRedo]);
+  }, []);
 
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
     const { code, status, message } = getErrorMeta(err);
@@ -262,7 +262,7 @@ export default function App() {
     }
     setError(message || fallbackMessage);
     return false;
-  }, [clearRedo]);
+  }, []);
 
   const handleAudioSkip = useCallback((block: ScriptBlock) => {
     const rawText = block.text.trim();
@@ -766,7 +766,7 @@ export default function App() {
       return { ...prev, scenes: newScenes };
     });
     setInsertTarget(null);
-  }, []);
+  }, [clearRedo]);
 
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
@@ -844,7 +844,7 @@ export default function App() {
       });
       return { ...prev, scenes: newScenes };
     });
-  }, []);
+  }, [clearRedo]);
 
   const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
     clearRedo();
@@ -858,7 +858,7 @@ export default function App() {
         } : scene)
       };
     });
-  }, []);
+  }, [clearRedo]);
 
   const resetTitleSuggestionState = useCallback(() => {
     titleSuggestionTokenRef.current += 1;
