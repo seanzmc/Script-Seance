@@ -42,6 +42,10 @@ interface DraftPayload {
   savedAt: string;
 }
 
+type RedoPayload =
+  | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
+  | { type: 'scene'; scene: Scene; index: number };
+
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
 const DEFAULT_TITLE = 'Untitled Screenplay';
@@ -148,7 +152,9 @@ export default function App() {
   const [pendingInsertBlock, setPendingInsertBlock] = useState<ScriptBlock | null>(null);
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
-  const [setupMode, setSetupMode] = useState<'manual' | 'surprise'>('manual');
+  const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
+  const [redoPayload, setRedoPayload] = useState<RedoPayload | null>(null);
+  const [isControlPanelCollapsed, setIsControlPanelCollapsed] = useState(false);
 
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -167,6 +173,17 @@ export default function App() {
   const autosaveFailureNotifiedRef = useRef(false);
 
   const hasScript = Boolean(context?.scenes.some(scene => scene.blocks.length > 0));
+  const canRedo = Boolean(redoPayload);
+  const scriptStyleContext = useMemo(() => {
+    const style = setupState.style.trim();
+    const length = setupState.length.trim();
+    const parts = [
+      setupState.genre ? `Genre: ${setupState.genre}.` : '',
+      style ? `Style: ${style}.` : '',
+      length ? `Length: ${length}.` : ''
+    ].filter(Boolean);
+    return parts.join(' ');
+  }, [setupState.genre, setupState.length, setupState.style]);
 
   const applyStep = (
     requestedStep: ControlStep,
@@ -183,24 +200,29 @@ export default function App() {
     }));
   };
 
+  const clearRedo = useCallback(() => setRedoPayload(null), []);
+
   const openManualSetup = () => {
-    setSetupMode('manual');
+    setSetupSurprisePrompt(false);
     setIsSetupOpen(true);
   };
 
   const openSurpriseSetup = () => {
-    setSetupMode('surprise');
+    setSetupSurprisePrompt(true);
     setIsSetupOpen(true);
   };
 
   const closeSetup = () => {
     setIsSetupOpen(false);
-    setSetupMode('manual');
+    setSetupSurprisePrompt(false);
   };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
+    if (setupSurprisePrompt && typeof next.genre === 'string') {
+      setSetupSurprisePrompt(false);
+    }
     setSetupState(prev => ({ ...prev, ...next }));
-  }, []);
+  }, [setupSurprisePrompt]);
   const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     if (!insertModeActive) return;
     setInsertTarget(target);
@@ -210,13 +232,13 @@ export default function App() {
     setPendingInsertBlock(block);
     setInsertTarget(null);
     setInsertModeActive(true);
-  }, []);
+  }, [clearRedo]);
 
   const handleCancelInsertMode = useCallback(() => {
     setInsertModeActive(false);
     setPendingInsertBlock(null);
     setInsertTarget(null);
-  }, []);
+  }, [clearRedo]);
 
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
     const { code, status, message } = getErrorMeta(err);
@@ -240,7 +262,7 @@ export default function App() {
     }
     setError(message || fallbackMessage);
     return false;
-  }, []);
+  }, [clearRedo]);
 
   const handleAudioSkip = useCallback((block: ScriptBlock) => {
     const rawText = block.text.trim();
@@ -506,6 +528,7 @@ export default function App() {
     cancelAiRequest();
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
+    clearRedo();
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
@@ -532,6 +555,7 @@ export default function App() {
     cancelAiRequest();
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
+    clearRedo();
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
@@ -593,6 +617,7 @@ export default function App() {
     let request: CancellableRequest<Scene> | null = null;
     try {
       closeSetup();
+      clearRedo();
       resetTitleSuggestionState();
       void requestTitleSuggestion(setupState);
       const setupNotes: string[] = [];
@@ -637,6 +662,7 @@ export default function App() {
     if (!context || isGenerating) return;
     let request: CancellableRequest<Scene> | null = null;
     try {
+      clearRedo();
       const prompt = userInstruction || "Continue the story logically.";
       request = createGenerateSceneRequest(context, prompt, false);
       startAiRequest(request);
@@ -672,6 +698,7 @@ export default function App() {
 
   const handleAddBlock = (block: ScriptBlock) => {
     if (!context) return;
+    clearRedo();
     
     setContext(prev => {
       if (!prev) return null;
@@ -707,6 +734,7 @@ export default function App() {
   };
 
   const handleInsertAfter = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
+    clearRedo();
     setContext(prev => {
       if (!prev) return null;
       const sceneIndex = prev.scenes.findIndex(scene => scene.id === target.sceneId);
@@ -758,16 +786,53 @@ export default function App() {
       const lastScene = { ...newScenes[lastSceneIndex] };
 
       if (lastScene.blocks.length > 0) {
+        const removedBlock = lastScene.blocks[lastScene.blocks.length - 1];
         lastScene.blocks = lastScene.blocks.slice(0, -1);
         newScenes[lastSceneIndex] = lastScene;
+        setRedoPayload({
+          type: 'block',
+          sceneId: lastScene.id,
+          block: removedBlock,
+          index: lastScene.blocks.length
+        });
       } else {
-        newScenes.pop();
+        const removedScene = newScenes.pop();
+        if (removedScene) {
+          setRedoPayload({
+            type: 'scene',
+            scene: removedScene,
+            index: lastSceneIndex
+          });
+        }
       }
       return { ...prev, scenes: newScenes };
     });
   };
 
+  const handleRedo = () => {
+    if (!redoPayload) return;
+    setContext(prev => {
+      if (!prev) return null;
+      const newScenes = [...prev.scenes];
+      if (redoPayload.type === 'scene') {
+        const insertIndex = Math.min(redoPayload.index, newScenes.length);
+        newScenes.splice(insertIndex, 0, redoPayload.scene);
+        return { ...prev, scenes: newScenes };
+      }
+      const sceneIndex = newScenes.findIndex(scene => scene.id === redoPayload.sceneId);
+      if (sceneIndex === -1) return prev;
+      const scene = { ...newScenes[sceneIndex] };
+      const updatedBlocks = [...scene.blocks];
+      const insertIndex = Math.min(redoPayload.index, updatedBlocks.length);
+      updatedBlocks.splice(insertIndex, 0, redoPayload.block);
+      newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
+      return { ...prev, scenes: newScenes };
+    });
+    setRedoPayload(null);
+  };
+
   const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
+    clearRedo();
     setContext(prev => {
       if (!prev) return null;
       const newScenes = prev.scenes.map(scene => {
@@ -782,6 +847,7 @@ export default function App() {
   }, []);
 
   const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
+    clearRedo();
     setContext(prev => {
       if (!prev) return null;
       return {
@@ -819,6 +885,7 @@ export default function App() {
       const newText = await request.promise;
       
       // Update state
+      clearRedo();
       setContext(prev => {
         if (!prev) return null;
         return {
@@ -856,7 +923,7 @@ export default function App() {
         finishAiRequest(request);
       }
     }
-  }, [context, isGenerating, handleAiError, startAiRequest, finishAiRequest]);
+  }, [clearRedo, context, finishAiRequest, handleAiError, isGenerating, startAiRequest]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     setVoiceConfigs(prev => {
@@ -1203,6 +1270,8 @@ export default function App() {
         onPlotTwist={handleTwist}
         onAddBlock={handleAddBlock}
         onUndo={handleUndo}
+        onRedo={handleRedo}
+        canRedo={canRedo}
         insertTarget={insertTarget}
         insertModeActive={insertModeActive}
         pendingInsertBlock={pendingInsertBlock}
@@ -1232,7 +1301,9 @@ export default function App() {
         setupState={setupState}
         onSetupChange={updateSetupState}
         onStartSetup={handleStart}
-        setupAutoSurprise={setupMode === 'surprise'}
+        setupAutoSurprise={false}
+        setupSurprisePrompt={setupSurprisePrompt}
+        styleContext={scriptStyleContext}
         onSetupError={handleAiError}
       />
 
@@ -1241,9 +1312,11 @@ export default function App() {
         onStepChange={handleStepChange}
         primaryAction={primaryAction}
         isDisabled={isSidebarDisabled}
+        isCollapsed={isControlPanelCollapsed}
+        onToggleCollapse={() => setIsControlPanelCollapsed(prev => !prev)}
         showPrimaryAction={showPrimaryAction}
-        footer={(
-          <>
+        header={(
+          <div className="grid grid-cols-1 gap-2">
             <Button
               variant="ghost"
               onClick={handleDownload}
@@ -1262,7 +1335,7 @@ export default function App() {
             >
               <FileDown className="w-3 h-3 mr-2" /> Export PDF
             </Button>
-          </>
+          </div>
         )}
       >
         <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">

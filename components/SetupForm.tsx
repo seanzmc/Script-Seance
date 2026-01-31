@@ -24,6 +24,7 @@ export interface SetupFormProps {
   onClearDraft?: () => void;
   variant?: "full" | "summary";
   autoSurprise?: boolean;
+  surprisePrompt?: boolean;
 }
 
 const STARTER_IDEAS = [
@@ -46,6 +47,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   onClearDraft,
   variant = "full",
   autoSurprise = false,
+  surprisePrompt = false,
 }) => {
   const { genre, premise, characters, style, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
@@ -225,6 +227,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 Surprise Me
               </Button>
             </div>
+            {surprisePrompt && (
+              <div className="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-[11px] text-indigo-100">
+                Pick a genre first, then click "Surprise Me" to generate a setup.
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {GENRES.map((g) => (
                 <button
@@ -319,7 +326,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   ))}
                 </select>
                 <p className="text-[10px] text-gray-500">
-                  {isLengthBlank ? "Using defaults." : "Length influences pacing, not format."}
+                  {isLengthBlank ? "Using defaults." : "Length guides how many beats and scenes we generate."}
                 </p>
               </div>
             </div>

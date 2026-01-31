@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { PenTool, Zap, Plus, Undo2 } from 'lucide-react';
+import { PenTool, Zap, Plus, Undo2, Redo2 } from 'lucide-react';
 
 export interface ScriptEditorProps {
   characters: string[];
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
+  onRedo?: () => void;
+  canRedo?: boolean;
   onError?: (error: unknown) => void;
   disabled?: boolean;
+  styleContext?: string;
 }
 
 export const ScriptEditor: React.FC<ScriptEditorProps> = ({ 
@@ -18,8 +21,11 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
   genre, 
   onAddBlock,
   onUndo,
+  onRedo,
+  canRedo,
   onError,
-  disabled 
+  disabled,
+  styleContext
 }) => {
   const [mode, setMode] = useState<'write' | 'generate'>('write');
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
@@ -37,7 +43,8 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
     if (mode === 'generate') {
       setIsGenerating(true);
       try {
-        finalText = await generateScriptElement(elementType, selectedChar, content, genre);
+        const promptContext = styleContext?.trim() ? styleContext : genre;
+        finalText = await generateScriptElement(elementType, selectedChar, content, promptContext);
       } catch (e) {
         console.error("Generation failed", e);
         onError?.(e);
@@ -76,6 +83,16 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
              >
                <Undo2 className="w-4 h-4" />
              </button>
+          )}
+          {onRedo && (
+            <button
+              onClick={onRedo}
+              disabled={disabled || !canRedo}
+              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title={canRedo ? 'Redo last undone action' : 'Redo is available after undo'}
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
           )}
 
           {/* Mode Toggle */}

@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { PenTool, Undo2 } from 'lucide-react';
+import { PenTool, Undo2, Redo2 } from 'lucide-react';
 
 export interface InsertBlockProps {
   characters: string[];
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
+  onRedo?: () => void;
+  canRedo?: boolean;
   onStartInsertMode: (block: ScriptBlock) => void;
   insertModeActive: boolean;
   insertModeAvailable: boolean;
@@ -16,6 +18,7 @@ export interface InsertBlockProps {
   onError?: (error: unknown) => void;
   disabled?: boolean;
   insertTarget?: { sceneId: string; blockId: string } | null;
+  styleContext?: string;
 }
 
 const HINTS: Record<BlockType, string> = {
@@ -30,13 +33,16 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   genre, 
   onAddBlock,
   onUndo,
+  onRedo,
+  canRedo,
   onStartInsertMode,
   insertModeActive,
   insertModeAvailable,
   insertCompleteToken,
   onError,
   disabled,
-  insertTarget
+  insertTarget,
+  styleContext
 }) => {
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
@@ -101,23 +107,15 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
       content.trim() || `Surprise me with a ${elementType} block.`;
 
     try {
+      const promptContext = styleContext?.trim() ? styleContext : genre;
       const generatedText = await generateScriptElement(
         elementType,
         selectedChar,
         instruction,
-        genre
+        promptContext
       );
       if (!generatedText.trim()) return;
-
-      const newBlock: ScriptBlock = {
-        id: crypto.randomUUID(),
-        type: elementType,
-        text: generatedText,
-        character: elementType === BlockType.DIALOGUE ? selectedChar : undefined
-      };
-
-      onAddBlock(newBlock);
-      setContent('');
+      setContent(generatedText.trim());
     } catch (e) {
       console.error("Generation failed", e);
       onError?.(e);
@@ -145,13 +143,23 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
                <Undo2 className="w-4 h-4" />
              </button>
           )}
+          {onRedo && (
+            <button
+              onClick={onRedo}
+              disabled={disabled || !canRedo}
+              className="p-1 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title={canRedo ? 'Redo last undone action' : 'Redo is available after undo'}
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          )}
           <Button
             onClick={handleSurpriseMe}
             disabled={disabled || isGenerating}
             size="sm"
             variant="secondary"
             loading={isGenerating}
-            title="Generate a new block and insert it"
+            title="Generate a new block in the editor"
           >
             Surprise me
           </Button>
@@ -204,7 +212,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
 
         <div className="space-y-2">
           <p className="text-[10px] text-gray-500">
-            Add Block inserts what you wrote. Surprise me generates a new block using the selected type and genre (text optional).
+            Add Block inserts what you wrote. Surprise me fills the editor with a generated block based on the selected type and style.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative w-full sm:flex-1">

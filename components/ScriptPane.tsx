@@ -29,6 +29,8 @@ export interface ScriptPaneProps {
   onPlotTwist: () => void;
   onAddBlock: (block: ScriptBlock) => void;
   onUndo: () => void;
+  onRedo?: () => void;
+  canRedo?: boolean;
   insertTarget: InsertTarget | null;
   insertModeActive: boolean;
   pendingInsertBlock: ScriptBlock | null;
@@ -59,6 +61,8 @@ export interface ScriptPaneProps {
   onSetupChange: (next: Partial<SetupFormState>) => void;
   onStartSetup: () => void;
   setupAutoSurprise: boolean;
+  setupSurprisePrompt?: boolean;
+  styleContext?: string;
   onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
 }
 
@@ -96,6 +100,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onPlotTwist,
   onAddBlock,
   onUndo,
+  onRedo,
+  canRedo,
   insertTarget,
   insertModeActive,
   pendingInsertBlock,
@@ -126,6 +132,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onSetupChange,
   onStartSetup,
   setupAutoSurprise,
+  setupSurprisePrompt,
+  styleContext,
   onSetupError
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
@@ -137,7 +145,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const isSplitView = viewMode === 'split';
   const isInsertModeView = insertModeActive && Boolean(context);
   const insertModeAvailable = viewMode !== 'preview';
-  const canConfirmInsert = Boolean(isInsertModeView && insertTarget && pendingInsertBlock);
   const titleMatchesSuggestion = Boolean(context && suggestedTitle && context.title.trim() === suggestedTitle);
   const showSuggestedTitle = Boolean(context && suggestedTitle && !suggestedTitleDismissed);
   const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
@@ -272,6 +279,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         genre={context.genre}
         onAddBlock={onAddBlock}
         onUndo={onUndo}
+        onRedo={onRedo}
+        canRedo={canRedo}
         onStartInsertMode={onStartInsertMode}
         insertModeActive={isInsertModeView}
         insertModeAvailable={insertModeAvailable}
@@ -279,6 +288,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onError={onInsertError}
         disabled={isPlaying || isGenerating}
         insertTarget={insertTarget}
+        styleContext={styleContext}
       />
     </>
   ) : null;
@@ -298,6 +308,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       insertTarget={insertTarget}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
+      onConfirmInsertMode={onConfirmInsertMode}
+      onCancelInsertMode={onCancelInsertMode}
       isRegenerating={isRegenerating}
       className={previewClassName}
       scrollable={isSplitView}
@@ -354,19 +366,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
         <p className="text-[10px] uppercase tracking-[0.4em] text-indigo-200">Insert Mode</p>
-        <p className="text-xs text-indigo-100/80">Select where to place the new block.</p>
+        <p className="text-xs text-indigo-100/80">Select a spot below, then confirm inline.</p>
       </div>
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onCancelInsertMode}>
           Cancel
-        </Button>
-        <Button
-          size="sm"
-          onClick={onConfirmInsertMode}
-          disabled={!canConfirmInsert}
-          title={canConfirmInsert ? 'Insert the block here' : 'Select an insertion point'}
-        >
-          Insert Here
         </Button>
       </div>
     </div>
@@ -405,6 +409,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             isLocked={false}
             showSubmit
             autoSurprise={setupAutoSurprise}
+            surprisePrompt={setupSurprisePrompt}
           />
         </div>
       </div>
@@ -421,8 +426,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
               <div className="space-y-2">
-                <p className="text-[10px] uppercase tracking-[0.45em] text-gray-500">SCRIPT SEANCE</p>
-                <h1 className="text-2xl md:text-3xl font-semibold text-white">Script Workspace</h1>
+                <p className="text-sm md:text-base font-semibold uppercase tracking-[0.35em] text-gray-200">Script Seance</p>
+                <h1 className="text-lg md:text-xl font-medium text-gray-400">Script Workspace</h1>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>

@@ -17,6 +17,8 @@ export interface ScriptDisplayProps {
   insertTarget?: { sceneId: string; blockId: string } | null;
   insertModeActive?: boolean;
   pendingInsertBlock?: ScriptBlock | null;
+  onConfirmInsertMode?: () => void;
+  onCancelInsertMode?: () => void;
   isRegenerating: boolean;
   className?: string;
   scrollable?: boolean;
@@ -25,6 +27,9 @@ export interface ScriptDisplayProps {
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
 const ERROR_CLASSES = 'border border-red-300/70 bg-red-50/60';
 export const SCRIPT_EXPORT_ROOT_SELECTOR = '[data-script-export-root="true"]';
+
+const normalizeCharacterName = (value: string) =>
+  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
 const SCRIPT_EXPORT_STYLES = `
   * {
@@ -220,6 +225,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   onRegenerate,
   onToggleLock,
   onSelectInsertTarget,
+  onConfirmInsertMode,
+  onCancelInsertMode,
+  characters,
   insertTarget,
   insertModeActive = false,
   pendingInsertBlock = null,
@@ -245,6 +253,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       : currentBlockId;
   const isInsertMode = insertModeActive;
   const hasPendingPreview = Boolean(pendingInsertBlock && insertTarget);
+  const getDisplayCharacter = useCallback((name?: string) => {
+    if (!name) return '';
+    const normalized = normalizeCharacterName(name);
+    const matched = characters.find(char => normalizeCharacterName(char) === normalized);
+    return matched ?? name;
+  }, [characters]);
 
   useEffect(() => {
     if (autoScroll && activeBlockId) {
@@ -301,7 +315,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       content = (
         <div className="script-block-dialogue max-w-md mx-auto text-center">
           <div className="script-dialogue-character uppercase mt-2 mb-0 font-bold tracking-wider">
-            {block.character}
+            {getDisplayCharacter(block.character)}
           </div>
           {block.parenthetical && (
             <div className="script-dialogue-parenthetical text-sm italic lowercase mb-0">
@@ -333,42 +347,67 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   const renderInsertTarget = useCallback(
     (
-    target: { sceneId: string; blockId: string },
-    label?: string
+      target: { sceneId: string; blockId: string },
+      label?: string
     ) => {
-    const isSelected = insertTarget?.sceneId === target.sceneId && insertTarget?.blockId === target.blockId;
-    return (
-      <button
-        type="button"
-        onClick={() => onSelectInsertTarget(target)}
-        className={`script-export-chrome group w-full flex items-center gap-3 py-2 text-left transition-colors ${
-          isSelected ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'
-        }`}
-        aria-pressed={isSelected}
-      >
-        <span
-          className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
-            isSelected
-              ? 'bg-indigo-500 text-white border-indigo-400'
-              : 'bg-white border-gray-300 text-gray-500 group-hover:border-indigo-400 group-hover:text-indigo-500'
-          }`}
-        >
-          <PlusCircle className="w-3.5 h-3.5" />
-        </span>
-        <span
-          className={`h-px flex-1 transition-colors ${
-            isSelected ? 'bg-indigo-400' : 'bg-gray-300/80 group-hover:bg-indigo-300'
-          }`}
-        />
-        {(label || isSelected) && (
-          <span className="text-[9px] uppercase tracking-widest text-gray-400">
-            {label ?? 'Selected'}
-          </span>
-        )}
-      </button>
-    );
+      const isSelected = insertTarget?.sceneId === target.sceneId && insertTarget?.blockId === target.blockId;
+      const showActions = isSelected && Boolean(pendingInsertBlock) && (onConfirmInsertMode || onCancelInsertMode);
+      return (
+        <div className="script-export-chrome w-full">
+          <button
+            type="button"
+            onClick={() => onSelectInsertTarget(target)}
+            className={`group w-full flex items-center gap-3 py-2 text-left transition-colors ${
+              isSelected ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+            }`}
+            aria-pressed={isSelected}
+          >
+            <span
+              className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
+                isSelected
+                  ? 'bg-indigo-500 text-white border-indigo-400'
+                  : 'bg-white border-gray-300 text-gray-500 group-hover:border-indigo-400 group-hover:text-indigo-500'
+              }`}
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+            </span>
+            <span
+              className={`h-px flex-1 transition-colors ${
+                isSelected ? 'bg-indigo-400' : 'bg-gray-300/80 group-hover:bg-indigo-300'
+              }`}
+            />
+            {(label || isSelected) && (
+              <span className="text-[9px] uppercase tracking-widest text-gray-400">
+                {label ?? 'Selected'}
+              </span>
+            )}
+          </button>
+          {showActions && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 pl-10">
+              {onConfirmInsertMode && (
+                <button
+                  type="button"
+                  onClick={onConfirmInsertMode}
+                  className="px-3 py-1 text-[10px] uppercase tracking-widest rounded-md bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+                >
+                  Insert Here
+                </button>
+              )}
+              {onCancelInsertMode && (
+                <button
+                  type="button"
+                  onClick={onCancelInsertMode}
+                  className="px-3 py-1 text-[10px] uppercase tracking-widest rounded-md border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
     },
-    [insertTarget, onSelectInsertTarget]
+    [insertTarget, onCancelInsertMode, onConfirmInsertMode, onSelectInsertTarget, pendingInsertBlock]
   );
 
   const renderedScenes = useMemo(() => {
@@ -412,7 +451,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               } else if (block.type === BlockType.DIALOGUE) {
                 content = (
                   <div className="script-block-dialogue max-w-md mx-auto text-center">
-                    <div className="script-dialogue-character uppercase mt-4 mb-0 font-bold tracking-wider">{block.character}</div>
+                    <div className="script-dialogue-character uppercase mt-4 mb-0 font-bold tracking-wider">
+                      {getDisplayCharacter(block.character)}
+                    </div>
                     {block.parenthetical && (
                       <div className="script-dialogue-parenthetical text-sm italic lowercase mb-0">{block.parenthetical}</div>
                     )}
@@ -510,7 +551,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         </div>
       );
     });
-  }, [blockStatuses, hasPendingPreview, insertTarget, isInsertMode, isRegenerating, onRegenerate, onToggleLock, openMenuId, pendingInsertBlock, renderInsertTarget, scenes]);
+  }, [blockStatuses, getDisplayCharacter, hasPendingPreview, insertTarget, isInsertMode, isRegenerating, onRegenerate, onToggleLock, openMenuId, pendingInsertBlock, renderInsertTarget, scenes]);
 
   if (scenes.length === 0) return null;
 

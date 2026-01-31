@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PrimaryActionButton } from './PrimaryActionButton';
 
 export type ControlStep = 'setup' | 'script' | 'voices' | 'playback';
@@ -44,6 +45,8 @@ export interface ControlPanelProps {
   footer?: React.ReactNode;
   isDisabled?: boolean;
   showPrimaryAction?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -54,14 +57,42 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   children,
   footer,
   isDisabled = false,
-  showPrimaryAction = true
+  showPrimaryAction = true,
+  isCollapsed = false,
+  onToggleCollapse
 }) => {
   const activeMeta = FLOW_STEPS.find(step => step.id === currentStep) || FLOW_STEPS[0];
   const interactionClass = isDisabled ? 'pointer-events-none select-none' : '';
+  const activeIndex = FLOW_STEPS.findIndex(step => step.id === currentStep);
+
+  if (isCollapsed) {
+    return (
+      <aside
+        className={`w-12 bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col items-center py-4 ${
+          isDisabled ? 'opacity-50' : ''
+        }`}
+        aria-label="Control panel"
+        aria-disabled={isDisabled}
+      >
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+          aria-label="Expand tools"
+          disabled={isDisabled}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="mt-6 text-[10px] uppercase tracking-[0.3em] text-gray-500 rotate-90">
+          Tools
+        </span>
+      </aside>
+    );
+  }
 
   return (
     <aside
-      className={`w-full lg:w-[380px] lg:min-w-[340px] lg:max-w-[420px] bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col shrink-0 ${
+      className={`w-full lg:w-[380px] lg:min-w-[340px] lg:max-w-[420px] lg:h-screen bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col shrink-0 ${
         isDisabled ? 'opacity-50' : ''
       }`}
       aria-label="Control panel"
@@ -70,47 +101,53 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       <div className={`p-4 border-b border-gray-700 bg-gray-900/40 shrink-0 ${interactionClass}`}>
         <div className="space-y-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.35em] text-gray-500">Flow</p>
-            <div className="mt-3 space-y-2">
-              {FLOW_STEPS.map((step, index) => {
-                const isActive = step.id === currentStep;
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => onStepChange?.(step.id)}
-                    disabled={isDisabled}
-                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left w-full ${
-                      isActive
-                        ? 'border-indigo-400/40 bg-indigo-500/15 text-white'
-                        : 'border-gray-800 bg-gray-900/40 text-gray-500'
-                    }`}
-                    aria-current={isActive ? 'step' : undefined}
-                  >
-                    <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold ${
-                        isActive ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-gray-500'
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`text-xs font-semibold ${isActive ? 'text-white' : 'text-gray-400'}`}>
-                          {step.label}
-                        </span>
-                        {isActive && (
-                          <span className="text-[9px] uppercase tracking-widest text-indigo-300">
-                            You are here
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-[0.35em] text-gray-500">Flow</p>
+              {onToggleCollapse && (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                  aria-label="Collapse tools"
+                  disabled={isDisabled}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <p className="mt-3 text-[11px] text-gray-400">{activeMeta.instruction}</p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                {FLOW_STEPS.map((step, index) => {
+                  const isActive = step.id === currentStep;
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => onStepChange?.(step.id)}
+                      disabled={isDisabled}
+                      className={`flex items-center gap-2 text-[10px] uppercase tracking-widest transition-colors ${
+                        isActive ? 'text-indigo-200' : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                      aria-current={isActive ? 'step' : undefined}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          isActive ? 'bg-indigo-400' : 'bg-gray-600'
+                        }`}
+                      />
+                      <span className="hidden sm:inline">{step.label}</span>
+                      {index < FLOW_STEPS.length - 1 && (
+                        <span className="hidden sm:inline text-gray-600">-</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[9px] uppercase tracking-widest text-gray-500">
+                {activeIndex + 1}/{FLOW_STEPS.length}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-400">{activeMeta.instruction}</p>
           </div>
           {showPrimaryAction && (
             <PrimaryActionButton
@@ -125,7 +162,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar ${interactionClass}`}>
+      <div className={`flex-1 overflow-y-auto lg:overflow-visible p-4 space-y-5 custom-scrollbar ${interactionClass}`}>
         {children}
       </div>
 
