@@ -173,9 +173,11 @@ export default function App() {
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
-  const [redoPayload, setRedoPayload] = useState<RedoPayload | null>(null);
+  const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
   const [isControlPanelCollapsed, setIsControlPanelCollapsed] = useState(false);
   const undoStackRef = useRef<UndoAction[]>([]);
+  const redoStackRef = useRef<UndoAction[]>([]);
 
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -194,7 +196,8 @@ export default function App() {
   const autosaveFailureNotifiedRef = useRef(false);
 
   const hasScript = Boolean(context?.scenes.some(scene => scene.blocks.length > 0));
-  const canRedo = Boolean(redoPayload);
+  const canRedo = redoCount > 0;
+  const canUndo = undoCount > 0;
   const scriptStyleContext = useMemo(() => {
     const style = setupState.style.trim();
     const length = setupState.length.trim();
@@ -221,13 +224,33 @@ export default function App() {
     }));
   };
 
-  const clearRedo = useCallback(() => setRedoPayload(null), []);
+  const clearRedo = useCallback(() => {
+    redoStackRef.current = [];
+    setRedoCount(0);
+  }, []);
   const resetUndoRedo = useCallback(() => {
     undoStackRef.current = [];
-    setRedoPayload(null);
+    redoStackRef.current = [];
+    setUndoCount(0);
+    setRedoCount(0);
   }, []);
   const pushUndoAction = useCallback((action: UndoAction) => {
     undoStackRef.current.push(action);
+    setUndoCount(undoStackRef.current.length);
+  }, []);
+  const popUndoAction = useCallback(() => {
+    const action = undoStackRef.current.pop();
+    setUndoCount(undoStackRef.current.length);
+    return action;
+  }, []);
+  const pushRedoAction = useCallback((action: UndoAction) => {
+    redoStackRef.current.push(action);
+    setRedoCount(redoStackRef.current.length);
+  }, []);
+  const popRedoAction = useCallback(() => {
+    const action = redoStackRef.current.pop();
+    setRedoCount(redoStackRef.current.length);
+    return action;
   }, []);
 
   const openManualSetup = () => {
@@ -681,7 +704,6 @@ export default function App() {
         ...initialContext,
         scenes: [normalizedFirstScene]
       });
-      pushUndoAction({ type: 'scene', scene: normalizedFirstScene, index: 0 });
       setHasReviewedVoices(false);
       applyStep('script', { hasScript: true, confirmSetup: true });
     } catch (err: unknown) {
@@ -706,7 +728,6 @@ export default function App() {
         if (!prev) return null;
         const normalizedScene = normalizeSceneCharacters(nextScene, prev.characters);
         const updatedScenes = [...prev.scenes, normalizedScene];
-        pushUndoAction({ type: 'scene', scene: normalizedScene, index: updatedScenes.length - 1 });
         return { ...prev, scenes: updatedScenes };
       });
       setUserInstruction('');
@@ -836,8 +857,9 @@ export default function App() {
 
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
-    const lastAction = undoStackRef.current.pop();
+    const lastAction = popUndoAction();
     if (!lastAction) return;
+    let didUndo = false;
 
     setContext(prev => {
       if (!prev) return null;
@@ -846,6 +868,7 @@ export default function App() {
         const sceneIndex = newScenes.findIndex(scene => scene.id === lastAction.scene.id);
         if (sceneIndex === -1) return prev;
         newScenes.splice(sceneIndex, 1);
+        didUndo = true;
         return { ...prev, scenes: newScenes };
       }
       const sceneIndex = newScenes.findIndex(scene => scene.id === lastAction.sceneId);
@@ -859,21 +882,27 @@ export default function App() {
       const updatedBlocks = [...scene.blocks];
       updatedBlocks.splice(blockIndex, 1);
       newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
+      didUndo = true;
       return { ...prev, scenes: newScenes };
     });
-    setRedoPayload(lastAction);
+    if (didUndo) {
+      pushRedoAction(lastAction);
+    } else {
+      pushUndoAction(lastAction);
+    }
   };
 
   const handleRedo = () => {
-    if (!redoPayload) return;
-    const action = redoPayload;
+    const action = popRedoAction();
+    if (!action) return;
+    let didRedo = false;
     setContext(prev => {
       if (!prev) return null;
       const newScenes = [...prev.scenes];
       if (action.type === 'scene') {
         const insertIndex = Math.min(action.index, newScenes.length);
         newScenes.splice(insertIndex, 0, action.scene);
-        pushUndoAction(action);
+        didRedo = true;
         return { ...prev, scenes: newScenes };
       }
       const sceneIndex = newScenes.findIndex(scene => scene.id === action.sceneId);
@@ -883,10 +912,14 @@ export default function App() {
       const insertIndex = Math.min(action.index, updatedBlocks.length);
       updatedBlocks.splice(insertIndex, 0, action.block);
       newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
-      pushUndoAction(action);
+      didRedo = true;
       return { ...prev, scenes: newScenes };
     });
-    setRedoPayload(null);
+    if (didRedo) {
+      pushUndoAction(action);
+    } else {
+      pushRedoAction(action);
+    }
   };
 
   const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
@@ -1361,6 +1394,7 @@ export default function App() {
         onAddBlock={handleAddBlock}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        canUndo={canUndo}
         canRedo={canRedo}
         insertTarget={insertTarget}
         insertModeActive={insertModeActive}

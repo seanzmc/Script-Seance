@@ -17,6 +17,7 @@ export interface InsertBlockProps {
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  canUndo?: boolean;
   canRedo?: boolean;
   onStartInsertMode: (block: ScriptBlock) => void;
   insertModeActive: boolean;
@@ -41,6 +42,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   onAddBlock,
   onUndo,
   onRedo,
+  canUndo,
   canRedo,
   onStartInsertMode,
   insertModeActive,
@@ -156,9 +158,9 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
           {onUndo && (
              <button
               onClick={onUndo}
-              disabled={disabled}
+              disabled={disabled || canUndo === false}
               className="p-1 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors"
-              title="Undo last action"
+              title={canUndo === false ? 'Undo is available after adding a block' : 'Undo last action'}
              >
                <Undo2 className="w-4 h-4" />
              </button>

@@ -30,6 +30,7 @@ export interface ScriptPaneProps {
   onAddBlock: (block: ScriptBlock) => void;
   onUndo: () => void;
   onRedo?: () => void;
+  canUndo?: boolean;
   canRedo?: boolean;
   insertTarget: InsertTarget | null;
   insertModeActive: boolean;
@@ -101,6 +102,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onAddBlock,
   onUndo,
   onRedo,
+  canUndo,
   canRedo,
   insertTarget,
   insertModeActive,
@@ -280,6 +282,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onAddBlock={onAddBlock}
         onUndo={onUndo}
         onRedo={onRedo}
+        canUndo={canUndo}
         canRedo={canRedo}
         onStartInsertMode={onStartInsertMode}
         insertModeActive={isInsertModeView}

@@ -17,6 +17,7 @@ export interface ScriptEditorProps {
   onAddBlock: (block: ScriptBlock) => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  canUndo?: boolean;
   canRedo?: boolean;
   onError?: (error: unknown) => void;
   disabled?: boolean;
@@ -29,6 +30,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
   onAddBlock,
   onUndo,
   onRedo,
+  canUndo,
   canRedo,
   onError,
   disabled,
@@ -97,9 +99,9 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
           {onUndo && (
              <button
               onClick={onUndo}
-              disabled={disabled}
+              disabled={disabled || canUndo === false}
               className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
-              title="Undo last action"
+              title={canUndo === false ? 'Undo is available after adding a block' : 'Undo last action'}
              >
                <Undo2 className="w-4 h-4" />
              </button>
