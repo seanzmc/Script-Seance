@@ -224,6 +224,62 @@ export default function App() {
     }));
   };
 
+  const applyUndoAction = useCallback((current: StoryContext, action: UndoAction) => {
+    if (action.type === 'scene') {
+      const sceneIndex = current.scenes.findIndex(scene => scene.id === action.scene.id);
+      if (sceneIndex === -1) {
+        return { nextContext: current, applied: false };
+      }
+      const nextScenes = [...current.scenes];
+      nextScenes.splice(sceneIndex, 1);
+      return { nextContext: { ...current, scenes: nextScenes }, applied: true };
+    }
+
+    const sceneIndex = current.scenes.findIndex(scene => scene.id === action.sceneId);
+    if (sceneIndex === -1) {
+      return { nextContext: current, applied: false };
+    }
+    const scene = current.scenes[sceneIndex];
+    const blockIndex = scene.blocks.findIndex(block => block.id === action.block.id);
+    if (blockIndex === -1) {
+      return { nextContext: current, applied: false };
+    }
+    const nextBlocks = [...scene.blocks];
+    nextBlocks.splice(blockIndex, 1);
+    const nextScenes = [...current.scenes];
+    nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+    return { nextContext: { ...current, scenes: nextScenes }, applied: true };
+  }, []);
+
+  const applyRedoAction = useCallback((current: StoryContext, action: UndoAction) => {
+    if (action.type === 'scene') {
+      const existing = current.scenes.some(scene => scene.id === action.scene.id);
+      if (existing) {
+        return { nextContext: current, applied: false };
+      }
+      const nextScenes = [...current.scenes];
+      const insertIndex = Math.min(action.index, nextScenes.length);
+      nextScenes.splice(insertIndex, 0, action.scene);
+      return { nextContext: { ...current, scenes: nextScenes }, applied: true };
+    }
+
+    const sceneIndex = current.scenes.findIndex(scene => scene.id === action.sceneId);
+    if (sceneIndex === -1) {
+      return { nextContext: current, applied: false };
+    }
+    const scene = current.scenes[sceneIndex];
+    const alreadyExists = scene.blocks.some(block => block.id === action.block.id);
+    if (alreadyExists) {
+      return { nextContext: current, applied: false };
+    }
+    const nextBlocks = [...scene.blocks];
+    const insertIndex = Math.min(action.index, nextBlocks.length);
+    nextBlocks.splice(insertIndex, 0, action.block);
+    const nextScenes = [...current.scenes];
+    nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+    return { nextContext: { ...current, scenes: nextScenes }, applied: true };
+  }, []);
+
   const clearRedo = useCallback(() => {
     redoStackRef.current = [];
     setRedoCount(0);
@@ -857,69 +913,36 @@ export default function App() {
 
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
-    const lastAction = popUndoAction();
-    if (!lastAction) return;
-    let didUndo = false;
-
     setContext(prev => {
-      if (!prev) return null;
-      const newScenes = [...prev.scenes];
-      if (lastAction.type === 'scene') {
-        const sceneIndex = newScenes.findIndex(scene => scene.id === lastAction.scene.id);
-        if (sceneIndex === -1) return prev;
-        newScenes.splice(sceneIndex, 1);
-        didUndo = true;
-        return { ...prev, scenes: newScenes };
+      if (!prev || prev.scenes.length === 0) return prev;
+      const lastAction = popUndoAction();
+      if (!lastAction) return prev;
+      const { nextContext, applied } = applyUndoAction(prev, lastAction);
+      if (!applied) {
+        pushUndoAction(lastAction);
+        return prev;
       }
-      const sceneIndex = newScenes.findIndex(scene => scene.id === lastAction.sceneId);
-      if (sceneIndex === -1) return prev;
-      const scene = { ...newScenes[sceneIndex] };
-      let blockIndex = scene.blocks.findIndex(block => block.id === lastAction.block.id);
-      if (blockIndex === -1) {
-        blockIndex = Math.min(lastAction.index, scene.blocks.length - 1);
-      }
-      if (blockIndex < 0) return prev;
-      const updatedBlocks = [...scene.blocks];
-      updatedBlocks.splice(blockIndex, 1);
-      newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
-      didUndo = true;
-      return { ...prev, scenes: newScenes };
-    });
-    if (didUndo) {
       pushRedoAction(lastAction);
-    } else {
-      pushUndoAction(lastAction);
-    }
+      return nextContext;
+    });
   };
 
   const handleRedo = () => {
-    const action = popRedoAction();
-    if (!action) return;
-    let didRedo = false;
     setContext(prev => {
-      if (!prev) return null;
-      const newScenes = [...prev.scenes];
-      if (action.type === 'scene') {
-        const insertIndex = Math.min(action.index, newScenes.length);
-        newScenes.splice(insertIndex, 0, action.scene);
-        didRedo = true;
-        return { ...prev, scenes: newScenes };
+      const action = popRedoAction();
+      if (!action) return prev;
+      if (!prev) {
+        pushRedoAction(action);
+        return prev;
       }
-      const sceneIndex = newScenes.findIndex(scene => scene.id === action.sceneId);
-      if (sceneIndex === -1) return prev;
-      const scene = { ...newScenes[sceneIndex] };
-      const updatedBlocks = [...scene.blocks];
-      const insertIndex = Math.min(action.index, updatedBlocks.length);
-      updatedBlocks.splice(insertIndex, 0, action.block);
-      newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
-      didRedo = true;
-      return { ...prev, scenes: newScenes };
-    });
-    if (didRedo) {
+      const { nextContext, applied } = applyRedoAction(prev, action);
+      if (!applied) {
+        pushRedoAction(action);
+        return prev;
+      }
       pushUndoAction(action);
-    } else {
-      pushRedoAction(action);
-    }
+      return nextContext;
+    });
   };
 
   const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
