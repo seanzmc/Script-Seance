@@ -167,6 +167,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const summaryLine = summaryParts.join(' / ');
   const isStyleBlank = !style.trim();
   const isLengthBlank = !length;
+  const lengthHint = (() => {
+    if (isLengthBlank) {
+      return 'Defaults generate a balanced scene count.';
+    }
+    if (length === 'Short') {
+      return 'Short keeps it tight: a few beats or a single scene.';
+    }
+    if (length === 'Medium') {
+      return 'Medium balances a few scenes with room for turns.';
+    }
+    return 'Long stretches into more scenes and beats for a fuller arc.';
+  })();
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
 
@@ -325,9 +337,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-gray-500">
-                  {isLengthBlank ? "Using defaults." : "Length guides how many beats and scenes we generate."}
-                </p>
+                <p className="text-[10px] text-gray-500">{lengthHint}</p>
               </div>
             </div>
           </div>

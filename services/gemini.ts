@@ -98,6 +98,13 @@ const createAiRequest = <T>(
       if (apiError?.details) {
         error.details = apiError.details;
       }
+      const retryAfterHeader = response.headers?.get?.('Retry-After');
+      if (retryAfterHeader) {
+        const retryAfterSeconds = Number.parseInt(retryAfterHeader, 10);
+        if (Number.isFinite(retryAfterSeconds)) {
+          error.details = { ...(error.details ?? {}), retryAfterSeconds };
+        }
+      }
       throw error;
     }
 

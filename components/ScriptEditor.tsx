@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
 import { PenTool, Zap, Plus, Undo2, Redo2 } from 'lucide-react';
+
+const normalizeCharacterName = (value: string) =>
+  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+const resolveCharacterName = (value: string, characters: string[]) => {
+  const normalized = normalizeCharacterName(value);
+  return characters.find(char => normalizeCharacterName(char) === normalized) || value;
+};
 
 export interface ScriptEditorProps {
   characters: string[];
@@ -33,6 +40,19 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
   const [content, setContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
+  useEffect(() => {
+    if (!characters.length) return;
+    const normalizedSelected = normalizeCharacterName(selectedChar);
+    const match = characters.find(char => normalizeCharacterName(char) === normalizedSelected);
+    if (!match) {
+      setSelectedChar(characters[0]);
+      return;
+    }
+    if (match !== selectedChar) {
+      setSelectedChar(match);
+    }
+  }, [characters, selectedChar]);
+
   const handleSubmit = async () => {
     if (!content.trim()) return;
 
@@ -58,7 +78,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
       id: crypto.randomUUID(),
       type: blockType,
       text: finalText,
-      character: blockType === BlockType.DIALOGUE ? char : undefined
+      character: blockType === BlockType.DIALOGUE ? resolveCharacterName(char, characters) : undefined
     };
 
     onAddBlock(newBlock);

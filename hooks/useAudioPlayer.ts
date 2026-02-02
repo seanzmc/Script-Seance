@@ -5,6 +5,8 @@ import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
 type BlockAudioStatus = 'notGenerated' | 'generating' | 'ready' | 'error';
 
 const PLAYABLE_BLOCKS = [BlockType.DIALOGUE, BlockType.ACTION, BlockType.TRANSITION];
+const normalizeCharacterName = (value: string) =>
+  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
 export const useAudioPlayer = (
   voiceConfigs: VoiceConfig[],
@@ -34,6 +36,8 @@ export const useAudioPlayer = (
   const bufferedScriptKeyRef = useRef<string | null>(null);
   
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const activeBlockIdRef = useRef<string | null>(null);
+  const pendingBlockIdRef = useRef<string | null>(null);
   const isPlayingRef = useRef(false); // Sync ref for callbacks
   const playbackRunIdRef = useRef(0);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,8 +86,9 @@ export const useAudioPlayer = (
     if (!charName || block.type !== BlockType.DIALOGUE) {
       charName = 'Narrator';
     }
-    return voiceConfigsRef.current.find(c => c.name.toLowerCase().trim() === charName?.toLowerCase().trim())
-      || voiceConfigsRef.current.find(c => c.name === 'Narrator');
+    const normalized = normalizeCharacterName(charName);
+    return voiceConfigsRef.current.find(c => normalizeCharacterName(c.name) === normalized)
+      || voiceConfigsRef.current.find(c => normalizeCharacterName(c.name) === 'narrator');
   }, []);
 
   const updateBufferProgress = useCallback((nextTotal?: number) => {
@@ -122,6 +127,8 @@ export const useAudioPlayer = (
       }
       activeSourceRef.current = null;
     }
+    activeBlockIdRef.current = null;
+    pendingBlockIdRef.current = null;
   }, []);
 
   const stop = useCallback((options?: { clearBuffer?: boolean }) => {
@@ -143,6 +150,8 @@ export const useAudioPlayer = (
     engineRef.current?.stop();
     queueRef.current = [];
     currentIndexRef.current = 0;
+    activeBlockIdRef.current = null;
+    pendingBlockIdRef.current = null;
     if (clearBuffer) {
       resetBuffer();
     }
@@ -173,6 +182,12 @@ export const useAudioPlayer = (
 
     const block = script[idx];
     setCurrentBlockIndex(idx);
+    if (activeSourceRef.current && activeBlockIdRef.current === block.id) {
+      return;
+    }
+    if (pendingBlockIdRef.current === block.id && !activeSourceRef.current) {
+      return;
+    }
 
     const isSkipped = skippedBlockIdsRef.current.has(block.id);
     if (blockStatusesRef.current[block.id] === 'error' && !isSkipped) {
@@ -196,11 +211,13 @@ export const useAudioPlayer = (
       // YES: Audio is ready. Play immediately.
       setIsLoadingAudio(false);
       setCurrentBlockId(block.id);
-      
+      pendingBlockIdRef.current = block.id;
+
       const ctx = getContext();
       const audioBuffer = await decodePCM(chunk.audioBuffer, ctx);
 
       if (!isPlayingRef.current || runId !== playbackRunIdRef.current) {
+        pendingBlockIdRef.current = null;
         return;
       }
       
@@ -217,28 +234,38 @@ export const useAudioPlayer = (
       source.playbackRate.value = speed;
       source.detune.value = pitch * 100;
       
-      source.connect(ctx.destination);
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 0.92;
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
       activeSourceRef.current = source;
+      activeBlockIdRef.current = block.id;
       ignoreOnEndedRef.current = false;
       
       source.onended = () => {
         if (ignoreOnEndedRef.current || !isPlayingRef.current || runId !== playbackRunIdRef.current) {
           activeSourceRef.current = null;
+          activeBlockIdRef.current = null;
+          pendingBlockIdRef.current = null;
           return;
         }
         activeSourceRef.current = null;
+        activeBlockIdRef.current = null;
+        pendingBlockIdRef.current = null;
         // Advance pointer and loop
         currentIndexRef.current++;
         playNext(runId);
       };
       
       source.start();
+      pendingBlockIdRef.current = null;
 
     } else {
       // NO: Audio is still generating.
       // Show loading and wait. The 'audio' event listener will re-trigger playNext() when it arrives.
       setIsLoadingAudio(true);
       setCurrentBlockId(block.id); // Visually focus the block so user knows where we are
+      pendingBlockIdRef.current = null;
     }
   }, [getContext, getVoiceConfigForBlock, stop]);
 
@@ -255,10 +282,15 @@ export const useAudioPlayer = (
       
       // 2. If we are currently stalled waiting for THIS specific block, resume playback
       if (isPlayingRef.current) {
-      const currentBlock = queueRef.current[currentIndexRef.current];
-      if (currentBlock && currentBlock.id === chunk.blockId) {
-        playNext(playbackRunIdRef.current);
-      }
+        const currentBlock = queueRef.current[currentIndexRef.current];
+        if (
+          currentBlock &&
+          currentBlock.id === chunk.blockId &&
+          !activeSourceRef.current &&
+          pendingBlockIdRef.current !== chunk.blockId
+        ) {
+          playNext(playbackRunIdRef.current);
+        }
       }
     };
 
@@ -464,6 +496,7 @@ export const useAudioPlayer = (
 
     if (isPlayingRef.current) {
       playbackRunIdRef.current += 1;
+      haltActiveSource();
       currentIndexRef.current++;
       playNext(playbackRunIdRef.current);
       return;
@@ -473,7 +506,7 @@ export const useAudioPlayer = (
       setCurrentBlockIndex(currentIndexRef.current);
       setCurrentBlockId(queueRef.current[currentIndexRef.current]?.id ?? null);
     }
-  }, [isPaused, playNext, updateBufferProgress]);
+  }, [haltActiveSource, isPaused, playNext, updateBufferProgress]);
 
   const playPreview = async (text: string, config: VoiceConfig) => {
     stop({ clearBuffer: false });
@@ -495,8 +528,11 @@ export const useAudioPlayer = (
       source.buffer = audioBuffer;
       source.playbackRate.value = config.speed || 1;
       source.detune.value = (config.pitch || 0) * 100;
-      
-      source.connect(ctx.destination);
+
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 0.92;
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
       activeSourceRef.current = source;
       
       source.onended = () => {

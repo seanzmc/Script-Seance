@@ -4,6 +4,13 @@ import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
 import { PenTool, Undo2, Redo2 } from 'lucide-react';
 
+const normalizeCharacterName = (value: string) =>
+  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+const resolveCharacterName = (value: string, characters: string[]) => {
+  const normalized = normalizeCharacterName(value);
+  return characters.find(char => normalizeCharacterName(char) === normalized) || value;
+};
+
 export interface InsertBlockProps {
   characters: string[];
   genre: string;
@@ -62,6 +69,19 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     }
   }, [insertCompleteToken]);
 
+  useEffect(() => {
+    if (!characters.length) return;
+    const normalizedSelected = normalizeCharacterName(selectedChar);
+    const match = characters.find(char => normalizeCharacterName(char) === normalizedSelected);
+    if (!match) {
+      setSelectedChar(characters[0]);
+      return;
+    }
+    if (match !== selectedChar) {
+      setSelectedChar(match);
+    }
+  }, [characters, selectedChar]);
+
   const showTooltip = (message: string, anchor: 'add' | 'insert') => {
     setTooltip({ message, anchor });
   };
@@ -70,7 +90,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     id: crypto.randomUUID(),
     type: elementType,
     text: trimmedContent,
-    character: elementType === BlockType.DIALOGUE ? selectedChar : undefined
+    character: elementType === BlockType.DIALOGUE ? resolveCharacterName(selectedChar, characters) : undefined
   });
 
   const handleAddBlock = () => {

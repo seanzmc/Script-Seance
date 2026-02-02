@@ -79,6 +79,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={onToggleCollapse}
           className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
           aria-label="Expand tools"
+          title="Expand tools"
           disabled={isDisabled}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -92,28 +93,29 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   return (
     <aside
-      className={`w-full lg:w-[380px] lg:min-w-[340px] lg:max-w-[420px] lg:h-screen bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col shrink-0 ${
+      className={`relative w-full lg:w-[380px] lg:min-w-[340px] lg:max-w-[420px] lg:h-screen lg:overflow-hidden bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col shrink-0 ${
         isDisabled ? 'opacity-50' : ''
       }`}
       aria-label="Control panel"
       aria-disabled={isDisabled}
     >
+      {onToggleCollapse && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="hidden lg:flex items-center justify-center absolute -left-3 top-1/2 -translate-y-1/2 w-7 h-12 rounded-l-lg border border-gray-700 bg-gray-900 text-gray-400 hover:text-white hover:border-gray-500 shadow-lg transition-colors"
+          aria-label="Collapse tools"
+          title="Collapse tools"
+          disabled={isDisabled}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
       <div className={`p-4 border-b border-gray-700 bg-gray-900/40 shrink-0 ${interactionClass}`}>
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] uppercase tracking-[0.35em] text-gray-500">Flow</p>
-              {onToggleCollapse && (
-                <button
-                  type="button"
-                  onClick={onToggleCollapse}
-                  className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-                  aria-label="Collapse tools"
-                  disabled={isDisabled}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
             </div>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex items-center gap-2 flex-1">
@@ -148,6 +150,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               </span>
             </div>
             <p className="mt-2 text-[11px] text-gray-400">{activeMeta.instruction}</p>
+            {onStepChange && (
+              <div className="mt-3 lg:hidden space-y-1">
+                <label className="text-[10px] uppercase tracking-[0.35em] text-gray-500">Tools</label>
+                <select
+                  value={currentStep}
+                  onChange={(event) => onStepChange(event.target.value as ControlStep)}
+                  disabled={isDisabled}
+                  className="w-full rounded-md border border-gray-700 bg-gray-900/70 px-3 py-2 text-[11px] uppercase tracking-widest text-gray-300"
+                >
+                  {FLOW_STEPS.map(step => (
+                    <option key={step.id} value={step.id}>{step.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           {showPrimaryAction && (
             <PrimaryActionButton
@@ -162,7 +179,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto lg:overflow-visible p-4 space-y-5 custom-scrollbar ${interactionClass}`}>
+      <div className={`flex-1 overflow-y-auto lg:overflow-y-hidden p-4 space-y-5 custom-scrollbar ${interactionClass}`}>
         {children}
       </div>
 

@@ -45,6 +45,7 @@ interface DraftPayload {
 type RedoPayload =
   | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
   | { type: 'scene'; scene: Scene; index: number };
+type UndoAction = RedoPayload;
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
@@ -94,6 +95,25 @@ const sanitizeSuggestedTitle = (rawTitle: string) => {
   if (/^(int|ext)\./i.test(collapsed)) return '';
   return collapsed.length > 120 ? collapsed.slice(0, 120).replace(/[,\s]+$/g, '') : collapsed;
 };
+
+const normalizeCharacterName = (value: string) =>
+  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+
+const resolveCharacterName = (value: string | null | undefined, characters: string[]) => {
+  if (!value) return value ?? undefined;
+  const normalized = normalizeCharacterName(value);
+  const match = characters.find(char => normalizeCharacterName(char) === normalized);
+  return match ?? value;
+};
+
+const normalizeSceneCharacters = (scene: Scene, characters: string[]) => ({
+  ...scene,
+  blocks: scene.blocks.map(block => (
+    block.character
+      ? { ...block, character: resolveCharacterName(block.character, characters) }
+      : block
+  ))
+});
 
 const buildFallbackTitle = (premise: string, genre: string) => {
   const words = premise
@@ -155,6 +175,7 @@ export default function App() {
   const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
   const [redoPayload, setRedoPayload] = useState<RedoPayload | null>(null);
   const [isControlPanelCollapsed, setIsControlPanelCollapsed] = useState(false);
+  const undoStackRef = useRef<UndoAction[]>([]);
 
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -201,6 +222,13 @@ export default function App() {
   };
 
   const clearRedo = useCallback(() => setRedoPayload(null), []);
+  const resetUndoRedo = useCallback(() => {
+    undoStackRef.current = [];
+    setRedoPayload(null);
+  }, []);
+  const pushUndoAction = useCallback((action: UndoAction) => {
+    undoStackRef.current.push(action);
+  }, []);
 
   const openManualSetup = () => {
     setSetupSurprisePrompt(false);
@@ -362,14 +390,16 @@ export default function App() {
   useEffect(() => {
     if (context?.characters) {
       const newConfigs = [...voiceConfigs];
+      const hasVoiceConfig = (name: string) =>
+        newConfigs.some(config => normalizeCharacterName(config.name) === normalizeCharacterName(name));
       
       // Ensure Narrator exists
-      if (!newConfigs.find(c => c.name === 'Narrator')) {
+      if (!hasVoiceConfig('Narrator')) {
         newConfigs.push({ name: 'Narrator', voiceId: 'Zephyr', speed: playbackSpeed, pitch: 0 });
       }
 
       context.characters.forEach((char, idx) => {
-        if (!newConfigs.find(c => c.name.toLowerCase() === char.toLowerCase())) {
+        if (!hasVoiceConfig(char)) {
           const voice = AVAILABLE_VOICES[idx % AVAILABLE_VOICES.length];
           newConfigs.push({ name: char, voiceId: voice, speed: playbackSpeed, pitch: 0 });
         }
@@ -441,11 +471,15 @@ export default function App() {
     try {
       const parsed = JSON.parse(storedDraft) as DraftPayload;
       if (parsed && isStoryContext(parsed.context)) {
-        setContext(parsed.context);
+        const hydratedContext: StoryContext = {
+          ...parsed.context,
+          scenes: parsed.context.scenes.map(scene => normalizeSceneCharacters(scene, parsed.context.characters))
+        };
+        setContext(hydratedContext);
         if (typeof parsed.userInstruction === 'string') {
           setUserInstruction(parsed.userInstruction);
         }
-        const hydratedHasScript = parsed.context.scenes.some(scene => scene.blocks.length > 0);
+        const hydratedHasScript = hydratedContext.scenes.some(scene => scene.blocks.length > 0);
         if (hydratedHasScript) {
           setHasConfirmedSetup(true);
           setCurrentStep(resolveStep({
@@ -528,7 +562,7 @@ export default function App() {
     cancelAiRequest();
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
-    clearRedo();
+    resetUndoRedo();
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
@@ -555,7 +589,7 @@ export default function App() {
     cancelAiRequest();
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
-    clearRedo();
+    resetUndoRedo();
     setContext(null);
     setUserInstruction('');
     setVoiceConfigs([]);
@@ -617,7 +651,7 @@ export default function App() {
     let request: CancellableRequest<Scene> | null = null;
     try {
       closeSetup();
-      clearRedo();
+      resetUndoRedo();
       resetTitleSuggestionState();
       void requestTitleSuggestion(setupState);
       const setupNotes: string[] = [];
@@ -642,11 +676,12 @@ export default function App() {
       );
       startAiRequest(request);
       const firstScene = await request.promise;
-      
+      const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
       setContext({
         ...initialContext,
-        scenes: [firstScene]
+        scenes: [normalizedFirstScene]
       });
+      pushUndoAction({ type: 'scene', scene: normalizedFirstScene, index: 0 });
       setHasReviewedVoices(false);
       applyStep('script', { hasScript: true, confirmSetup: true });
     } catch (err: unknown) {
@@ -667,7 +702,13 @@ export default function App() {
       request = createGenerateSceneRequest(context, prompt, false);
       startAiRequest(request);
       const nextScene = await request.promise;
-      setContext(prev => prev ? { ...prev, scenes: [...prev.scenes, nextScene] } : null);
+      setContext(prev => {
+        if (!prev) return null;
+        const normalizedScene = normalizeSceneCharacters(nextScene, prev.characters);
+        const updatedScenes = [...prev.scenes, normalizedScene];
+        pushUndoAction({ type: 'scene', scene: normalizedScene, index: updatedScenes.length - 1 });
+        return { ...prev, scenes: updatedScenes };
+      });
       setUserInstruction('');
     } catch (err: unknown) {
       handleAiError(err, 'Failed to generate scene.');
@@ -703,30 +744,42 @@ export default function App() {
     setContext(prev => {
       if (!prev) return null;
       const newScenes = [...prev.scenes];
+      const normalizedBlock = block.character
+        ? { ...block, character: resolveCharacterName(block.character, prev.characters) }
+        : block;
       
-      if (block.type === BlockType.HEADING) {
+      if (normalizedBlock.type === BlockType.HEADING) {
         const newScene: Scene = {
           id: crypto.randomUUID(),
-          heading: block.text.toUpperCase(),
+          heading: normalizedBlock.text.toUpperCase(),
           summary: "New user created scene",
           blocks: []
         };
         newScenes.push(newScene);
+        pushUndoAction({ type: 'scene', scene: newScene, index: newScenes.length - 1 });
       } else {
         if (newScenes.length > 0) {
           const lastSceneIndex = newScenes.length - 1;
           const updatedScene = { 
             ...newScenes[lastSceneIndex],
-            blocks: [...newScenes[lastSceneIndex].blocks, block]
+            blocks: [...newScenes[lastSceneIndex].blocks, normalizedBlock]
           };
           newScenes[lastSceneIndex] = updatedScene;
+          pushUndoAction({
+            type: 'block',
+            sceneId: updatedScene.id,
+            block: normalizedBlock,
+            index: updatedScene.blocks.length - 1
+          });
         } else {
-          newScenes.push({
+          const newScene: Scene = {
             id: crypto.randomUUID(),
             heading: "EXT. UNKNOWN - DAY",
             summary: "Start",
-            blocks: [block]
-          });
+            blocks: [normalizedBlock]
+          };
+          newScenes.push(newScene);
+          pushUndoAction({ type: 'scene', scene: newScene, index: newScenes.length - 1 });
         }
       }
       return { ...prev, scenes: newScenes };
@@ -740,16 +793,20 @@ export default function App() {
       const sceneIndex = prev.scenes.findIndex(scene => scene.id === target.sceneId);
       if (sceneIndex === -1) return prev;
 
+      const normalizedBlock = block.character
+        ? { ...block, character: resolveCharacterName(block.character, prev.characters) }
+        : block;
       const newScenes = [...prev.scenes];
-      if (block.type === BlockType.HEADING) {
+      if (normalizedBlock.type === BlockType.HEADING) {
         const newScene: Scene = {
           id: crypto.randomUUID(),
-          heading: block.text.toUpperCase(),
+          heading: normalizedBlock.text.toUpperCase(),
           summary: 'New user created scene',
           blocks: []
         };
         const insertIndex = target.blockId === INSERT_TOP_ID ? sceneIndex : sceneIndex + 1;
         newScenes.splice(insertIndex, 0, newScene);
+        pushUndoAction({ type: 'scene', scene: newScene, index: insertIndex });
         return { ...prev, scenes: newScenes };
       }
 
@@ -761,12 +818,13 @@ export default function App() {
           ? scene.blocks.length
           : blockIndex + 1;
       const updatedBlocks = [...scene.blocks];
-      updatedBlocks.splice(insertIndex, 0, block);
+      updatedBlocks.splice(insertIndex, 0, normalizedBlock);
       newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
+      pushUndoAction({ type: 'block', sceneId: scene.id, block: normalizedBlock, index: insertIndex });
       return { ...prev, scenes: newScenes };
     });
     setInsertTarget(null);
-  }, [clearRedo]);
+  }, [clearRedo, pushUndoAction]);
 
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
@@ -778,54 +836,54 @@ export default function App() {
 
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
+    const lastAction = undoStackRef.current.pop();
+    if (!lastAction) return;
 
     setContext(prev => {
       if (!prev) return null;
       const newScenes = [...prev.scenes];
-      const lastSceneIndex = newScenes.length - 1;
-      const lastScene = { ...newScenes[lastSceneIndex] };
-
-      if (lastScene.blocks.length > 0) {
-        const removedBlock = lastScene.blocks[lastScene.blocks.length - 1];
-        lastScene.blocks = lastScene.blocks.slice(0, -1);
-        newScenes[lastSceneIndex] = lastScene;
-        setRedoPayload({
-          type: 'block',
-          sceneId: lastScene.id,
-          block: removedBlock,
-          index: lastScene.blocks.length
-        });
-      } else {
-        const removedScene = newScenes.pop();
-        if (removedScene) {
-          setRedoPayload({
-            type: 'scene',
-            scene: removedScene,
-            index: lastSceneIndex
-          });
-        }
+      if (lastAction.type === 'scene') {
+        const sceneIndex = newScenes.findIndex(scene => scene.id === lastAction.scene.id);
+        if (sceneIndex === -1) return prev;
+        newScenes.splice(sceneIndex, 1);
+        return { ...prev, scenes: newScenes };
       }
+      const sceneIndex = newScenes.findIndex(scene => scene.id === lastAction.sceneId);
+      if (sceneIndex === -1) return prev;
+      const scene = { ...newScenes[sceneIndex] };
+      let blockIndex = scene.blocks.findIndex(block => block.id === lastAction.block.id);
+      if (blockIndex === -1) {
+        blockIndex = Math.min(lastAction.index, scene.blocks.length - 1);
+      }
+      if (blockIndex < 0) return prev;
+      const updatedBlocks = [...scene.blocks];
+      updatedBlocks.splice(blockIndex, 1);
+      newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
       return { ...prev, scenes: newScenes };
     });
+    setRedoPayload(lastAction);
   };
 
   const handleRedo = () => {
     if (!redoPayload) return;
+    const action = redoPayload;
     setContext(prev => {
       if (!prev) return null;
       const newScenes = [...prev.scenes];
-      if (redoPayload.type === 'scene') {
-        const insertIndex = Math.min(redoPayload.index, newScenes.length);
-        newScenes.splice(insertIndex, 0, redoPayload.scene);
+      if (action.type === 'scene') {
+        const insertIndex = Math.min(action.index, newScenes.length);
+        newScenes.splice(insertIndex, 0, action.scene);
+        pushUndoAction(action);
         return { ...prev, scenes: newScenes };
       }
-      const sceneIndex = newScenes.findIndex(scene => scene.id === redoPayload.sceneId);
+      const sceneIndex = newScenes.findIndex(scene => scene.id === action.sceneId);
       if (sceneIndex === -1) return prev;
       const scene = { ...newScenes[sceneIndex] };
       const updatedBlocks = [...scene.blocks];
-      const insertIndex = Math.min(redoPayload.index, updatedBlocks.length);
-      updatedBlocks.splice(insertIndex, 0, redoPayload.block);
+      const insertIndex = Math.min(action.index, updatedBlocks.length);
+      updatedBlocks.splice(insertIndex, 0, action.block);
       newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
+      pushUndoAction(action);
       return { ...prev, scenes: newScenes };
     });
     setRedoPayload(null);
@@ -850,11 +908,12 @@ export default function App() {
     clearRedo();
     setContext(prev => {
       if (!prev) return null;
+      const resolvedCharacter = resolveCharacterName(character, prev.characters);
       return {
         ...prev,
         scenes: prev.scenes.map(scene => scene.id === sceneId ? {
           ...scene,
-          blocks: scene.blocks.map(block => block.id === blockId ? { ...block, character } : block)
+          blocks: scene.blocks.map(block => block.id === blockId ? { ...block, character: resolvedCharacter } : block)
         } : scene)
       };
     });
@@ -927,7 +986,8 @@ export default function App() {
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     setVoiceConfigs(prev => {
-      const existingIdx = prev.findIndex(c => c.name === char);
+      const normalized = normalizeCharacterName(char);
+      const existingIdx = prev.findIndex(c => normalizeCharacterName(c.name) === normalized);
       if (existingIdx >= 0) {
         const updated = [...prev];
         updated[existingIdx] = { ...updated[existingIdx], ...updates };
@@ -1079,7 +1139,7 @@ export default function App() {
   const currentBlock = currentBlockId ? blockLookup.get(currentBlockId) : null;
   const currentSpeaker = currentBlock
     ? currentBlock.type === BlockType.DIALOGUE
-      ? currentBlock.character || 'Narrator'
+      ? resolveCharacterName(currentBlock.character || 'Narrator', context?.characters ?? [])
       : 'Narrator'
     : 'None';
 
@@ -1125,7 +1185,15 @@ export default function App() {
   const handlePanelToggle = (panel: 'setup' | 'voices' | 'playback') =>
     (event: React.SyntheticEvent<HTMLDetailsElement>) => {
       const isOpen = (event.currentTarget as HTMLDetailsElement).open;
-      setOpenPanels(prev => ({ ...prev, [panel]: isOpen }));
+      if (isOpen) {
+        setOpenPanels({
+          setup: panel === 'setup',
+          voices: panel === 'voices',
+          playback: panel === 'playback'
+        });
+      } else {
+        setOpenPanels(prev => ({ ...prev, [panel]: false }));
+      }
       if (!isOpen) return;
       if (panel === 'setup') {
         applyStep('setup');
@@ -1245,6 +1313,28 @@ export default function App() {
   const setupCastCount = setupState.characters.filter(char => char.trim().length > 0).length;
   const setupPremiseText = setupState.premise.trim();
   const setupPremiseSnippet = setupPremiseText.length > 60 ? `${setupPremiseText.slice(0, 60)}...` : setupPremiseText;
+  const exportControls = (
+    <div className="grid grid-cols-1 gap-2">
+      <Button
+        variant="ghost"
+        onClick={handleDownload}
+        className="w-full text-xs py-2 h-auto hover:bg-gray-700"
+        disabled={!context}
+        title="Export script as a .txt file"
+      >
+        <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={handleExportPdf}
+        className="w-full text-xs py-2 h-auto hover:bg-gray-700"
+        disabled={!context}
+        title="Export script as a PDF via print dialog"
+      >
+        <FileDown className="w-3 h-3 mr-2" /> Export PDF
+      </Button>
+    </div>
+  );
 
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
@@ -1315,28 +1405,7 @@ export default function App() {
         isCollapsed={isControlPanelCollapsed}
         onToggleCollapse={() => setIsControlPanelCollapsed(prev => !prev)}
         showPrimaryAction={showPrimaryAction}
-        header={(
-          <div className="grid grid-cols-1 gap-2">
-            <Button
-              variant="ghost"
-              onClick={handleDownload}
-              className="w-full text-xs py-2 h-auto hover:bg-gray-700"
-              disabled={!context}
-              title="Export script as a .txt file"
-            >
-              <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={handleExportPdf}
-              className="w-full text-xs py-2 h-auto hover:bg-gray-700"
-              disabled={!context}
-              title="Export script as a PDF via print dialog"
-            >
-              <FileDown className="w-3 h-3 mr-2" /> Export PDF
-            </Button>
-          </div>
-        )}
+        footer={exportControls}
       >
         <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">
           <summary className={`${summaryBase} ${isSetupActive ? summaryActive : summaryInactive}`}>

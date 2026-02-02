@@ -426,8 +426,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
               <div className="space-y-2">
-                <p className="text-sm md:text-base font-semibold uppercase tracking-[0.35em] text-gray-200">Script Seance</p>
-                <h1 className="text-lg md:text-xl font-medium text-gray-400">Script Workspace</h1>
+                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">Script Seance</h1>
+                <p className="text-[11px] uppercase tracking-[0.4em] text-gray-400">Script Workspace</p>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>

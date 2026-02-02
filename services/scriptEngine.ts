@@ -5,6 +5,8 @@ import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from '.
 // Global Content-Addressable Cache (persists across plays)
 // Key: voiceId:text | Value: ArrayBuffer (Raw PCM)
 const AudioCache = new LruAudioCache(AUDIO_CACHE_MAX_ENTRIES, AUDIO_CACHE_MAX_BYTES);
+const normalizeCharacterName = (value: string) =>
+  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
 interface QueueItem {
   block: ScriptBlock;
@@ -27,6 +29,7 @@ const getErrorMeta = (error: unknown) => {
   let message: string | undefined;
   let status: number | undefined;
   let code: string | number | undefined;
+  let details: Record<string, unknown> | undefined;
 
   if (error instanceof Error) {
     message = error.message;
@@ -37,6 +40,7 @@ const getErrorMeta = (error: unknown) => {
     const recordMessage = record.message;
     const recordStatus = record.status;
     const recordCode = record.code;
+    const recordDetails = record.details;
 
     if (typeof recordMessage === 'string') {
       message = recordMessage;
@@ -47,9 +51,12 @@ const getErrorMeta = (error: unknown) => {
     if (typeof recordCode === 'string' || typeof recordCode === 'number') {
       code = recordCode;
     }
+    if (recordDetails && typeof recordDetails === 'object') {
+      details = recordDetails as Record<string, unknown>;
+    }
   }
 
-  return { message, status, code };
+  return { message, status, code, details };
 };
 
 export class ScriptEngine {
@@ -121,13 +128,13 @@ export class ScriptEngine {
       let config: VoiceConfig | undefined;
       
       if (block.type === BlockType.DIALOGUE && block.character) {
-        const target = block.character.toLowerCase().trim();
-        config = voiceConfigs.find(v => v.name.toLowerCase().trim() === target);
+        const target = normalizeCharacterName(block.character);
+        config = voiceConfigs.find(v => normalizeCharacterName(v.name) === target);
       }
       
       // Fallback for narrator or missing config
       if (!config) {
-        config = voiceConfigs.find(v => v.name === 'Narrator');
+        config = voiceConfigs.find(v => normalizeCharacterName(v.name) === 'narrator');
       }
 
       return {
@@ -250,7 +257,7 @@ export class ScriptEngine {
          throw error;
        }
        // Handle Rate Limiting (429)
-       const { message, status, code } = getErrorMeta(error);
+       const { message, status, code, details } = getErrorMeta(error);
        const isRateLimit =
          message?.includes('429') ||
          status === 429 ||
@@ -260,6 +267,32 @@ export class ScriptEngine {
        
        if (isRateLimit && retryCount < 4) {
          let delayMs = 3000 * Math.pow(2, retryCount); // Default: 3s, 6s, 12s, 24s
+         const retryAfterMsValue = (() => {
+           const retryAfterSeconds = details?.retryAfterSeconds;
+           if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
+             return Math.ceil(retryAfterSeconds * 1000);
+           }
+           if (typeof retryAfterSeconds === 'string') {
+             const parsedSeconds = Number.parseInt(retryAfterSeconds, 10);
+             if (Number.isFinite(parsedSeconds)) {
+               return Math.ceil(parsedSeconds * 1000);
+             }
+           }
+           const retryAfterMs = details?.retryAfterMs;
+           if (typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs)) {
+             return Math.ceil(retryAfterMs);
+           }
+           if (typeof retryAfterMs === 'string') {
+             const parsedMs = Number.parseInt(retryAfterMs, 10);
+             if (Number.isFinite(parsedMs)) {
+               return Math.ceil(parsedMs);
+             }
+           }
+           return null;
+         })();
+         if (retryAfterMsValue && retryAfterMsValue > 0) {
+           delayMs = retryAfterMsValue + 1000;
+         }
          
          // Extract specific retry delay if available from message "Please retry in X s."
          const match = message?.match(/retry in ([\d.]+)s/);
