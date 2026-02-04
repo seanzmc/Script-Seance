@@ -4,6 +4,7 @@ import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
+import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { AlertCircle, Loader2, Sparkles, PlusCircle, X } from 'lucide-react';
 
 export interface InsertTarget {
@@ -139,6 +140,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onSetupError
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
+  const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerOffset, setHeaderOffset] = useState(0);
   const promptCount = userInstruction.length;
@@ -152,6 +154,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
   const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
   const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
+  const toolbeltSpacerClassName = activeTool ? 'h-36' : 'h-20';
   const previewClassName = `${previewWidthClass} ${previewLayoutClass} ${
     isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
   }`.trim();
@@ -418,6 +421,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </div>
     </div>
   ) : null;
+  const handleToolSelect = (tool: ToolKey) => {
+    setActiveTool(tool);
+  };
+  const handleToolClose = () => {
+    setActiveTool(null);
+  };
 
   return (
     <section className="flex-1 flex flex-col overflow-hidden bg-[#1a1a1a]">
@@ -574,16 +583,25 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 </div>
               </div>
             )}
+            <div className={toolbeltSpacerClassName} aria-hidden="true" />
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center px-6 py-10">
-            <div className="w-full max-w-2xl space-y-6">
-              {errorBanner}
-              {showInitialGeneration ? startGenerationCard : showStartScreen ? startScreenCard : null}
+          <>
+            <div className="flex-1 flex items-center justify-center px-6 py-10">
+              <div className="w-full max-w-2xl space-y-6">
+                {errorBanner}
+                {showInitialGeneration ? startGenerationCard : showStartScreen ? startScreenCard : null}
+              </div>
             </div>
-          </div>
+            <div className={toolbeltSpacerClassName} aria-hidden="true" />
+          </>
         )}
       </div>
+      <BottomToolbelt
+        activeTool={activeTool}
+        onSelectTool={handleToolSelect}
+        onCloseTool={handleToolClose}
+      />
       {setupModal}
     </section>
   );
