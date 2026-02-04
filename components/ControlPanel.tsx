@@ -179,7 +179,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto lg:overflow-y-hidden p-4 space-y-5 custom-scrollbar ${interactionClass}`}>
+      <div className={`flex-1 overflow-hidden p-4 space-y-5 custom-scrollbar ${interactionClass}`}>
         {children}
       </div>
 

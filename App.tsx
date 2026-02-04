@@ -1397,7 +1397,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col lg:flex-row overflow-hidden relative">
+    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col lg:flex-row overflow-hidden relative">
       <ScriptPane
         context={context}
         titleInputRef={titleInputRef}

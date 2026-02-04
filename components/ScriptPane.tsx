@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
@@ -141,8 +141,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
-  const [headerOffset, setHeaderOffset] = useState(0);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -154,7 +152,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
   const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
   const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
-  const toolbeltSpacerClassName = activeTool ? 'h-36' : 'h-20';
   const previewClassName = `${previewWidthClass} ${previewLayoutClass} ${
     isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
   }`.trim();
@@ -318,23 +315,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onCancelInsertMode={onCancelInsertMode}
       isRegenerating={isRegenerating}
       className={previewClassName}
-      scrollable={isSplitView}
+      scrollable
     />
   ) : null;
-
-  useEffect(() => {
-    const updateHeaderOffset = () => {
-      if (!headerRef.current) {
-        setHeaderOffset(0);
-        return;
-      }
-      setHeaderOffset(headerRef.current.getBoundingClientRect().height);
-    };
-
-    updateHeaderOffset();
-    window.addEventListener('resize', updateHeaderOffset);
-    return () => window.removeEventListener('resize', updateHeaderOffset);
-  }, [context]);
 
   useEffect(() => {
     if (!insertModeActive) return;
@@ -353,17 +336,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     }
   }, [insertModeActive, onCancelInsertMode, viewMode]);
 
-  const splitContainerStyle = isSplitView && headerOffset
-    ? { height: `calc(100vh - ${headerOffset}px)` }
-    : undefined;
-  const contentWrapperClassName = isSplitView
-    ? 'max-w-6xl mx-auto px-6 py-6 h-full flex flex-col gap-6'
-    : 'max-w-6xl mx-auto px-6 py-6 space-y-6';
+  const contentWrapperClassName = 'max-w-6xl mx-auto px-6 py-6 h-full min-h-0 flex flex-col gap-6';
   const writePanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
     isInsertModeView ? 'max-h-0 opacity-0 -translate-y-2 pointer-events-none' : 'max-h-[2000px] opacity-100 translate-y-0'
   }`;
   const insertPanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
-    isInsertModeView ? 'max-h-[2000px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 translate-y-2 pointer-events-none'
+    isInsertModeView ? 'max-h-[2000px] opacity-100 translate-y-0 flex-1 min-h-0' : 'max-h-0 opacity-0 translate-y-2 pointer-events-none'
   }`;
   const splitGridClassName = `grid grid-cols-1 ${
     isInsertModeView ? 'lg:grid-cols-[minmax(0,0)_minmax(0,100%)]' : 'lg:grid-cols-[minmax(0,40%)_minmax(0,60%)]'
@@ -429,11 +407,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   };
 
   return (
-    <section className="flex-1 flex flex-col overflow-hidden bg-[#1a1a1a]">
+    <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
       {context && (
         <div
-          ref={headerRef}
-          className={`border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
+          className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
         >
           <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
@@ -536,16 +513,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
 
-      <div
-        className={`flex-1 min-h-0 ${context && isSplitView ? 'overflow-hidden' : 'overflow-y-auto'}`}
-        style={context ? splitContainerStyle : undefined}
-      >
+      <div className="flex-1 min-h-0 overflow-hidden">
         {context ? (
           <div className={contentWrapperClassName}>
             {errorBanner}
 
             {context && viewMode === 'write' && (
-              <div className="space-y-6">
+              <div className="flex flex-col gap-6 flex-1 min-h-0">
                 <div className={writePanelClassName}>
                   <div className={`space-y-6 ${isInsertModeView ? 'pointer-events-none opacity-40' : ''}`}>
                     {writeSections}
@@ -553,37 +527,42 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </div>
                 </div>
                 <div className={insertPanelClassName}>
-                  <div className="space-y-4">
+                  <div className="flex flex-col gap-4 h-full">
                     {insertModeToolbar}
-                    {previewSection}
+                    <div className="flex-1 min-h-0">
+                      {previewSection}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {context && viewMode === 'preview' && (
-              <div className="space-y-6">
-                {previewSection}
+              <div className="flex flex-col gap-6 flex-1 min-h-0">
+                <div className="flex-1 min-h-0">
+                  {previewSection}
+                </div>
               </div>
             )}
 
             {context && viewMode === 'split' && (
               <div className={splitGridClassName}>
                 <div
-                  className={`min-h-0 h-full overflow-y-auto pr-2 space-y-6 transition-all duration-300 ease-out ${
+                  className={`min-h-0 h-full overflow-hidden pr-2 space-y-6 transition-all duration-300 ease-out ${
                     isInsertModeView ? 'opacity-0 -translate-x-2 pointer-events-none' : 'opacity-100 translate-x-0'
                   }`}
                 >
                   {writeSections}
                   {generationIndicator}
                 </div>
-                <div className="min-h-0 h-full overflow-hidden space-y-4">
+                <div className="min-h-0 h-full overflow-hidden flex flex-col gap-4">
                   {insertModeToolbar}
-                  {previewSection}
+                  <div className="flex-1 min-h-0">
+                    {previewSection}
+                  </div>
                 </div>
               </div>
             )}
-            <div className={toolbeltSpacerClassName} aria-hidden="true" />
           </div>
         ) : (
           <>
@@ -593,7 +572,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 {showInitialGeneration ? startGenerationCard : showStartScreen ? startScreenCard : null}
               </div>
             </div>
-            <div className={toolbeltSpacerClassName} aria-hidden="true" />
           </>
         )}
       </div>
