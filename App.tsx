@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SetupForm, SetupFormState } from './components/SetupForm';
-import { Button } from './components/Button';
 import { ControlPanel, ControlStep, resolveStep } from './components/ControlPanel';
 import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
@@ -29,7 +28,7 @@ import {
   INSERT_BOTTOM_ID
 } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { ChevronDown, Download, FileDown, RotateCcw } from 'lucide-react';
+import { ChevronDown, RotateCcw } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -1369,29 +1368,6 @@ export default function App() {
   const setupCastCount = setupState.characters.filter(char => char.trim().length > 0).length;
   const setupPremiseText = setupState.premise.trim();
   const setupPremiseSnippet = setupPremiseText.length > 60 ? `${setupPremiseText.slice(0, 60)}...` : setupPremiseText;
-  const exportControls = (
-    <div className="grid grid-cols-1 gap-2">
-      <Button
-        variant="ghost"
-        onClick={handleDownload}
-        className="w-full text-xs py-2 h-auto hover:bg-gray-700"
-        disabled={!context}
-        title="Export script as a .txt file"
-      >
-        <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={handleExportPdf}
-        className="w-full text-xs py-2 h-auto hover:bg-gray-700"
-        disabled={!context}
-        title="Export script as a PDF via print dialog"
-      >
-        <FileDown className="w-3 h-3 mr-2" /> Export PDF
-      </Button>
-    </div>
-  );
-
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
   );
@@ -1452,6 +1428,9 @@ export default function App() {
         setupSurprisePrompt={setupSurprisePrompt}
         styleContext={scriptStyleContext}
         onSetupError={handleAiError}
+        onExportTxt={handleDownload}
+        onExportPdf={handleExportPdf}
+        canExport={Boolean(context)}
       />
 
       <ControlPanel
@@ -1462,7 +1441,6 @@ export default function App() {
         isCollapsed={isControlPanelCollapsed}
         onToggleCollapse={() => setIsControlPanelCollapsed(prev => !prev)}
         showPrimaryAction={showPrimaryAction}
-        footer={exportControls}
       >
         <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">
           <summary className={`${summaryBase} ${isSetupActive ? summaryActive : summaryInactive}`}>

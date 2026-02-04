@@ -1,5 +1,6 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Download, FileDown, X } from 'lucide-react';
+import { Button } from './Button';
 
 export type ToolKey = 'generate' | 'insert' | 'rewrite' | 'voices' | 'playback' | 'export';
 
@@ -27,26 +28,50 @@ const TOOL_PLACEHOLDERS: Record<ToolKey, string> = {
   export: 'Export panel (coming soon).'
 };
 
+const TOOL_LABELS: Record<ToolKey, string> = {
+  generate: 'Generate',
+  insert: 'Insert',
+  rewrite: 'Rewrite',
+  voices: 'Voices',
+  playback: 'Playback',
+  export: 'Export'
+};
+
 export interface BottomToolbeltProps {
   activeTool: ToolKey | null;
   onSelectTool: (tool: ToolKey) => void;
   onCloseTool: () => void;
+  onExportTxt?: () => void;
+  onExportPdf?: () => void;
+  exportDisabled?: boolean;
 }
 
 export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   activeTool,
   onSelectTool,
-  onCloseTool
+  onCloseTool,
+  onExportTxt,
+  onExportPdf,
+  exportDisabled = false
 }) => {
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
+  const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
+  const hasExportPanel = activeTool === 'export';
 
   return (
     <div className="w-full shrink-0 px-4 pb-4">
       <div className="mx-auto w-full max-w-6xl flex flex-col gap-2">
         {activeTool && (
           <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm text-gray-200">{activePlaceholder}</span>
+            <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-3">
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">{activeLabel}</p>
+                {hasExportPanel ? (
+                  <p className="text-xs text-gray-400">Download your script in common formats.</p>
+                ) : (
+                  <p className="text-sm text-gray-200">{activePlaceholder}</p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={onCloseTool}
@@ -56,6 +81,34 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {hasExportPanel && (
+              <div className="px-4 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onExportTxt}
+                    disabled={exportDisabled || !onExportTxt}
+                    className="w-full text-xs"
+                    title="Export script as a .txt file"
+                  >
+                    <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
+                  </Button>
+                  {onExportPdf && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={onExportPdf}
+                      disabled={exportDisabled}
+                      className="w-full text-xs"
+                      title="Export script as a PDF via print dialog"
+                    >
+                      <FileDown className="w-3 h-3 mr-2" /> Export PDF
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-4 py-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">

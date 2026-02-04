@@ -66,6 +66,9 @@ export interface ScriptPaneProps {
   setupSurprisePrompt?: boolean;
   styleContext?: string;
   onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
+  onExportTxt: () => void;
+  onExportPdf?: () => void;
+  canExport: boolean;
 }
 
 type ViewMode = 'write' | 'preview' | 'split';
@@ -137,7 +140,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   setupAutoSurprise,
   setupSurprisePrompt,
   styleContext,
-  onSetupError
+  onSetupError,
+  onExportTxt,
+  onExportPdf,
+  canExport
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
@@ -579,6 +585,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         activeTool={activeTool}
         onSelectTool={handleToolSelect}
         onCloseTool={handleToolClose}
+        onExportTxt={onExportTxt}
+        onExportPdf={onExportPdf}
+        exportDisabled={!canExport}
       />
       {setupModal}
     </section>
