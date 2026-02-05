@@ -715,8 +715,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
               <div className="space-y-2">
-                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">Script Seance</h1>
-                <p className="text-[11px] uppercase tracking-[0.4em] text-gray-400">Script Workspace</p>
+                <h1 className="text-3xl md:text-4xl font-semibold tracking-[0.35em] text-white">SCRIPT SEANCE</h1>
+                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Script Workspace</p>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>
@@ -740,7 +740,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   Draft Title
                 </label>
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-lg md:text-xl font-semibold text-white">
+                  <span className="text-base md:text-lg font-semibold text-white">
                     {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
                   </span>
                   <button

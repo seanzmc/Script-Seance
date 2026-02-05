@@ -170,7 +170,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
         {hasActivePanel && (
           <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[240px] max-h-[360px] overflow-hidden">
             <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
-              <p className="text-[10px] uppercase tracking-[0.4em] text-gray-400">{activeLabel}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{activeLabel}</p>
               <button
                 type="button"
                 onClick={onCloseTool}
@@ -201,26 +201,26 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                     onClick={() => onSelectTool(tool)}
                     aria-label={TOOL_LABELS[tool]}
                     aria-pressed={isActive}
-                    className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 border ${
                       isActive
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
+                        ? 'bg-indigo-500 text-white border-indigo-400 shadow-[0_0_0_1px_rgba(99,102,241,0.6)]'
+                        : 'text-gray-400 border-gray-800 bg-gray-900/40 hover:bg-gray-800/80 hover:text-white'
                     }`}
-                  >
-                    {compactIcons[tool]}
-                    <span>{TOOL_LABELS[tool]}</span>
-                  </button>
-                );
+                >
+                  {compactIcons[tool]}
+                  <span>{TOOL_LABELS[tool]}</span>
+                </button>
+              );
               })}
               <div className="relative" data-toolbelt-overflow="true">
                 <button
                   type="button"
                   onClick={() => setIsOverflowOpen((open) => !open)}
                   aria-label="More tools"
-                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 border ${
                     isOverflowOpen
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
+                      ? 'bg-indigo-500 text-white border-indigo-400 shadow-[0_0_0_1px_rgba(99,102,241,0.6)]'
+                      : 'text-gray-400 border-gray-800 bg-gray-900/40 hover:bg-gray-800/80 hover:text-white'
                   }`}
                 >
                   <MoreHorizontal className="h-4 w-4" />
@@ -242,7 +242,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                             aria-pressed={isActive}
                             className={`w-full flex items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
                               isActive
-                                ? 'bg-gray-100 text-gray-900'
+                                ? 'bg-indigo-500 text-white'
                                 : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                             }`}
                           >
@@ -270,10 +270,10 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                           onClick={() => onSelectTool(tool.key)}
                           aria-label={tool.label}
                           aria-pressed={isActive}
-                          className={`rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.3em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                        className={`rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.3em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 border ${
                             isActive
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
+                              ? 'bg-indigo-500 text-white border-indigo-400 shadow-[0_0_0_1px_rgba(99,102,241,0.6)]'
+                              : 'text-gray-400 border-gray-800 bg-gray-900/40 hover:bg-gray-800/80 hover:text-white'
                           }`}
                         >
                           {tool.label}
