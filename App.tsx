@@ -165,6 +165,7 @@ export default function App() {
   const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
+  const [setupAutoSurprise, setSetupAutoSurprise] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
   const undoStackRef = useRef<UndoAction[]>([]);
@@ -285,18 +286,24 @@ export default function App() {
   }, []);
 
   const openManualSetup = () => {
+    setSetupAutoSurprise(false);
     setSetupSurprisePrompt(false);
     setIsSetupOpen(true);
   };
 
-  const openSurpriseSetup = () => {
-    setSetupSurprisePrompt(true);
+  const openSurpriseSetup = (genre?: string) => {
+    if (typeof genre === 'string' && genre.trim()) {
+      setSetupState(prev => ({ ...prev, genre }));
+    }
+    setSetupSurprisePrompt(false);
+    setSetupAutoSurprise(true);
     setIsSetupOpen(true);
   };
 
   const closeSetup = () => {
     setIsSetupOpen(false);
     setSetupSurprisePrompt(false);
+    setSetupAutoSurprise(false);
   };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
@@ -843,6 +850,12 @@ export default function App() {
     setInsertTarget(null);
   }, [clearRedo, pushUndoAction]);
 
+  const handleInsertAtTarget = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
+    setInsertScrollTargetId(block.id);
+    setInsertScrollToken(token => token + 1);
+    handleInsertAfter(target, block);
+  }, [handleInsertAfter]);
+
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
     setInsertScrollTargetId(pendingInsertBlock.id);
@@ -1230,6 +1243,7 @@ export default function App() {
         onSelectInsertTarget={handleSelectInsertTarget}
         onChangeSpeaker={handleChangeSpeaker}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
+        onInsertAtTarget={handleInsertAtTarget}
         onRegenerate={handleRegenerateBlock}
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
@@ -1249,7 +1263,7 @@ export default function App() {
         setupState={setupState}
         onSetupChange={updateSetupState}
         onStartSetup={handleStart}
-        setupAutoSurprise={false}
+        setupAutoSurprise={setupAutoSurprise}
         setupSurprisePrompt={setupSurprisePrompt}
         styleContext={scriptStyleContext}
         onSetupError={handleAiError}
