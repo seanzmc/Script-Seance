@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { SetupForm, SetupFormState } from './components/SetupForm';
-import { ControlPanel, ControlStep, resolveStep } from './components/ControlPanel';
+import { SetupFormState } from './components/SetupForm';
 import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
 import { VoicesPanel } from './components/VoicesPanel';
@@ -28,7 +27,7 @@ import {
   INSERT_BOTTOM_ID
 } from './types';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { ChevronDown, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -158,14 +157,6 @@ export default function App() {
   const hasManualTitleRef = useRef(false);
 
   const [setupState, setSetupState] = useState<SetupFormState>(DEFAULT_SETUP_STATE);
-  const [openPanels, setOpenPanels] = useState({
-    setup: true,
-    voices: false,
-    playback: false
-  });
-  const [currentStep, setCurrentStep] = useState<ControlStep>('setup');
-  const [hasConfirmedSetup, setHasConfirmedSetup] = useState(false);
-  const [hasReviewedVoices, setHasReviewedVoices] = useState(false);
   const [insertTarget, setInsertTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [insertModeActive, setInsertModeActive] = useState(false);
   const [pendingInsertBlock, setPendingInsertBlock] = useState<ScriptBlock | null>(null);
@@ -174,7 +165,6 @@ export default function App() {
   const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
-  const [isControlPanelCollapsed, setIsControlPanelCollapsed] = useState(false);
   const undoStackRef = useRef<UndoAction[]>([]);
   const redoStackRef = useRef<UndoAction[]>([]);
 
@@ -194,7 +184,6 @@ export default function App() {
   const lastNonPrivacyPathRef = useRef('/');
   const autosaveFailureNotifiedRef = useRef(false);
 
-  const hasScript = Boolean(context?.scenes.some(scene => scene.blocks.length > 0));
   const canRedo = redoCount > 0;
   const canUndo = undoCount > 0;
   const scriptStyleContext = useMemo(() => {
@@ -207,21 +196,6 @@ export default function App() {
     ].filter(Boolean);
     return parts.join(' ');
   }, [setupState.genre, setupState.length, setupState.style]);
-
-  const applyStep = (
-    requestedStep: ControlStep,
-    overrides?: { hasScript?: boolean; confirmSetup?: boolean }
-  ) => {
-    const resolvedHasScript = overrides?.hasScript ?? hasScript;
-    const confirmedSetup =
-      overrides?.confirmSetup ?? (hasConfirmedSetup || requestedStep !== 'setup');
-    setHasConfirmedSetup(confirmedSetup);
-    setCurrentStep(resolveStep({
-      requestedStep,
-      hasScript: resolvedHasScript,
-      hasConfirmedSetup: confirmedSetup
-    }));
-  };
 
   const applyUndoAction = useCallback((current: StoryContext, action: UndoAction) => {
     if (action.type === 'scene') {
@@ -435,10 +409,8 @@ export default function App() {
     isLoadingAudio, 
     bufferedCount,
     totalBufferedCount,
-    isBuffering,
     blockStatuses,
     playScript, 
-    bufferScript,
     playPreview, 
     stop,
     pause,
@@ -557,15 +529,6 @@ export default function App() {
         if (typeof parsed.userInstruction === 'string') {
           setUserInstruction(parsed.userInstruction);
         }
-        const hydratedHasScript = hydratedContext.scenes.some(scene => scene.blocks.length > 0);
-        if (hydratedHasScript) {
-          setHasConfirmedSetup(true);
-          setCurrentStep(resolveStep({
-            requestedStep: 'script',
-            hasScript: true,
-            hasConfirmedSetup: true
-          }));
-        }
       } else {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY);
       }
@@ -645,8 +608,6 @@ export default function App() {
     setUserInstruction('');
     setVoiceConfigs([]);
     setSetupState(DEFAULT_SETUP_STATE);
-    setOpenPanels({ setup: true, voices: false, playback: false });
-    setHasReviewedVoices(false);
     setInsertTarget(null);
     setInsertModeActive(false);
     setPendingInsertBlock(null);
@@ -654,34 +615,6 @@ export default function App() {
     setToast(null);
     setAutosaveError(null);
     autosaveFailureNotifiedRef.current = false;
-    applyStep('setup', { hasScript: false, confirmSetup: false });
-    try {
-      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    } catch (err) {
-      console.warn('Failed to clear draft', err);
-    }
-  };
-
-  const handleEditSetup = () => {
-    if (!context) return;
-    cancelAiRequest();
-    stop({ clearBuffer: true });
-    resetTitleSuggestionState();
-    resetUndoRedo();
-    setContext(null);
-    setUserInstruction('');
-    setVoiceConfigs([]);
-    setOpenPanels({ setup: true, voices: false, playback: false });
-    setHasReviewedVoices(false);
-    setInsertTarget(null);
-    setInsertModeActive(false);
-    setPendingInsertBlock(null);
-    setError(null);
-    setToast(null);
-    setAutosaveError(null);
-    autosaveFailureNotifiedRef.current = false;
-    applyStep('setup', { hasScript: false, confirmSetup: false });
-    openManualSetup();
     try {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     } catch (err) {
@@ -759,8 +692,6 @@ export default function App() {
         ...initialContext,
         scenes: [normalizedFirstScene]
       });
-      setHasReviewedVoices(false);
-      applyStep('script', { hasScript: true, confirmSetup: true });
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
     } finally {
@@ -1086,7 +1017,6 @@ export default function App() {
 
   const handlePlay = () => {
     if (!context || allBlocks.length === 0) return;
-    applyStep('playback', { hasScript: true, confirmSetup: true });
     playScript(allBlocks);
   };
 
@@ -1203,151 +1133,9 @@ export default function App() {
     [context]
   );
 
-  const expectedVoices = context ? context.characters.length + 1 : 0;
-  const voicesReady = context ? voiceConfigs.length >= expectedVoices : false;
-  const voicesAssigned = Boolean(context) && voicesReady && hasReviewedVoices;
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
-  const errorBlocks = Object.values(blockStatuses).filter(status => status === 'error').length;
-  const readyOrErrorBlocks = bufferedBlocks + errorBlocks;
-  const pendingBlocks = Math.max(totalBufferedBlocks - readyOrErrorBlocks, 0);
-  const audioBuffered = totalBufferedBlocks > 0 && readyOrErrorBlocks >= totalBufferedBlocks;
-  const setupReady = setupState.premise.trim().length > 0 && setupState.characters.some(char => char.trim().length > 0);
 
-  const handleStepChange = (step: ControlStep) => {
-    applyStep(step);
-  };
-
-  useEffect(() => {
-    const nextPanels = {
-      setup: currentStep === 'setup' || currentStep === 'script',
-      voices: currentStep === 'voices',
-      playback: currentStep === 'playback'
-    };
-    setOpenPanels(prev => {
-      if (
-        prev.setup === nextPanels.setup &&
-        prev.voices === nextPanels.voices &&
-        prev.playback === nextPanels.playback
-      ) {
-        return prev;
-      }
-      return nextPanels;
-    });
-  }, [currentStep]);
-
-  const handlePanelToggle = (panel: 'setup' | 'voices' | 'playback') =>
-    (event: React.SyntheticEvent<HTMLDetailsElement>) => {
-      const isOpen = (event.currentTarget as HTMLDetailsElement).open;
-      if (isOpen) {
-        setOpenPanels({
-          setup: panel === 'setup',
-          voices: panel === 'voices',
-          playback: panel === 'playback'
-        });
-      } else {
-        setOpenPanels(prev => ({ ...prev, [panel]: false }));
-      }
-      if (!isOpen) return;
-      if (panel === 'setup') {
-        applyStep('setup');
-        return;
-      }
-      if (panel === 'voices') {
-        applyStep('voices');
-        setHasReviewedVoices(true);
-        return;
-      }
-      applyStep('playback');
-    };
-
-  const openVoicesPanel = () => {
-    applyStep('voices');
-    setOpenPanels({ setup: false, voices: true, playback: false });
-    setHasReviewedVoices(true);
-  };
-
-  const openPlaybackPanel = () => {
-    applyStep('playback');
-    setOpenPanels({ setup: false, voices: false, playback: true });
-  };
-
-  const isGeneratingAudio = (pendingBlocks > 0 && isBuffering) || isLoadingAudio;
-  const isSidebarDisabled = !context || isSetupOpen || insertModeActive;
-  const showPrimaryAction = Boolean(context) && !isSetupOpen;
-
-  const primaryAction = (() => {
-    if (!hasScript) {
-      return {
-        label: 'Generate First Scene',
-        helperText: setupReady
-          ? 'Generate the opening scene to start the draft.'
-          : 'Pick a premise and cast to begin.',
-        onClick: handleStart,
-        disabled: isGenerating || !setupState.premise.trim(),
-        loading: isGenerating
-      };
-    }
-    if (!voicesAssigned) {
-      return {
-        label: 'Assign Voices',
-        helperText: 'Assign a voice to each character.',
-        onClick: openVoicesPanel,
-        disabled: false,
-        loading: false
-      };
-    }
-    if (!audioBuffered) {
-      return {
-        label: isGeneratingAudio ? 'Generating Audio...' : 'Generate Audio',
-        helperText: 'Generate audio so playback is ready.',
-        onClick: () => {
-          openPlaybackPanel();
-          if (allBlocks.length > 0) {
-            bufferScript(allBlocks);
-          }
-        },
-        disabled: isGeneratingAudio || allBlocks.length === 0,
-        loading: isGeneratingAudio
-      };
-    }
-    if (isPlaying) {
-      return {
-        label: 'Pause',
-        helperText: 'Playback is running.',
-        onClick: pause,
-        disabled: false,
-        loading: false
-      };
-    }
-    if (isPaused) {
-      return {
-        label: 'Resume',
-        helperText: 'Playback is paused.',
-        onClick: resume,
-        disabled: false,
-        loading: false
-      };
-    }
-    return {
-      label: 'Play',
-      helperText: 'Audio is ready for performance.',
-      onClick: handlePlay,
-      disabled: false,
-      loading: false
-    };
-  })();
-
-  const setupBadge = context ? 'Locked' : setupReady ? 'Ready' : 'Start';
-  const summaryBase = 'cursor-pointer list-none flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-colors';
-  const summaryActive = 'bg-gray-900/70 border-indigo-500/40 text-white shadow-[0_0_20px_rgba(79,70,229,0.15)]';
-  const summaryInactive = 'bg-gray-900/30 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200';
-  const isSetupActive = currentStep === 'setup' || currentStep === 'script';
-  const setupMetaParts = [setupState.genre, setupState.length, setupState.style.trim()].filter(Boolean);
-  const setupMetaLine = setupMetaParts.join(' / ');
-  const setupCastCount = setupState.characters.filter(char => char.trim().length > 0).length;
-  const setupPremiseText = setupState.premise.trim();
-  const setupPremiseSnippet = setupPremiseText.length > 60 ? `${setupPremiseText.slice(0, 60)}...` : setupPremiseText;
   const voicesContent = context ? (
     <VoicesPanel
       characters={context.characters}
@@ -1358,7 +1146,6 @@ export default function App() {
       onStop={stop}
       isAudioPlaying={isPreviewPlaying && !castingCharacter}
       isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
-      onReviewed={() => setHasReviewedVoices(true)}
     />
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
@@ -1397,7 +1184,7 @@ export default function App() {
   );
 
   return (
-    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col lg:flex-row overflow-hidden relative">
+    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden relative">
       <ScriptPane
         context={context}
         titleInputRef={titleInputRef}
@@ -1458,67 +1245,6 @@ export default function App() {
         playbackContent={playbackContent}
         voicesContent={voicesContent}
       />
-
-      <ControlPanel
-        currentStep={currentStep}
-        onStepChange={handleStepChange}
-        primaryAction={primaryAction}
-        isDisabled={isSidebarDisabled}
-        isCollapsed={isControlPanelCollapsed}
-        onToggleCollapse={() => setIsControlPanelCollapsed(prev => !prev)}
-        showPrimaryAction={showPrimaryAction}
-      >
-        <details open={openPanels.setup} onToggle={handlePanelToggle('setup')} className="group">
-          <summary className={`${summaryBase} ${isSetupActive ? summaryActive : summaryInactive}`}>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-3">
-                <span>Setup</span>
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                    isSetupActive
-                      ? 'border-indigo-500/40 text-indigo-200 bg-indigo-500/10'
-                      : 'border-gray-700/70 text-gray-500 bg-gray-900/40'
-                  }`}
-                >
-                  {setupBadge}
-                </span>
-              </div>
-              {context && (
-                <div className="mt-1 text-[10px] text-gray-500">
-                  <span>
-                    {setupMetaLine ? `${setupMetaLine} / ` : ''}
-                    Cast: {setupCastCount}
-                  </span>
-                  {setupPremiseSnippet && (
-                    <span className="text-gray-600"> - &quot;{setupPremiseSnippet}&quot;</span>
-                  )}
-                </div>
-              )}
-            </div>
-            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="mt-4 space-y-3">
-            {context ? (
-              <SetupForm
-                value={setupState}
-                onChange={updateSetupState}
-                isLoading={isGenerating}
-                onError={handleAiError}
-                isLocked
-                showSubmit={false}
-                onEditSetup={handleEditSetup}
-                onClearDraft={handleClearDraft}
-                variant="summary"
-              />
-            ) : (
-              <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 text-[11px] text-gray-500">
-                Start from the center to set your premise and cast.
-              </div>
-            )}
-          </div>
-        </details>
-
-      </ControlPanel>
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5 fade-in z-50">
