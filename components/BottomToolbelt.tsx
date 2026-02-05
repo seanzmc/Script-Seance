@@ -44,6 +44,7 @@ export interface BottomToolbeltProps {
   onExportTxt?: () => void;
   onExportPdf?: () => void;
   exportDisabled?: boolean;
+  playbackContent?: React.ReactNode;
 }
 
 export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
@@ -52,11 +53,18 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   onCloseTool,
   onExportTxt,
   onExportPdf,
-  exportDisabled = false
+  exportDisabled = false,
+  playbackContent
 }) => {
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
   const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
   const hasExportPanel = activeTool === 'export';
+  const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
+  const panelDescription = hasExportPanel
+    ? 'Download your script in common formats.'
+    : hasPlaybackPanel
+      ? 'Control playback and audio readiness.'
+      : null;
 
   return (
     <div className="w-full shrink-0 px-4 pb-4">
@@ -66,8 +74,8 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
             <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-3">
               <div className="space-y-1">
                 <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">{activeLabel}</p>
-                {hasExportPanel ? (
-                  <p className="text-xs text-gray-400">Download your script in common formats.</p>
+                {panelDescription ? (
+                  <p className="text-xs text-gray-400">{panelDescription}</p>
                 ) : (
                   <p className="text-sm text-gray-200">{activePlaceholder}</p>
                 )}
@@ -107,6 +115,11 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                     </Button>
                   )}
                 </div>
+              </div>
+            )}
+            {hasPlaybackPanel && (
+              <div className="px-4 py-4">
+                {playbackContent}
               </div>
             )}
           </div>

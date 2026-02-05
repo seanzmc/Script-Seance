@@ -1346,28 +1346,45 @@ export default function App() {
   const voicesBadge = context
     ? (voicesAssigned ? 'Ready' : `Unassigned: ${unassignedVoices}`)
     : 'Locked';
-  const totalAudioBlocks = Math.max(totalBufferedBlocks, allBlocks.length);
-  const playbackBadge = !context
-    ? 'Not generated'
-    : audioBuffered
-      ? errorBlocks > 0
-        ? `Audio ready ${readyOrErrorBlocks}/${totalBufferedBlocks} (${errorBlocks} errors)`
-        : `Audio ready ${readyOrErrorBlocks}/${totalBufferedBlocks}`
-      : isGeneratingAudio
-        ? `Generating ${readyOrErrorBlocks}/${totalAudioBlocks || 0}`
-        : 'Not generated';
-
   const summaryBase = 'cursor-pointer list-none flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-colors';
   const summaryActive = 'bg-gray-900/70 border-indigo-500/40 text-white shadow-[0_0_20px_rgba(79,70,229,0.15)]';
   const summaryInactive = 'bg-gray-900/30 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200';
   const isSetupActive = currentStep === 'setup' || currentStep === 'script';
   const isVoicesActive = currentStep === 'voices';
-  const isPlaybackActive = currentStep === 'playback';
   const setupMetaParts = [setupState.genre, setupState.length, setupState.style.trim()].filter(Boolean);
   const setupMetaLine = setupMetaParts.join(' / ');
   const setupCastCount = setupState.characters.filter(char => char.trim().length > 0).length;
   const setupPremiseText = setupState.premise.trim();
   const setupPremiseSnippet = setupPremiseText.length > 60 ? `${setupPremiseText.slice(0, 60)}...` : setupPremiseText;
+  const playbackContent = context ? (
+    <PlaybackPanel
+      isPlaying={isPlaying}
+      isPaused={isPaused}
+      isLoadingAudio={isLoadingAudio}
+      currentBlockId={currentBlockId}
+      currentBlockIndex={currentBlockIndex}
+      blockStatuses={blockStatuses}
+      onPlay={handlePlay}
+      onPause={pause}
+      onResume={resume}
+      onStop={stop}
+      onPrev={goToPrevious}
+      onNext={goToNext}
+      onRetry={retryCurrentBlock}
+      onSkip={skipCurrentBlock}
+      bufferedCount={bufferedBlocks}
+      totalCount={totalBufferedBlocks}
+      currentSpeaker={currentSpeaker}
+      playbackSpeed={playbackSpeed}
+      onPlaybackSpeedChange={handleGlobalSpeedChange}
+      showHighlights={showHighlights}
+      onToggleHighlights={() => setShowHighlights(!showHighlights)}
+      autoScroll={autoScroll}
+      onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
+    />
+  ) : (
+    <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
+  );
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
   );
@@ -1431,6 +1448,7 @@ export default function App() {
         onExportTxt={handleDownload}
         onExportPdf={handleExportPdf}
         canExport={Boolean(context)}
+        playbackContent={playbackContent}
       />
 
       <ControlPanel
@@ -1527,54 +1545,6 @@ export default function App() {
           </div>
         </details>
 
-        <details open={openPanels.playback} onToggle={handlePanelToggle('playback')} className="group">
-          <summary className={`${summaryBase} ${isPlaybackActive ? summaryActive : summaryInactive}`}>
-            <div className="flex items-center gap-3">
-              <span>Playback</span>
-              <span
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                  isPlaybackActive
-                    ? 'border-indigo-500/40 text-indigo-200 bg-indigo-500/10'
-                    : 'border-gray-700/70 text-gray-500 bg-gray-900/40'
-                }`}
-              >
-                {playbackBadge}
-              </span>
-            </div>
-            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="mt-4">
-            {context ? (
-              <PlaybackPanel
-                isPlaying={isPlaying}
-                isPaused={isPaused}
-                isLoadingAudio={isLoadingAudio}
-                currentBlockId={currentBlockId}
-                currentBlockIndex={currentBlockIndex}
-                blockStatuses={blockStatuses}
-                onPlay={handlePlay}
-                onPause={pause}
-                onResume={resume}
-                onStop={stop}
-                onPrev={goToPrevious}
-                onNext={goToNext}
-                onRetry={retryCurrentBlock}
-                onSkip={skipCurrentBlock}
-                bufferedCount={bufferedBlocks}
-                totalCount={totalBufferedBlocks}
-                currentSpeaker={currentSpeaker}
-                playbackSpeed={playbackSpeed}
-                onPlaybackSpeedChange={handleGlobalSpeedChange}
-                showHighlights={showHighlights}
-                onToggleHighlights={() => setShowHighlights(!showHighlights)}
-                autoScroll={autoScroll}
-                onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
-              />
-            ) : (
-              <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
-            )}
-          </div>
-        </details>
       </ControlPanel>
 
       {toast && (

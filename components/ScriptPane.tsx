@@ -69,6 +69,7 @@ export interface ScriptPaneProps {
   onExportTxt: () => void;
   onExportPdf?: () => void;
   canExport: boolean;
+  playbackContent?: React.ReactNode;
 }
 
 type ViewMode = 'write' | 'preview' | 'split';
@@ -143,7 +144,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onSetupError,
   onExportTxt,
   onExportPdf,
-  canExport
+  canExport,
+  playbackContent
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
@@ -588,6 +590,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onExportTxt={onExportTxt}
         onExportPdf={onExportPdf}
         exportDisabled={!canExport}
+        playbackContent={playbackContent}
       />
       {setupModal}
     </section>
