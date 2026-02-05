@@ -458,6 +458,9 @@ const handleAiGenerate = async (req, res) => {
   const payload = req.body || {};
   const kind = payload.kind;
   const context = payload.context;
+  const requestId = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+  let rawAiResponse;
+  let parsedAiKeys;
 
   if (!isNonEmptyString(kind, 64) || !isObject(context)) {
     return sendError(res, 400, 'Invalid request payload.', 'INVALID_REQUEST');
@@ -574,9 +577,11 @@ const handleAiGenerate = async (req, res) => {
       if (!text) {
         throw new Error('No response from AI');
       }
+      rawAiResponse = text;
 
       try {
         data = JSON.parse(text);
+        parsedAiKeys = data && typeof data === 'object' ? Object.keys(data) : [];
       } catch {
         createAiValidationError(kind, 'Invalid JSON payload.');
       }
@@ -782,6 +787,17 @@ const handleAiGenerate = async (req, res) => {
       message.includes('rate limit');
     const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
     const isInvalidAi = error?.code === 'INVALID_AI_RESPONSE';
+
+    if (!IS_PROD && isInvalidAi && kind === 'generateScene') {
+      const rawSnippet = typeof rawAiResponse === 'string' ? rawAiResponse.slice(0, 2000) : null;
+      console.warn('[ai/generate] Invalid AI response', {
+        requestId,
+        kind,
+        reason: error?.details?.reason,
+        parsedKeys: parsedAiKeys || null,
+        rawResponse: rawSnippet
+      });
+    }
 
     console.error('[ai/generate] Failed', error);
     return sendError(
