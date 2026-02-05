@@ -45,6 +45,7 @@ export interface BottomToolbeltProps {
   onExportPdf?: () => void;
   exportDisabled?: boolean;
   generateContent?: React.ReactNode;
+  rewriteContent?: React.ReactNode;
   playbackContent?: React.ReactNode;
   voicesContent?: React.ReactNode;
   insertContent?: React.ReactNode;
@@ -58,6 +59,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   onExportPdf,
   exportDisabled = false,
   generateContent,
+  rewriteContent,
   playbackContent,
   voicesContent,
   insertContent
@@ -66,6 +68,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
   const hasExportPanel = activeTool === 'export';
   const hasGeneratePanel = activeTool === 'generate' && Boolean(generateContent);
+  const hasRewritePanel = activeTool === 'rewrite' && Boolean(rewriteContent);
   const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
@@ -74,11 +77,13 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
     ? 'Download your script in common formats.'
     : hasGeneratePanel
       ? 'Guide the next scene with a focused prompt.'
+      : hasRewritePanel
+        ? 'Regenerate an existing block with fresh wording.'
     : hasPlaybackPanel
       ? 'Control playback and audio readiness.'
     : hasVoicesPanel
       ? 'Assign and preview voices for each character.'
-        : hasInsertPanel
+    : hasInsertPanel
           ? 'Insert new blocks at a specific point in the script.'
           : null;
 
@@ -147,6 +152,11 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
             {hasGeneratePanel && (
               <div className="px-4 py-4 flex-1">
                 {generateContent}
+              </div>
+            )}
+            {hasRewritePanel && (
+              <div className="px-4 py-4 flex-1">
+                {rewriteContent}
               </div>
             )}
             {hasPlaybackPanel && (

@@ -953,6 +953,8 @@ export default function App() {
           } : s)
         };
       });
+      setInsertScrollTargetId(blockId);
+      setInsertScrollToken(token => token + 1);
 
       // Show toast with undo
       setToast({

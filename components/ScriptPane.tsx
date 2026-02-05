@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
@@ -158,6 +158,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+  const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -305,7 +306,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       blockStatuses={blockStatuses}
       showHighlights={showHighlights}
       autoScroll={autoScroll}
-      onRegenerate={onRegenerate}
       onToggleLock={onToggleLock}
       onSelectInsertTarget={onSelectInsertTarget}
       onChangeSpeaker={onChangeSpeaker}
@@ -315,7 +315,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
       onCancelInsertMode={onCancelInsertMode}
-      isRegenerating={isRegenerating}
       className={previewClassName}
       scrollable
       insertScrollTargetId={insertScrollTargetId}
@@ -425,6 +424,79 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onTitleChange(nextTitle);
     setIsTitleModalOpen(false);
   };
+  const rewriteOptions = useMemo(() => {
+    if (!context) return [];
+    return context.scenes.flatMap((scene, sceneIndex) => (
+      scene.blocks.map((block, blockIndex) => {
+        const typeLabel = block.type.charAt(0).toUpperCase() + block.type.slice(1);
+        const snippet = block.text.replace(/\s+/g, ' ').slice(0, 36);
+        const label = `Scene ${sceneIndex + 1}: ${scene.heading} — ${typeLabel} ${blockIndex + 1}${snippet ? ` · ${snippet}` : ''}`;
+        return {
+          sceneId: scene.id,
+          blockId: block.id,
+          label,
+          locked: Boolean(block.locked),
+          snippet
+        };
+      })
+    ));
+  }, [context]);
+  useEffect(() => {
+    if (rewriteOptions.length === 0) {
+      setRewriteTarget(null);
+      return;
+    }
+    if (!rewriteTarget || !rewriteOptions.some(option => option.blockId === rewriteTarget.blockId)) {
+      const [first] = rewriteOptions;
+      if (first) {
+        setRewriteTarget({ sceneId: first.sceneId, blockId: first.blockId });
+      }
+    }
+  }, [rewriteOptions, rewriteTarget]);
+  const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
+  const rewriteContent = context ? (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+          Target Block
+        </label>
+        <select
+          value={rewriteTarget ? `${rewriteTarget.sceneId}:${rewriteTarget.blockId}` : ''}
+          onChange={(event) => {
+            const [sceneId, blockId] = event.target.value.split(':');
+            if (sceneId && blockId) {
+              setRewriteTarget({ sceneId, blockId });
+            }
+          }}
+          className="w-full bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 outline-none"
+        >
+          {rewriteOptions.map(option => (
+            <option key={option.blockId} value={`${option.sceneId}:${option.blockId}`}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {selectedRewrite?.locked && (
+          <p className="text-[11px] text-amber-300">This block is locked and cannot be regenerated.</p>
+        )}
+      </div>
+      <Button
+        onClick={() => {
+          if (rewriteTarget) {
+            onRegenerate(rewriteTarget.sceneId, rewriteTarget.blockId);
+          }
+        }}
+        disabled={!rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
+        size="sm"
+        className="w-full"
+        title="Regenerate the selected block"
+      >
+        Regenerate block
+      </Button>
+    </div>
+  ) : (
+    <p className="text-[11px] text-gray-500">Generate a script to unlock rewrite tools.</p>
+  );
   const insertContent = context ? (
     <InsertBlock
       characters={context.characters}
@@ -631,6 +703,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onExportPdf={onExportPdf}
         exportDisabled={!canExport}
         generateContent={generateContent}
+        rewriteContent={rewriteContent}
         playbackContent={playbackContent}
         voicesContent={voicesContent}
         insertContent={insertContent}

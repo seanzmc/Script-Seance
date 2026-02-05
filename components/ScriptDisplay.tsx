@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Scene, BlockType, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
-import { MoreVertical, RefreshCw, Lock, Unlock, PlusCircle } from 'lucide-react';
+import { MoreVertical, Lock, Unlock, PlusCircle } from 'lucide-react';
 
 export interface ScriptDisplayProps {
   scenes: Scene[];
@@ -9,7 +9,6 @@ export interface ScriptDisplayProps {
   blockStatuses: Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>;
   showHighlights: boolean;
   autoScroll: boolean;
-  onRegenerate: (sceneId: string, blockId: string) => void;
   onToggleLock: (sceneId: string, blockId: string) => void;
   onSelectInsertTarget: (target: { sceneId: string; blockId: string }) => void;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
@@ -19,7 +18,6 @@ export interface ScriptDisplayProps {
   pendingInsertBlock?: ScriptBlock | null;
   onConfirmInsertMode?: () => void;
   onCancelInsertMode?: () => void;
-  isRegenerating: boolean;
   className?: string;
   scrollable?: boolean;
   insertScrollTargetId?: string | null;
@@ -225,7 +223,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   blockStatuses,
   showHighlights,
   autoScroll,
-  onRegenerate,
   onToggleLock,
   onSelectInsertTarget,
   onConfirmInsertMode,
@@ -234,7 +231,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   insertTarget,
   insertModeActive = false,
   pendingInsertBlock = null,
-  isRegenerating,
   className = '',
   scrollable = false,
   insertScrollTargetId,
@@ -524,19 +520,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
                           {openMenuId === block.id && (
                             <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 text-sm text-gray-700 z-20">
-                              {!block.locked && (
-                                <button
-                                  onClick={() => {
-                                    setOpenMenuId(null);
-                                    onRegenerate(scene.id, block.id);
-                                  }}
-                                  disabled={isRegenerating}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-100 text-left disabled:opacity-60"
-                                >
-                                  <RefreshCw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
-                                  Regenerate block
-                                </button>
-                              )}
                               <button
                                 onClick={() => {
                                   setOpenMenuId(null);
