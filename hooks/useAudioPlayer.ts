@@ -43,6 +43,11 @@ export const useAudioPlayer = (
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreOnEndedRef = useRef(false);
   const blockStatusesRef = useRef<Record<string, BlockAudioStatus>>({});
+  const debug = useCallback((...args: unknown[]) => {
+    if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.debug('[playback]', ...args);
+    }
+  }, []);
 
   // Store latest configs in ref for real-time access during playback loop
   const voiceConfigsRef = useRef(voiceConfigs);
@@ -125,6 +130,11 @@ export const useAudioPlayer = (
       } catch {
         // Ignore errors when stopping an already-stopped node.
       }
+      try {
+        activeSourceRef.current.disconnect();
+      } catch {
+        // Ignore disconnect errors on stopped nodes.
+      }
       activeSourceRef.current = null;
     }
     activeBlockIdRef.current = null;
@@ -135,6 +145,7 @@ export const useAudioPlayer = (
     const clearBuffer = options?.clearBuffer ?? false;
     clearStartTimeout();
     playbackRunIdRef.current += 1;
+    debug('stopped');
     setIsPlaying(false);
     setIsPaused(false);
     setIsPreviewPlaying(false);
@@ -155,7 +166,7 @@ export const useAudioPlayer = (
     if (clearBuffer) {
       resetBuffer();
     }
-  }, [clearStartTimeout, haltActiveSource, resetBuffer]);
+  }, [clearStartTimeout, debug, haltActiveSource, resetBuffer]);
 
   useEffect(() => {
     return () => {
@@ -182,7 +193,7 @@ export const useAudioPlayer = (
 
     const block = script[idx];
     setCurrentBlockIndex(idx);
-    if (activeSourceRef.current && activeBlockIdRef.current === block.id) {
+    if (activeSourceRef.current) {
       return;
     }
     if (pendingBlockIdRef.current === block.id && !activeSourceRef.current) {
@@ -241,6 +252,7 @@ export const useAudioPlayer = (
       activeSourceRef.current = source;
       activeBlockIdRef.current = block.id;
       ignoreOnEndedRef.current = false;
+      debug('start block', idx, block.id);
       
       source.onended = () => {
         if (ignoreOnEndedRef.current || !isPlayingRef.current || runId !== playbackRunIdRef.current) {
@@ -252,6 +264,7 @@ export const useAudioPlayer = (
         activeSourceRef.current = null;
         activeBlockIdRef.current = null;
         pendingBlockIdRef.current = null;
+        debug('end block', idx, block.id);
         // Advance pointer and loop
         currentIndexRef.current++;
         playNext(runId);
@@ -267,7 +280,7 @@ export const useAudioPlayer = (
       setCurrentBlockId(block.id); // Visually focus the block so user knows where we are
       pendingBlockIdRef.current = null;
     }
-  }, [getContext, getVoiceConfigForBlock, stop]);
+  }, [debug, getContext, getVoiceConfigForBlock, stop]);
 
   // --- Event Bindings ---
 
@@ -399,12 +412,13 @@ export const useAudioPlayer = (
     if (!isPlayingRef.current) return;
     clearStartTimeout();
     playbackRunIdRef.current += 1;
+    debug('paused');
     setIsPlaying(false);
     setIsPaused(true);
     isPlayingRef.current = false;
     setIsLoadingAudio(false);
     haltActiveSource();
-  }, [clearStartTimeout, haltActiveSource]);
+  }, [clearStartTimeout, debug, haltActiveSource]);
 
   const resume = useCallback(() => {
     if (isPlayingRef.current || queueRef.current.length === 0) return;
@@ -412,13 +426,14 @@ export const useAudioPlayer = (
     setIsPaused(false);
     setIsPlaying(true);
     isPlayingRef.current = true;
+    debug('resumed');
     if (currentIndexRef.current < 0) {
       currentIndexRef.current = 0;
       setCurrentBlockIndex(0);
     }
     playbackRunIdRef.current += 1;
     playNext(playbackRunIdRef.current);
-  }, [clearStartTimeout, playNext]);
+  }, [clearStartTimeout, debug, playNext]);
 
   const jumpToIndex = useCallback((targetIndex: number, autoPlay: boolean) => {
     const nextIndex = Math.max(0, Math.min(targetIndex, queueRef.current.length - 1));
