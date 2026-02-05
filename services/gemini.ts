@@ -31,6 +31,13 @@ export type CancellableRequest<T> = {
 };
 
 const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_VOICE_NAME = 'Zephyr';
+
+type GenerateSpeechContext = {
+  text: string;
+  voiceName: string;
+  [key: string]: unknown;
+};
 
 const createAiRequest = <T>(
   kind: string,
@@ -222,6 +229,32 @@ export const generateSurpriseSetup = async (
 
 // --- TTS Generation ---
 
+const buildGenerateSpeechContext = (
+  text: string,
+  voiceName: string,
+  extraContext?: Record<string, unknown>
+): GenerateSpeechContext => {
+  const safeText = text?.trim() ?? '';
+  const extraVoice =
+    typeof extraContext?.voiceName === 'string' ? extraContext.voiceName.trim() : '';
+  const resolvedVoiceName = voiceName?.trim() || extraVoice || DEFAULT_VOICE_NAME;
+
+  if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    if (!voiceName || !voiceName.trim()) {
+      console.debug('[generateSpeech] missing voiceName, falling back to', resolvedVoiceName);
+    }
+    if (extraVoice && extraVoice !== resolvedVoiceName) {
+      console.debug('[generateSpeech] voiceName mismatch, using', resolvedVoiceName);
+    }
+  }
+
+  return {
+    ...extraContext,
+    text: safeText,
+    voiceName: resolvedVoiceName
+  };
+};
+
 export const generateSpeech = async (
   text: string,
   voiceName: string,
@@ -238,7 +271,7 @@ export const createGenerateSpeechRequest = (
 ): CancellableRequest<ArrayBuffer> => {
   const request = createAiRequest<{ audioBase64: string }>(
     'generateSpeech',
-    { text, voiceName },
+    buildGenerateSpeechContext(text, voiceName),
     options
   );
 
