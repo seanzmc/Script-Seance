@@ -1206,7 +1206,6 @@ export default function App() {
   const expectedVoices = context ? context.characters.length + 1 : 0;
   const voicesReady = context ? voiceConfigs.length >= expectedVoices : false;
   const voicesAssigned = Boolean(context) && voicesReady && hasReviewedVoices;
-  const voiceReviewPending = Boolean(context) && voicesReady && !hasReviewedVoices;
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
   const errorBlocks = Object.values(blockStatuses).filter(status => status === 'error').length;
@@ -1339,23 +1338,31 @@ export default function App() {
     };
   })();
 
-  const unassignedVoices = voiceReviewPending
-    ? expectedVoices
-    : Math.max(expectedVoices - voiceConfigs.length, 0);
   const setupBadge = context ? 'Locked' : setupReady ? 'Ready' : 'Start';
-  const voicesBadge = context
-    ? (voicesAssigned ? 'Ready' : `Unassigned: ${unassignedVoices}`)
-    : 'Locked';
   const summaryBase = 'cursor-pointer list-none flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-colors';
   const summaryActive = 'bg-gray-900/70 border-indigo-500/40 text-white shadow-[0_0_20px_rgba(79,70,229,0.15)]';
   const summaryInactive = 'bg-gray-900/30 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200';
   const isSetupActive = currentStep === 'setup' || currentStep === 'script';
-  const isVoicesActive = currentStep === 'voices';
   const setupMetaParts = [setupState.genre, setupState.length, setupState.style.trim()].filter(Boolean);
   const setupMetaLine = setupMetaParts.join(' / ');
   const setupCastCount = setupState.characters.filter(char => char.trim().length > 0).length;
   const setupPremiseText = setupState.premise.trim();
   const setupPremiseSnippet = setupPremiseText.length > 60 ? `${setupPremiseText.slice(0, 60)}...` : setupPremiseText;
+  const voicesContent = context ? (
+    <VoicesPanel
+      characters={context.characters}
+      voiceConfigs={voiceConfigs}
+      onUpdateConfig={updateVoiceConfig}
+      onOpenCasting={setCastingCharacter}
+      onPreview={(config) => playPreview(getPreviewText(config.name), config)}
+      onStop={stop}
+      isAudioPlaying={isPreviewPlaying && !castingCharacter}
+      isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
+      onReviewed={() => setHasReviewedVoices(true)}
+    />
+  ) : (
+    <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
+  );
   const playbackContent = context ? (
     <PlaybackPanel
       isPlaying={isPlaying}
@@ -1449,6 +1456,7 @@ export default function App() {
         onExportPdf={handleExportPdf}
         canExport={Boolean(context)}
         playbackContent={playbackContent}
+        voicesContent={voicesContent}
       />
 
       <ControlPanel
@@ -1506,41 +1514,6 @@ export default function App() {
               <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 text-[11px] text-gray-500">
                 Start from the center to set your premise and cast.
               </div>
-            )}
-          </div>
-        </details>
-
-        <details open={openPanels.voices} onToggle={handlePanelToggle('voices')} className="group">
-          <summary className={`${summaryBase} ${isVoicesActive ? summaryActive : summaryInactive}`}>
-            <div className="flex items-center gap-3">
-              <span>Voices</span>
-              <span
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                  isVoicesActive
-                    ? 'border-indigo-500/40 text-indigo-200 bg-indigo-500/10'
-                    : 'border-gray-700/70 text-gray-500 bg-gray-900/40'
-                }`}
-              >
-                {voicesBadge}
-              </span>
-            </div>
-            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="mt-4">
-            {context ? (
-              <VoicesPanel
-                characters={context.characters}
-                voiceConfigs={voiceConfigs}
-                onUpdateConfig={updateVoiceConfig}
-                onOpenCasting={setCastingCharacter}
-                onPreview={(config) => playPreview(getPreviewText(config.name), config)}
-                onStop={stop}
-                isAudioPlaying={isPreviewPlaying && !castingCharacter}
-                isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
-                onReviewed={() => setHasReviewedVoices(true)}
-              />
-            ) : (
-              <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
             )}
           </div>
         </details>

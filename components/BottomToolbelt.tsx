@@ -45,6 +45,7 @@ export interface BottomToolbeltProps {
   onExportPdf?: () => void;
   exportDisabled?: boolean;
   playbackContent?: React.ReactNode;
+  voicesContent?: React.ReactNode;
 }
 
 export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
@@ -54,17 +55,21 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   onExportTxt,
   onExportPdf,
   exportDisabled = false,
-  playbackContent
+  playbackContent,
+  voicesContent
 }) => {
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
   const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
   const hasExportPanel = activeTool === 'export';
   const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
+  const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const panelDescription = hasExportPanel
     ? 'Download your script in common formats.'
     : hasPlaybackPanel
       ? 'Control playback and audio readiness.'
-      : null;
+      : hasVoicesPanel
+        ? 'Assign and preview voices for each character.'
+        : null;
 
   return (
     <div className="w-full shrink-0 px-4 pb-4">
@@ -120,6 +125,11 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
             {hasPlaybackPanel && (
               <div className="px-4 py-4">
                 {playbackContent}
+              </div>
+            )}
+            {hasVoicesPanel && (
+              <div className="px-4 py-4">
+                {voicesContent}
               </div>
             )}
           </div>
