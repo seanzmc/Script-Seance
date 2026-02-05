@@ -72,6 +72,8 @@ export interface ScriptPaneProps {
   canExport: boolean;
   playbackContent?: React.ReactNode;
   voicesContent?: React.ReactNode;
+  insertScrollTargetId: string | null;
+  insertScrollToken: number;
 }
 
 type ViewMode = 'write' | 'preview' | 'split';
@@ -148,7 +150,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onExportPdf,
   canExport,
   playbackContent,
-  voicesContent
+  voicesContent,
+  insertScrollTargetId,
+  insertScrollToken
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
@@ -289,23 +293,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       </section>
 
-      <InsertBlock
-        characters={context.characters}
-        genre={context.genre}
-        onAddBlock={onAddBlock}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onStartInsertMode={onStartInsertMode}
-        insertModeActive={isInsertModeView}
-        insertModeAvailable={insertModeAvailable}
-        insertCompleteToken={insertCompleteToken}
-        onError={onInsertError}
-        disabled={isPlaying || isGenerating}
-        insertTarget={insertTarget}
-        styleContext={styleContext}
-      />
     </>
   ) : null;
   const previewSection = context ? (
@@ -329,6 +316,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       isRegenerating={isRegenerating}
       className={previewClassName}
       scrollable
+      insertScrollTargetId={insertScrollTargetId}
+      insertScrollToken={insertScrollToken}
     />
   ) : null;
 
@@ -417,6 +406,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   };
   const handleToolClose = () => {
     setActiveTool(null);
+    requestAnimationFrame(() => {
+      const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
+      scrollContainer?.focus({ preventScroll: true });
+    });
   };
   const handleOpenTitleModal = () => {
     setTitleDraft(context?.title ?? '');
@@ -430,6 +423,27 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onTitleChange(nextTitle);
     setIsTitleModalOpen(false);
   };
+  const insertContent = context ? (
+    <InsertBlock
+      characters={context.characters}
+      genre={context.genre}
+      onAddBlock={onAddBlock}
+      onUndo={onUndo}
+      onRedo={onRedo}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      onStartInsertMode={onStartInsertMode}
+      insertModeActive={isInsertModeView}
+      insertModeAvailable={insertModeAvailable}
+      insertCompleteToken={insertCompleteToken}
+      onError={onInsertError}
+      disabled={isPlaying || isGenerating}
+      insertTarget={insertTarget}
+      styleContext={styleContext}
+    />
+  ) : (
+    <p className="text-[11px] text-gray-500">Generate a script to unlock insert mode.</p>
+  );
 
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
@@ -614,6 +628,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         exportDisabled={!canExport}
         playbackContent={playbackContent}
         voicesContent={voicesContent}
+        insertContent={insertContent}
       />
       <TitleEditModal
         isOpen={isTitleModalOpen}

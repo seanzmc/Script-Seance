@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Scene, BlockType, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
 import { MoreVertical, RefreshCw, Lock, Unlock, PlusCircle } from 'lucide-react';
 
@@ -22,10 +22,13 @@ export interface ScriptDisplayProps {
   isRegenerating: boolean;
   className?: string;
   scrollable?: boolean;
+  insertScrollTargetId?: string | null;
+  insertScrollToken?: number;
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
 const ERROR_CLASSES = 'border border-red-300/70 bg-red-50/60';
+const INSERT_HIGHLIGHT_CLASSES = 'ring-2 ring-emerald-400/60 bg-emerald-100/40';
 export const SCRIPT_EXPORT_ROOT_SELECTOR = '[data-script-export-root="true"]';
 
 const normalizeCharacterName = (value: string) =>
@@ -233,9 +236,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   pendingInsertBlock = null,
   isRegenerating,
   className = '',
-  scrollable = false
+  scrollable = false,
+  insertScrollTargetId,
+  insertScrollToken
 }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const insertHighlightTimeoutRef = useRef<number | null>(null);
   const playableBlockIds = useMemo(() => {
     const ids: string[] = [];
     scenes.forEach(scene => {
@@ -280,6 +286,30 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       el.classList.add('script-block-active', ...activeClasses);
     }
   }, [activeBlockId, showHighlights]);
+
+  useEffect(() => {
+    if (!insertScrollTargetId) return;
+    const el = document.getElementById(`block-${insertScrollTargetId}`);
+    requestAnimationFrame(() => {
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
+        if (scrollContainer) {
+          scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+        }
+        return;
+      }
+      const highlightClasses = INSERT_HIGHLIGHT_CLASSES.split(' ');
+      el.classList.add(...highlightClasses);
+      if (insertHighlightTimeoutRef.current) {
+        window.clearTimeout(insertHighlightTimeoutRef.current);
+      }
+      insertHighlightTimeoutRef.current = window.setTimeout(() => {
+        el.classList.remove(...highlightClasses);
+      }, 1600);
+    });
+  }, [insertScrollTargetId, insertScrollToken]);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -564,7 +594,11 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       data-script-export-root="true"
     >
       <div className="script-export-texture absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('/textures/cream-paper.svg')]" />
-      <div className={contentClasses}>
+      <div
+        className={contentClasses}
+        data-script-scroll="true"
+        tabIndex={-1}
+      >
         {renderedScenes}
       </div>
     </div>

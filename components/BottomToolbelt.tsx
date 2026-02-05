@@ -46,6 +46,7 @@ export interface BottomToolbeltProps {
   exportDisabled?: boolean;
   playbackContent?: React.ReactNode;
   voicesContent?: React.ReactNode;
+  insertContent?: React.ReactNode;
 }
 
 export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
@@ -56,13 +57,15 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   onExportPdf,
   exportDisabled = false,
   playbackContent,
-  voicesContent
+  voicesContent,
+  insertContent
 }) => {
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
   const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
   const hasExportPanel = activeTool === 'export';
   const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
+  const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
   const hasActivePanel = Boolean(activeTool);
   const panelDescription = hasExportPanel
     ? 'Download your script in common formats.'
@@ -70,7 +73,9 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
       ? 'Control playback and audio readiness.'
       : hasVoicesPanel
         ? 'Assign and preview voices for each character.'
-        : null;
+        : hasInsertPanel
+          ? 'Insert new blocks at a specific point in the script.'
+          : null;
 
   useEffect(() => {
     if (!hasActivePanel) return;
@@ -87,7 +92,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
     <div className="w-full shrink-0 px-4 pb-4">
       <div className={`mx-auto w-full max-w-6xl flex flex-col ${hasActivePanel ? 'gap-2' : ''}`}>
         {hasActivePanel && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[220px] max-h-[360px]">
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[260px] max-h-[360px]">
             <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-3 shrink-0">
               <div className="space-y-1">
                 <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">{activeLabel}</p>
@@ -142,6 +147,11 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
             {hasVoicesPanel && (
               <div className="px-4 py-4 flex-1 overflow-y-auto">
                 {voicesContent}
+              </div>
+            )}
+            {hasInsertPanel && (
+              <div className="px-4 py-4 flex-1">
+                {insertContent}
               </div>
             )}
           </div>

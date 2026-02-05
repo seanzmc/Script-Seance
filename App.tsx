@@ -161,6 +161,8 @@ export default function App() {
   const [insertModeActive, setInsertModeActive] = useState(false);
   const [pendingInsertBlock, setPendingInsertBlock] = useState<ScriptBlock | null>(null);
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
+  const [insertScrollToken, setInsertScrollToken] = useState(0);
+  const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
@@ -747,6 +749,8 @@ export default function App() {
   const handleAddBlock = (block: ScriptBlock) => {
     if (!context) return;
     clearRedo();
+    setInsertScrollTargetId(block.id);
+    setInsertScrollToken(token => token + 1);
     
     setContext(prev => {
       if (!prev) return null;
@@ -835,6 +839,8 @@ export default function App() {
 
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
+    setInsertScrollTargetId(pendingInsertBlock.id);
+    setInsertScrollToken(token => token + 1);
     handleInsertAfter(insertTarget, pendingInsertBlock);
     setPendingInsertBlock(null);
     setInsertModeActive(false);
@@ -1244,6 +1250,8 @@ export default function App() {
         canExport={Boolean(context)}
         playbackContent={playbackContent}
         voicesContent={voicesContent}
+        insertScrollTargetId={insertScrollTargetId}
+        insertScrollToken={insertScrollToken}
       />
 
       {toast && (
