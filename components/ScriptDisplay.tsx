@@ -326,7 +326,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     if (block.type === BlockType.HEADING) {
       return (
         <div className={`${baseClasses} text-sm`}>
-          <div className="text-[9px] uppercase tracking-[0.4em] text-indigo-400 mb-2">Preview</div>
           <div className="script-scene-heading font-bold uppercase text-sm border-b border-indigo-200 pb-2">
             {block.text.toUpperCase()}
           </div>
@@ -365,7 +364,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
     return (
       <div className={baseClasses}>
-        <div className="text-[9px] uppercase tracking-[0.4em] text-indigo-400 mb-2">Preview</div>
         {content}
       </div>
     );

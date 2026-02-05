@@ -78,21 +78,7 @@ export interface ScriptPaneProps {
   insertScrollToken: number;
 }
 
-type ViewMode = 'write' | 'preview' | 'split';
-
 const PROMPT_CHAR_LIMIT = 320;
-const VIEW_OPTIONS: { mode: ViewMode; label: string }[] = [
-  { mode: 'write', label: 'Write' },
-  { mode: 'preview', label: 'Preview' },
-  { mode: 'split', label: 'Split' }
-];
-
-const getDefaultViewMode = (): ViewMode => {
-  if (typeof window !== 'undefined' && window.innerWidth >= 1200) {
-    return 'split';
-  }
-  return 'write';
-};
 
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
@@ -157,7 +143,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertScrollTargetId,
   insertScrollToken
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -169,15 +154,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
-  const isSplitView = viewMode === 'split';
   const isInsertModeView = insertModeActive && Boolean(context);
-  const insertModeAvailable = viewMode !== 'preview';
+  const insertModeAvailable = true;
   const titleMatchesSuggestion = Boolean(context && suggestedTitle && context.title.trim() === suggestedTitle);
   const showSuggestedTitle = Boolean(context && suggestedTitle && !suggestedTitleDismissed);
   const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
-  const previewWidthClass = viewMode === 'preview' ? 'max-w-none w-full' : 'w-full';
-  const previewLayoutClass = isSplitView ? 'h-full min-h-0' : '';
-  const previewClassName = `${previewWidthClass} ${previewLayoutClass} ${
+  const previewClassName = `w-full ${
     isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
   }`.trim();
   const genreLabel = context?.genre ?? 'Genre';
@@ -532,22 +514,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
 
-  useEffect(() => {
-    if (viewMode === 'preview' && insertModeActive) {
-      onCancelInsertMode();
-    }
-  }, [insertModeActive, onCancelInsertMode, viewMode]);
-
   const contentWrapperClassName = 'max-w-6xl mx-auto px-6 py-6 h-full min-h-0 flex flex-col gap-6';
   const writePanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
     isInsertModeView ? 'max-h-0 opacity-0 -translate-y-2 pointer-events-none' : 'max-h-[2000px] opacity-100 translate-y-0'
   }`;
-  const insertPanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
-    isInsertModeView ? 'max-h-[2000px] opacity-100 translate-y-0 flex-1 min-h-0' : 'max-h-0 opacity-0 translate-y-2 pointer-events-none'
-  }`;
-  const splitGridClassName = `grid grid-cols-1 ${
-    isInsertModeView ? 'lg:grid-cols-[minmax(0,0)_minmax(0,100%)]' : 'lg:grid-cols-[minmax(0,40%)_minmax(0,60%)]'
-  } gap-6 flex-1 min-h-0 transition-all duration-300 ease-out`;
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -744,34 +714,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="flex lg:justify-end">
-                <div
-                  className="inline-flex items-center bg-gray-950/70 border border-gray-800 rounded-lg p-1"
-                  role="group"
-                  aria-label="Script view"
-                >
-                  {VIEW_OPTIONS.map((option) => {
-                    const isActive = viewMode === option.mode;
-                    return (
-                      <button
-                        key={option.mode}
-                        type="button"
-                        onClick={() => setViewMode(option.mode)}
-                        aria-pressed={isActive}
-                        disabled={insertModeActive}
-                        aria-disabled={insertModeActive}
-                        className={`px-3 py-1.5 text-[10px] uppercase tracking-widest rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed ${
-                          isActive
-                            ? 'bg-gray-700 text-white shadow-sm'
-                            : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/70'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
@@ -835,53 +777,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className={contentWrapperClassName}>
             {errorBanner}
 
-            {context && viewMode === 'write' && (
-              <div className="flex flex-col gap-6 flex-1 min-h-0">
-                <div className={writePanelClassName}>
-                  <div className={`space-y-6 ${isInsertModeView ? 'pointer-events-none opacity-40' : ''}`}>
-                    <p className="text-[11px] text-gray-500">
-                      Use the tool belt below to generate or insert new content.
-                    </p>
-                  </div>
-                </div>
-                <div className={insertPanelClassName}>
-                  <div className="flex flex-col gap-4 h-full">
-                    {insertModeToolbar}
-                    <div className="flex-1 min-h-0">
-                      {previewSection}
-                    </div>
-                  </div>
+            <div className="flex flex-col gap-6 flex-1 min-h-0">
+              <div className={writePanelClassName}>
+                <div className={`space-y-6 ${isInsertModeView ? 'pointer-events-none opacity-40' : ''}`}>
+                  <p className="text-[11px] text-gray-500">
+                    Use the tool belt below to generate or insert new content.
+                  </p>
                 </div>
               </div>
-            )}
-
-            {context && viewMode === 'preview' && (
-              <div className="flex flex-col gap-6 flex-1 min-h-0">
+              <div className="flex flex-col gap-4 flex-1 min-h-0">
+                {insertModeToolbar}
                 <div className="flex-1 min-h-0">
                   {previewSection}
                 </div>
               </div>
-            )}
-
-            {context && viewMode === 'split' && (
-              <div className={splitGridClassName}>
-                <div
-                  className={`min-h-0 h-full overflow-hidden pr-2 space-y-6 transition-all duration-300 ease-out ${
-                    isInsertModeView ? 'opacity-0 -translate-x-2 pointer-events-none' : 'opacity-100 translate-x-0'
-                  }`}
-                >
-                  <div className="text-[11px] text-gray-500">
-                    Use the tool belt below to generate or insert new content.
-                  </div>
-                </div>
-                <div className="min-h-0 h-full overflow-hidden flex flex-col gap-4">
-                  {insertModeToolbar}
-                  <div className="flex-1 min-h-0">
-                    {previewSection}
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         ) : (
           <>
