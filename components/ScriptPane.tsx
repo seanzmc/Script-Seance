@@ -5,7 +5,8 @@ import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
-import { AlertCircle, Loader2, Sparkles, PlusCircle, X } from 'lucide-react';
+import { TitleEditModal } from './TitleEditModal';
+import { AlertCircle, Loader2, Sparkles, PlusCircle, X, Pencil } from 'lucide-react';
 
 export interface InsertTarget {
   sceneId: string;
@@ -151,6 +152,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(getDefaultViewMode);
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
+  const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -415,6 +418,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const handleToolClose = () => {
     setActiveTool(null);
   };
+  const handleOpenTitleModal = () => {
+    setTitleDraft(context?.title ?? '');
+    setIsTitleModalOpen(true);
+  };
+  const handleCloseTitleModal = () => {
+    setIsTitleModalOpen(false);
+  };
+  const handleSaveTitle = () => {
+    const nextTitle = titleDraft.trim() || 'Untitled Screenplay';
+    onTitleChange(nextTitle);
+    setIsTitleModalOpen(false);
+  };
 
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
@@ -477,14 +492,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 <label className="text-[10px] uppercase font-semibold text-gray-500 block tracking-[0.28em] mb-1">
                   Draft Title
                 </label>
-                <input
-                  ref={titleInputRef}
-                  value={context?.title ?? ''}
-                  onChange={(e) => onTitleChange(e.target.value)}
-                  placeholder="Untitled Screenplay"
-                  className="w-full bg-gray-950/80 border border-gray-700 rounded-lg px-4 py-2.5 text-lg md:text-xl focus:ring-1 focus:ring-indigo-500 text-white font-semibold outline-none transition-shadow disabled:opacity-60"
-                  disabled={!context}
-                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-lg md:text-xl font-semibold text-white">
+                    {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleOpenTitleModal}
+                    className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </button>
+                </div>
                 {showSuggestedTitle && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                     <span>
@@ -594,6 +614,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         exportDisabled={!canExport}
         playbackContent={playbackContent}
         voicesContent={voicesContent}
+      />
+      <TitleEditModal
+        isOpen={isTitleModalOpen}
+        value={titleDraft}
+        onChange={setTitleDraft}
+        onSave={handleSaveTitle}
+        onClose={handleCloseTitleModal}
+        inputRef={titleInputRef}
       />
       {setupModal}
     </section>
