@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, AlertTriangle } from 'lucide-react';
 
 export interface PlaybackPanelProps {
   isPlaying: boolean;
@@ -136,128 +136,75 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   })();
 
   return (
-    <div className="space-y-5">
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-            Transport
-          </h4>
-          <span className="text-[10px] text-gray-500">
-            Speaking: <span className="text-gray-300">{currentSpeaker}</span>
-          </span>
-        </div>
-        <div className="bg-gray-900/40 p-4 rounded-xl border border-gray-700/50 space-y-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={onPrev}
-                  disabled={!canNavigate || atStart}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Previous block"
-                >
-                  <SkipBack className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handlePlayPause}
-                  className={`flex items-center justify-center w-11 h-11 rounded-full transition-all ${
-                    isPlaying
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/40'
-                  }`}
-                  title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
-                >
-                  {isPlaying ? (
-                    <Pause className="w-5 h-5 fill-current" />
-                  ) : (
-                    <Play className="w-5 h-5 fill-current ml-0.5" />
-                  )}
-                </button>
-                <button
-                  onClick={onStop}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Stop playback"
-                >
-                  <Square className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={onNext}
-                  disabled={!canNavigate || atEnd}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Next block"
-                >
-                  <SkipForward className="w-4 h-4" />
-                </button>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-white">{statusHeadline}</p>
-                <p className="text-[11px] text-gray-400">{statusDetail}</p>
-              </div>
-            </div>
-            {currentStatus === 'error' && (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-300">
-                <div className="flex items-center gap-2 text-amber-300">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Audio failed for this block.
-                </div>
-                <button
-                  onClick={onRetry}
-                  className="flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  Retry block
-                </button>
-                <button
-                  onClick={onSkip}
-                  className="flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
-                >
-                  <SkipForward className="w-3 h-3" />
-                  Skip block
-                </button>
-              </div>
-            )}
-            {errorCount > 0 && currentStatus !== 'error' && (
-              <div className="text-[10px] text-amber-300">
-                {errorCount} block{errorCount === 1 ? '' : 's'} need attention. Jump back to retry or skip.
-              </div>
-            )}
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-gray-400">
-              <span>Audio generation</span>
-              <span>{progressCount}/{totalCount || 0} blocks</span>
-            </div>
-            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-500 transition-all"
-                style={{ width: `${progress * 100}%` }}
-              />
-            </div>
-            {isLoadingAudio && (
-              <div className="flex items-center gap-2 text-[10px] text-emerald-400">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Waiting for current block audio.
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+          Transport
+        </h4>
+        <span className="text-[10px] text-gray-500">
+          Speaking: <span className="text-gray-300">{currentSpeaker}</span>
+        </span>
+      </div>
 
-      <details className="group">
-        <summary className="cursor-pointer list-none flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm font-semibold text-gray-300">
-          <span>Advanced / Playback options</span>
-          <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
-        </summary>
-        <div className="mt-4 space-y-4">
-          <section className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-              Playback Speed
-            </h4>
-            <div className="bg-gray-900/40 p-4 rounded-xl border border-gray-700/50 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-gray-500 uppercase font-bold">Speed</span>
-                <span className="text-xs text-indigo-300 font-bold">{playbackSpeed.toFixed(1)}x</span>
+      <div className="bg-gray-900/40 p-3 rounded-xl border border-gray-700/50 space-y-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onPrev}
+                disabled={!canNavigate || atStart}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Previous block"
+              >
+                <SkipBack className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handlePlayPause}
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
+                  isPlaying
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/40'
+                }`}
+                title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
+              >
+                {isPlaying ? (
+                  <Pause className="w-5 h-5 fill-current" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                )}
+              </button>
+              <button
+                onClick={onStop}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Stop playback"
+              >
+                <Square className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onNext}
+                disabled={!canNavigate || atEnd}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Next block"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="min-w-[160px] flex-1 flex items-center gap-3 justify-end">
+              <div className="text-right">
+                <p className="text-[11px] font-semibold text-white">{statusHeadline}</p>
+                <p className="text-[10px] text-gray-400">{statusDetail}</p>
               </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-[10px] text-gray-400">
+              Audio generation: {progressCount}/{totalCount || 0}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest">Speed</span>
+              <span className="text-[11px] text-indigo-300 font-semibold">{playbackSpeed.toFixed(1)}x</span>
               <input
                 type="range"
                 min="0.5"
@@ -265,47 +212,78 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
                 step="0.1"
                 value={playbackSpeed}
                 onChange={(e) => onPlaybackSpeedChange(parseFloat(e.target.value))}
-                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                className="w-28 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                 title="Playback speed"
               />
             </div>
-          </section>
+          </div>
 
-          <section className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-              Focus & Scroll
-            </h4>
-            <div className="space-y-2 bg-gray-900/40 p-4 rounded-xl border border-gray-700/50">
+          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+          {isLoadingAudio && (
+            <div className="flex items-center gap-2 text-[10px] text-emerald-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Waiting for current block audio.
+            </div>
+          )}
+          {currentStatus === 'error' && (
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-300">
+              <div className="flex items-center gap-2 text-amber-300">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Audio failed for this block.
+              </div>
               <button
-                onClick={onToggleAutoScroll}
-                className="w-full flex items-center justify-between text-left text-sm text-gray-300"
-                title="Auto-scroll script with playback"
+                onClick={onRetry}
+                className="flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
               >
-                <span className="flex items-center gap-2">
-                  <ScrollText className={`w-4 h-4 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
-                  Auto-scroll script
-                </span>
-                <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${autoScroll ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-                  <span className={`w-4 h-4 bg-white rounded-full transition-transform ${autoScroll ? 'translate-x-4' : ''}`} />
-                </span>
+                <RotateCcw className="w-3 h-3" />
+                Retry block
               </button>
               <button
-                onClick={onToggleHighlights}
-                className="w-full flex items-center justify-between text-left text-sm text-gray-300"
-                title="Highlight the active line during playback"
+                onClick={onSkip}
+                className="flex items-center gap-1.5 rounded-full border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
               >
-                <span className="flex items-center gap-2">
-                  <HighlightIcon className={`w-4 h-4 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />
-                  Highlight active line
-                </span>
-                <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${showHighlights ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-                  <span className={`w-4 h-4 bg-white rounded-full transition-transform ${showHighlights ? 'translate-x-4' : ''}`} />
-                </span>
+                <SkipForward className="w-3 h-3" />
+                Skip block
               </button>
             </div>
-          </section>
+          )}
+          {errorCount > 0 && currentStatus !== 'error' && (
+            <div className="text-[10px] text-amber-300">
+              {errorCount} block{errorCount === 1 ? '' : 's'} need attention. Jump back to retry or skip.
+            </div>
+          )}
         </div>
-      </details>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={onToggleAutoScroll}
+          className="flex items-center gap-2 rounded-full border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
+          title="Auto-scroll script with playback"
+        >
+          <ScrollText className={`w-3.5 h-3.5 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
+          Auto-scroll
+          <span className={`ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors ${autoScroll ? 'bg-indigo-600' : 'bg-gray-700'}`}>
+            <span className={`w-3.5 h-3.5 bg-white rounded-full transition-transform ${autoScroll ? 'translate-x-4' : ''}`} />
+          </span>
+        </button>
+        <button
+          onClick={onToggleHighlights}
+          className="flex items-center gap-2 rounded-full border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
+          title="Highlight the active line during playback"
+        >
+          <HighlightIcon className={`w-3.5 h-3.5 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />
+          Highlight
+          <span className={`ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors ${showHighlights ? 'bg-indigo-600' : 'bg-gray-700'}`}>
+            <span className={`w-3.5 h-3.5 bg-white rounded-full transition-transform ${showHighlights ? 'translate-x-4' : ''}`} />
+          </span>
+        </button>
+      </div>
     </div>
   );
 };
