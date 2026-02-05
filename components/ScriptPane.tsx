@@ -149,6 +149,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [surpriseDraft, setSurpriseDraft] = useState('');
   const [isSurpriseGenerating, setIsSurpriseGenerating] = useState(false);
+  const [isSurpriseOpen, setIsSurpriseOpen] = useState(false);
   const [showSurprisePrompt, setShowSurprisePrompt] = useState(false);
   const [surpriseGenre, setSurpriseGenre] = useState(setupState.genre);
   const promptCount = userInstruction.length;
@@ -231,6 +232,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const canInsertSurprise = isSurpriseDraftReady && Boolean(insertTarget) && Boolean(onInsertAtTarget);
   const handleGenerateSurpriseDraft = async () => {
     if (!context || isSurpriseGenerating || isGenerating) return;
+    setIsSurpriseOpen(true);
     setIsSurpriseGenerating(true);
     const promptContext = styleContext?.trim() ? styleContext : context.genre;
     const instruction = userInstruction.trim()
@@ -362,10 +364,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     </div>
   );
   const generateContent = context ? (
-    <div className="space-y-4">
-      <section className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Next Scene Prompt</h3>
+    <div className="space-y-3">
+      <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Prompt</h3>
           <span className={`text-[10px] ${promptWarning ? 'text-amber-400' : 'text-gray-500'}`}>
             {promptCount}/{PROMPT_CHAR_LIMIT} chars
           </span>
@@ -374,11 +376,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           value={userInstruction}
           onChange={(e) => onInstructionChange(e.target.value)}
           placeholder="Suggest an action, or leave empty for AI to decide..."
-          className="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-sm h-28 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+          className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
         />
-        <div className="flex items-center justify-between text-[11px] text-gray-500">
-          <p>
-            Keep prompts concise for faster responses.{' '}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] text-gray-500">
+          <p className="flex items-center gap-2">
+            <span>Keep prompts concise.</span>
             <button
               type="button"
               onClick={onOpenPrivacy}
@@ -389,7 +391,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </p>
           {promptWarning && <span>Trim prompts to reduce latency.</span>}
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
           <Button
             onClick={onPlotTwist}
             variant="secondary"
@@ -412,67 +414,79 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </Button>
         </div>
       </section>
-      <section className="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Surprise Draft</p>
-            <p className="text-[11px] text-gray-500">Edit before applying.</p>
+      <section className="bg-gray-900/40 border border-gray-800 rounded-xl p-3 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="space-y-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Surprise Draft</p>
+            <p className="text-[10px] text-gray-500">Edit before applying.</p>
           </div>
-          <Button
-            onClick={handleGenerateSurpriseDraft}
-            variant="secondary"
-            size="sm"
-            loading={isSurpriseGenerating}
-            disabled={isGenerating || isPlaying}
-            title="Generate a surprise draft without committing"
-          >
-            <Sparkles className="w-3 h-3 mr-2" />
-            Surprise me
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsSurpriseOpen((open) => !open)}
+              variant="ghost"
+              size="sm"
+            >
+              {isSurpriseOpen ? 'Hide' : 'Show'}
+            </Button>
+            <Button
+              onClick={handleGenerateSurpriseDraft}
+              variant="secondary"
+              size="sm"
+              loading={isSurpriseGenerating}
+              disabled={isGenerating || isPlaying}
+              title="Generate a surprise draft without committing"
+            >
+              <Sparkles className="w-3 h-3 mr-2" />
+              Surprise
+            </Button>
+          </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
-            Draft suggestion (editable)
-          </label>
-          <textarea
-            value={surpriseDraft}
-            onChange={(e) => setSurpriseDraft(e.target.value)}
-            placeholder="Surprise text will appear here..."
-            className="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-sm h-24 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
-          />
-          {!insertTarget && (
-            <p className="text-[10px] text-gray-500">
-              Select an insert target in the script to enable “Insert at selection.”
-            </p>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <Button
-            onClick={() => handleApplySurprise('insert')}
-            variant="secondary"
-            size="sm"
-            disabled={!canInsertSurprise}
-            title={insertTarget ? 'Insert this draft at the selected location' : 'Select a target to insert'}
-          >
-            Insert at selection
-          </Button>
-          <Button
-            onClick={() => handleApplySurprise('append')}
-            size="sm"
-            disabled={!isSurpriseDraftReady}
-            title="Append this draft to the end of the script"
-          >
-            Add to bottom
-          </Button>
-          <Button
-            onClick={() => setSurpriseDraft('')}
-            variant="ghost"
-            size="sm"
-            disabled={!isSurpriseDraftReady}
-          >
-            Discard
-          </Button>
-        </div>
+        {isSurpriseOpen ? (
+          <div className="space-y-2">
+            <textarea
+              value={surpriseDraft}
+              onChange={(e) => setSurpriseDraft(e.target.value)}
+              placeholder="Surprise text will appear here..."
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+            />
+            {!insertTarget && (
+              <p className="text-[10px] text-gray-500">
+                Select an insert target to enable “Insert at selection.”
+              </p>
+            )}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+              <Button
+                onClick={() => handleApplySurprise('insert')}
+                variant="secondary"
+                size="sm"
+                disabled={!canInsertSurprise}
+                title={insertTarget ? 'Insert this draft at the selected location' : 'Select a target to insert'}
+              >
+                Insert at selection
+              </Button>
+              <Button
+                onClick={() => handleApplySurprise('append')}
+                size="sm"
+                disabled={!isSurpriseDraftReady}
+                title="Append this draft to the end of the script"
+              >
+                Add to bottom
+              </Button>
+              <Button
+                onClick={() => setSurpriseDraft('')}
+                variant="ghost"
+                size="sm"
+                disabled={!isSurpriseDraftReady}
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-500">
+            {isSurpriseDraftReady ? 'Draft ready. Open to review and apply.' : 'Generate a draft to review and apply.'}
+          </p>
+        )}
       </section>
       {generationIndicator}
     </div>
