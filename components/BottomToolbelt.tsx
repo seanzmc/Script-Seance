@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Download, FileDown, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, FileDown, X, Sparkles, PlusCircle, RefreshCw, Play, Mic, MoreHorizontal } from 'lucide-react';
 import { Button } from './Button';
 
 export type ToolKey = 'generate' | 'insert' | 'rewrite' | 'voices' | 'playback' | 'export';
@@ -64,6 +64,8 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   voicesContent,
   insertContent
 }) => {
+  const [isCompact, setIsCompact] = useState(false);
+  const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
   const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
   const hasExportPanel = activeTool === 'export';
@@ -97,6 +99,44 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasActivePanel, onCloseTool]);
+
+  useEffect(() => {
+    const updateCompact = () => {
+      setIsCompact(window.innerWidth < 900);
+    };
+    updateCompact();
+    window.addEventListener('resize', updateCompact);
+    return () => window.removeEventListener('resize', updateCompact);
+  }, []);
+
+  useEffect(() => {
+    if (!isOverflowOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const root = target.closest('[data-toolbelt-overflow="true"]');
+      if (!root) {
+        setIsOverflowOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClick);
+    return () => window.removeEventListener('mousedown', handleClick);
+  }, [isOverflowOpen]);
+
+  const compactPrimaryTools = useMemo<ToolKey[]>(() => (
+    ['generate', 'insert', 'rewrite', 'playback']
+  ), []);
+  const compactOverflowTools = useMemo<ToolKey[]>(() => (
+    ['voices', 'export']
+  ), []);
+  const compactIcons: Record<ToolKey, React.ReactNode> = {
+    generate: <Sparkles className="h-4 w-4" />,
+    insert: <PlusCircle className="h-4 w-4" />,
+    rewrite: <RefreshCw className="h-4 w-4" />,
+    playback: <Play className="h-4 w-4" />,
+    voices: <Mic className="h-4 w-4" />,
+    export: <Download className="h-4 w-4" />
+  };
 
   return (
     <div className="w-full shrink-0 px-4 pb-4">
@@ -177,35 +217,104 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
           </div>
         )}
         <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-4 py-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
-          <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.35em] text-gray-400">
-            {TOOL_GROUPS.map((group, groupIndex) => (
-              <React.Fragment key={`tool-group-${groupIndex}`}>
-                <div className="flex flex-wrap items-center gap-2">
-                  {group.map((tool) => {
-                    const isActive = activeTool === tool.key;
-                    return (
-                      <button
-                        key={tool.key}
-                        type="button"
-                        onClick={() => onSelectTool(tool.key)}
-                        aria-pressed={isActive}
-                        className={`rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.3em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
-                          isActive
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
-                        }`}
-                      >
-                        {tool.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {groupIndex < TOOL_GROUPS.length - 1 && (
-                  <span className="text-gray-600">|</span>
+          {isCompact ? (
+            <div className="grid grid-cols-5 gap-2 text-gray-400">
+              {compactPrimaryTools.map((tool) => {
+                const isActive = activeTool === tool;
+                return (
+                  <button
+                    key={tool}
+                    type="button"
+                    onClick={() => onSelectTool(tool)}
+                    aria-label={TOOL_LABELS[tool]}
+                    aria-pressed={isActive}
+                    className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                      isActive
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
+                    }`}
+                  >
+                    {compactIcons[tool]}
+                    <span>{TOOL_LABELS[tool]}</span>
+                  </button>
+                );
+              })}
+              <div className="relative" data-toolbelt-overflow="true">
+                <button
+                  type="button"
+                  onClick={() => setIsOverflowOpen((open) => !open)}
+                  aria-label="More tools"
+                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                    isOverflowOpen
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
+                  }`}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span>More</span>
+                </button>
+                {isOverflowOpen && (
+                  <div className="absolute right-0 bottom-14 w-48 rounded-xl border border-gray-800 bg-gray-950 shadow-[0_20px_40px_rgba(0,0,0,0.45)] p-2 text-xs">
+                    <div className="space-y-1">
+                      {compactOverflowTools.map((tool) => {
+                        const isActive = activeTool === tool;
+                        return (
+                          <button
+                            key={tool}
+                            type="button"
+                            onClick={() => {
+                              onSelectTool(tool);
+                              setIsOverflowOpen(false);
+                            }}
+                            aria-pressed={isActive}
+                            className={`w-full flex items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
+                              isActive
+                                ? 'bg-gray-100 text-gray-900'
+                                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                            }`}
+                          >
+                            {compactIcons[tool]}
+                            <span className="text-[10px] uppercase tracking-[0.3em]">{TOOL_LABELS[tool]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
-              </React.Fragment>
-            ))}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.35em] text-gray-400">
+              {TOOL_GROUPS.map((group, groupIndex) => (
+                <React.Fragment key={`tool-group-${groupIndex}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {group.map((tool) => {
+                      const isActive = activeTool === tool.key;
+                      return (
+                        <button
+                          key={tool.key}
+                          type="button"
+                          onClick={() => onSelectTool(tool.key)}
+                          aria-label={tool.label}
+                          aria-pressed={isActive}
+                          className={`rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.3em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
+                            isActive
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'text-gray-400 hover:bg-gray-800/80 hover:text-white'
+                          }`}
+                        >
+                          {tool.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {groupIndex < TOOL_GROUPS.length - 1 && (
+                    <span className="text-gray-600">|</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
