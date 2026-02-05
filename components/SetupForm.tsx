@@ -169,15 +169,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isLengthBlank = !length;
   const lengthHint = (() => {
     if (isLengthBlank) {
-      return 'Defaults generate a balanced scene count.';
+      return 'Defaults to a balanced scene count.';
     }
     if (length === 'Short') {
-      return 'Short keeps it tight: a few beats or a single scene.';
+      return 'Short aims for fewer scenes (roughly 1–2).';
     }
     if (length === 'Medium') {
-      return 'Medium balances a few scenes with room for turns.';
+      return 'Medium aims for a few scenes (roughly 3–5).';
     }
-    return 'Long stretches into more scenes and beats for a fuller arc.';
+    return 'Long aims for more scenes (roughly 6+).';
   })();
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
@@ -318,7 +318,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Length (optional)
+                  Target Length (optional)
                 </label>
                 <select
                   value={length}
@@ -330,7 +330,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
                   disabled={isLocked}
                 >
-                  <option value="">Using defaults</option>
+                  <option value="">Balanced (default)</option>
                   {LENGTH_OPTIONS.map((option) => (
                     <option key={option} value={option}>
                       {option}
