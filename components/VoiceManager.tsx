@@ -63,6 +63,9 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
 
   const renderRow = (char: string, options?: { variant?: 'narrator' | 'cast'; index?: number }) => {
     const config = getConfig(char);
+    const voiceOptions = config.voiceId && !AVAILABLE_VOICES.includes(config.voiceId)
+      ? [config.voiceId, ...AVAILABLE_VOICES]
+      : AVAILABLE_VOICES;
     const isActive = activeChar === char;
     const isThisLoading = isActive && isLoading;
     const isThisPlaying = isActive && isAudioPlaying;
@@ -76,18 +79,42 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
         : 'border-gray-800/60 bg-gray-900/40';
 
     return (
-      <div key={char} className="space-y-2">
-        <div className={`grid grid-cols-[1.6fr_1fr_auto_auto] items-center gap-3 rounded-lg border px-3 py-2 ${rowTone} ${
+      <div key={char} className="space-y-1.5">
+        <div className={`grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto] items-center gap-2 rounded-lg border px-2.5 py-2 ${rowTone} ${
           isActive ? 'ring-1 ring-indigo-500/40' : ''
         }`}>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate" title={char}>{char}</p>
-            <p className={`text-[11px] ${isNarrator ? 'text-indigo-200' : 'text-gray-400'}`}>
-              Voice: <span className="text-gray-200">{config.voiceId}</span>
-            </p>
+            {isNarrator && (
+              <span className="text-[9px] uppercase tracking-widest text-indigo-200">Narrator</span>
+            )}
           </div>
-          <div className="text-[11px] text-gray-400">
-            {config.speed?.toFixed(1) || '1.0'}x / Pitch {config.pitch || 0}
+          <div className="min-w-0 flex items-center gap-2">
+            <select
+              value={config.voiceId}
+              onChange={(e) => onUpdateConfig(char, { voiceId: e.target.value })}
+              className="min-w-0 flex-1 bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-md px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none appearance-none"
+            >
+              {voiceOptions.map(voice => (
+                <option key={voice} value={voice}>
+                  {voice}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => onOpenCasting(char)}
+              className="p-2 text-gray-400 hover:text-indigo-300 hover:bg-gray-800/70 rounded-md"
+              title="Cast a different voice"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => toggleExpand(char)}
+              className={`p-2 text-gray-500 hover:text-gray-300 rounded-md ${isExpanded ? 'bg-gray-800/70' : ''}`}
+              title="Adjust speed and pitch"
+            >
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
           </div>
           <button
             onClick={() => handlePreview(char, config)}
@@ -107,29 +134,13 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             )}
             <span>{isThisPlaying ? 'Stop' : 'Preview'}</span>
           </button>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onOpenCasting(char)}
-              className="p-2 text-gray-400 hover:text-indigo-300 hover:bg-gray-800/70 rounded-md"
-              title="Cast a different voice"
-            >
-              <Settings2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => toggleExpand(char)}
-              className={`p-2 text-gray-500 hover:text-gray-300 rounded-md ${isExpanded ? 'bg-gray-800/70' : ''}`}
-              title="Adjust speed and pitch"
-            >
-              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-          </div>
         </div>
 
         {isExpanded && (
-          <div className="grid grid-cols-2 gap-4 rounded-lg border border-gray-800 bg-black/20 px-3 py-3">
+          <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-800 bg-black/20 px-3 py-2">
             <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Speed</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[9px] uppercase font-bold text-gray-500 tracking-wider">Speed</label>
                 <span className="text-[10px] text-gray-300 bg-gray-700 px-1 rounded">{config.speed?.toFixed(1) || '1.0'}x</span>
               </div>
               <input
@@ -143,8 +154,8 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
               />
             </div>
             <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Pitch</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[9px] uppercase font-bold text-gray-500 tracking-wider">Pitch</label>
                 <span className="text-[10px] text-gray-300 bg-gray-700 px-1 rounded">{config.pitch || 0}</span>
               </div>
               <input
@@ -164,37 +175,29 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
           <Sliders className="w-4 h-4" />
-          Character Voices
+          Voices
         </h4>
         {showSaved && (
           <span className="text-[10px] text-emerald-400 font-semibold">Saved</span>
         )}
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-gray-500">
-            <span>Narrator</span>
-            <span className="text-gray-600">Voice lead</span>
-          </div>
-          {renderRow('Narrator', { variant: 'narrator' })}
+      <div className="sticky top-0 z-10 bg-gray-950/95 pb-1">
+        <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto] items-center gap-2 px-2.5 text-[10px] uppercase tracking-widest text-gray-500">
+          <span>Character</span>
+          <span>Voice</span>
+          <span className="text-right">Preview</span>
         </div>
+      </div>
 
-        <div className="h-px bg-gray-800/60" />
+      <div className="space-y-2">
+        {renderRow('Narrator', { variant: 'narrator' })}
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-gray-500">
-            <span>Cast</span>
-            <span className="text-gray-600">{characters.length} characters</span>
-          </div>
-          <div className="space-y-2">
-            {characters.map((char, index) => renderRow(char, { variant: 'cast', index }))}
-          </div>
-        </div>
+        {characters.map((char, index) => renderRow(char, { variant: 'cast', index }))}
       </div>
     </div>
   );

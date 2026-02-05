@@ -26,12 +26,10 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
   onReviewed
 }) => {
   return (
-    <div className="space-y-4" onFocus={onReviewed} onClick={onReviewed}>
-      <div className="space-y-1">
-        <p className="text-[11px] text-gray-500">
-          Map each character to a voice and preview the read. Defaults are assigned automatically.
-        </p>
-      </div>
+    <div className="space-y-2" onFocus={onReviewed} onClick={onReviewed}>
+      <p className="text-[10px] text-gray-500">
+        Assign voices and preview reads. Defaults are auto-assigned.
+      </p>
       <VoiceManager
         characters={characters}
         voiceConfigs={voiceConfigs}
