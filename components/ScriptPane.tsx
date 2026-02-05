@@ -241,8 +241,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </Button>
     </div>
   );
-  const writeSections = context ? (
-    <>
+  const generateContent = context ? (
+    <div className="space-y-4">
       <section className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Next Scene Prompt</h3>
@@ -292,9 +292,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </Button>
         </div>
       </section>
-
-    </>
-  ) : null;
+      {generationIndicator}
+    </div>
+  ) : (
+    <p className="text-[11px] text-gray-500">Start a script to generate new scenes.</p>
+  );
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -566,8 +568,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               <div className="flex flex-col gap-6 flex-1 min-h-0">
                 <div className={writePanelClassName}>
                   <div className={`space-y-6 ${isInsertModeView ? 'pointer-events-none opacity-40' : ''}`}>
-                    {writeSections}
-                    {generationIndicator}
+                    <p className="text-[11px] text-gray-500">
+                      Use the tool belt below to generate or insert new content.
+                    </p>
                   </div>
                 </div>
                 <div className={insertPanelClassName}>
@@ -596,8 +599,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     isInsertModeView ? 'opacity-0 -translate-x-2 pointer-events-none' : 'opacity-100 translate-x-0'
                   }`}
                 >
-                  {writeSections}
-                  {generationIndicator}
+                  <div className="text-[11px] text-gray-500">
+                    Use the tool belt below to generate or insert new content.
+                  </div>
                 </div>
                 <div className="min-h-0 h-full overflow-hidden flex flex-col gap-4">
                   {insertModeToolbar}
@@ -626,6 +630,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onExportTxt={onExportTxt}
         onExportPdf={onExportPdf}
         exportDisabled={!canExport}
+        generateContent={generateContent}
         playbackContent={playbackContent}
         voicesContent={voicesContent}
         insertContent={insertContent}

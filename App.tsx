@@ -690,10 +690,13 @@ export default function App() {
       startAiRequest(request);
       const firstScene = await request.promise;
       const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
+      const initialLastBlockId = normalizedFirstScene.blocks[normalizedFirstScene.blocks.length - 1]?.id;
       setContext({
         ...initialContext,
         scenes: [normalizedFirstScene]
       });
+      setInsertScrollTargetId(initialLastBlockId ?? 'bottom');
+      setInsertScrollToken(token => token + 1);
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
     } finally {
@@ -712,12 +715,15 @@ export default function App() {
       request = createGenerateSceneRequest(context, prompt, false);
       startAiRequest(request);
       const nextScene = await request.promise;
+      const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
+      const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
       setContext(prev => {
         if (!prev) return null;
-        const normalizedScene = normalizeSceneCharacters(nextScene, prev.characters);
         const updatedScenes = [...prev.scenes, normalizedScene];
         return { ...prev, scenes: updatedScenes };
       });
+      setInsertScrollTargetId(lastBlockId ?? 'bottom');
+      setInsertScrollToken(token => token + 1);
       setUserInstruction('');
     } catch (err: unknown) {
       handleAiError(err, 'Failed to generate scene.');

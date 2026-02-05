@@ -44,6 +44,7 @@ export interface BottomToolbeltProps {
   onExportTxt?: () => void;
   onExportPdf?: () => void;
   exportDisabled?: boolean;
+  generateContent?: React.ReactNode;
   playbackContent?: React.ReactNode;
   voicesContent?: React.ReactNode;
   insertContent?: React.ReactNode;
@@ -56,6 +57,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   onExportTxt,
   onExportPdf,
   exportDisabled = false,
+  generateContent,
   playbackContent,
   voicesContent,
   insertContent
@@ -63,16 +65,19 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
   const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
   const hasExportPanel = activeTool === 'export';
+  const hasGeneratePanel = activeTool === 'generate' && Boolean(generateContent);
   const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
   const hasActivePanel = Boolean(activeTool);
   const panelDescription = hasExportPanel
     ? 'Download your script in common formats.'
+    : hasGeneratePanel
+      ? 'Guide the next scene with a focused prompt.'
     : hasPlaybackPanel
       ? 'Control playback and audio readiness.'
-      : hasVoicesPanel
-        ? 'Assign and preview voices for each character.'
+    : hasVoicesPanel
+      ? 'Assign and preview voices for each character.'
         : hasInsertPanel
           ? 'Insert new blocks at a specific point in the script.'
           : null;
@@ -137,6 +142,11 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                     </Button>
                   )}
                 </div>
+              </div>
+            )}
+            {hasGeneratePanel && (
+              <div className="px-4 py-4 flex-1">
+                {generateContent}
               </div>
             )}
             {hasPlaybackPanel && (
