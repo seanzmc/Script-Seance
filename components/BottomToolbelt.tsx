@@ -75,19 +75,45 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
   const hasActivePanel = Boolean(activeTool);
-  const panelDescription = hasExportPanel
-    ? 'Download your script in common formats.'
+
+  const panelBodyContent = hasExportPanel
+    ? (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onExportTxt}
+          disabled={exportDisabled || !onExportTxt}
+          className="w-full text-xs"
+          title="Export script as a .txt file"
+        >
+          <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
+        </Button>
+        {onExportPdf && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onExportPdf}
+            disabled={exportDisabled}
+            className="w-full text-xs"
+            title="Export script as a PDF via print dialog"
+          >
+            <FileDown className="w-3 h-3 mr-2" /> Export PDF
+          </Button>
+        )}
+      </div>
+    )
     : hasGeneratePanel
-      ? 'Guide the next scene with a focused prompt.'
+      ? generateContent
       : hasRewritePanel
-        ? 'Regenerate an existing block with fresh wording.'
-    : hasPlaybackPanel
-      ? 'Control playback and audio readiness.'
-    : hasVoicesPanel
-      ? 'Assign and preview voices for each character.'
-    : hasInsertPanel
-          ? 'Insert new blocks at a specific point in the script.'
-          : null;
+        ? rewriteContent
+        : hasPlaybackPanel
+          ? playbackContent
+          : hasVoicesPanel
+            ? voicesContent
+            : hasInsertPanel
+              ? insertContent
+              : activePlaceholder;
 
   useEffect(() => {
     if (!hasActivePanel) return;
@@ -142,16 +168,9 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
     <div className="w-full shrink-0 px-4 pb-4">
       <div className={`mx-auto w-full max-w-6xl flex flex-col ${hasActivePanel ? 'gap-2' : ''}`}>
         {hasActivePanel && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[260px] max-h-[360px]">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-3 shrink-0">
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">{activeLabel}</p>
-                {panelDescription ? (
-                  <p className="text-xs text-gray-400">{panelDescription}</p>
-                ) : (
-                  <p className="text-sm text-gray-200">{activePlaceholder}</p>
-                )}
-              </div>
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[240px] max-h-[360px] overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
+              <p className="text-[10px] uppercase tracking-[0.4em] text-gray-400">{activeLabel}</p>
               <button
                 type="button"
                 onClick={onCloseTool}
@@ -161,59 +180,13 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {hasExportPanel && (
-              <div className="px-4 py-4 flex-1 overflow-y-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={onExportTxt}
-                    disabled={exportDisabled || !onExportTxt}
-                    className="w-full text-xs"
-                    title="Export script as a .txt file"
-                  >
-                    <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
-                  </Button>
-                  {onExportPdf && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={onExportPdf}
-                      disabled={exportDisabled}
-                      className="w-full text-xs"
-                      title="Export script as a PDF via print dialog"
-                    >
-                      <FileDown className="w-3 h-3 mr-2" /> Export PDF
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-            {hasGeneratePanel && (
-              <div className="px-4 py-4 flex-1">
-                {generateContent}
-              </div>
-            )}
-            {hasRewritePanel && (
-              <div className="px-4 py-4 flex-1">
-                {rewriteContent}
-              </div>
-            )}
-            {hasPlaybackPanel && (
-              <div className="px-4 py-4 flex-1 overflow-y-auto">
-                {playbackContent}
-              </div>
-            )}
-            {hasVoicesPanel && (
-              <div className="px-4 py-4 flex-1 overflow-y-auto">
-                {voicesContent}
-              </div>
-            )}
-            {hasInsertPanel && (
-              <div className="px-4 py-4 flex-1">
-                {insertContent}
-              </div>
-            )}
+            <div className="px-4 py-3 flex-1 min-h-0 overflow-y-auto">
+              {typeof panelBodyContent === 'string' ? (
+                <p className="text-sm text-gray-300">{panelBodyContent}</p>
+              ) : (
+                panelBodyContent
+              )}
+            </div>
           </div>
         )}
         <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-4 py-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
