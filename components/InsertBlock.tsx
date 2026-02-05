@@ -58,6 +58,8 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   const [content, setContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [tooltip, setTooltip] = useState<{ message: string; anchor: 'add' | 'insert' } | null>(null);
+  const addMessage = tooltip?.anchor === 'add' ? tooltip.message : null;
+  const insertMessage = tooltip?.anchor === 'insert' ? tooltip.message : null;
 
   useEffect(() => {
     if (!tooltip) return;
@@ -148,22 +150,22 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
 
   return (
     <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 space-y-3">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold text-gray-300 flex items-center gap-2 uppercase tracking-[0.3em]">
           <PenTool className="w-4 h-4" />
-          Script Editor
+          Insert Block
         </h3>
 
         <div className="flex items-center gap-2">
           {onUndo && (
-             <button
+            <button
               onClick={onUndo}
               disabled={disabled || canUndo === false}
               className="p-1 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors"
               title={canUndo === false ? 'Undo is available after adding a block' : 'Undo last action'}
-             >
-               <Undo2 className="w-4 h-4" />
-             </button>
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
           )}
           {onRedo && (
             <button
@@ -183,24 +185,25 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
             loading={isGenerating}
             title="Generate a new block in the editor"
           >
-            Surprise me
+            Surprise
           </Button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {insertTarget && (
-          <p className="text-[10px] text-indigo-300">
-            Insertion point selected.
-          </p>
-        )}
-        <div className="space-y-1.5">
-          <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Block Type</label>
-          <div className="grid grid-cols-2 gap-2">
+      {insertTarget && (
+        <p className="text-[10px] text-indigo-300">
+          Insertion point selected.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)] gap-3">
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Type</label>
+          <div className="space-y-2">
             <select
               value={elementType}
               onChange={(e) => setElementType(e.target.value as BlockType)}
-              className="bg-gray-900 border border-gray-700 text-gray-200 text-sm rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
+              className="bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
             >
               <option value={BlockType.ACTION}>Action</option>
               <option value={BlockType.DIALOGUE}>Dialogue</option>
@@ -212,65 +215,62 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
               <select
                 value={selectedChar}
                 onChange={(e) => setSelectedChar(e.target.value)}
-                className="bg-gray-900 border border-gray-700 text-gray-200 text-sm rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
+                className="bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
               >
                 {characters.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
           </div>
-          <p className="text-[10px] text-gray-500 italic px-1">
+          <p className="text-[10px] text-gray-500 italic">
             {HINTS[elementType]}
           </p>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Content</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Type your block content here..."
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm h-24 focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm h-24 focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner"
           />
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <p className="text-[10px] text-gray-500">
-            Add Block inserts what you wrote. Surprise me fills the editor with a generated block based on the selected type and style.
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:flex-1">
-              {tooltip?.anchor === 'add' && (
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] text-white bg-gray-900 border border-gray-700 px-2 py-1 rounded shadow-lg pointer-events-none">
-                  {tooltip.message}
-                </div>
-              )}
-              <Button 
-                onClick={handleAddBlock} 
-                disabled={disabled || isGenerating} 
-                className="w-full shadow-lg"
-                size="md"
-                variant="primary"
-                title="Add the block to the end of your script"
-              >
-                Add Block
-              </Button>
-            </div>
-            <div className="relative w-full sm:w-auto">
-              {tooltip?.anchor === 'insert' && (
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] text-white bg-gray-900 border border-gray-700 px-2 py-1 rounded shadow-lg pointer-events-none">
-                  {tooltip.message}
-                </div>
-              )}
-              <Button
-                onClick={handleInsertMode}
-                disabled={disabled || isGenerating || insertModeActive}
-                className="w-full"
-                size="md"
-                variant="secondary"
-                title="Pick an insertion point in the script"
-              >
-                Insert Block
-              </Button>
-            </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-[10px] text-gray-500">
+          Add to the end or enter insert mode to pick a point in the script.
+        </p>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-end gap-2">
+          <div className="flex flex-col gap-1 w-full sm:w-auto">
+            <Button
+              onClick={handleAddBlock}
+              disabled={disabled || isGenerating}
+              className="w-full"
+              size="sm"
+              variant="secondary"
+              title="Add the block to the end of your script"
+            >
+              Add to End
+            </Button>
+            {addMessage && (
+              <span className="text-[10px] text-amber-300">{addMessage}</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1 w-full sm:w-auto sm:items-end">
+            <Button
+              onClick={handleInsertMode}
+              disabled={disabled || isGenerating || insertModeActive}
+              className="w-full shadow-lg"
+              size="sm"
+              variant="primary"
+              title="Pick an insertion point in the script"
+            >
+              Insert at Point
+            </Button>
+            {insertMessage && (
+              <span className="text-[10px] text-amber-300">{insertMessage}</span>
+            )}
           </div>
         </div>
       </div>
