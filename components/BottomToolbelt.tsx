@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Download, FileDown, X } from 'lucide-react';
 import { Button } from './Button';
 
@@ -63,6 +63,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const hasExportPanel = activeTool === 'export';
   const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
+  const hasActivePanel = Boolean(activeTool);
   const panelDescription = hasExportPanel
     ? 'Download your script in common formats.'
     : hasPlaybackPanel
@@ -71,12 +72,23 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
         ? 'Assign and preview voices for each character.'
         : null;
 
+  useEffect(() => {
+    if (!hasActivePanel) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onCloseTool();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasActivePanel, onCloseTool]);
+
   return (
     <div className="w-full shrink-0 px-4 pb-4">
-      <div className="mx-auto w-full max-w-6xl flex flex-col gap-2">
-        {activeTool && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-3">
+      <div className={`mx-auto w-full max-w-6xl flex flex-col ${hasActivePanel ? 'gap-2' : ''}`}>
+        {hasActivePanel && (
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[220px] max-h-[360px]">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-3 shrink-0">
               <div className="space-y-1">
                 <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">{activeLabel}</p>
                 {panelDescription ? (
@@ -95,7 +107,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               </button>
             </div>
             {hasExportPanel && (
-              <div className="px-4 py-4">
+              <div className="px-4 py-4 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Button
                     variant="secondary"
@@ -123,12 +135,12 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               </div>
             )}
             {hasPlaybackPanel && (
-              <div className="px-4 py-4">
+              <div className="px-4 py-4 flex-1 overflow-y-auto">
                 {playbackContent}
               </div>
             )}
             {hasVoicesPanel && (
-              <div className="px-4 py-4">
+              <div className="px-4 py-4 flex-1 overflow-y-auto">
                 {voicesContent}
               </div>
             )}
