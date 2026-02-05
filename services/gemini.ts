@@ -32,12 +32,166 @@ export type CancellableRequest<T> = {
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_VOICE_NAME = 'Zephyr';
+const TTS_MAX_ATTEMPTS = 5;
+const TTS_BASE_DELAY_MS = 1000;
+const TTS_MAX_DELAY_MS = 10000;
+const TTS_JITTER_MS = 250;
 
 type GenerateSpeechContext = {
   text: string;
   voiceName: string;
   [key: string]: unknown;
 };
+
+type TtsQueueItem<T> = {
+  run: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+  cancelled: boolean;
+  inFlightCancel?: (() => void) | null;
+  delayTimeout?: ReturnType<typeof setTimeout> | null;
+  delayReject?: ((error: unknown) => void) | null;
+};
+
+const ttsQueue: Array<TtsQueueItem<unknown>> = [];
+let ttsActive = false;
+
+const createAbortError = () => {
+  const abortError = new Error('Request canceled.') as Error & { code?: string };
+  abortError.code = 'REQUEST_ABORTED';
+  return abortError;
+};
+
+const drainTtsQueue = () => {
+  if (ttsActive) return;
+  const next = ttsQueue.shift() as TtsQueueItem<unknown> | undefined;
+  if (!next) return;
+  if (next.cancelled) {
+    next.reject(createAbortError());
+    drainTtsQueue();
+    return;
+  }
+  ttsActive = true;
+  next.run()
+    .then(next.resolve)
+    .catch(next.reject)
+    .finally(() => {
+      ttsActive = false;
+      drainTtsQueue();
+    });
+};
+
+const enqueueTts = <T>(run: (item: TtsQueueItem<T>) => Promise<T>): CancellableRequest<T> => {
+  let item!: TtsQueueItem<T>;
+  const promise = new Promise<T>((resolve, reject) => {
+    item = {
+      run: () => run(item),
+      resolve,
+      reject,
+      cancelled: false,
+      inFlightCancel: null,
+      delayTimeout: null,
+      delayReject: null
+    };
+    ttsQueue.push(item as unknown as TtsQueueItem<unknown>);
+    drainTtsQueue();
+  });
+
+  const cancel = () => {
+    if (!item || item.cancelled) return;
+    item.cancelled = true;
+    if (item.inFlightCancel) {
+      item.inFlightCancel();
+    }
+    if (item.delayTimeout) {
+      clearTimeout(item.delayTimeout);
+      item.delayTimeout = null;
+      const rejectDelay = item.delayReject;
+      item.delayReject = null;
+      rejectDelay?.(createAbortError());
+    }
+    const index = ttsQueue.indexOf(item as unknown as TtsQueueItem<unknown>);
+    if (index >= 0) {
+      ttsQueue.splice(index, 1);
+      item.reject(createAbortError());
+    }
+  };
+
+  return { promise, cancel };
+};
+
+const isRateLimitError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const record = error as { status?: number; code?: string | number; message?: string; details?: Record<string, unknown> };
+  if (record.status === 429 || record.code === 429 || record.code === 'RATE_LIMITED') {
+    return true;
+  }
+  const message = record.message?.toLowerCase() ?? '';
+  if (message.includes('resource_exhausted') || message.includes('rate limit') || message.includes('429')) {
+    return true;
+  }
+  const details = record.details as Record<string, unknown> | undefined;
+  if (!details) return false;
+  const reason = typeof details.reason === 'string' ? details.reason.toLowerCase() : '';
+  return reason.includes('resource_exhausted') || reason.includes('rate limit');
+};
+
+const getRetryDelayMs = (error: unknown) => {
+  if (!error || typeof error !== 'object') return null;
+  const record = error as { details?: Record<string, unknown> };
+  const details = record.details as Record<string, unknown> | undefined;
+  if (!details) return null;
+  const retryAfterSeconds = details.retryAfterSeconds;
+  if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
+    return Math.ceil(retryAfterSeconds * 1000);
+  }
+  const retryDelayMs = details.retryDelayMs;
+  if (typeof retryDelayMs === 'number' && Number.isFinite(retryDelayMs)) {
+    return Math.ceil(retryDelayMs);
+  }
+  const retryDelaySeconds = details.retryDelaySeconds;
+  if (typeof retryDelaySeconds === 'number' && Number.isFinite(retryDelaySeconds)) {
+    return Math.ceil(retryDelaySeconds * 1000);
+  }
+  const retryDelay = (details.retryDelay ?? (details.retryInfo as { retryDelay?: unknown } | undefined)?.retryDelay) as
+    | { seconds?: number; nanos?: number }
+    | number
+    | string
+    | undefined;
+  if (typeof retryDelay === 'number' && Number.isFinite(retryDelay)) {
+    return Math.ceil(retryDelay);
+  }
+  if (typeof retryDelay === 'string') {
+    const parsed = Number.parseInt(retryDelay, 10);
+    if (Number.isFinite(parsed)) {
+      return Math.ceil(parsed);
+    }
+  }
+  if (retryDelay && typeof retryDelay === 'object') {
+    const seconds = typeof retryDelay.seconds === 'number' ? retryDelay.seconds : 0;
+    const nanos = typeof retryDelay.nanos === 'number' ? retryDelay.nanos : 0;
+    const totalMs = seconds * 1000 + Math.ceil(nanos / 1e6);
+    if (Number.isFinite(totalMs) && totalMs > 0) {
+      return totalMs;
+    }
+  }
+  return null;
+};
+
+const waitWithCancel = (ms: number, item: TtsQueueItem<unknown>) =>
+  new Promise<void>((resolve, reject) => {
+    if (item.cancelled) {
+      reject(createAbortError());
+      return;
+    }
+    const timeout = setTimeout(() => {
+      item.delayTimeout = null;
+      item.delayReject = null;
+      resolve();
+    }, ms);
+    item.delayTimeout = timeout;
+    item.delayReject = reject;
+  });
 
 const createAiRequest = <T>(
   kind: string,
@@ -269,29 +423,77 @@ export const createGenerateSpeechRequest = (
   voiceName: string,
   options?: RequestOptions
 ): CancellableRequest<ArrayBuffer> => {
-  const request = createAiRequest<{ audioBase64: string }>(
-    'generateSpeech',
-    buildGenerateSpeechContext(text, voiceName),
-    options
-  );
+  const context = buildGenerateSpeechContext(text, voiceName);
 
-  return {
-    cancel: request.cancel,
-    promise: request.promise.then((data) => {
-      const base64Audio = data.audioBase64;
-      if (!base64Audio) {
-        throw new Error('No audio data returned');
+  return enqueueTts<ArrayBuffer>(async (item) => {
+    let attempt = 1;
+    let lastDelayMs = 0;
+
+    while (attempt <= TTS_MAX_ATTEMPTS) {
+      if (item.cancelled) {
+        throw createAbortError();
       }
 
-      const binaryString = atob(base64Audio);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      const request = createAiRequest<{ audioBase64: string }>(
+        'generateSpeech',
+        context,
+        options
+      );
+      item.inFlightCancel = request.cancel;
+
+      try {
+        const data = await request.promise;
+        item.inFlightCancel = null;
+        const base64Audio = data.audioBase64;
+        if (!base64Audio) {
+          throw new Error('No audio data returned');
+        }
+
+        const binaryString = atob(base64Audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      } catch (error: unknown) {
+        item.inFlightCancel = null;
+        if (item.cancelled) {
+          throw createAbortError();
+        }
+        if (!isRateLimitError(error)) {
+          throw error;
+        }
+        if (attempt >= TTS_MAX_ATTEMPTS) {
+          const finalError = new Error(
+            `TTS rate limit exceeded after retries (attempts: ${attempt}, lastDelayMs: ${lastDelayMs})`
+          ) as Error & { code?: string; status?: number; details?: Record<string, unknown> };
+          const record = error as { code?: string | number; status?: number; details?: Record<string, unknown> };
+          finalError.code = record.code ? String(record.code) : 'RATE_LIMITED';
+          finalError.status = record.status ?? 429;
+          finalError.details = {
+            ...(record.details ?? {}),
+            attempts: attempt,
+            lastDelayMs
+          };
+          throw finalError;
+        }
+
+        const retryDelayMs = getRetryDelayMs(error);
+        const baseDelay = Math.min(
+          TTS_MAX_DELAY_MS,
+          TTS_BASE_DELAY_MS * Math.pow(2, attempt - 1)
+        );
+        const jitter = Math.floor(Math.random() * TTS_JITTER_MS);
+        const delayMs = Math.min(TTS_MAX_DELAY_MS, (retryDelayMs ?? baseDelay) + jitter);
+        lastDelayMs = delayMs;
+        await waitWithCancel(delayMs, item as unknown as TtsQueueItem<unknown>);
+        attempt += 1;
       }
-      return bytes.buffer;
-    })
-  };
+    }
+
+    throw new Error('TTS retry loop exhausted.');
+  });
 };
 
 export const createGenerateSceneRequest = (
