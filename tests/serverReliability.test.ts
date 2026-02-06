@@ -34,6 +34,47 @@ beforeEach(() => {
 });
 
 describe('server reliability', () => {
+  it('returns 429 when upstream error message indicates a rate limit in mixed case', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockGenerateContent.mockRejectedValue(new Error('Rate limit exceeded. Please retry.'));
+
+      const req = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: {
+            genre: 'Noir'
+          }
+        }
+      } as any;
+
+      const res = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(req, res);
+
+      expect(res.statusCode).toBe(429);
+      expect(res.body?.error?.code).toBe('RATE_LIMITED');
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('returns 502 when AI response fails schema validation', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {

@@ -792,10 +792,11 @@ const handleAiGenerate = async (req, res) => {
     return res.json({ data });
   } catch (error) {
     const message = error?.message || '';
+    const normalizedMessage = message.toLowerCase();
     const isRateLimit =
-      message.includes('429') ||
-      message.includes('RESOURCE_EXHAUSTED') ||
-      message.includes('rate limit');
+      normalizedMessage.includes('429') ||
+      normalizedMessage.includes('resource_exhausted') ||
+      normalizedMessage.includes('rate limit');
     const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
     const isInvalidAi = error?.code === 'INVALID_AI_RESPONSE';
 
