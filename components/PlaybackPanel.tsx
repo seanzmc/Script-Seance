@@ -160,6 +160,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
               </button>
               <button
                 onClick={handlePlayPause}
+                aria-pressed={isPlaying}
                 className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
                   isPlaying
                     ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40'
@@ -263,6 +264,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={onToggleAutoScroll}
+          aria-pressed={autoScroll}
           className="flex items-center gap-2 rounded-full border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
           title="Auto-scroll script with playback"
         >
@@ -274,6 +276,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
         </button>
         <button
           onClick={onToggleHighlights}
+          aria-pressed={showHighlights}
           className="flex items-center gap-2 rounded-full border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
           title="Highlight the active line during playback"
         >

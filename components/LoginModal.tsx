@@ -34,7 +34,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Admin login"
+      >
         <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
             <Lock className="w-5 h-5 text-indigo-400" />

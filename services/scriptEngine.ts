@@ -59,6 +59,12 @@ const getErrorMeta = (error: unknown) => {
   return { message, status, code, details };
 };
 
+const createRequestAbortedError = () => {
+  const abortError = new Error('Request canceled.') as Error & { code?: string };
+  abortError.code = 'REQUEST_ABORTED';
+  return abortError;
+};
+
 export class ScriptEngine {
   private queue: QueueItem[] = [];
   private activeRequests = 0;
@@ -304,9 +310,9 @@ export class ScriptEngine {
          
          await new Promise(resolve => setTimeout(resolve, delayMs));
          
-         // If we are stopping, abort retries to prevent zombie requests
-         if (!this.isRunning && retryCount === 0) {
-            throw new Error("Engine stopped during retry backoff");
+         // If we are stopping, abort retries to prevent zombie requests.
+         if (!this.isRunning) {
+            throw createRequestAbortedError();
          }
 
          return this.fetchAudio(text, voiceId, requestId, retryCount + 1);

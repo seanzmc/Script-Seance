@@ -17,7 +17,6 @@ export interface InsertBlockProps {
   onAddBlock: (block: ScriptBlock) => void;
   onStartInsertMode: (block: ScriptBlock) => void;
   insertModeActive: boolean;
-  insertModeAvailable: boolean;
   insertCompleteToken: number;
   onError?: (error: unknown) => void;
   disabled?: boolean;
@@ -38,7 +37,6 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   onAddBlock,
   onStartInsertMode,
   insertModeActive,
-  insertModeAvailable,
   insertCompleteToken,
   onError,
   disabled,
@@ -102,10 +100,6 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   const handleInsertMode = () => {
-    if (!insertModeAvailable) {
-      showTooltip('Insert Mode is unavailable in Preview view', 'insert');
-      return;
-    }
     const trimmedContent = content.trim();
     if (!trimmedContent) {
       showTooltip('Add content first', 'insert');

@@ -11,7 +11,6 @@ export interface VoicesPanelProps {
   onStop: () => void;
   isAudioPlaying: boolean;
   isLoading: boolean;
-  onReviewed?: () => void;
 }
 
 export const VoicesPanel: React.FC<VoicesPanelProps> = ({
@@ -22,11 +21,10 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
   onPreview,
   onStop,
   isAudioPlaying,
-  isLoading,
-  onReviewed
+  isLoading
 }) => {
   return (
-    <div className="space-y-2" onFocus={onReviewed} onClick={onReviewed}>
+    <div className="space-y-2">
       <p className="text-[10px] text-gray-500">
         Assign voices and preview reads. Defaults are auto-assigned.
       </p>

@@ -24,7 +24,6 @@ export interface SetupFormProps {
   onClearDraft?: () => void;
   variant?: "full" | "summary";
   autoSurprise?: boolean;
-  surprisePrompt?: boolean;
 }
 
 const STARTER_IDEAS = [
@@ -48,7 +47,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   onClearDraft,
   variant = "full",
   autoSurprise = false,
-  surprisePrompt = false,
 }) => {
   const { genre, premise, characters, style, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
@@ -183,6 +181,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   })();
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
+  const hasValidCharacter = characters.some(char => char.trim().length > 0);
 
   useEffect(() => {
     if (showAdvanced) return;
@@ -248,11 +247,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 Surprise Me
               </Button>
             </div>
-            {surprisePrompt && (
-              <div className="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-[11px] text-indigo-100">
-                Pick a genre first, then click &quot;Surprise Me&quot; to generate a setup.
-              </div>
-            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               {GENRES.map((g) => (
                 <button
@@ -421,7 +415,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all text-sm font-medium"
               loading={isLoading}
               size="lg"
-              disabled={!premise.trim() || isLoading || isSurprising || isLocked}
+              disabled={!premise.trim() || !hasValidCharacter || isLoading || isSurprising || isLocked}
               title="Generate your opening scene"
             >
               Generate First Scene

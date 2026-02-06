@@ -8,7 +8,6 @@ import { GoogleGenAI, Type } from '@google/genai';
 
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
 
 const BODY_LIMIT = '64kb';
 const PORT = process.env.PORT || 3001;
@@ -18,6 +17,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 const IS_PROD = process.env.NODE_ENV === 'production';
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+app.set('trust proxy', TRUST_PROXY ? 1 : false);
 const AI_RPM = parsePositiveInt(process.env.AI_RPM, 30);
 const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
 const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
@@ -189,11 +190,13 @@ const sendError = (res, status, message, code, details) =>
 const parseCookies = (cookieHeader = '') => cookie.parse(cookieHeader);
 
 const getClientIp = (req) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
+  if (typeof req.ip === 'string' && req.ip.trim().length > 0) {
+    return req.ip.trim();
   }
-  return req.ip || req.socket?.remoteAddress || 'unknown';
+  if (typeof req.socket?.remoteAddress === 'string' && req.socket.remoteAddress.trim().length > 0) {
+    return req.socket.remoteAddress.trim();
+  }
+  return 'unknown';
 };
 
 const safeEqual = (left, right) => {
@@ -871,4 +874,13 @@ if (isMain) {
   startServer();
 }
 
-export { app, startServer, pruneStaleEntries, sessions, rateBuckets, handleLogin, handleAiGenerate };
+export {
+  app,
+  startServer,
+  pruneStaleEntries,
+  sessions,
+  rateBuckets,
+  loginBuckets,
+  handleLogin,
+  handleAiGenerate
+};

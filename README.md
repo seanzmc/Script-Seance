@@ -36,6 +36,7 @@ AI_RPM=30
 AI_RPD=500
 AI_MAX_PROMPT_CHARS=8000
 AI_UPSTREAM_TIMEOUT_MS=30000
+TRUST_PROXY=0
 ```
 
 `GEMINI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.
@@ -68,7 +69,7 @@ pnpm run dev
 
 Default local endpoints:
 
-- Client: `http://localhost:5173`
+- Client: `http://localhost:3000`
 - API: `http://localhost:3001`
 
 ## Quality Checks

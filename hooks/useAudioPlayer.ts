@@ -20,7 +20,6 @@ export const useAudioPlayer = (
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [bufferedCount, setBufferedCount] = useState(0);
   const [totalBufferedCount, setTotalBufferedCount] = useState(0);
-  const [isBuffering, setIsBuffering] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [blockStatuses, setBlockStatuses] = useState<Record<string, BlockAudioStatus>>({});
 
@@ -102,7 +101,6 @@ export const useAudioPlayer = (
     totalCountRef.current = total;
     setTotalBufferedCount(total);
     setBufferedCount(ready);
-    setIsBuffering(total > 0 && ready < total);
   }, []);
 
   const resetBuffer = useCallback(() => {
@@ -389,25 +387,6 @@ export const useAudioPlayer = (
     }, 10);
   };
 
-  const bufferScript = (blocks: ScriptBlock[]) => {
-    const playableBlocks = getPlayableBlocks(blocks);
-    stop({ clearBuffer: true });
-    queueRef.current = playableBlocks;
-    currentIndexRef.current = 0;
-    setCurrentBlockIndex(-1);
-    setIsPaused(false);
-    bufferedScriptKeyRef.current = playableBlocks.map(block => block.id).join('|') || null;
-    updateBufferProgress(playableBlocks.length);
-    setBlockStatuses(() => {
-      const nextStatuses: Record<string, BlockAudioStatus> = {};
-      playableBlocks.forEach(block => {
-        nextStatuses[block.id] = 'generating';
-      });
-      return nextStatuses;
-    });
-    engineRef.current?.start(blocks, voiceConfigs);
-  };
-
   const pause = useCallback(() => {
     if (!isPlayingRef.current) return;
     clearStartTimeout();
@@ -576,10 +555,8 @@ export const useAudioPlayer = (
     isLoadingAudio,
     bufferedCount,
     totalBufferedCount,
-    isBuffering,
     blockStatuses,
     playScript,
-    bufferScript,
     playPreview,
     stop,
     pause,

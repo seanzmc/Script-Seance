@@ -87,7 +87,12 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
       />
 
       {/* Modal Content */}
-      <div className="relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Voice casting for ${characterName}`}
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gray-900/50">
@@ -101,6 +106,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
           <button 
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors"
+            aria-label="Close voice casting"
           >
             <X className="w-6 h-6" />
           </button>

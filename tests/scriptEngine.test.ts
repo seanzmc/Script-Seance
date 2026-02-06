@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ScriptEngine } from '../services/scriptEngine';
 import { BlockType, ScriptBlock, VoiceConfig } from '../types';
 
@@ -35,12 +35,16 @@ const { pendingRequests, createGenerateSpeechRequest } = vi.hoisted(() => {
 
 vi.mock('../services/gemini', () => ({ createGenerateSpeechRequest }));
 
-const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+const flushPromises = () => new Promise<void>((resolve) => queueMicrotask(resolve));
 
 describe('ScriptEngine', () => {
   beforeEach(() => {
     pendingRequests.length = 0;
     createGenerateSpeechRequest.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('aborts inflight requests on stop without stalling a subsequent start', async () => {
@@ -78,5 +82,35 @@ describe('ScriptEngine', () => {
     expect(onAudio).toHaveBeenCalledWith(
       expect.objectContaining({ blockId: 'block-2' })
     );
+  });
+
+  it('does not retry after stop when rate-limited during backoff', async () => {
+    vi.useFakeTimers();
+    const engine = new ScriptEngine();
+    const onError = vi.fn();
+    engine.on('error', onError);
+
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+    ];
+
+    await engine.start(blocks, voiceConfigs);
+    expect(pendingRequests).toHaveLength(1);
+
+    const rateLimitError = new Error('429 RESOURCE_EXHAUSTED');
+    (rateLimitError as Error & { status?: number; code?: string }).status = 429;
+    (rateLimitError as Error & { status?: number; code?: string }).code = 'RATE_LIMITED';
+    pendingRequests[0].reject(rateLimitError);
+    await flushPromises();
+
+    engine.stop();
+    await vi.runAllTimersAsync();
+    await flushPromises();
+
+    expect(pendingRequests).toHaveLength(1);
+    expect(onError).not.toHaveBeenCalled();
   });
 });

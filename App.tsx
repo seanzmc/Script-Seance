@@ -136,6 +136,34 @@ const buildTitleContext = (setup: SetupFormState) => {
   return parts.join(' ');
 };
 
+export const buildScriptTextExport = (scenes: Scene[]) => (
+  scenes
+    .map(scene => {
+      const lines: string[] = [];
+      const heading = scene.heading.trim();
+      if (heading) {
+        lines.push(`\n${heading.toUpperCase()}\n`);
+      }
+      scene.blocks.forEach(block => {
+        if (block.type === BlockType.HEADING) {
+          return;
+        }
+        if (block.type === BlockType.DIALOGUE) {
+          const speaker = block.character?.trim().toUpperCase() || 'UNKNOWN';
+          lines.push(`\n${speaker}\n`);
+          if (block.parenthetical?.trim()) {
+            lines.push(`${block.parenthetical.trim()}\n`);
+          }
+          lines.push(`${block.text}\n`);
+          return;
+        }
+        lines.push(`\n${block.text}\n`);
+      });
+      return lines.join('');
+    })
+    .join('\n***\n')
+);
+
 export default function App() {
   // State
   const [context, setContext] = useState<StoryContext | null>(null);
@@ -164,7 +192,6 @@ export default function App() {
   const [insertScrollToken, setInsertScrollToken] = useState(0);
   const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
-  const [setupSurprisePrompt, setSetupSurprisePrompt] = useState(false);
   const [setupAutoSurprise, setSetupAutoSurprise] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
@@ -287,31 +314,17 @@ export default function App() {
 
   const openManualSetup = () => {
     setSetupAutoSurprise(false);
-    setSetupSurprisePrompt(false);
-    setIsSetupOpen(true);
-  };
-
-  const openSurpriseSetup = (genre?: string) => {
-    if (typeof genre === 'string' && genre.trim()) {
-      setSetupState(prev => ({ ...prev, genre }));
-    }
-    setSetupSurprisePrompt(false);
-    setSetupAutoSurprise(true);
     setIsSetupOpen(true);
   };
 
   const closeSetup = () => {
     setIsSetupOpen(false);
-    setSetupSurprisePrompt(false);
     setSetupAutoSurprise(false);
   };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
-    if (setupSurprisePrompt && typeof next.genre === 'string') {
-      setSetupSurprisePrompt(false);
-    }
     setSetupState(prev => ({ ...prev, ...next }));
-  }, [setupSurprisePrompt]);
+  }, []);
   const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     if (!insertModeActive) return;
     setInsertTarget(target);
@@ -668,6 +681,13 @@ export default function App() {
   // Handlers
   const handleStart = async () => {
     if (isGenerating) return;
+    const normalizedCharacters = setupState.characters
+      .map(character => character.trim())
+      .filter(Boolean);
+    if (normalizedCharacters.length === 0) {
+      setError('Add at least one character before generating a script.');
+      return;
+    }
     let request: CancellableRequest<Scene> | null = null;
     try {
       closeSetup();
@@ -685,7 +705,7 @@ export default function App() {
       const initialContext: StoryContext = { 
         genre: setupState.genre,
         premise: setupState.premise,
-        characters: setupState.characters,
+        characters: normalizedCharacters,
         title: DEFAULT_TITLE,
         scenes: [] 
       };
@@ -1072,13 +1092,7 @@ export default function App() {
     const exportMeta = getExportMeta();
     if (!exportMeta) return;
 
-    const text = context.scenes.map(s => {
-      return s.blocks.map(b => {
-        if (b.type === 'heading') return `\n${b.text}\n`;
-        if (b.type === 'dialogue') return `\n${b.character?.toUpperCase()}\n${b.parenthetical || ''}\n${b.text}\n`;
-        return `\n${b.text}\n`;
-      }).join('');
-    }).join('\n***\n');
+    const text = buildScriptTextExport(context.scenes);
     
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -1257,14 +1271,12 @@ export default function App() {
         autoScroll={autoScroll}
         onOpenPrivacy={openPrivacy}
         onOpenSetup={openManualSetup}
-        onSurpriseSetup={openSurpriseSetup}
         isSetupOpen={isSetupOpen}
         onCloseSetup={closeSetup}
         setupState={setupState}
         onSetupChange={updateSetupState}
         onStartSetup={handleStart}
         setupAutoSurprise={setupAutoSurprise}
-        setupSurprisePrompt={setupSurprisePrompt}
         styleContext={scriptStyleContext}
         onSetupError={handleAiError}
         onExportTxt={handleDownload}

@@ -16,14 +16,19 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="relative w-full max-w-lg rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="privacy-modal-title"
+      >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
               <Shield className="w-5 h-5 text-indigo-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Privacy</h2>
+              <h2 id="privacy-modal-title" className="text-lg font-bold text-white">Privacy</h2>
               <p className="text-xs text-gray-400">How your draft and prompts are handled.</p>
             </div>
           </div>

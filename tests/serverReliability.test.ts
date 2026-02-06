@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import request from 'supertest';
 
+let app: typeof import('../server/index.js').app;
 let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
 let pruneStaleEntries: typeof import('../server/index.js').pruneStaleEntries;
 let sessions: typeof import('../server/index.js').sessions;
 let rateBuckets: typeof import('../server/index.js').rateBuckets;
+let loginBuckets: typeof import('../server/index.js').loginBuckets;
 
 const mockGenerateContent = vi.fn();
 
@@ -21,16 +24,19 @@ beforeAll(async () => {
   process.env.GEMINI_API_KEY = 'test-key';
 
   const serverModule = await import('../server/index.js');
+  app = serverModule.app;
   handleAiGenerate = serverModule.handleAiGenerate;
   pruneStaleEntries = serverModule.pruneStaleEntries;
   sessions = serverModule.sessions;
   rateBuckets = serverModule.rateBuckets;
+  loginBuckets = serverModule.loginBuckets;
 });
 
 beforeEach(() => {
   mockGenerateContent.mockReset();
   sessions.clear();
   rateBuckets.clear();
+  loginBuckets.clear();
 });
 
 describe('server reliability', () => {
@@ -154,5 +160,29 @@ describe('server reliability', () => {
     expect(sessions.has('active')).toBe(true);
     expect(rateBuckets.has('stale')).toBe(false);
     expect(rateBuckets.has('active')).toBe(true);
+  });
+
+  it('enforces login rate limits even when x-forwarded-for is spoofed', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const agent = request(app);
+      for (let i = 0; i < 8; i++) {
+        const response = await agent
+          .post('/api/auth/login')
+          .set('x-forwarded-for', `198.51.100.${i}`)
+          .send({ password: 'wrong-password' });
+        expect(response.status).toBe(401);
+      }
+
+      const limited = await agent
+        .post('/api/auth/login')
+        .set('x-forwarded-for', '203.0.113.200')
+        .send({ password: 'wrong-password' });
+
+      expect(limited.status).toBe(429);
+      expect(limited.body?.error?.code).toBe('LOGIN_RATE_LIMITED');
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 });

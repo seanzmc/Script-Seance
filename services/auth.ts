@@ -48,13 +48,6 @@ export const login = async (password: string): Promise<void> => {
   });
 };
 
-export const logout = async (): Promise<void> => {
-  await requestAuth<{ ok: true }>('/api/auth/logout', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-};
-
 export const getSession = async (): Promise<boolean> => {
   await requestAuth<{ ok: true }>('/api/auth/session', {
     method: 'GET',

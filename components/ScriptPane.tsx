@@ -59,14 +59,12 @@ export interface ScriptPaneProps {
   autoScroll: boolean;
   onOpenPrivacy: () => void;
   onOpenSetup: () => void;
-  onSurpriseSetup: (genre?: string) => void;
   isSetupOpen: boolean;
   onCloseSetup: () => void;
   setupState: SetupFormState;
   onSetupChange: (next: Partial<SetupFormState>) => void;
   onStartSetup: () => void;
   setupAutoSurprise: boolean;
-  setupSurprisePrompt?: boolean;
   styleContext?: string;
   onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
   onExportTxt: () => void;
@@ -126,7 +124,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onSetupChange,
   onStartSetup,
   setupAutoSurprise,
-  setupSurprisePrompt,
   styleContext,
   onSetupError,
   onExportTxt,
@@ -148,7 +145,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
   const isInsertModeView = insertModeActive && Boolean(context);
-  const insertModeAvailable = true;
   const previewClassName = `w-full ${
     isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
   }`.trim();
@@ -457,7 +453,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             isLocked={false}
             showSubmit
             autoSurprise={setupAutoSurprise}
-            surprisePrompt={setupSurprisePrompt}
           />
         </div>
       </div>
@@ -571,7 +566,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onAddBlock={onAddBlock}
       onStartInsertMode={onStartInsertMode}
       insertModeActive={isInsertModeView}
-      insertModeAvailable={insertModeAvailable}
       insertCompleteToken={insertCompleteToken}
       onError={onInsertError}
       disabled={isPlaying || isGenerating}
