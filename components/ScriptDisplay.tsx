@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Scene, BlockType, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
-import { MoreVertical, Lock, Unlock, PlusCircle } from 'lucide-react';
+import { Lock, Unlock, PlusCircle } from 'lucide-react';
 
 export interface ScriptDisplayProps {
   scenes: Scene[];
@@ -242,7 +242,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   insertScrollTargetId,
   insertScrollToken
 }) => {
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const insertHighlightTimeoutRef = useRef<number | null>(null);
   const playableBlockIds = useMemo(() => {
     const ids: string[] = [];
@@ -313,20 +312,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       }, 1600);
     });
   }, [insertScrollTargetId, insertScrollToken]);
-
-  useEffect(() => {
-    if (!openMenuId) return;
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      const menuRoot = target.closest(`[data-menu-root="${openMenuId}"]`);
-      if (!menuRoot) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [openMenuId]);
 
   const renderPreviewBlock = (block: ScriptBlock) => {
     const baseClasses = 'script-block script-export-chrome relative rounded border border-dashed border-indigo-400/60 bg-indigo-50/60 px-4 py-3 shadow-sm';
@@ -531,39 +516,30 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       </span>
                     )}
                     {!isInsertMode && (
-                      <div className="script-export-chrome absolute right-0 top-1 flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="relative" data-menu-root={block.id}>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setOpenMenuId(openMenuId === block.id ? null : block.id);
-                            }}
-                            className="p-1.5 bg-white border border-gray-200 rounded-full text-gray-500 hover:text-indigo-600 shadow-sm hover:shadow transition-all"
-                            title="Block actions"
-                          >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </button>
-
-                          {openMenuId === block.id && (
-                            <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 text-sm text-gray-700 z-20">
-                              <button
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setOpenMenuId(null);
-                                  onToggleLock(scene.id, block.id);
-                                }}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-100 text-left"
-                              >
-                                {block.locked ? (
-                                  <Lock className="w-3.5 h-3.5" />
-                                ) : (
-                                  <Unlock className="w-3.5 h-3.5" />
-                                )}
-                                {block.locked ? 'Unlock block' : 'Lock block'}
-                              </button>
-                            </div>
+                      <div
+                        className={`script-export-chrome absolute right-0 top-1 transition-opacity ${
+                          block.locked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleLock(scene.id, block.id);
+                          }}
+                          className={`p-1.5 bg-white border rounded-full shadow-sm hover:shadow transition-all ${
+                            block.locked
+                              ? 'border-indigo-300 text-indigo-700 hover:text-indigo-800'
+                              : 'border-gray-200 text-gray-500 hover:text-indigo-600'
+                          }`}
+                          title={block.locked ? 'Unlock block' : 'Lock block'}
+                          aria-label={block.locked ? 'Unlock block' : 'Lock block'}
+                        >
+                          {block.locked ? (
+                            <Lock className="w-3.5 h-3.5" />
+                          ) : (
+                            <Unlock className="w-3.5 h-3.5" />
                           )}
-                        </div>
+                        </button>
                       </div>
                     )}
                     {content}
