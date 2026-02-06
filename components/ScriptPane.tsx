@@ -84,11 +84,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
   titleInputRef,
   onTitleChange,
-  suggestedTitle,
-  isSuggestingTitle,
-  suggestedTitleDismissed,
-  onUseSuggestedTitle,
-  onDismissSuggestedTitle,
   onClearDraft,
   autosaveError,
   error,
@@ -154,9 +149,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
   const isInsertModeView = insertModeActive && Boolean(context);
   const insertModeAvailable = true;
-  const titleMatchesSuggestion = Boolean(context && suggestedTitle && context.title.trim() === suggestedTitle);
-  const showSuggestedTitle = Boolean(context && suggestedTitle && !suggestedTitleDismissed);
-  const showSuggestingTitle = Boolean(context && !suggestedTitle && isSuggestingTitle && !suggestedTitleDismissed);
   const previewClassName = `w-full ${
     isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
   }`.trim();
@@ -417,10 +409,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
 
-  const contentWrapperClassName = 'max-w-7xl mx-auto px-6 py-4 h-full min-h-0 flex flex-col gap-4';
-  const writePanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
-    isInsertModeView ? 'max-h-0 opacity-0 -translate-y-2 pointer-events-none' : 'max-h-[2000px] opacity-100 translate-y-0'
-  }`;
+  const contentWrapperClassName = 'max-w-7xl mx-auto px-6 py-2 h-full min-h-0 flex flex-col gap-2';
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -438,12 +427,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCloseSetup} />
       <div
-        className="relative w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-6xl max-h-[92vh] overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         aria-label="Setup"
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-3.5">
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Setup</p>
             <h2 className="text-xl font-semibold text-white">Start a new script</h2>
@@ -458,7 +447,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-5">
+        <div className="p-4 sm:p-5 overflow-y-auto max-h-[calc(92vh-108px)]">
           <SetupForm
             value={setupState}
             onChange={onSetupChange}
@@ -599,15 +588,28 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
         >
-          <div className="max-w-7xl mx-auto px-6 py-4 space-y-3">
-            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
-              <div className="space-y-2">
-                <h1 className="text-2xl md:text-3xl font-semibold tracking-[0.28em] text-white">SCRIPT SEANCE</h1>
-                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Script Workspace</p>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+          <div className="max-w-7xl mx-auto px-6 py-2.5 space-y-1.5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+              <div className="space-y-1">
+                <h1 className="text-xl md:text-2xl font-semibold tracking-[0.22em] text-white">SCRIPT SEANCE</h1>
+                <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>
                   <span>{sceneCountLabel}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Draft Title</span>
+                  <span className="text-base font-semibold text-white">
+                    {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleOpenTitleModal}
+                    className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </button>
                 </div>
               </div>
               <div className="flex items-center justify-start lg:justify-end">
@@ -644,57 +646,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
-              <div>
-                <label className="text-[10px] uppercase font-semibold text-gray-500 block tracking-[0.28em] mb-1">
-                  Draft Title
-                </label>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-base md:text-lg font-semibold text-white">
-                    {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleOpenTitleModal}
-                    className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Edit
-                  </button>
-                </div>
-                {showSuggestedTitle && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                    <span>
-                      Suggested title:{' '}
-                      <span className="text-gray-200 font-medium">{suggestedTitle}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={onUseSuggestedTitle}
-                      disabled={titleMatchesSuggestion}
-                      className="text-indigo-400 hover:text-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      Use
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onDismissSuggestedTitle}
-                      className="text-gray-500 hover:text-gray-300"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                )}
-                {showSuggestingTitle && (
-                  <div className="mt-2 text-[11px] text-gray-500">
-                    Generating a suggested title...
-                  </div>
-                )}
-                <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
-                  <span>Draft autosaves locally.</span>
-                  {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
-                </div>
-              </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
+              <span>Draft autosaves locally.</span>
+              {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
             </div>
           </div>
         </div>
@@ -705,19 +659,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className={contentWrapperClassName}>
             {errorBanner}
 
-            <div className="flex flex-col gap-6 flex-1 min-h-0">
-              <div className={writePanelClassName}>
-                <div className={`space-y-6 ${isInsertModeView ? 'pointer-events-none opacity-40' : ''}`}>
-                  <p className="text-[11px] text-gray-500">
-                    Use the tool belt below to generate or insert new content.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-4 flex-1 min-h-0">
-                {insertModeToolbar}
-                <div className="flex-1 min-h-0">
-                  {previewSection}
-                </div>
+            <div className="flex flex-col gap-2 flex-1 min-h-0">
+              {insertModeToolbar}
+              <div className="flex-1 min-h-0">
+                {previewSection}
               </div>
             </div>
           </div>

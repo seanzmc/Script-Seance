@@ -591,7 +591,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   if (scenes.length === 0) return null;
 
-  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-6 md:p-10 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1100px] mx-auto rounded-md relative ${
+  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-4 md:p-8 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
   } ${className}`.trim();
   const contentClasses = scrollable
