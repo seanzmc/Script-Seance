@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BlockType, GENRES, StoryContext, ScriptBlock } from '../types';
+import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { TitleEditModal } from './TitleEditModal';
-import { AlertCircle, Loader2, Sparkles, PlusCircle, X, Pencil } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 import { generateScriptElement } from '../services/gemini';
 
 export interface InsertTarget {
@@ -46,7 +46,7 @@ export interface ScriptPaneProps {
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   onInsertError: (error: unknown) => void;
   onInsertAtTarget?: (target: InsertTarget, block: ScriptBlock) => void;
-  onRegenerate: (sceneId: string, blockId: string) => void;
+  onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
   onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
   isPlaying: boolean;
@@ -125,7 +125,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   autoScroll,
   onOpenPrivacy,
   onOpenSetup,
-  onSurpriseSetup,
   isSetupOpen,
   onCloseSetup,
   setupState,
@@ -147,11 +146,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [surpriseDraft, setSurpriseDraft] = useState('');
   const [isSurpriseGenerating, setIsSurpriseGenerating] = useState(false);
-  const [isSurpriseOpen, setIsSurpriseOpen] = useState(false);
-  const [showSurprisePrompt, setShowSurprisePrompt] = useState(false);
-  const [surpriseGenre, setSurpriseGenre] = useState(setupState.genre);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -189,50 +186,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : null;
 
   useEffect(() => {
-    if (!showSurprisePrompt) return;
-    setSurpriseGenre(setupState.genre);
-  }, [setupState.genre, showSurprisePrompt]);
-
-  useEffect(() => {
-    if (!showStartScreen || isSetupOpen) {
-      setShowSurprisePrompt(false);
-    }
-  }, [isSetupOpen, showStartScreen]);
-
-  useEffect(() => {
     if (!context) {
       setSurpriseDraft('');
     }
   }, [context]);
 
   const handleStartSetupClick = () => {
-    setShowSurprisePrompt(false);
     onOpenSetup();
   };
-  const handleOpenSurprisePrompt = () => {
-    setShowSurprisePrompt(true);
-  };
-  const handleSurpriseContinue = (overrideGenre?: string) => {
-    const nextGenre = overrideGenre ?? surpriseGenre?.trim();
-    if (nextGenre) {
-      onSetupChange({ genre: nextGenre });
-      onSurpriseSetup(nextGenre);
-    } else {
-      onSurpriseSetup();
-    }
-    setShowSurprisePrompt(false);
-  };
-  const handleSurpriseSkip = () => {
-    const fallbackGenre = GENRES[0];
-    onSetupChange({ genre: fallbackGenre });
-    onSurpriseSetup(fallbackGenre);
-    setShowSurprisePrompt(false);
-  };
   const isSurpriseDraftReady = Boolean(surpriseDraft.trim());
-  const canInsertSurprise = isSurpriseDraftReady && Boolean(insertTarget) && Boolean(onInsertAtTarget);
+  const surpriseApplyLabel = insertTarget ? 'Insert at Selection' : 'Add to Script';
   const handleGenerateSurpriseDraft = async () => {
     if (!context || isSurpriseGenerating || isGenerating) return;
-    setIsSurpriseOpen(true);
     setIsSurpriseGenerating(true);
     const promptContext = styleContext?.trim() ? styleContext : context.genre;
     const instruction = userInstruction.trim()
@@ -256,7 +221,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setIsSurpriseGenerating(false);
     }
   };
-  const handleApplySurprise = (mode: 'insert' | 'append') => {
+  const handleApplySurprise = () => {
     const trimmedDraft = surpriseDraft.trim();
     if (!trimmedDraft) return;
     const block: ScriptBlock = {
@@ -264,15 +229,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       type: BlockType.ACTION,
       text: trimmedDraft
     };
-    if (mode === 'append') {
-      onAddBlock(block);
-      setSurpriseDraft('');
-      return;
-    }
     if (insertTarget && onInsertAtTarget) {
       onInsertAtTarget(insertTarget, block);
       setSurpriseDraft('');
+      return;
     }
+    onAddBlock(block);
+    setSurpriseDraft('');
   };
   const startScreenCard = (
     <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]">
@@ -294,59 +257,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <PlusCircle className="w-4 h-4 mr-2" />
             Start a New Script
           </Button>
-          {!showSurprisePrompt ? (
-            <Button
-              onClick={handleOpenSurprisePrompt}
-              variant="ghost"
-              size="sm"
-              className="text-gray-400 hover:text-white"
-            >
-              <Sparkles className="w-3.5 h-3.5 mr-2" />
-              Surprise Me
-            </Button>
-          ) : (
-            <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-950/70 p-4 text-left space-y-3">
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Pick a genre (optional)</p>
-                <p className="text-[11px] text-gray-500">Choose a vibe or skip to use defaults.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {GENRES.map((genre) => (
-                  <button
-                    key={genre}
-                    type="button"
-                    onClick={() => {
-                      setSurpriseGenre(genre);
-                      onSetupChange({ genre });
-                    }}
-                    className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition-all border ${
-                      surpriseGenre === genre
-                        ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm'
-                        : 'bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600'
-                    }`}
-                  >
-                    {genre}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  className="px-4"
-                  onClick={() => handleSurpriseContinue()}
-                >
-                  Continue
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleSurpriseSkip}
-                >
-                  Skip
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -365,7 +275,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
   const generateContent = context ? (
     <div className="space-y-3">
-      <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-3">
+      <section className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Prompt</h3>
           <span className={`text-[10px] ${promptWarning ? 'text-amber-400' : 'text-gray-500'}`}>
@@ -414,63 +324,43 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </Button>
         </div>
       </section>
-      <section className="bg-gray-900/40 border border-gray-800 rounded-xl p-3 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-800 pt-3">
           <div className="space-y-0.5">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Surprise Draft</p>
-            <p className="text-[10px] text-gray-500">Edit before applying.</p>
+            <p className="text-[10px] text-gray-500">Playful one-click draft. Tweak, then apply.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setIsSurpriseOpen((open) => !open)}
-              variant="ghost"
-              size="sm"
-            >
-              {isSurpriseOpen ? 'Hide' : 'Show'}
-            </Button>
-            <Button
-              onClick={handleGenerateSurpriseDraft}
-              variant="secondary"
-              size="sm"
-              loading={isSurpriseGenerating}
-              disabled={isGenerating || isPlaying}
-              title="Generate a surprise draft without committing"
-            >
-              <Sparkles className="w-3 h-3 mr-2" />
-              Surprise
-            </Button>
-          </div>
+          <Button
+            onClick={handleGenerateSurpriseDraft}
+            variant="secondary"
+            size="sm"
+            loading={isSurpriseGenerating}
+            disabled={isGenerating || isPlaying}
+            title="Generate a surprise draft without committing"
+          >
+            <Sparkles className="w-3 h-3 mr-2" />
+            {isSurpriseDraftReady ? 'Remix' : 'Surprise'}
+          </Button>
         </div>
-        {isSurpriseOpen ? (
-          <div className="space-y-2">
-            <textarea
-              value={surpriseDraft}
-              onChange={(e) => setSurpriseDraft(e.target.value)}
-              placeholder="Surprise text will appear here..."
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
-            />
-            {!insertTarget && (
-              <p className="text-[10px] text-gray-500">
-                Select an insert target to enable “Insert at selection.”
-              </p>
-            )}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+        <div className="space-y-2">
+          <textarea
+            value={surpriseDraft}
+            onChange={(e) => setSurpriseDraft(e.target.value)}
+            placeholder="Surprise text will appear here..."
+            className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+          />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-[10px] text-gray-500">
+              {insertTarget ? 'Will apply at current insertion target.' : 'No insert target selected. Will append to end.'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                onClick={() => handleApplySurprise('insert')}
-                variant="secondary"
-                size="sm"
-                disabled={!canInsertSurprise}
-                title={insertTarget ? 'Insert this draft at the selected location' : 'Select a target to insert'}
-              >
-                Insert at selection
-              </Button>
-              <Button
-                onClick={() => handleApplySurprise('append')}
+                onClick={handleApplySurprise}
                 size="sm"
                 disabled={!isSurpriseDraftReady}
-                title="Append this draft to the end of the script"
+                title="Apply this surprise draft"
               >
-                Add to bottom
+                {surpriseApplyLabel}
               </Button>
               <Button
                 onClick={() => setSurpriseDraft('')}
@@ -478,15 +368,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 size="sm"
                 disabled={!isSurpriseDraftReady}
               >
-                Discard
+                Clear
               </Button>
             </div>
           </div>
-        ) : (
-          <p className="text-[10px] text-gray-500">
-            {isSurpriseDraftReady ? 'Draft ready. Open to review and apply.' : 'Generate a draft to review and apply.'}
-          </p>
-        )}
+        </div>
       </section>
       {generationIndicator}
     </div>
@@ -506,6 +392,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onChangeSpeaker={onChangeSpeaker}
       characters={context.characters}
       insertTarget={insertTarget}
+      rewriteTarget={rewriteTarget}
+      rewriteModeActive={activeTool === 'rewrite'}
+      onSelectRewriteTarget={setRewriteTarget}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
@@ -528,7 +417,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
 
-  const contentWrapperClassName = 'max-w-6xl mx-auto px-6 py-6 h-full min-h-0 flex flex-col gap-6';
+  const contentWrapperClassName = 'max-w-7xl mx-auto px-6 py-4 h-full min-h-0 flex flex-col gap-4';
   const writePanelClassName = `transition-all duration-300 ease-out overflow-hidden ${
     isInsertModeView ? 'max-h-0 opacity-0 -translate-y-2 pointer-events-none' : 'max-h-[2000px] opacity-100 translate-y-0'
   }`;
@@ -546,19 +435,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     </div>
   ) : null;
   const setupModal = isSetupOpen ? (
-    <div className="fixed inset-0 z-[70] flex">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCloseSetup} />
       <div
-        className="relative ml-auto h-full w-full max-w-xl border-l border-gray-800 bg-gray-950 shadow-2xl animate-in slide-in-from-right-8 duration-200"
+        className="relative w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         aria-label="Setup"
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Setup</p>
             <h2 className="text-xl font-semibold text-white">Start a new script</h2>
-            <p className="text-xs text-gray-400">Define the premise, cast, and tone before we write.</p>
+            <p className="text-xs text-gray-400">Define premise and cast, then generate your opening scene.</p>
           </div>
           <button
             type="button"
@@ -569,7 +458,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="h-full overflow-y-auto p-6 pb-10">
+        <div className="p-5">
           <SetupForm
             value={setupState}
             onChange={onSetupChange}
@@ -641,35 +530,37 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
-          Target block
-        </label>
-        <select
-          value={rewriteTarget ? `${rewriteTarget.sceneId}:${rewriteTarget.blockId}` : ''}
-          onChange={(event) => {
-            const [sceneId, blockId] = event.target.value.split(':');
-            if (sceneId && blockId) {
-              setRewriteTarget({ sceneId, blockId });
-            }
-          }}
-          className="w-full bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none"
-        >
-          {rewriteOptions.map(option => (
-            <option key={option.blockId} value={`${option.sceneId}:${option.blockId}`}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+      <p className="text-[10px] text-gray-500">
+        Click a block in the script to target rewrite.
+      </p>
+      <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-3 py-2 space-y-1">
+        <p className="text-[10px] uppercase tracking-widest text-gray-500">Selected Block</p>
+        <p className="text-xs text-gray-200">
+          {selectedRewrite ? selectedRewrite.label : 'No block selected.'}
+        </p>
         {selectedRewrite?.locked && (
           <p className="text-[10px] text-amber-300">This block is locked and cannot be regenerated.</p>
         )}
       </div>
-      <div className="flex items-center justify-end">
+      <div className="space-y-1">
+        <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+          Guidance (optional)
+        </label>
+        <textarea
+          value={rewriteGuidance}
+          onChange={(event) => setRewriteGuidance(event.target.value)}
+          maxLength={220}
+          placeholder="Tone, intent, constraints..."
+          className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] text-gray-500">{rewriteGuidance.length}/220 chars</p>
         <Button
           onClick={() => {
             if (rewriteTarget) {
-              onRegenerate(rewriteTarget.sceneId, rewriteTarget.blockId);
+              const guidance = rewriteGuidance.trim();
+              onRegenerate(rewriteTarget.sceneId, rewriteTarget.blockId, guidance || undefined);
             }
           }}
           disabled={!rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
@@ -689,10 +580,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       characters={context.characters}
       genre={context.genre}
       onAddBlock={onAddBlock}
-      onUndo={onUndo}
-      onRedo={onRedo}
-      canUndo={canUndo}
-      canRedo={canRedo}
       onStartInsertMode={onStartInsertMode}
       insertModeActive={isInsertModeView}
       insertModeAvailable={insertModeAvailable}
@@ -712,21 +599,44 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
         >
-          <div className="max-w-6xl mx-auto px-6 py-5 space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="max-w-7xl mx-auto px-6 py-4 space-y-3">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
               <div className="space-y-2">
-                <h1 className="text-3xl md:text-4xl font-semibold tracking-[0.35em] text-white">SCRIPT SEANCE</h1>
+                <h1 className="text-2xl md:text-3xl font-semibold tracking-[0.28em] text-white">SCRIPT SEANCE</h1>
                 <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Script Workspace</p>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>
                   <span>{sceneCountLabel}</span>
-                  <span className="text-gray-600">•</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-start lg:justify-end">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onUndo}
+                    disabled={!canUndo}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={canUndo ? 'Undo last script change' : 'No action to undo'}
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRedo?.()}
+                    disabled={!canRedo || !onRedo}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={canRedo ? 'Redo last undone script change' : 'No action to redo'}
+                  >
+                    <Redo2 className="h-3.5 w-3.5" />
+                    Redo
+                  </button>
                   <button
                     type="button"
                     onClick={onClearDraft}
                     disabled={!context}
-                    className="uppercase tracking-widest text-[10px] text-gray-500 hover:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-red-200 transition-colors hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     Clear Draft
                   </button>
@@ -822,19 +732,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </>
         )}
       </div>
-      <BottomToolbelt
-        activeTool={activeTool}
-        onSelectTool={handleToolSelect}
-        onCloseTool={handleToolClose}
-        onExportTxt={onExportTxt}
-        onExportPdf={onExportPdf}
-        exportDisabled={!canExport}
-        generateContent={generateContent}
-        rewriteContent={rewriteContent}
-        playbackContent={playbackContent}
-        voicesContent={voicesContent}
-        insertContent={insertContent}
-      />
+      {context && (
+        <BottomToolbelt
+          activeTool={activeTool}
+          onSelectTool={handleToolSelect}
+          onCloseTool={handleToolClose}
+          onExportTxt={onExportTxt}
+          onExportPdf={onExportPdf}
+          exportDisabled={!canExport}
+          generateContent={generateContent}
+          rewriteContent={rewriteContent}
+          playbackContent={playbackContent}
+          voicesContent={voicesContent}
+          insertContent={insertContent}
+        />
+      )}
       <TitleEditModal
         isOpen={isTitleModalOpen}
         value={titleDraft}

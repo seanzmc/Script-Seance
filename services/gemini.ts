@@ -359,12 +359,14 @@ export const regenerateScriptBlock = async (
   block: ScriptBlock,
   genre: string,
   premise: string,
+  rewriteGuidance?: string,
   options?: RequestOptions
 ): Promise<string> => {
   const data = await requestAi<{ text: string }>('regenerateScriptBlock', {
     block,
     genre,
-    premise
+    premise,
+    rewriteGuidance
   }, options);
 
   return data.text?.trim() || block.text;
@@ -542,11 +544,12 @@ export const createRegenerateScriptBlockRequest = (
   block: ScriptBlock,
   genre: string,
   premise: string,
+  rewriteGuidance?: string,
   options?: RequestOptions
 ): CancellableRequest<string> => {
   const request = createAiRequest<{ text: string }>(
     'regenerateScriptBlock',
-    { block, genre, premise },
+    { block, genre, premise, rewriteGuidance },
     options
   );
   return {

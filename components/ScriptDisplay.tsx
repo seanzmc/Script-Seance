@@ -14,6 +14,9 @@ export interface ScriptDisplayProps {
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   characters: string[];
   insertTarget?: { sceneId: string; blockId: string } | null;
+  rewriteTarget?: { sceneId: string; blockId: string } | null;
+  rewriteModeActive?: boolean;
+  onSelectRewriteTarget?: (target: { sceneId: string; blockId: string }) => void;
   insertModeActive?: boolean;
   pendingInsertBlock?: ScriptBlock | null;
   onConfirmInsertMode?: () => void;
@@ -229,6 +232,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   onCancelInsertMode,
   characters,
   insertTarget,
+  rewriteTarget = null,
+  rewriteModeActive = false,
+  onSelectRewriteTarget,
   insertModeActive = false,
   pendingInsertBlock = null,
   className = '',
@@ -254,6 +260,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       ? playableBlockIds[currentBlockIndex]
       : currentBlockId;
   const isInsertMode = insertModeActive;
+  const isRewriteMode = rewriteModeActive && !isInsertMode;
   const hasPendingPreview = Boolean(pendingInsertBlock && insertTarget);
   const getDisplayCharacter = useCallback((name?: string) => {
     if (!name) return '';
@@ -453,9 +460,14 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
             {blocks.map((block, index) => {
               const isInsertTarget = insertTarget?.blockId === block.id;
+              const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
               const isError = blockStatuses[block.id] === 'error';
               const blockWrapperClasses = `group relative rounded transition-colors ${
                 isInsertTarget ? 'ring-1 ring-indigo-500/50 bg-indigo-100/30' : ''
+              } ${
+                isRewriteTarget ? 'ring-2 ring-sky-400/60 bg-sky-100/40' : ''
+              } ${
+                isRewriteMode ? 'cursor-pointer hover:bg-sky-100/20' : ''
               }`;
               const blockStatusClasses = isError ? ERROR_CLASSES : '';
               const isLastBlock = index === blocks.length - 1;
@@ -499,6 +511,19 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     id={`block-${block.id}`}
                     className={`${blockWrapperClasses} ${blockStatusClasses} script-block`}
                     data-block-type={block.type}
+                    onClick={() => {
+                      if (!isRewriteMode || !onSelectRewriteTarget) return;
+                      onSelectRewriteTarget({ sceneId: scene.id, blockId: block.id });
+                    }}
+                    onKeyDown={(event) => {
+                      if (!isRewriteMode || !onSelectRewriteTarget) return;
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      onSelectRewriteTarget({ sceneId: scene.id, blockId: block.id });
+                    }}
+                    role={isRewriteMode ? 'button' : undefined}
+                    tabIndex={isRewriteMode ? 0 : undefined}
+                    aria-pressed={isRewriteMode ? isRewriteTarget : undefined}
                   >
                     {isError && (
                       <span className="script-export-chrome absolute left-2 top-2 text-[9px] uppercase tracking-widest text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
@@ -509,7 +534,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       <div className="script-export-chrome absolute right-0 top-1 flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="relative" data-menu-root={block.id}>
                           <button
-                            onClick={() => setOpenMenuId(openMenuId === block.id ? null : block.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setOpenMenuId(openMenuId === block.id ? null : block.id);
+                            }}
                             className="p-1.5 bg-white border border-gray-200 rounded-full text-gray-500 hover:text-indigo-600 shadow-sm hover:shadow transition-all"
                             title="Block actions"
                           >
@@ -519,7 +547,8 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                           {openMenuId === block.id && (
                             <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 text-sm text-gray-700 z-20">
                               <button
-                                onClick={() => {
+                                onClick={(event) => {
+                                  event.stopPropagation();
                                   setOpenMenuId(null);
                                   onToggleLock(scene.id, block.id);
                                 }}
@@ -562,11 +591,11 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   if (scenes.length === 0) return null;
 
-  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-8 md:p-16 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] max-w-4xl mx-auto rounded-md relative ${
+  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-6 md:p-10 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1100px] mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
   } ${className}`.trim();
   const contentClasses = scrollable
-    ? 'script-export-content relative z-10 h-full overflow-y-auto space-y-6'
+    ? 'script-export-content relative z-10 h-full overflow-y-auto pr-3 space-y-6'
     : 'script-export-content relative z-10 space-y-6';
 
   return (

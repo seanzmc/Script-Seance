@@ -4,19 +4,10 @@ import { Button } from './Button';
 
 export type ToolKey = 'generate' | 'insert' | 'rewrite' | 'voices' | 'playback' | 'export';
 
-const TOOL_GROUPS: { key: ToolKey; label: string }[][] = [
-  [
-    { key: 'generate', label: 'Generate' },
-    { key: 'insert', label: 'Insert' },
-    { key: 'rewrite', label: 'Rewrite' }
-  ],
-  [
-    { key: 'voices', label: 'Voices' },
-    { key: 'playback', label: 'Playback' }
-  ],
-  [
-    { key: 'export', label: 'Export' }
-  ]
+const TOOL_GROUPS: ToolKey[][] = [
+  ['generate', 'insert', 'rewrite'],
+  ['voices', 'playback'],
+  ['export']
 ];
 
 const TOOL_PLACEHOLDERS: Record<ToolKey, string> = {
@@ -28,13 +19,13 @@ const TOOL_PLACEHOLDERS: Record<ToolKey, string> = {
   export: 'Export panel (coming soon).'
 };
 
-const TOOL_LABELS: Record<ToolKey, string> = {
-  generate: 'Generate',
-  insert: 'Insert',
-  rewrite: 'Rewrite',
-  voices: 'Voices',
-  playback: 'Playback',
-  export: 'Export'
+const TOOL_CONFIG: Record<ToolKey, { label: string; icon: React.ReactNode }> = {
+  generate: { label: 'Generate', icon: <Sparkles className="h-4 w-4" /> },
+  insert: { label: 'Insert', icon: <PlusCircle className="h-4 w-4" /> },
+  rewrite: { label: 'Rewrite', icon: <RefreshCw className="h-4 w-4" /> },
+  voices: { label: 'Voices', icon: <Mic className="h-4 w-4" /> },
+  playback: { label: 'Playback', icon: <Play className="h-4 w-4" /> },
+  export: { label: 'Export', icon: <Download className="h-4 w-4" /> }
 };
 
 export interface BottomToolbeltProps {
@@ -67,7 +58,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const [isCompact, setIsCompact] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const activePlaceholder = activeTool ? TOOL_PLACEHOLDERS[activeTool] : null;
-  const activeLabel = activeTool ? TOOL_LABELS[activeTool] : null;
+  const activeLabel = activeTool ? TOOL_CONFIG[activeTool].label : null;
   const hasExportPanel = activeTool === 'export';
   const hasGeneratePanel = activeTool === 'generate' && Boolean(generateContent);
   const hasRewritePanel = activeTool === 'rewrite' && Boolean(rewriteContent);
@@ -155,20 +146,11 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const compactOverflowTools = useMemo<ToolKey[]>(() => (
     ['voices', 'export']
   ), []);
-  const compactIcons: Record<ToolKey, React.ReactNode> = {
-    generate: <Sparkles className="h-4 w-4" />,
-    insert: <PlusCircle className="h-4 w-4" />,
-    rewrite: <RefreshCw className="h-4 w-4" />,
-    playback: <Play className="h-4 w-4" />,
-    voices: <Mic className="h-4 w-4" />,
-    export: <Download className="h-4 w-4" />
-  };
-
   return (
     <div className="w-full shrink-0 px-4 pb-4">
       <div className={`mx-auto w-full max-w-6xl flex flex-col ${hasActivePanel ? 'gap-2' : ''}`}>
         {hasActivePanel && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[240px] max-h-[360px] overflow-hidden">
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[180px] max-h-[320px] overflow-hidden">
             <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{activeLabel}</p>
               <button
@@ -199,7 +181,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                     key={tool}
                     type="button"
                     onClick={() => onSelectTool(tool)}
-                    aria-label={TOOL_LABELS[tool]}
+                    aria-label={TOOL_CONFIG[tool].label}
                     aria-pressed={isActive}
                   className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.25em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 border ${
                       isActive
@@ -207,8 +189,8 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                         : 'text-gray-400 border-gray-800 bg-gray-900/40 hover:bg-gray-800/80 hover:text-white'
                     }`}
                 >
-                  {compactIcons[tool]}
-                  <span>{TOOL_LABELS[tool]}</span>
+                  {TOOL_CONFIG[tool].icon}
+                  <span>{TOOL_CONFIG[tool].label}</span>
                 </button>
               );
               })}
@@ -246,8 +228,8 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                                 : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                             }`}
                           >
-                            {compactIcons[tool]}
-                            <span className="text-[10px] uppercase tracking-[0.3em]">{TOOL_LABELS[tool]}</span>
+                            {TOOL_CONFIG[tool].icon}
+                            <span className="text-[10px] uppercase tracking-[0.3em]">{TOOL_CONFIG[tool].label}</span>
                           </button>
                         );
                       })}
@@ -257,26 +239,28 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.35em] text-gray-400">
+            <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] uppercase tracking-[0.35em] text-gray-400">
               {TOOL_GROUPS.map((group, groupIndex) => (
                 <React.Fragment key={`tool-group-${groupIndex}`}>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
                     {group.map((tool) => {
-                      const isActive = activeTool === tool.key;
+                      const isActive = activeTool === tool;
+                      const config = TOOL_CONFIG[tool];
                       return (
                         <button
-                          key={tool.key}
+                          key={tool}
                           type="button"
-                          onClick={() => onSelectTool(tool.key)}
-                          aria-label={tool.label}
+                          onClick={() => onSelectTool(tool)}
+                          aria-label={config.label}
                           aria-pressed={isActive}
-                        className={`rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.3em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 border ${
+                        className={`rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 border inline-flex items-center gap-2 ${
                             isActive
                               ? 'bg-indigo-500 text-white border-indigo-400 shadow-[0_0_0_1px_rgba(99,102,241,0.6)]'
                               : 'text-gray-400 border-gray-800 bg-gray-900/40 hover:bg-gray-800/80 hover:text-white'
                           }`}
                         >
-                          {tool.label}
+                          {config.icon}
+                          {config.label}
                         </button>
                       );
                     })}

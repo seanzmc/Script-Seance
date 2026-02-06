@@ -938,7 +938,7 @@ export default function App() {
     setIsSuggestingTitle(false);
   }, []);
 
-  const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string) => {
+  const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string, rewriteGuidance?: string) => {
     if (!context || isGenerating) return;
 
     const scene = context.scenes.find(s => s.id === sceneId);
@@ -950,7 +950,7 @@ export default function App() {
 
     let request: CancellableRequest<string> | null = null;
     try {
-      request = createRegenerateScriptBlockRequest(block, context.genre, context.premise);
+      request = createRegenerateScriptBlockRequest(block, context.genre, context.premise, rewriteGuidance);
       startAiRequest(request);
       const newText = await request.promise;
       

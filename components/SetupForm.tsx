@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
-import { Users, Plus, Trash2, Shuffle } from "lucide-react";
+import { Users, Plus, Trash2, Shuffle, ChevronDown } from "lucide-react";
 import { generateSurpriseSetup } from "../services/gemini";
 
 export type SetupFormState = {
@@ -31,6 +31,7 @@ const STARTER_IDEAS = [
   "Two rivals are forced to work together",
   "A secret threatens to unravel everything",
   "A normal day goes very wrong",
+  "One mistake rewrites the entire future",
 ];
 
 const LENGTH_OPTIONS = ["Short", "Medium", "Long"];
@@ -52,6 +53,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const { genre, premise, characters, style, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
   const [justSurprised, setJustSurprised] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const autoSurpriseRef = useRef(false);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -182,8 +184,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
 
+  useEffect(() => {
+    if (showAdvanced) return;
+    if (style.trim() || (length && length !== "Medium")) {
+      setShowAdvanced(true);
+    }
+  }, [length, showAdvanced, style]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {showSummary && (
         <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-3">
           <div className="space-y-1">
@@ -220,7 +229,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
       {!isSummaryOnly && (
         <>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
                 Genre
@@ -263,16 +272,16 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-[1.15fr_0.85fr] gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
                 Premise
               </label>
               <textarea
-                rows={3}
+                rows={4}
                 value={premise}
                 onChange={(e) => updateValue({ premise: e.target.value })}
-                className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-y min-h-[80px] text-sm leading-relaxed ${
+                className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[110px] text-sm leading-relaxed ${
                   justSurprised
                     ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                     : "bg-gray-800 border-gray-700"
@@ -280,14 +289,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 placeholder="e.g., A detective discovers his new partner is a ghost..."
                 disabled={isLocked}
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {STARTER_IDEAS.map((idea) => (
                   <button
                     key={idea}
                     type="button"
                     onClick={() => handlePillClick(idea)}
                     disabled={isLocked}
-                    className="text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full text-left text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {idea}
                   </button>
@@ -295,97 +304,112 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Style (optional)
-                </label>
-                <input
-                  value={style}
-                  onChange={(e) => updateValue({ style: e.target.value })}
-                  className={`w-full rounded-lg p-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm ${
-                    justSurprised
-                      ? "bg-indigo-900/20 border-indigo-500"
-                      : "bg-gray-800 border-gray-700"
-                  } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
-                  placeholder="e.g., Witty noir with crisp dialogue"
-                  disabled={isLocked}
-                />
-                {isStyleBlank && (
-                  <p className="text-[10px] text-gray-500">Using defaults.</p>
-                )}
-              </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-indigo-400" /> Characters
+              </label>
+              <div className="space-y-2">
+                {characters.map((char, idx) => (
+                  <div key={idx} className="relative group">
+                    <input
+                      ref={(el) => {
+                        characterInputs.current[idx] = el;
+                      }}
+                      value={char}
+                      onChange={(e) => handleCharacterChange(idx, e.target.value)}
+                      className={`w-full rounded-lg p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
+                        justSurprised
+                          ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
+                          : "bg-gray-800 border-gray-700"
+                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                      placeholder={`Character ${idx + 1}`}
+                      disabled={isLocked}
+                    />
+                    {characters.length > 1 && !isLocked && (
+                      <button
+                        onClick={() => removeCharacter(idx)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        tabIndex={-1}
+                        aria-label="Remove character"
+                        title="Remove character"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Target Length (optional)
-                </label>
-                <select
-                  value={length}
-                  onChange={(e) => updateValue({ length: e.target.value })}
-                  className={`w-full rounded-lg p-2.5 text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    justSurprised
-                      ? "bg-indigo-900/20 border-indigo-500"
-                      : "bg-gray-800 border-gray-700"
-                  } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                <button
+                  type="button"
+                  onClick={addCharacter}
                   disabled={isLocked}
+                  className="w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <option value="">Balanced (default)</option>
-                  {LENGTH_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-gray-500">{lengthHint}</p>
+                  <Plus className="w-3.5 h-3.5" /> Add Character
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-              <Users className="w-3.5 h-3.5 text-indigo-400" /> Characters
-            </label>
-            <div className="space-y-2">
-              {characters.map((char, idx) => (
-                <div key={idx} className="relative group">
+          <div className="rounded-lg border border-gray-800 bg-gray-900/30">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((open) => !open)}
+              className="w-full px-3 py-2 text-left flex items-center justify-between"
+            >
+              <span className="text-[11px] uppercase tracking-[0.32em] text-gray-400">
+                Advanced options
+              </span>
+              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            </button>
+            {showAdvanced && (
+              <div className="border-t border-gray-800 px-3 pb-3 pt-2 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                    Style (optional)
+                  </label>
                   <input
-                    ref={(el) => {
-                      characterInputs.current[idx] = el;
-                    }}
-                    value={char}
-                    onChange={(e) => handleCharacterChange(idx, e.target.value)}
-                    className={`w-full rounded-lg p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
+                    value={style}
+                    onChange={(e) => updateValue({ style: e.target.value })}
+                    className={`w-full rounded-lg p-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm ${
                       justSurprised
-                        ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
+                        ? "bg-indigo-900/20 border-indigo-500"
                         : "bg-gray-800 border-gray-700"
                     } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
-                    placeholder={`Character ${idx + 1}`}
+                    placeholder="e.g., Witty noir with crisp dialogue"
                     disabled={isLocked}
                   />
-                  {characters.length > 1 && !isLocked && (
-                    <button
-                      onClick={() => removeCharacter(idx)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                      tabIndex={-1}
-                      aria-label="Remove character"
-                      title="Remove character"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  {isStyleBlank && (
+                    <p className="text-[10px] text-gray-500">Using defaults.</p>
                   )}
                 </div>
-              ))}
 
-              <button
-                type="button"
-                onClick={addCharacter}
-                disabled={isLocked}
-                className="w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Character
-              </button>
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                    Target Length (optional)
+                  </label>
+                  <select
+                    value={length}
+                    onChange={(e) => updateValue({ length: e.target.value })}
+                    className={`w-full rounded-lg p-2.5 text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                      justSurprised
+                        ? "bg-indigo-900/20 border-indigo-500"
+                        : "bg-gray-800 border-gray-700"
+                    } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                    disabled={isLocked}
+                  >
+                    <option value="">Balanced (default)</option>
+                    {LENGTH_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-500">{lengthHint}</p>
+                </div>
+
+              </div>
+            )}
           </div>
 
           {showSubmit && onStart && (

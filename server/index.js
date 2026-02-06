@@ -643,9 +643,16 @@ const handleAiGenerate = async (req, res) => {
 
       data = { text: response.text?.trim() || '' };
     } else if (kind === 'regenerateScriptBlock') {
-      const { block, genre, premise } = context;
+      const { block, genre, premise, rewriteGuidance } = context;
       if (!isObject(block) || !isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000)) {
         return sendError(res, 400, 'Invalid regenerateScriptBlock context.', 'INVALID_REQUEST');
+      }
+      if (
+        rewriteGuidance !== undefined &&
+        rewriteGuidance !== null &&
+        !isNonEmptyString(rewriteGuidance, 1200)
+      ) {
+        return sendError(res, 400, 'Invalid rewrite guidance.', 'INVALID_REQUEST');
       }
 
       const { type, text, character } = block;
@@ -665,7 +672,8 @@ const handleAiGenerate = async (req, res) => {
         return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
       }
 
-      if (!ensurePromptSize(res, `${premise}\n${text}`.length)) {
+      const guidanceText = typeof rewriteGuidance === 'string' ? rewriteGuidance.trim() : '';
+      if (!ensurePromptSize(res, `${premise}\n${text}\n${guidanceText}`.length)) {
         return;
       }
 
@@ -674,11 +682,14 @@ const handleAiGenerate = async (req, res) => {
         prompt = `Rewrite this dialogue line for ${character} to be more impactful, witty, or dramatic, fitting the genre "${genre}". 
     Premise: ${premise}.
     Original line: "${text}".
+    ${guidanceText ? `Additional direction: ${guidanceText}.` : ''}
     Output ONLY the new dialogue text.`;
       } else {
         prompt = `Rewrite this screenplay ${type} block to be more descriptive and engaging. 
     Genre: ${genre}.
+    Premise: ${premise}.
     Original text: "${text}".
+    ${guidanceText ? `Additional direction: ${guidanceText}.` : ''}
     Output ONLY the new text.`;
       }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/gemini';
-import { PenTool, Undo2, Redo2 } from 'lucide-react';
+import { PenTool } from 'lucide-react';
 
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
@@ -15,10 +15,6 @@ export interface InsertBlockProps {
   characters: string[];
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
   onStartInsertMode: (block: ScriptBlock) => void;
   insertModeActive: boolean;
   insertModeAvailable: boolean;
@@ -40,10 +36,6 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   characters, 
   genre, 
   onAddBlock,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
   onStartInsertMode,
   insertModeActive,
   insertModeAvailable,
@@ -149,7 +141,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold text-gray-300 flex items-center gap-2 uppercase tracking-[0.3em]">
           <PenTool className="w-4 h-4" />
@@ -157,26 +149,6 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         </h3>
 
         <div className="flex items-center gap-2">
-          {onUndo && (
-            <button
-              onClick={onUndo}
-              disabled={disabled || canUndo === false}
-              className="p-1 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors"
-              title={canUndo === false ? 'Undo is available after adding a block' : 'Undo last action'}
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-          )}
-          {onRedo && (
-            <button
-              onClick={onRedo}
-              disabled={disabled || !canRedo}
-              className="p-1 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              title={canRedo ? 'Redo last undone action' : 'Redo is available after undo'}
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
-          )}
           <Button
             onClick={handleSurpriseMe}
             disabled={disabled || isGenerating}
