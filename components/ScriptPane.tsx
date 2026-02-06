@@ -459,15 +459,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </div>
     </div>
   ) : null;
-  const handleToolSelect = (tool: ToolKey) => {
-    setActiveTool(tool);
-  };
   const handleToolClose = () => {
     setActiveTool(null);
     requestAnimationFrame(() => {
       const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
       scrollContainer?.focus({ preventScroll: true });
     });
+  };
+  const handleToolSelect = (tool: ToolKey) => {
+    if (activeTool === tool) {
+      handleToolClose();
+      return;
+    }
+    setActiveTool(tool);
   };
   const handleOpenTitleModal = () => {
     setTitleDraft(context?.title ?? '');
