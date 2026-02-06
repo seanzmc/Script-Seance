@@ -113,7 +113,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
 
   return (
     <div className="w-full shrink-0 px-4 pb-3">
-      <div className={`mx-auto w-full max-w-6xl flex flex-col ${hasActivePanel ? 'gap-2' : ''}`}>
+      <div className="mx-auto w-full max-w-6xl flex flex-col">
         {hasActivePanel && (
           <div className="rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col min-h-[180px] max-h-[320px] overflow-hidden">
             <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
