@@ -150,6 +150,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }`.trim();
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
+  const styleLabel = setupState.style.trim();
   const generationIndicator = isGenerating ? (
     <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
       <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
@@ -582,17 +583,33 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
         >
-          <div className="max-w-7xl mx-auto px-6 py-2.5 space-y-1.5">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+          <div className="max-w-7xl mx-auto px-6 py-2.5">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
               <div className="space-y-1">
                 <h1 className="text-xl md:text-2xl font-semibold tracking-[0.22em] text-white">SCRIPT SEANCE</h1>
                 <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>
                   <span>{sceneCountLabel}</span>
+                  <span className="text-gray-600">•</span>
+                  <span>Draft autosaves locally.</span>
+                  {autosaveError && (
+                    <>
+                      <span className="text-gray-600">•</span>
+                      <span className="text-amber-400">{autosaveError}</span>
+                    </>
+                  )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Draft Title</span>
+                {styleLabel && (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Style</span>
+                    <span className="text-sm font-medium text-gray-200">{styleLabel}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col items-center justify-center gap-1 text-center">
+                <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Draft Title</span>
+                <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
                   <span className="text-base font-semibold text-white">
                     {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
                   </span>
@@ -638,11 +655,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
-              <span>Draft autosaves locally.</span>
-              {autosaveError && <span className="text-amber-400">{autosaveError}</span>}
             </div>
           </div>
         </div>
