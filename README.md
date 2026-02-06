@@ -1,113 +1,88 @@
 # Script Seance
 
-Script Seance is an AI-powered screenwriting and storytelling assistant designed to help writers generate scenes, dialogue, and plot twists using Google's Gemini AI.
+Script Seance is a React + Node app for AI-assisted screenplay drafting, rewriting, and voice playback using Gemini through a server-side proxy.
+
+## Current Status
+
+The app is functional end-to-end and in active UI iteration.
+
+- Setup flow with manual input or "Surprise Me" generation.
+- Auth-gated AI requests (`/api/ai/*`) with session cookies, rate limits, and upstream timeout handling.
+- Scene generation, plot-twist suggestions, targeted block rewrite, and insert workflows.
+- Voice casting and script playback with cached TTS generation.
+- Local draft autosave, undo/redo controls, and TXT/PDF export.
+- Automated tests for core reliability paths (client services, playback engine, server error handling).
+
+UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
 
 ## Tech Stack
 
-- **Framework**: [React 19](https://react.dev/)
-- **Build Tool**: [Vite](https://vitejs.dev/)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **AI Integration**: [Google GenAI SDK](https://www.npmjs.com/package/@google/genai)
-- **Icons**: [Lucide React](https://lucide.dev/)
+- React 19 + TypeScript
+- Vite 6
+- Express 5 API server
+- Google GenAI SDK (`@google/genai`)
+- Vitest + Testing Library
 
-## Configuration & Secrets
+## Environment Variables
 
-To run this application, you need to configure your environment variables for the Google Gemini API.
-
-1.  Create a file named `.env` in the root directory of the project.
-2.  Add the following variable to the file:
+Copy `.env.example` to `.env` and set:
 
 ```bash
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
+ADMIN_PASSWORD=your_admin_password
+PORT=3001
+NODE_ENV=development
+AI_RPM=30
+AI_RPD=500
+AI_MAX_PROMPT_CHARS=8000
+AI_UPSTREAM_TIMEOUT_MS=30000
 ```
 
-## Production prerequisites
+`GEMINI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.
 
-- Server-side proxy for all Gemini/AI calls (no client-exposed keys).
-- Authentication and rate limiting on AI endpoints.
-- Request timeouts and retry handling.
-- CSP and security headers at the edge.
+## Local Development
 
-## Installation & Run Instructions
+Prereqs:
 
-### Prerequisites
+- Node.js (LTS)
+- pnpm
 
-- [Node.js](https://nodejs.org/) (Latest LTS recommended)
-- [pnpm](https://pnpm.io/) (install via Corepack or package manager of choice)
-
-### Installation
-
-Install the dependencies:
+Install:
 
 ```bash
 pnpm install
 ```
 
-### Running the App
+Run both client and server:
 
-Start the API server (used for Gemini calls):
+```bash
+pnpm start
+```
+
+Or run them separately:
 
 ```bash
 pnpm run server
-```
-
-Start the Vite development server:
-
-```bash
 pnpm run dev
 ```
 
-The API server runs on `http://localhost:3001` and the app will typically start at `http://localhost:3000`.
+Default local endpoints:
 
-## Deployment (Production)
+- Client: `http://localhost:5173`
+- API: `http://localhost:3001`
 
-This project ships a static client plus a Node API server. In production, serve the `dist/` output and reverse-proxy `/api` to the Node server so the client and API share the same origin.
-
-1. Build the client:
-
-```bash
-pnpm run build
-```
-
-2. Start the API server with required env vars:
+## Quality Checks
 
 ```bash
-ADMIN_PASSWORD=your_admin_password \
-GEMINI_API_KEY=your_google_ai_studio_api_key_here \
-PORT=3001 \
-node server/index.js
+pnpm test
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
-3. Serve `dist/` from your web server and proxy `/api` to the API server.
+## Production Notes
 
-Example Nginx location block:
-
-```nginx
-location /api/ {
-  proxy_pass http://127.0.0.1:3001;
-  proxy_http_version 1.1;
-  proxy_set_header Host $host;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-  proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-## Security Headers & CSP
-
-Apply security headers at your edge (CDN/reverse proxy/static host). Below is a recommended baseline for the client app.
-
-Recommended CSP (adjust `connect-src` if the API is on a separate origin):
-
-```text
-Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; upgrade-insecure-requests
-```
-
-Suggested security headers:
-
-```text
-Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-X-Content-Type-Options: nosniff
-Referrer-Policy: no-referrer
-Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-Cross-Origin-Resource-Policy: same-origin
-```
+- Keep Gemini keys server-side only.
+- Serve `dist/` and reverse-proxy `/api` to the Node server.
+- Set `NODE_ENV=production` for secure cookies and production security headers.
+- Configure HTTPS + security headers at the edge/proxy.
