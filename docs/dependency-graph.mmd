@@ -29,14 +29,17 @@ end
 N["index.tsx"]
 subgraph O["server"]
 P["index.js"]
+Q["ttsProviders.js"]
 end
-subgraph Q["tests"]
-R["audioCache.test.ts"]
-S["exportAndSetup.test.tsx"]
-T["gemini.test.ts"]
-U["scriptEngine.test.ts"]
-V["serverReliability.test.ts"]
-W["useAudioPlayer.test.tsx"]
+subgraph R["tests"]
+S["audioCache.test.ts"]
+T["exportAndSetup.test.tsx"]
+U["gemini.test.ts"]
+V["scriptEngine.test.ts"]
+W["serverReliability.test.ts"]
+X["ttsProviders.test.ts"]
+Y["useAudioPlayer.test.tsx"]
+Z["voiceManager.test.tsx"]
 end
 0-->2
 0-->4
@@ -68,6 +71,7 @@ D-->A
 D-->7
 D-->3
 E-->3
+F-->7
 G-->H
 H-->7
 J-->K
@@ -76,14 +80,17 @@ K-->7
 K-->L
 K-->A
 N-->0
-R-->L
-S-->0
-S-->D
-S-->7
-T-->A
+P-->Q
+S-->L
+T-->0
+T-->D
 T-->7
-U-->K
+U-->A
 U-->7
-V-->P
-W-->J
-W-->7
+V-->K
+V-->7
+W-->P
+X-->Q
+Y-->J
+Y-->7
+Z-->H
