@@ -34,6 +34,7 @@ const STARTER_IDEAS = [
 ];
 
 const LENGTH_OPTIONS = ["Short", "Medium", "Long"];
+const STYLE_SUGGESTIONS = ["Dry humor", "Cinematic", "Fast-paced", "Lyrical", "Unhinged"];
 
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
@@ -385,11 +386,25 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       disabled={isLocked}
                     />
                     <div className="flex flex-wrap gap-1.5">
-                      {["Dry humor", "Cinematic", "Fast-paced", "Lyrical", "Unhinged"].map((tag) => (
-                        <span key={tag} className="text-[10px] text-indigo-100/80 bg-indigo-500/18 px-2 py-1 rounded-full ring-1 ring-indigo-200/30">
-                          {tag}
-                        </span>
-                      ))}
+                      {STYLE_SUGGESTIONS.map((tag) => {
+                        const isSelected = style.trim().toLowerCase() === tag.toLowerCase();
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => updateValue({ style: tag })}
+                            disabled={isLocked}
+                            className={`text-[10px] px-2 py-1 rounded-full ring-1 transition-colors ${
+                              isSelected
+                                ? "text-indigo-100 bg-indigo-500/28 ring-indigo-100/50"
+                                : "text-indigo-100/85 bg-indigo-500/16 ring-indigo-200/30 hover:bg-indigo-500/24 hover:ring-indigo-100/40"
+                            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                            title={`Use style: ${tag}`}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      })}
                     </div>
                     {isStyleBlank && (
                       <p className="text-[10px] text-slate-400">Using defaults.</p>
