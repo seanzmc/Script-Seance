@@ -422,29 +422,30 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : null;
   const setupModal = isSetupOpen ? (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCloseSetup} />
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onCloseSetup} />
       <div
-        className="relative w-full max-w-6xl max-h-[92vh] overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-6xl max-h-[92vh] overflow-hidden rounded-3xl bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f] shadow-[0_35px_120px_rgba(2,6,23,0.75)] ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         aria-label="Setup"
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-3.5">
+        <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.24),_transparent_42%)]" />
+        <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Setup</p>
+            <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
             <h2 className="text-xl font-semibold text-white">Start a new script</h2>
-            <p className="text-xs text-gray-400">Define premise and cast, then generate your opening scene.</p>
+            <p className="text-xs text-slate-300/80">Pick a genre and let AI shape your opening spark.</p>
           </div>
           <button
             type="button"
             onClick={onCloseSetup}
-            className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
             aria-label="Close setup"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-4 sm:p-5 overflow-y-auto max-h-[calc(92vh-108px)]">
+        <div className="relative px-4 pb-5 sm:px-6 sm:pb-6 overflow-y-auto max-h-[calc(92vh-112px)]">
           <SetupForm
             value={setupState}
             onChange={onSetupChange}

@@ -191,17 +191,17 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   }, [length, showAdvanced, style]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {showSummary && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 space-y-3">
+        <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10 space-y-3">
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500">
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">
               {summaryLine || 'Setup summary'}
             </p>
-            <p className="text-xs text-gray-300">
+            <p className="text-xs text-slate-200">
               &quot;{premiseSnippet}&quot;
             </p>
-            <p className="text-[11px] text-gray-500">Cast: {castCount}</p>
+            <p className="text-[11px] text-slate-400">Cast: {castCount}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -228,23 +228,28 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
       {!isSummaryOnly && (
         <>
-          <div className="space-y-2 rounded-xl border border-gray-800/80 bg-gray-900/20 p-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-300">
-                Genre
-              </label>
+          <div className="rounded-2xl bg-slate-950/55 p-4 sm:p-5 ring-1 ring-white/10 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
+                  Genre
+                </label>
+                <p className="text-xs text-slate-400">
+                  Pick a genre, then let AI spin up a premise and cast.
+                </p>
+              </div>
               <Button
                 variant="secondary"
                 onClick={handleSurpriseMe}
-                className="!bg-transparent hover:!bg-slate-800 !border-slate-700 hover:!border-indigo-500 border !text-gray-400 hover:!text-indigo-400 transition-colors text-[11px] py-1 h-auto group"
+                className="!bg-white/[0.03] hover:!bg-indigo-500/15 !border-white/20 hover:!border-indigo-400/60 !text-slate-200 transition-colors text-[11px] py-1.5 h-auto group"
                 type="button"
                 loading={isSurprising}
                 disabled={isLoading || isSurprising || isLocked}
                 size="sm"
                 title="Randomly generate a genre, premise, and cast"
               >
-                <Shuffle className="w-3 h-3 mr-2 opacity-75 group-hover:rotate-180 transition-transform duration-500" />
-                Surprise Me
+                <Shuffle className="w-3 h-3 mr-2 opacity-80 group-hover:rotate-180 transition-transform duration-500" />
+                Let AI Surprise Me
               </Button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -254,10 +259,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   type="button"
                   onClick={() => updateValue({ genre: g })}
                   disabled={isLocked}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all border text-left ${
+                  className={`px-3 py-2 text-xs font-medium rounded-lg transition-all text-left ring-1 ${
                     genre === g
-                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-sm"
-                      : "bg-gray-800/40 text-gray-500 border-gray-700/50 hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
+                      ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
+                      : "bg-white/[0.03] text-slate-300 ring-white/15 hover:bg-white/[0.07] hover:text-white"
                   } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   {g}
@@ -267,19 +272,19 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-3">
-            <div className="space-y-1.5 rounded-xl border border-gray-800/80 bg-gray-900/20 p-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-300">
+            <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
+              <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                 Premise
               </label>
               <textarea
                 rows={4}
                 value={premise}
                 onChange={(e) => updateValue({ premise: e.target.value })}
-                className={`w-full rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[94px] text-sm leading-relaxed ${
+                className={`w-full rounded-xl p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[98px] text-sm leading-relaxed ${
                   justSurprised
-                    ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                    : "bg-gray-800 border-gray-700"
-                } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                    ? "bg-indigo-900/25 ring-1 ring-indigo-400/45 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
+                    : "bg-slate-900/75 ring-1 ring-white/10"
+                } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                 placeholder="e.g., A detective discovers his new partner is a ghost..."
                 disabled={isLocked}
               />
@@ -290,7 +295,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     type="button"
                     onClick={() => handlePillClick(idea)}
                     disabled={isLocked}
-                    className="w-full text-left text-[10px] text-gray-500 hover:text-indigo-400 bg-gray-800/40 hover:bg-gray-800 border border-gray-700/30 hover:border-indigo-500 rounded-full px-3 py-1 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-colors cursor-pointer ring-1 ring-white/10 hover:ring-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {idea}
                   </button>
@@ -298,9 +303,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2 rounded-xl border border-gray-800/80 bg-gray-900/20 p-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-300 flex items-center gap-2">
-                <Users className="w-3.5 h-3.5 text-indigo-400" /> Characters
+            <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
+              <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
               </label>
               <div className="space-y-2">
                 {characters.map((char, idx) => (
@@ -311,18 +316,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       }}
                       value={char}
                       onChange={(e) => handleCharacterChange(idx, e.target.value)}
-                      className={`w-full rounded-lg p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-600 transition-all duration-700 ${
+                      className={`w-full rounded-xl p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-all duration-700 ${
                         justSurprised
-                          ? "bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/50"
-                          : "bg-gray-800 border-gray-700"
-                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                          ? "bg-indigo-900/25 ring-1 ring-indigo-400/45"
+                          : "bg-slate-900/80 ring-1 ring-white/10"
+                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                       placeholder={`Character ${idx + 1}`}
                       disabled={isLocked}
                     />
                     {characters.length > 1 && !isLocked && (
                       <button
                         onClick={() => removeCharacter(idx)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
                         tabIndex={-1}
                         aria-label="Remove character"
                         title="Remove character"
@@ -337,7 +342,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   type="button"
                   onClick={addCharacter}
                   disabled={isLocked}
-                  className="w-full py-2 border border-gray-700 border-dashed rounded-lg text-gray-500 hover:text-indigo-400 hover:border-indigo-500/50 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ring-1 ring-dashed ring-white/20 hover:ring-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Character
                 </button>
@@ -345,52 +350,64 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-800 bg-gray-900/30">
+          <div className="rounded-2xl bg-slate-950/45 ring-1 ring-white/10 overflow-hidden">
             <button
               type="button"
               onClick={() => setShowAdvanced((open) => !open)}
-              className="w-full px-3 py-2 text-left flex items-center justify-between"
+              className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-white/[0.02] transition-colors"
             >
-              <span className="text-[11px] uppercase tracking-[0.32em] text-gray-400">
+              <span className="text-[11px] uppercase tracking-[0.32em] text-slate-300">
                 Advanced options (optional)
               </span>
-              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
             </button>
             {showAdvanced && (
-              <div className="border-t border-gray-800 px-3 pb-3 pt-2 space-y-3">
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5 space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                      Style (optional)
-                    </label>
+                  <div className="space-y-2 rounded-xl bg-indigo-500/[0.08] ring-1 ring-indigo-300/25 p-3.5">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold uppercase tracking-[0.32em] text-indigo-100">
+                        Style (optional)
+                      </label>
+                      <p className="text-[11px] text-indigo-100/75">
+                        Add a mood, tone, or pacing hint to make the output feel distinct.
+                      </p>
+                    </div>
                     <input
                       value={style}
                       onChange={(e) => updateValue({ style: e.target.value })}
-                      className={`w-full rounded-lg p-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm ${
+                      className={`w-full rounded-lg p-2.5 text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm ${
                         justSurprised
-                          ? "bg-indigo-900/20 border-indigo-500"
-                          : "bg-gray-800 border-gray-700"
-                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                          ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
+                          : "bg-slate-900/80 ring-1 ring-white/15"
+                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                       placeholder="e.g., Witty noir with crisp dialogue"
                       disabled={isLocked}
                     />
+                    <div className="flex flex-wrap gap-1.5">
+                      {["Dry humor", "Cinematic", "Fast-paced", "Lyrical", "Unhinged"].map((tag) => (
+                        <span key={tag} className="text-[10px] text-indigo-100/80 bg-indigo-500/18 px-2 py-1 rounded-full ring-1 ring-indigo-200/30">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                     {isStyleBlank && (
-                      <p className="text-[10px] text-gray-500">Using defaults.</p>
+                      <p className="text-[10px] text-slate-400">Using defaults.</p>
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  <div className="space-y-1.5 rounded-xl bg-slate-900/55 ring-1 ring-white/10 p-3.5">
+                    <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                       Target Length (optional)
                     </label>
                     <select
                       value={length}
                       onChange={(e) => updateValue({ length: e.target.value })}
-                      className={`w-full rounded-lg p-2.5 text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                      className={`w-full rounded-lg p-2.5 text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
                         justSurprised
-                          ? "bg-indigo-900/20 border-indigo-500"
-                          : "bg-gray-800 border-gray-700"
-                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-gray-900/60 border-gray-800 text-gray-400" : ""}`}
+                          ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
+                          : "bg-slate-900/80 ring-1 ring-white/15"
+                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                       disabled={isLocked}
                     >
                       <option value="">Balanced (default)</option>
@@ -400,10 +417,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         </option>
                       ))}
                     </select>
-                    <p className="text-[10px] text-gray-500">{lengthHint}</p>
+                    <p className="text-[10px] text-slate-400">{lengthHint}</p>
                   </div>
                 </div>
-
               </div>
             )}
           </div>
@@ -412,7 +428,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             <Button
               variant="primary"
               onClick={onStart}
-              className="w-full shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] !bg-indigo-600 hover:!bg-indigo-500 border border-indigo-500/50 transition-all text-sm font-medium"
+              className="w-full shadow-[0_14px_40px_rgba(99,102,241,0.3)] hover:shadow-[0_18px_52px_rgba(99,102,241,0.42)] !bg-indigo-600 hover:!bg-indigo-500 transition-all text-sm font-medium"
               loading={isLoading}
               size="lg"
               disabled={!premise.trim() || !hasValidCharacter || isLoading || isSurprising || isLocked}
