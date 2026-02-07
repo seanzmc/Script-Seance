@@ -152,10 +152,7 @@ const extractAudioBase64FromPayload = (value, depth = 0) => {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed.length === 0) return null;
-    if (/^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length % 4 === 0) {
-      return trimmed;
-    }
-    return null;
+    return trimmed;
   }
   if (Array.isArray(value)) {
     for (const item of value) {

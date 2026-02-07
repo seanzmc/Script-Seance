@@ -10,7 +10,6 @@ import {
   LEGACY_VOICE_IDS,
   normalizeTtsProvider,
   applyExpressiveText,
-  extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
   parseInworldVoiceList,
   normalizeInworldVoice,
@@ -232,11 +231,14 @@ const createUpstreamError = (message, status, code, details) => {
 const isTtsFallbackEligible = (error) => {
   const status = typeof error?.status === 'number' ? error.status : undefined;
   const code = typeof error?.code === 'string' ? error.code : '';
+  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
   if (!status) return true;
   if (status >= 500) return true;
   if (status === 429) return true;
   if (status === 408 || status === 504) return true;
-  return code === 'UPSTREAM_TIMEOUT' || code === 'UPSTREAM_ERROR';
+  if (status === 404) return true;
+  if (message.includes('unknown voice') || message.includes('voice not found')) return true;
+  return code === 'UPSTREAM_TIMEOUT' || code === 'UPSTREAM_ERROR' || code === 'UPSTREAM_NOT_FOUND';
 };
 
 const parseJsonSafe = (text) => {
@@ -501,15 +503,17 @@ const generateSpeechWithGemini = async (ai, text, voiceName) => {
 
 const generateSpeechWithInworld = async (text, voiceName, expressive = false) => {
   const preparedText = applyExpressiveText(text, expressive);
+  const resolvedVoiceId = typeof voiceName === 'string' ? voiceName.trim() : '';
+  if (!resolvedVoiceId) {
+    throw createUpstreamError('Voice ID is required for Inworld TTS.', 400, 'INVALID_VOICE');
+  }
   const payload = {
-    model: TTS_INWORLD_MODEL,
+    model_id: TTS_INWORLD_MODEL,
     text: preparedText,
-    voice: {
-      name: voiceName
-    },
-    outputAudioConfig: {
+    voice_id: resolvedVoiceId,
+    output_audio_config: {
       encoding: 'LINEAR16',
-      sampleRateHertz: 24000,
+      sample_rate_hertz: 24000,
       channels: 1
     }
   };
@@ -531,15 +535,6 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
       mapUpstreamStatusToErrorCode(response.status),
       parsed?.error?.details || parsed?.details
     );
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
-    const jsonBody = await response.json();
-    const audioBase64 = extractAudioBase64FromPayload(jsonBody);
-    if (audioBase64) {
-      return { audioBase64, provider: 'inworld' };
-    }
   }
 
   const streamAudioBase64 = await collectAudioFromStreamBody(response.body);
