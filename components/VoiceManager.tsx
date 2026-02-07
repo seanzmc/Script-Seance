@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { VoiceConfig, AVAILABLE_VOICES } from '../types';
+import { VoiceConfig, TtsVoice, LEGACY_VOICE_IDS, DEFAULT_NARRATOR_VOICE_ID } from '../types';
 import { Volume2, Loader, Square, Settings2, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 
 export interface VoiceManagerProps {
   characters: string[];
+  availableVoices: TtsVoice[];
   voiceConfigs: VoiceConfig[];
   onUpdateConfig: (character: string, updates: Partial<VoiceConfig>) => void;
   onOpenCasting: (character: string) => void;
@@ -15,6 +16,7 @@ export interface VoiceManagerProps {
 
 export const VoiceManager: React.FC<VoiceManagerProps> = ({
   characters,
+  availableVoices,
   voiceConfigs,
   onUpdateConfig,
   onOpenCasting,
@@ -23,6 +25,9 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   isAudioPlaying,
   isLoading
 }) => {
+  const availableVoiceIds = availableVoices.map((voice) => voice.id);
+  const fallbackVoiceIds = availableVoiceIds.length > 0 ? availableVoiceIds : LEGACY_VOICE_IDS;
+
   const [activeChar, setActiveChar] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [expandedChars, setExpandedChars] = useState<Record<string, boolean>>({});
@@ -46,7 +51,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   const getConfig = (char: string): VoiceConfig => {
     return voiceConfigs.find(c => c.name === char) || {
       name: char,
-      voiceId: AVAILABLE_VOICES[0],
+      voiceId: fallbackVoiceIds[0] || DEFAULT_NARRATOR_VOICE_ID,
       speed: 1,
       pitch: 0
     };
@@ -63,9 +68,10 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
 
   const renderRow = (char: string, options?: { variant?: 'narrator' | 'cast'; index?: number }) => {
     const config = getConfig(char);
-    const voiceOptions = config.voiceId && !AVAILABLE_VOICES.includes(config.voiceId)
-      ? [config.voiceId, ...AVAILABLE_VOICES]
-      : AVAILABLE_VOICES;
+    const voiceOptions = config.voiceId && !fallbackVoiceIds.includes(config.voiceId)
+      ? [config.voiceId, ...fallbackVoiceIds]
+      : fallbackVoiceIds;
+    const hasDynamicCatalog = availableVoices.length > 0;
     const isActive = activeChar === char;
     const isThisLoading = isActive && isLoading;
     const isThisPlaying = isActive && isAudioPlaying;
@@ -97,7 +103,9 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             >
               {voiceOptions.map(voice => (
                 <option key={voice} value={voice}>
-                  {voice}
+                  {hasDynamicCatalog
+                    ? (availableVoices.find((entry) => entry.id === voice)?.displayName || voice)
+                    : voice}
                 </option>
               ))}
             </select>
@@ -168,6 +176,15 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
                 className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
             </div>
+            <label className="col-span-2 flex items-center justify-between rounded-md border border-gray-700 bg-gray-900/60 px-2 py-1.5 text-[10px] uppercase tracking-widest text-gray-400">
+              <span>Expressive TTS</span>
+              <input
+                type="checkbox"
+                checked={config.expressive || false}
+                onChange={(e) => onUpdateConfig(char, { expressive: e.target.checked })}
+                className="h-3.5 w-3.5 accent-indigo-500"
+              />
+            </label>
           </div>
         )}
       </div>

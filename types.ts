@@ -32,15 +32,16 @@ export interface StoryContext {
 
 export interface VoiceConfig {
   name: string; // The character name in the script
-  voiceId: string; // The Gemini voice name (Puck, Charon, etc.)
+  voiceId: string;
   pitch?: number; // Simulated by choosing different voices usually, but placeholders for now
   speed?: number;
+  expressive?: boolean;
 }
 
 export const INSERT_TOP_ID = '__insert-top__';
 export const INSERT_BOTTOM_ID = '__insert-bottom__';
 
-export const AVAILABLE_VOICES = [
+export const LEGACY_VOICE_IDS = [
   'Aoede',
   'Callirrhoe',
   'Kore',
@@ -52,6 +53,24 @@ export const AVAILABLE_VOICES = [
   'Rasalgethi',
   'Umbriel'
 ];
+
+export const AVAILABLE_VOICES = LEGACY_VOICE_IDS;
+
+export const DEFAULT_NARRATOR_VOICE_ID = 'Zephyr';
+
+export interface TtsVoice {
+  id: string;
+  displayName: string;
+  source: 'inworld-premade' | 'inworld-custom' | 'legacy';
+  language?: string;
+  labels: string[];
+  isCustom: boolean;
+  gender?: string;
+  category?: string;
+  description?: string;
+}
+
+export type VoiceCatalogState = 'idle' | 'loading' | 'ready' | 'error';
 
 export const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'

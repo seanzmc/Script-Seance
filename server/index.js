@@ -5,6 +5,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import cookie from 'cookie';
 import { GoogleGenAI, Type } from '@google/genai';
+import {
+  LEGACY_TTS_VOICES,
+  LEGACY_VOICE_IDS,
+  normalizeTtsProvider,
+  applyExpressiveText,
+  extractAudioBase64FromPayload,
+  collectAudioFromStreamBody,
+  parseInworldVoiceList,
+  normalizeInworldVoice,
+  dedupeVoices,
+  isInworldVoiceFetchErrorRecoverable
+} from './ttsProviders.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -30,22 +42,17 @@ const CLEANUP_INTERVAL_MS = parsePositiveInt(process.env.MAP_CLEANUP_INTERVAL_MS
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 8;
 const LOGIN_BUCKET_TTL_MS = LOGIN_WINDOW_MS * 2;
+const TTS_PROVIDER = normalizeTtsProvider(process.env.TTS_PROVIDER, 'dual');
+const TTS_INWORLD_MODEL = process.env.TTS_INWORLD_MODEL || 'inworld-tts-1.5-max';
+const INWORLD_API_KEY = process.env.INWORLD_API_KEY || '';
+const INWORLD_WORKSPACE_ID = process.env.INWORLD_WORKSPACE_ID || '';
+const INWORLD_API_BASE = process.env.INWORLD_API_BASE || 'https://api.inworld.ai';
+const VOICE_CATALOG_CACHE_TTL_MS = parsePositiveInt(process.env.VOICE_CATALOG_CACHE_TTL_MS, 5 * 60 * 1000);
 
 const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
 ];
-const ALLOWED_VOICES = new Set([
-  'Aoede',
-  'Callirrhoe',
-  'Kore',
-  'Sulafat',
-  'Zephyr',
-  'Charon',
-  'Fenrir',
-  'Puck',
-  'Rasalgethi',
-  'Umbriel'
-]);
+const ALLOWED_VOICES = LEGACY_VOICE_IDS;
 
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
 const sessions = new Map();
@@ -167,6 +174,13 @@ const validateAiResponse = (kind, data) => {
     return { ok: true };
   }
 
+  if (kind === 'listVoices') {
+    if (!Array.isArray(data.voices)) {
+      return { ok: false, reason: 'Voice catalog missing or invalid.' };
+    }
+    return { ok: true };
+  }
+
   if (kind === 'suggestPlotTwist') {
     if (!isStringWithin(data.text, MAX_BLOCK_TEXT_CHARS)) {
       return { ok: false, reason: 'Plot twist missing or too long.' };
@@ -175,6 +189,264 @@ const validateAiResponse = (kind, data) => {
   }
 
   return { ok: true };
+};
+
+const voiceCatalogCache = {
+  expiresAt: 0,
+  voices: []
+};
+
+const getTtsProviderOrder = () => {
+  const inworldConfigured = Boolean(INWORLD_API_KEY && INWORLD_WORKSPACE_ID);
+  if (!inworldConfigured) {
+    return ['gemini'];
+  }
+  if (TTS_PROVIDER === 'gemini') {
+    return ['gemini'];
+  }
+  if (TTS_PROVIDER === 'inworld') {
+    return ['inworld'];
+  }
+  return ['inworld', 'gemini'];
+};
+
+const createUpstreamError = (message, status, code, details) => {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  if (details) {
+    error.details = details;
+  }
+  return error;
+};
+
+const isTtsFallbackEligible = (error) => {
+  const status = typeof error?.status === 'number' ? error.status : undefined;
+  const code = typeof error?.code === 'string' ? error.code : '';
+  if (!status) return true;
+  if (status >= 500) return true;
+  if (status === 429) return true;
+  if (status === 408 || status === 504) return true;
+  return code === 'UPSTREAM_TIMEOUT' || code === 'UPSTREAM_ERROR';
+};
+
+const parseJsonSafe = (text) => {
+  if (!text || typeof text !== 'string') return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+};
+
+const mapUpstreamStatusToErrorCode = (status) => {
+  if (status === 401 || status === 403) return 'UPSTREAM_UNAUTHORIZED';
+  if (status === 404) return 'UPSTREAM_NOT_FOUND';
+  if (status === 408 || status === 504) return 'UPSTREAM_TIMEOUT';
+  if (status === 429) return 'RATE_LIMITED';
+  if (status >= 500) return 'UPSTREAM_ERROR';
+  return 'UPSTREAM_BAD_REQUEST';
+};
+
+const createInworldHeaders = () => ({
+  Authorization: `Bearer ${INWORLD_API_KEY}`,
+  'Content-Type': 'application/json',
+  Accept: 'application/json, text/event-stream'
+});
+
+const normalizeVoicePayloads = (voices, source, isCustom) =>
+  dedupeVoices(
+    voices
+      .map((voice) => normalizeInworldVoice(voice, source, isCustom))
+      .filter(Boolean)
+  );
+
+const fetchInworldVoiceList = async (endpoint, source, isCustom) => {
+  const response = await withTimeout(fetch(`${INWORLD_API_BASE}${endpoint}`, {
+    method: 'GET',
+    headers: createInworldHeaders()
+  }), AI_UPSTREAM_TIMEOUT_MS);
+  if (!response.ok) {
+    const body = await response.text();
+    const payload = parseJsonSafe(body);
+    const message = payload?.error?.message || payload?.message || `Inworld voice list failed (${response.status})`;
+    throw createUpstreamError(
+      message,
+      response.status,
+      mapUpstreamStatusToErrorCode(response.status),
+      payload?.error?.details || payload?.details
+    );
+  }
+  const payload = await response.json();
+  return normalizeVoicePayloads(parseInworldVoiceList(payload), source, isCustom);
+};
+
+const listInworldVoices = async () => {
+  const now = Date.now();
+  if (voiceCatalogCache.expiresAt > now && voiceCatalogCache.voices.length > 0) {
+    return voiceCatalogCache.voices;
+  }
+
+  const premadeEndpoints = [
+    '/tts/v1/voices',
+    '/tts/v1/voices:premade'
+  ];
+  const customEndpoints = [
+    `/voice/v1/workspaces/${encodeURIComponent(INWORLD_WORKSPACE_ID)}/voices`,
+    `/studio/v1/workspaces/${encodeURIComponent(INWORLD_WORKSPACE_ID)}/voices`
+  ];
+
+  let premadeVoices = [];
+  for (const endpoint of premadeEndpoints) {
+    try {
+      premadeVoices = await fetchInworldVoiceList(endpoint, 'inworld-premade', false);
+      if (premadeVoices.length > 0) break;
+    } catch (error) {
+      if (!isInworldVoiceFetchErrorRecoverable(error?.status)) {
+        throw error;
+      }
+    }
+  }
+
+  let customVoices = [];
+  for (const endpoint of customEndpoints) {
+    try {
+      customVoices = await fetchInworldVoiceList(endpoint, 'inworld-custom', true);
+      break;
+    } catch (error) {
+      if (!isInworldVoiceFetchErrorRecoverable(error?.status)) {
+        throw error;
+      }
+    }
+  }
+
+  const merged = dedupeVoices([...premadeVoices, ...customVoices, ...LEGACY_TTS_VOICES]);
+  voiceCatalogCache.expiresAt = now + VOICE_CATALOG_CACHE_TTL_MS;
+  voiceCatalogCache.voices = merged;
+  return merged;
+};
+
+const generateSpeechWithGemini = async (ai, text, voiceName) => {
+  if (!ALLOWED_VOICES.has(voiceName)) {
+    throw createUpstreamError('Invalid voice selection for Gemini provider.', 400, 'INVALID_VOICE');
+  }
+  const response = await withTimeout(ai.models.generateContent({
+    model: 'gemini-2.5-flash-preview-tts',
+    contents: [{ parts: [{ text }] }],
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName }
+        }
+      }
+    }
+  }), AI_UPSTREAM_TIMEOUT_MS);
+
+  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!base64Audio) {
+    throw new Error('No audio data returned');
+  }
+  return { audioBase64: base64Audio, provider: 'gemini' };
+};
+
+const generateSpeechWithInworld = async (text, voiceName, expressive = false) => {
+  const preparedText = applyExpressiveText(text, expressive);
+  const payload = {
+    model: TTS_INWORLD_MODEL,
+    text: preparedText,
+    voice: {
+      name: voiceName
+    },
+    outputAudioConfig: {
+      encoding: 'LINEAR16',
+      sampleRateHertz: 24000,
+      channels: 1
+    }
+  };
+
+  const response = await withTimeout(fetch(`${INWORLD_API_BASE}/tts/v1/voice:stream`, {
+    method: 'POST',
+    headers: createInworldHeaders(),
+    body: JSON.stringify(payload)
+  }), AI_UPSTREAM_TIMEOUT_MS);
+
+  if (!response.ok) {
+    const body = await response.text();
+    const parsed = parseJsonSafe(body);
+    const message = parsed?.error?.message || parsed?.message || `Inworld TTS request failed (${response.status})`;
+    throw createUpstreamError(
+      message,
+      response.status,
+      mapUpstreamStatusToErrorCode(response.status),
+      parsed?.error?.details || parsed?.details
+    );
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
+    const jsonBody = await response.json();
+    const audioBase64 = extractAudioBase64FromPayload(jsonBody);
+    if (audioBase64) {
+      return { audioBase64, provider: 'inworld' };
+    }
+  }
+
+  const streamAudioBase64 = await collectAudioFromStreamBody(response.body);
+  if (streamAudioBase64) {
+    return { audioBase64: streamAudioBase64, provider: 'inworld' };
+  }
+
+  throw createUpstreamError('No audio data returned from Inworld.', 502, 'UPSTREAM_ERROR');
+};
+
+const generateSpeechByProvider = async (ai, text, voiceName, expressive = false) => {
+  const providers = getTtsProviderOrder();
+  const startedAt = Date.now();
+  const errors = [];
+
+  for (let index = 0; index < providers.length; index++) {
+    const provider = providers[index];
+    try {
+      const result = provider === 'inworld'
+        ? await generateSpeechWithInworld(text, voiceName, expressive)
+        : await generateSpeechWithGemini(ai, text, voiceName);
+      const latencyMs = Date.now() - startedAt;
+      return { ...result, latencyMs };
+    } catch (error) {
+      errors.push({ provider, error });
+      const hasFallback = index < providers.length - 1;
+      if (!hasFallback || !isTtsFallbackEligible(error)) {
+        throw error;
+      }
+      console.warn('[tts] provider failed; falling back', {
+        provider,
+        status: error?.status,
+        code: error?.code
+      });
+    }
+  }
+
+  const lastError = errors[errors.length - 1]?.error;
+  throw lastError || new Error('TTS request failed.');
+};
+
+const listVoicesByProvider = async () => {
+  const providers = getTtsProviderOrder();
+  if (providers.includes('inworld')) {
+    try {
+      return await listInworldVoices();
+    } catch (error) {
+      if (providers.length === 1) {
+        throw error;
+      }
+      console.warn('[tts] voice catalog fallback to legacy voices', {
+        status: error?.status,
+        code: error?.code
+      });
+    }
+  }
+  return [...LEGACY_TTS_VOICES];
 };
 
 const createAiValidationError = (kind, reason) => {
@@ -753,36 +1025,23 @@ const handleAiGenerate = async (req, res) => {
         createAiValidationError(kind, 'Invalid JSON payload.');
       }
     } else if (kind === 'generateSpeech') {
-      const { text, voiceName } = context;
+      const { text, voiceName, expressive } = context;
       if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
         return sendError(res, 400, 'Invalid generateSpeech context.', 'INVALID_REQUEST');
-      }
-      if (!ALLOWED_VOICES.has(voiceName)) {
-        return sendError(res, 400, 'Invalid voice selection.', 'INVALID_VOICE');
       }
       if (!ensurePromptSize(res, text.length)) {
         return;
       }
-
-      const response = await withTimeout(ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-tts',
-        contents: [{ parts: [{ text: text }] }],
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voiceName }
-            }
-          }
-        }
-      }), AI_UPSTREAM_TIMEOUT_MS);
-
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!base64Audio) {
-        throw new Error('No audio data returned');
-      }
-
-      data = { audioBase64: base64Audio };
+      const result = await generateSpeechByProvider(ai, text, voiceName, Boolean(expressive));
+      data = { audioBase64: result.audioBase64 };
+      console.info('[tts] generated', {
+        provider: result.provider,
+        voiceName,
+        latencyMs: result.latencyMs
+      });
+    } else if (kind === 'listVoices') {
+      const voices = await listVoicesByProvider();
+      data = { voices };
     } else {
       return sendError(res, 400, 'Unknown request kind.', 'INVALID_REQUEST');
     }

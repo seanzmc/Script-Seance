@@ -13,6 +13,7 @@ interface QueueItem {
   voiceId: string;
   speed: number;
   pitch: number;
+  expressive: boolean;
 }
 
 export interface AudioChunk {
@@ -21,6 +22,7 @@ export interface AudioChunk {
   voiceId: string;
   speed: number;
   pitch: number;
+  expressive: boolean;
 }
 
 export type EventHandler = (data: unknown) => void;
@@ -147,7 +149,8 @@ export class ScriptEngine {
         block,
         voiceId: config?.voiceId || 'Zephyr',
         speed: config?.speed || 1,
-        pitch: config?.pitch || 0
+        pitch: config?.pitch || 0,
+        expressive: config?.expressive || false
       };
     });
     this.blockRetryCounts.clear();
@@ -158,9 +161,13 @@ export class ScriptEngine {
   }
 
   // One-off generation for UI previews (uses same cache)
-  public async generateSingle(text: string, voiceId: string): Promise<ArrayBuffer> {
+  public async generateSingle(
+    text: string,
+    voiceId: string,
+    options?: { expressive?: boolean }
+  ): Promise<ArrayBuffer> {
      const requestId = `preview:${Date.now()}:${Math.random().toString(16).slice(2)}`;
-     return this.fetchAudio(text, voiceId, requestId);
+     return this.fetchAudio(text, voiceId, requestId, 0, options?.expressive || false);
   }
 
   // --- Core Processing Loop ---
@@ -192,7 +199,13 @@ export class ScriptEngine {
     if (!this.isRunning) return;
     try {
       // Check cache or fetch
-      const buffer = await this.fetchAudio(item.block.text, item.voiceId, item.block.id);
+      const buffer = await this.fetchAudio(
+        item.block.text,
+        item.voiceId,
+        item.block.id,
+        0,
+        item.expressive
+      );
       this.blockRetryCounts.delete(item.block.id);
 
       if (this.isRunning) {
@@ -202,7 +215,8 @@ export class ScriptEngine {
           audioBuffer: buffer,
           voiceId: item.voiceId,
           speed: item.speed,
-          pitch: item.pitch
+          pitch: item.pitch,
+          expressive: item.expressive
         } as AudioChunk);
       }
     } catch (error: unknown) {
@@ -237,19 +251,20 @@ export class ScriptEngine {
     text: string,
     voiceId: string,
     requestId: string,
-    retryCount = 0
+    retryCount = 0,
+    expressive = false
   ): Promise<ArrayBuffer> {
     const safeText = text.trim();
     // Cache Key: VoiceID + Text. 
     // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
-    const cacheKey = `${voiceId}:${safeText}`;
+    const cacheKey = `${voiceId}:${expressive ? 'expr' : 'plain'}:${safeText}`;
 
     const cached = AudioCache.get(cacheKey);
     if (cached !== undefined) {
       return cached;
     }
 
-    const request = createGenerateSpeechRequest(safeText, voiceId);
+    const request = createGenerateSpeechRequest(safeText, voiceId, undefined, { expressive });
     this.inflightCancels.set(requestId, request.cancel);
 
     try {
@@ -315,7 +330,7 @@ export class ScriptEngine {
             throw createRequestAbortedError();
          }
 
-         return this.fetchAudio(text, voiceId, requestId, retryCount + 1);
+         return this.fetchAudio(text, voiceId, requestId, retryCount + 1, expressive);
        }
        
        throw error;

@@ -132,6 +132,91 @@ describe('server reliability', () => {
     }
   });
 
+  it('returns legacy voice catalog for listVoices when inworld is not configured', async () => {
+    const req = {
+      body: {
+        kind: 'listVoices',
+        context: {}
+      }
+    } as any;
+
+    const res = {
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    } as any;
+
+    await handleAiGenerate(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body?.data?.voices)).toBe(true);
+    expect(res.body.data.voices.some((voice: { id: string }) => voice.id === 'Zephyr')).toBe(true);
+  });
+
+  it('keeps generateSpeech response contract for backwards compatibility', async () => {
+    const base64Audio = 'QUJD'; // "ABC"
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                inlineData: {
+                  data: base64Audio
+                }
+              }
+            ]
+          }
+        }
+      ]
+    });
+
+    const req = {
+      body: {
+        kind: 'generateSpeech',
+        context: {
+          text: 'Hello world',
+          voiceName: 'Zephyr'
+        }
+      }
+    } as any;
+
+    const res = {
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    } as any;
+
+    await handleAiGenerate(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body?.data?.audioBase64).toBe(base64Audio);
+  });
+
   it('prunes expired sessions and stale rate buckets', () => {
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;

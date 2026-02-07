@@ -12,14 +12,18 @@ import {
   createSuggestPlotTwistRequest,
   createRegenerateScriptBlockRequest,
   CancellableRequest,
-  generateScriptElement
+  generateScriptElement,
+  listVoices
 } from './services/gemini';
 import { getSession, login } from './services/auth';
 import {
   Scene,
   StoryContext,
   VoiceConfig,
-  AVAILABLE_VOICES,
+  LEGACY_VOICE_IDS,
+  DEFAULT_NARRATOR_VOICE_ID,
+  TtsVoice,
+  VoiceCatalogState,
   ScriptBlock,
   BlockType,
   GENRES,
@@ -113,6 +117,18 @@ const normalizeSceneCharacters = (scene: Scene, characters: string[]) => ({
   ))
 });
 
+const getVoiceIdList = (voices: TtsVoice[]) =>
+  voices.length > 0 ? voices.map((voice) => voice.id) : LEGACY_VOICE_IDS;
+
+const getDefaultNarratorVoiceId = (voices: TtsVoice[]) => {
+  if (voices.length === 0) return DEFAULT_NARRATOR_VOICE_ID;
+  const preferred = voices.find((voice) =>
+    voice.labels.some((label) => ['narrator', 'calm', 'neutral', 'professional'].includes(label.toLowerCase()))
+  );
+  if (preferred) return preferred.id;
+  return voices[0].id;
+};
+
 const buildFallbackTitle = (premise: string, genre: string) => {
   const words = premise
     .replace(/[^a-z0-9\s]/gi, ' ')
@@ -169,6 +185,8 @@ export default function App() {
   const [context, setContext] = useState<StoryContext | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [voiceConfigs, setVoiceConfigs] = useState<VoiceConfig[]>([]);
+  const [availableVoices, setAvailableVoices] = useState<TtsVoice[]>([]);
+  const [voiceCatalogState, setVoiceCatalogState] = useState<VoiceCatalogState>('idle');
   const [userInstruction, setUserInstruction] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -460,26 +478,35 @@ export default function App() {
 
   // Initialize Voices when characters change
   useEffect(() => {
-    if (context?.characters) {
-      const newConfigs = [...voiceConfigs];
+    if (!context?.characters) return;
+    const voiceIds = getVoiceIdList(availableVoices);
+    const narratorVoiceId = getDefaultNarratorVoiceId(availableVoices);
+
+    setVoiceConfigs((prev) => {
+      const next = [...prev];
       const hasVoiceConfig = (name: string) =>
-        newConfigs.some(config => normalizeCharacterName(config.name) === normalizeCharacterName(name));
-      
-      // Ensure Narrator exists
+        next.some(config => normalizeCharacterName(config.name) === normalizeCharacterName(name));
+
       if (!hasVoiceConfig('Narrator')) {
-        newConfigs.push({ name: 'Narrator', voiceId: 'Zephyr', speed: playbackSpeed, pitch: 0 });
+        next.push({
+          name: 'Narrator',
+          voiceId: narratorVoiceId,
+          speed: playbackSpeed,
+          pitch: 0,
+          expressive: false
+        });
       }
 
       context.characters.forEach((char, idx) => {
         if (!hasVoiceConfig(char)) {
-          const voice = AVAILABLE_VOICES[idx % AVAILABLE_VOICES.length];
-          newConfigs.push({ name: char, voiceId: voice, speed: playbackSpeed, pitch: 0 });
+          const voice = voiceIds[idx % voiceIds.length] || narratorVoiceId;
+          next.push({ name: char, voiceId: voice, speed: playbackSpeed, pitch: 0, expressive: false });
         }
       });
-      setVoiceConfigs(newConfigs);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [context?.characters]);
+
+      return next;
+    });
+  }, [availableVoices, context?.characters, playbackSpeed]);
 
   useEffect(() => {
     if (context) {
@@ -516,6 +543,29 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return;
+    let isActive = true;
+    const loadVoiceCatalog = async () => {
+      setVoiceCatalogState('loading');
+      try {
+        const voices = await listVoices();
+        if (!isActive) return;
+        setAvailableVoices(voices);
+        setVoiceCatalogState('ready');
+      } catch (err) {
+        console.error('Failed to load voices', err);
+        if (!isActive) return;
+        setAvailableVoices([]);
+        setVoiceCatalogState('error');
+      }
+    };
+    loadVoiceCatalog();
+    return () => {
+      isActive = false;
+    };
+  }, [authStatus]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1018,6 +1068,8 @@ export default function App() {
   }, [clearRedo, context, finishAiRequest, handleAiError, isGenerating, startAiRequest]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
+    const voiceIds = getVoiceIdList(availableVoices);
+    const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
     setVoiceConfigs(prev => {
       const normalized = normalizeCharacterName(char);
       const existingIdx = prev.findIndex(c => normalizeCharacterName(c.name) === normalized);
@@ -1028,9 +1080,10 @@ export default function App() {
       }
       return [...prev, { 
         name: char, 
-        voiceId: AVAILABLE_VOICES[0], 
+        voiceId: defaultVoiceId,
         speed: playbackSpeed, 
         pitch: 0,
+        expressive: false,
         ...updates 
       } as VoiceConfig];
     });
@@ -1144,11 +1197,15 @@ export default function App() {
     
     setPreviewVoiceId(voiceId);
     const text = getPreviewText(castingCharacter);
+    const currentConfig = voiceConfigs.find((config) =>
+      normalizeCharacterName(config.name) === normalizeCharacterName(castingCharacter)
+    );
     const config: VoiceConfig = { 
       name: castingCharacter, 
       voiceId, 
       speed: playbackSpeed, 
-      pitch: 0 
+      pitch: currentConfig?.pitch ?? 0,
+      expressive: currentConfig?.expressive ?? false
     };
     await playPreview(text, config);
   };
@@ -1176,18 +1233,29 @@ export default function App() {
 
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
+  const voiceIds = getVoiceIdList(availableVoices);
+  const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
 
   const voicesContent = context ? (
-    <VoicesPanel
-      characters={context.characters}
-      voiceConfigs={voiceConfigs}
-      onUpdateConfig={updateVoiceConfig}
-      onOpenCasting={setCastingCharacter}
-      onPreview={(config) => playPreview(getPreviewText(config.name), config)}
-      onStop={stop}
-      isAudioPlaying={isPreviewPlaying && !castingCharacter}
-      isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
-    />
+    <div className="space-y-2">
+      {voiceCatalogState === 'loading' && (
+        <p className="text-[10px] text-gray-500">Loading available voices...</p>
+      )}
+      {voiceCatalogState === 'error' && (
+        <p className="text-[10px] text-amber-400">Voice catalog unavailable. Using fallback voices.</p>
+      )}
+      <VoicesPanel
+        characters={context.characters}
+        availableVoices={availableVoices}
+        voiceConfigs={voiceConfigs}
+        onUpdateConfig={updateVoiceConfig}
+        onOpenCasting={setCastingCharacter}
+        onPreview={(config) => playPreview(getPreviewText(config.name), config)}
+        onStop={stop}
+        isAudioPlaying={isPreviewPlaying && !castingCharacter}
+        isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
+      />
+    </div>
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
   );
@@ -1310,7 +1378,8 @@ export default function App() {
             setCastingCharacter(null);
           }}
           characterName={castingCharacter}
-          currentVoiceId={voiceConfigs.find(c => c.name === castingCharacter)?.voiceId || AVAILABLE_VOICES[0]}
+          currentVoiceId={voiceConfigs.find(c => c.name === castingCharacter)?.voiceId || defaultVoiceId}
+          availableVoices={availableVoices}
           voiceConfigs={voiceConfigs}
           onSelect={(voiceId) => {
             updateVoiceConfig(castingCharacter, { voiceId });

@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { X, Play, Check, Mic, User, Pause, Info } from 'lucide-react';
-import { VoiceConfig } from '../types';
+import { VoiceConfig, TtsVoice, LEGACY_VOICE_IDS } from '../types';
 
 export interface VoiceCastingModalProps {
   isOpen: boolean;
   onClose: () => void;
   characterName: string;
   currentVoiceId: string;
+  availableVoices: TtsVoice[];
   voiceConfigs: VoiceConfig[];
   onSelect: (voiceId: string) => void;
   onPreview: (voiceId: string) => void;
@@ -17,31 +18,50 @@ export interface VoiceCastingModalProps {
 interface VoiceData {
   id: string;
   name: string;
-  gender: 'Masculine' | 'Feminine';
+  gender: string;
   category: string;
   description: string;
+  labels: string[];
+  source: string;
+  isCustom: boolean;
 }
 
 const AVAILABLE_VOICES_DATA: VoiceData[] = [
-  { id: 'Aoede', name: 'Aoede', gender: 'Feminine', category: 'Calm', description: 'Smooth, confident, and professional. The "Narrator" type.' },
-  { id: 'Callirrhoe', name: 'Callirrhoe', gender: 'Feminine', category: 'Warm', description: 'Gentle, warm, and slightly breathy. The "Friend".' },
-  { id: 'Kore', name: 'Kore', gender: 'Feminine', category: 'Firm', description: 'Firm, clear, and direct. Good for reporters or pragmatic characters.' },
-  { id: 'Sulafat', name: 'Sulafat', gender: 'Feminine', category: 'Warm', description: 'Warm, motherly, and assuring. A "Guide" figure.' },
-  { id: 'Zephyr', name: 'Zephyr', gender: 'Feminine', category: 'High Energy', description: 'Breezy, cheerful, and fast. The "Sidekick".' },
-  { id: 'Charon', name: 'Charon', gender: 'Masculine', category: 'Deep', description: 'Deep, resonant, and serious. The "Villain" or "Movie Trailer" voice.' },
-  { id: 'Fenrir', name: 'Fenrir', gender: 'Masculine', category: 'High Energy', description: 'Excitable, fast, and intense. The "Action Hero".' },
-  { id: 'Puck', name: 'Puck', gender: 'Masculine', category: 'High Energy', description: 'Playful, mischievous, and higher-pitch. The "Trickster".' },
-  { id: 'Rasalgethi', name: 'Rasalgethi', gender: 'Masculine', category: 'Textured', description: 'Gravelly, informative, and older. The "Veteran".' },
-  { id: 'Umbriel', name: 'Umbriel', gender: 'Masculine', category: 'Calm', description: 'Smooth, easy-going, and low-stress. The "Cool Guy".' }
+  { id: 'Aoede', name: 'Aoede', gender: 'Feminine', category: 'Calm', description: 'Smooth, confident, and professional. The "Narrator" type.', labels: ['calm'], source: 'legacy', isCustom: false },
+  { id: 'Callirrhoe', name: 'Callirrhoe', gender: 'Feminine', category: 'Warm', description: 'Gentle, warm, and slightly breathy. The "Friend".', labels: ['warm'], source: 'legacy', isCustom: false },
+  { id: 'Kore', name: 'Kore', gender: 'Feminine', category: 'Firm', description: 'Firm, clear, and direct. Good for reporters or pragmatic characters.', labels: ['firm'], source: 'legacy', isCustom: false },
+  { id: 'Sulafat', name: 'Sulafat', gender: 'Feminine', category: 'Warm', description: 'Warm, motherly, and assuring. A "Guide" figure.', labels: ['warm'], source: 'legacy', isCustom: false },
+  { id: 'Zephyr', name: 'Zephyr', gender: 'Feminine', category: 'High Energy', description: 'Breezy, cheerful, and fast. The "Sidekick".', labels: ['high-energy'], source: 'legacy', isCustom: false },
+  { id: 'Charon', name: 'Charon', gender: 'Masculine', category: 'Deep', description: 'Deep, resonant, and serious. The "Villain" or "Movie Trailer" voice.', labels: ['deep'], source: 'legacy', isCustom: false },
+  { id: 'Fenrir', name: 'Fenrir', gender: 'Masculine', category: 'High Energy', description: 'Excitable, fast, and intense. The "Action Hero".', labels: ['high-energy'], source: 'legacy', isCustom: false },
+  { id: 'Puck', name: 'Puck', gender: 'Masculine', category: 'High Energy', description: 'Playful, mischievous, and higher-pitch. The "Trickster".', labels: ['high-energy'], source: 'legacy', isCustom: false },
+  { id: 'Rasalgethi', name: 'Rasalgethi', gender: 'Masculine', category: 'Textured', description: 'Gravelly, informative, and older. The "Veteran".', labels: ['textured'], source: 'legacy', isCustom: false },
+  { id: 'Umbriel', name: 'Umbriel', gender: 'Masculine', category: 'Calm', description: 'Smooth, easy-going, and low-stress. The "Cool Guy".', labels: ['calm'], source: 'legacy', isCustom: false }
 ];
 
 const FILTERS = ['All', 'Masculine', 'Feminine', 'High Energy', 'Calm', 'Deep'];
+const LEGACY_VOICE_MAP = new Map(AVAILABLE_VOICES_DATA.map((voice) => [voice.id, voice]));
+
+const toVoiceData = (voice: TtsVoice): VoiceData => {
+  const legacy = LEGACY_VOICE_MAP.get(voice.id);
+  return {
+    id: voice.id,
+    name: voice.displayName || legacy?.name || voice.id,
+    gender: voice.gender || legacy?.gender || 'Unknown',
+    category: voice.category || legacy?.category || (voice.isCustom ? 'Custom' : 'General'),
+    description: voice.description || legacy?.description || 'Inworld voice.',
+    labels: voice.labels.length > 0 ? voice.labels : (legacy?.labels || []),
+    source: voice.source,
+    isCustom: voice.isCustom
+  };
+};
 
 export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
   isOpen,
   onClose,
   characterName,
   currentVoiceId,
+  availableVoices,
   voiceConfigs,
   onSelect,
   onPreview,
@@ -60,12 +80,49 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
     }, {} as Record<string, string[]>);
   }, [voiceConfigs]);
 
+  const mergedVoices = useMemo(() => {
+    const dynamic = availableVoices.map(toVoiceData);
+    if (dynamic.length > 0) {
+      const withCurrent = dynamic.some((voice) => voice.id === currentVoiceId)
+        ? dynamic
+        : (currentVoiceId && LEGACY_VOICE_MAP.has(currentVoiceId))
+          ? [toVoiceData({
+            id: currentVoiceId,
+            displayName: LEGACY_VOICE_MAP.get(currentVoiceId)?.name || currentVoiceId,
+            source: 'legacy',
+            labels: LEGACY_VOICE_MAP.get(currentVoiceId)?.labels || [],
+            isCustom: false
+          }), ...dynamic]
+          : dynamic;
+      return withCurrent;
+    }
+    const fallback = AVAILABLE_VOICES_DATA.filter((voice) => LEGACY_VOICE_IDS.includes(voice.id));
+    if (currentVoiceId && !fallback.some((voice) => voice.id === currentVoiceId)) {
+      return [{
+        id: currentVoiceId,
+        name: currentVoiceId,
+        gender: 'Unknown',
+        category: 'Legacy',
+        description: 'Voice assigned from a previous catalog.',
+        labels: [],
+        source: 'legacy',
+        isCustom: false
+      }, ...fallback];
+    }
+    return fallback;
+  }, [availableVoices, currentVoiceId]);
+
   const filteredVoices = useMemo(() => {
-    let result = AVAILABLE_VOICES_DATA;
+    let result = mergedVoices;
     
     // Category Filter
     if (activeFilter !== 'All') {
-      result = result.filter(v => v.gender === activeFilter || v.category === activeFilter);
+      result = result.filter((v) => {
+        if (v.gender === activeFilter || v.category === activeFilter) {
+          return true;
+        }
+        return v.labels.some((label) => label.toLowerCase() === activeFilter.toLowerCase());
+      });
     }
     
     // Availability Filter
@@ -74,7 +131,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
     }
     
     return result;
-  }, [activeFilter, showAvailableOnly, assignedMap]);
+  }, [activeFilter, showAvailableOnly, assignedMap, mergedVoices]);
 
   if (!isOpen) return null;
 

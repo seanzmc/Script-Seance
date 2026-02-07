@@ -454,7 +454,9 @@ export const useAudioPlayer = (
 
     try {
       const config = getVoiceConfigForBlock(block);
-      const buffer = await engineRef.current?.generateSingle(block.text, config?.voiceId || 'Zephyr');
+      const buffer = await engineRef.current?.generateSingle(block.text, config?.voiceId || 'Zephyr', {
+        expressive: config?.expressive || false
+      });
       if (!buffer) {
         setBlockStatuses(prev => ({ ...prev, [block.id]: 'error' }));
         return;
@@ -464,7 +466,8 @@ export const useAudioPlayer = (
         audioBuffer: buffer,
         voiceId: config?.voiceId || 'Zephyr',
         speed: config?.speed ?? 1,
-        pitch: config?.pitch ?? 0
+        pitch: config?.pitch ?? 0,
+        expressive: config?.expressive ?? false
       });
       setBlockStatuses(prev => ({ ...prev, [block.id]: 'ready' }));
       updateBufferProgress();
@@ -509,7 +512,9 @@ export const useAudioPlayer = (
     
     try {
       // Use engine for preview to benefit from caching
-      const buffer = await engineRef.current?.generateSingle(text, config.voiceId);
+      const buffer = await engineRef.current?.generateSingle(text, config.voiceId, {
+        expressive: config.expressive || false
+      });
       if (!buffer) {
          setIsLoadingAudio(false);
          return;

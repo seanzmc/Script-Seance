@@ -1,9 +1,10 @@
 import React from 'react';
-import { VoiceConfig } from '../types';
+import { VoiceConfig, TtsVoice } from '../types';
 import { VoiceManager } from './VoiceManager';
 
 export interface VoicesPanelProps {
   characters: string[];
+  availableVoices: TtsVoice[];
   voiceConfigs: VoiceConfig[];
   onUpdateConfig: (character: string, updates: Partial<VoiceConfig>) => void;
   onOpenCasting: (character: string) => void;
@@ -15,6 +16,7 @@ export interface VoicesPanelProps {
 
 export const VoicesPanel: React.FC<VoicesPanelProps> = ({
   characters,
+  availableVoices,
   voiceConfigs,
   onUpdateConfig,
   onOpenCasting,
@@ -30,6 +32,7 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
       </p>
       <VoiceManager
         characters={characters}
+        availableVoices={availableVoices}
         voiceConfigs={voiceConfigs}
         onUpdateConfig={onUpdateConfig}
         onOpenCasting={onOpenCasting}

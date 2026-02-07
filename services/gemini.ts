@@ -1,4 +1,4 @@
-import { Scene, StoryContext, BlockType, ScriptBlock } from '../types';
+import { Scene, StoryContext, BlockType, ScriptBlock, TtsVoice } from '../types';
 
 type ApiError = {
   message: string;
@@ -40,6 +40,11 @@ const TTS_JITTER_MS = 250;
 type GenerateSpeechContext = {
   text: string;
   voiceName: string;
+  [key: string]: unknown;
+};
+
+type GenerateSpeechExtraContext = {
+  expressive?: boolean;
   [key: string]: unknown;
 };
 
@@ -414,18 +419,20 @@ const buildGenerateSpeechContext = (
 export const generateSpeech = async (
   text: string,
   voiceName: string,
-  options?: RequestOptions
+  options?: RequestOptions,
+  extraContext?: GenerateSpeechExtraContext
 ): Promise<ArrayBuffer> => {
-  const request = createGenerateSpeechRequest(text, voiceName, options);
+  const request = createGenerateSpeechRequest(text, voiceName, options, extraContext);
   return request.promise;
 };
 
 export const createGenerateSpeechRequest = (
   text: string,
   voiceName: string,
-  options?: RequestOptions
+  options?: RequestOptions,
+  extraContext?: GenerateSpeechExtraContext
 ): CancellableRequest<ArrayBuffer> => {
-  const context = buildGenerateSpeechContext(text, voiceName);
+  const context = buildGenerateSpeechContext(text, voiceName, extraContext);
 
   return enqueueTts<ArrayBuffer>(async (item) => {
     let attempt = 1;
@@ -496,6 +503,11 @@ export const createGenerateSpeechRequest = (
 
     throw new Error('TTS retry loop exhausted.');
   });
+};
+
+export const listVoices = async (options?: RequestOptions): Promise<TtsVoice[]> => {
+  const data = await requestAi<{ voices: TtsVoice[] }>('listVoices', {}, options);
+  return Array.isArray(data.voices) ? data.voices : [];
 };
 
 export const createGenerateSceneRequest = (
