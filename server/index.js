@@ -48,6 +48,7 @@ const INWORLD_API_KEY = process.env.INWORLD_API_KEY || '';
 const INWORLD_API_SECRET = process.env.INWORLD_API_SECRET || '';
 const INWORLD_WORKSPACE_ID = process.env.INWORLD_WORKSPACE_ID || '';
 const INWORLD_API_BASE = process.env.INWORLD_API_BASE || 'https://api.inworld.ai';
+const INWORLD_ENGINE_HOST = process.env.INWORLD_ENGINE_HOST || 'api-engine.inworld.ai';
 const VOICE_CATALOG_CACHE_TTL_MS = parsePositiveInt(process.env.VOICE_CATALOG_CACHE_TTL_MS, 5 * 60 * 1000);
 const INWORLD_JWT_REFRESH_BUFFER_MS = parsePositiveInt(process.env.INWORLD_JWT_REFRESH_BUFFER_MS, 60 * 1000);
 const INWORLD_TOKEN_METHOD = 'ai.inworld.engine.WorldEngine/GenerateToken';
@@ -280,10 +281,15 @@ const getInworldHost = () => {
   }
 };
 
+const getInworldEngineHost = () => {
+  const host = typeof INWORLD_ENGINE_HOST === 'string' ? INWORLD_ENGINE_HOST.trim() : '';
+  return host.replace(':443', '') || 'api-engine.inworld.ai';
+};
+
 const getSignatureKey = (secret, params) => {
-  let signature = `IW1${secret}`;
+  let signature = Buffer.from(`IW1${secret}`, 'utf8');
   for (const param of params) {
-    signature = crypto.createHmac('sha256', signature).update(param).digest('hex');
+    signature = crypto.createHmac('sha256', signature).update(param).digest();
   }
   return crypto.createHmac('sha256', signature).update('iw1_request').digest('hex');
 };
@@ -291,10 +297,11 @@ const getSignatureKey = (secret, params) => {
 const createInworldJwtRequestHeaders = () => {
   const dateTime = formatInworldDateTime();
   const host = getInworldHost();
-  const nonce = crypto.randomBytes(16).toString('hex');
+  const engineHost = getInworldEngineHost();
+  const nonce = crypto.randomBytes(16).toString('hex').slice(1, 12);
   const signature = getSignatureKey(INWORLD_API_SECRET, [
     dateTime,
-    host,
+    engineHost,
     INWORLD_TOKEN_METHOD,
     nonce
   ]);
@@ -403,7 +410,14 @@ const fetchInworldVoiceList = async (endpoint, source, isCustom) => {
       payload?.error?.details || payload?.details
     );
   }
-  const payload = await response.json();
+  const bodyText = await response.text();
+  if (!bodyText || bodyText.trim().length === 0) {
+    return [];
+  }
+  const payload = parseJsonSafe(bodyText);
+  if (!payload) {
+    return [];
+  }
   return normalizeVoicePayloads(parseInworldVoiceList(payload), source, isCustom);
 };
 
@@ -417,9 +431,10 @@ const listInworldVoices = async () => {
     '/tts/v1/voices',
     '/tts/v1/voices:premade'
   ];
+  const workspaceId = getInworldWorkspaceResource().replace(/^workspaces\//, '');
   const customEndpoints = [
-    `/voice/v1/workspaces/${encodeURIComponent(INWORLD_WORKSPACE_ID)}/voices`,
-    `/studio/v1/workspaces/${encodeURIComponent(INWORLD_WORKSPACE_ID)}/voices`
+    `/voices/v1/workspaces/${encodeURIComponent(workspaceId)}/voices`,
+    '/voices/v1/voices'
   ];
 
   let premadeVoices = [];
@@ -438,10 +453,18 @@ const listInworldVoices = async () => {
   for (const endpoint of customEndpoints) {
     try {
       customVoices = await fetchInworldVoiceList(endpoint, 'inworld-custom', true);
-      break;
+      if (customVoices.length > 0) {
+        break;
+      }
     } catch (error) {
-      if (!isInworldVoiceFetchErrorRecoverable(error?.status)) {
-        throw error;
+      const status = error?.status;
+      const silentlyRecoverable = [400, 401, 403, 404, 405, 422].includes(status);
+      if (!silentlyRecoverable && !isInworldVoiceFetchErrorRecoverable(status)) {
+        console.warn('[tts] custom voice catalog unavailable', {
+          endpoint,
+          status,
+          code: error?.code
+        });
       }
     }
   }
