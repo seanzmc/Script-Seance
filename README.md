@@ -30,6 +30,7 @@ Copy `.env.example` to `.env` and set:
 ```bash
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
 INWORLD_API_KEY=your_inworld_api_key_here
+INWORLD_API_SECRET=your_inworld_api_secret_here
 INWORLD_WORKSPACE_ID=your_inworld_workspace_id_here
 ADMIN_PASSWORD=your_admin_password
 PORT=3001
@@ -43,10 +44,11 @@ TTS_PROVIDER=dual
 TTS_INWORLD_MODEL=inworld-tts-1.5-max
 INWORLD_API_BASE=https://api.inworld.ai
 VOICE_CATALOG_CACHE_TTL_MS=300000
+INWORLD_JWT_REFRESH_BUFFER_MS=60000
 ```
 
 `GEMINI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.  
-For Inworld TTS migration paths, also set `INWORLD_API_KEY` and `INWORLD_WORKSPACE_ID`.
+For Inworld TTS migration paths, set `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
 
 ## Local Development
 

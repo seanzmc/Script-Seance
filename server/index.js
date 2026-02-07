@@ -45,9 +45,12 @@ const LOGIN_BUCKET_TTL_MS = LOGIN_WINDOW_MS * 2;
 const TTS_PROVIDER = normalizeTtsProvider(process.env.TTS_PROVIDER, 'dual');
 const TTS_INWORLD_MODEL = process.env.TTS_INWORLD_MODEL || 'inworld-tts-1.5-max';
 const INWORLD_API_KEY = process.env.INWORLD_API_KEY || '';
+const INWORLD_API_SECRET = process.env.INWORLD_API_SECRET || '';
 const INWORLD_WORKSPACE_ID = process.env.INWORLD_WORKSPACE_ID || '';
 const INWORLD_API_BASE = process.env.INWORLD_API_BASE || 'https://api.inworld.ai';
 const VOICE_CATALOG_CACHE_TTL_MS = parsePositiveInt(process.env.VOICE_CATALOG_CACHE_TTL_MS, 5 * 60 * 1000);
+const INWORLD_JWT_REFRESH_BUFFER_MS = parsePositiveInt(process.env.INWORLD_JWT_REFRESH_BUFFER_MS, 60 * 1000);
+const INWORLD_TOKEN_METHOD = 'ai.inworld.engine.WorldEngine/GenerateToken';
 
 const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
@@ -195,9 +198,14 @@ const voiceCatalogCache = {
   expiresAt: 0,
   voices: []
 };
+const inworldJwtCache = {
+  token: '',
+  expiresAt: 0,
+  pending: null
+};
 
 const getTtsProviderOrder = () => {
-  const inworldConfigured = Boolean(INWORLD_API_KEY && INWORLD_WORKSPACE_ID);
+  const inworldConfigured = Boolean(INWORLD_API_KEY && INWORLD_API_SECRET && INWORLD_WORKSPACE_ID);
   if (!inworldConfigured) {
     return ['gemini'];
   }
@@ -248,8 +256,125 @@ const mapUpstreamStatusToErrorCode = (status) => {
   return 'UPSTREAM_BAD_REQUEST';
 };
 
-const createInworldHeaders = () => ({
-  Authorization: `Bearer ${INWORLD_API_KEY}`,
+const getInworldWorkspaceResource = () => (
+  INWORLD_WORKSPACE_ID.startsWith('workspaces/')
+    ? INWORLD_WORKSPACE_ID
+    : `workspaces/${INWORLD_WORKSPACE_ID}`
+);
+
+const formatInworldDateTime = (date = new Date()) => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hour = String(date.getUTCHours()).padStart(2, '0');
+  const minute = String(date.getUTCMinutes()).padStart(2, '0');
+  const second = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${year}${month}${day}${hour}${minute}${second}`;
+};
+
+const getInworldHost = () => {
+  try {
+    return new URL(INWORLD_API_BASE).host;
+  } catch {
+    return 'api.inworld.ai';
+  }
+};
+
+const getSignatureKey = (secret, params) => {
+  let signature = `IW1${secret}`;
+  for (const param of params) {
+    signature = crypto.createHmac('sha256', signature).update(param).digest('hex');
+  }
+  return crypto.createHmac('sha256', signature).update('iw1_request').digest('hex');
+};
+
+const createInworldJwtRequestHeaders = () => {
+  const dateTime = formatInworldDateTime();
+  const host = getInworldHost();
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const signature = getSignatureKey(INWORLD_API_SECRET, [
+    dateTime,
+    host,
+    INWORLD_TOKEN_METHOD,
+    nonce
+  ]);
+  return {
+    Authorization: `IW1-HMAC-SHA256 ApiKey=${INWORLD_API_KEY},DateTime=${dateTime},Nonce=${nonce},Signature=${signature}`,
+    Host: host,
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+  };
+};
+
+const parseInworldExpirationTime = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const parsed = Date.parse(value);
+  if (Number.isFinite(parsed) && parsed > Date.now()) {
+    return parsed;
+  }
+  return null;
+};
+
+const fetchInworldJwtToken = async () => {
+  const response = await withTimeout(fetch(`${INWORLD_API_BASE}/auth/v1/tokens/token:generate`, {
+    method: 'POST',
+    headers: createInworldJwtRequestHeaders(),
+    body: JSON.stringify({
+      key: INWORLD_API_KEY,
+      resources: [getInworldWorkspaceResource()]
+    })
+  }), AI_UPSTREAM_TIMEOUT_MS);
+
+  const text = await response.text();
+  const payload = parseJsonSafe(text);
+  if (!response.ok) {
+    const message = payload?.error?.message || payload?.message || `Inworld token generation failed (${response.status})`;
+    throw createUpstreamError(
+      message,
+      response.status,
+      mapUpstreamStatusToErrorCode(response.status),
+      payload?.error?.details || payload?.details
+    );
+  }
+
+  const token = typeof payload?.token === 'string' ? payload.token.trim() : '';
+  if (!token) {
+    throw createUpstreamError('Inworld token generation returned an empty token.', 502, 'UPSTREAM_ERROR');
+  }
+  const expiresAt = parseInworldExpirationTime(payload?.expirationTime)
+    ?? parseInworldExpirationTime(payload?.expiryTime)
+    ?? (Date.now() + 15 * 60 * 1000);
+
+  return { token, expiresAt };
+};
+
+const getInworldJwtToken = async () => {
+  const now = Date.now();
+  if (
+    inworldJwtCache.token &&
+    inworldJwtCache.expiresAt - INWORLD_JWT_REFRESH_BUFFER_MS > now
+  ) {
+    return inworldJwtCache.token;
+  }
+
+  if (inworldJwtCache.pending) {
+    return inworldJwtCache.pending;
+  }
+
+  inworldJwtCache.pending = (async () => {
+    const nextToken = await fetchInworldJwtToken();
+    inworldJwtCache.token = nextToken.token;
+    inworldJwtCache.expiresAt = nextToken.expiresAt;
+    return nextToken.token;
+  })().finally(() => {
+    inworldJwtCache.pending = null;
+  });
+
+  return inworldJwtCache.pending;
+};
+
+const createInworldHeaders = async () => ({
+  Authorization: `Bearer ${await getInworldJwtToken()}`,
   'Content-Type': 'application/json',
   Accept: 'application/json, text/event-stream'
 });
@@ -262,9 +387,10 @@ const normalizeVoicePayloads = (voices, source, isCustom) =>
   );
 
 const fetchInworldVoiceList = async (endpoint, source, isCustom) => {
+  const headers = await createInworldHeaders();
   const response = await withTimeout(fetch(`${INWORLD_API_BASE}${endpoint}`, {
     method: 'GET',
-    headers: createInworldHeaders()
+    headers
   }), AI_UPSTREAM_TIMEOUT_MS);
   if (!response.ok) {
     const body = await response.text();
@@ -365,9 +491,10 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
     }
   };
 
+  const headers = await createInworldHeaders();
   const response = await withTimeout(fetch(`${INWORLD_API_BASE}/tts/v1/voice:stream`, {
     method: 'POST',
-    headers: createInworldHeaders(),
+    headers,
     body: JSON.stringify(payload)
   }), AI_UPSTREAM_TIMEOUT_MS);
 
