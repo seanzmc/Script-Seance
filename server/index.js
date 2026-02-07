@@ -10,6 +10,7 @@ import {
   LEGACY_VOICE_IDS,
   normalizeTtsProvider,
   applyExpressiveText,
+  extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
   parseInworldVoiceList,
   normalizeInworldVoice,
@@ -523,27 +524,57 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
   };
 
   const headers = await createInworldHeaders();
-  const response = await withTimeout(fetch(`${INWORLD_API_BASE}/tts/v1/voice:stream`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  }), AI_UPSTREAM_TIMEOUT_MS);
+  const requestInworld = async (endpoint, parseAsStream = false) => {
+    const response = await withTimeout(fetch(`${INWORLD_API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    }), AI_UPSTREAM_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const body = await response.text();
-    const parsed = parseJsonSafe(body);
-    const message = parsed?.error?.message || parsed?.message || `Inworld TTS request failed (${response.status})`;
-    throw createUpstreamError(
-      message,
-      response.status,
-      mapUpstreamStatusToErrorCode(response.status),
-      parsed?.error?.details || parsed?.details
-    );
+    const bodyText = await response.text();
+    if (!response.ok) {
+      const parsedError = parseJsonSafe(bodyText);
+      const message = parsedError?.error?.message || parsedError?.message || `Inworld TTS request failed (${response.status})`;
+      throw createUpstreamError(
+        message,
+        response.status,
+        mapUpstreamStatusToErrorCode(response.status),
+        parsedError?.error?.details || parsedError?.details
+      );
+    }
+
+    if (parseAsStream) {
+      const syntheticStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(bodyText));
+          controller.close();
+        }
+      });
+      const streamAudioBase64 = await collectAudioFromStreamBody(syntheticStream);
+      if (streamAudioBase64) {
+        return streamAudioBase64;
+      }
+      return '';
+    }
+
+    const parsed = parseJsonSafe(bodyText);
+    return extractAudioBase64FromPayload(parsed) || '';
+  };
+
+  try {
+    const audioBase64 = await requestInworld('/tts/v1/voice', false);
+    if (audioBase64) {
+      return { audioBase64, provider: 'inworld' };
+    }
+  } catch (error) {
+    if (![404, 405].includes(error?.status)) {
+      throw error;
+    }
   }
 
-  const streamAudioBase64 = await collectAudioFromStreamBody(response.body);
-  if (streamAudioBase64) {
-    return { audioBase64: streamAudioBase64, provider: 'inworld' };
+  const streamFallback = await requestInworld('/tts/v1/voice:stream', true);
+  if (streamFallback) {
+    return { audioBase64: streamFallback, provider: 'inworld' };
   }
 
   throw createUpstreamError('No audio data returned from Inworld.', 502, 'UPSTREAM_ERROR');

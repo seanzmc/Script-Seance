@@ -5,6 +5,7 @@ import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from '.
 // Global Content-Addressable Cache (persists across plays)
 // Key: voiceId:text | Value: ArrayBuffer (Raw PCM)
 const AudioCache = new LruAudioCache(AUDIO_CACHE_MAX_ENTRIES, AUDIO_CACHE_MAX_BYTES);
+const AUDIO_CACHE_SCHEMA_VERSION = 'v2';
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
@@ -257,7 +258,7 @@ export class ScriptEngine {
     const safeText = text.trim();
     // Cache Key: VoiceID + Text. 
     // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
-    const cacheKey = `${voiceId}:${expressive ? 'expr' : 'plain'}:${safeText}`;
+    const cacheKey = `${AUDIO_CACHE_SCHEMA_VERSION}:${voiceId}:${expressive ? 'expr' : 'plain'}:${safeText}`;
 
     const cached = AudioCache.get(cacheKey);
     if (cached !== undefined) {

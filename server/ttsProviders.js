@@ -211,6 +211,30 @@ const decodeBase64Chunk = (value) => {
   }
 };
 
+const extractBase64ChunksFromRawJsonText = (rawText) => {
+  if (typeof rawText !== 'string' || rawText.length === 0) {
+    return [];
+  }
+  const chunks = [];
+  const pattern = /"(?:audioBase64|audio_base64|audioContent|audio_content|audio)"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+  let match = pattern.exec(rawText);
+  while (match) {
+    const escapedValue = match[1];
+    if (typeof escapedValue === 'string' && escapedValue.length > 0) {
+      try {
+        const decodedString = JSON.parse(`"${escapedValue}"`);
+        if (typeof decodedString === 'string' && decodedString.trim().length > 0) {
+          chunks.push(decodedString.trim());
+        }
+      } catch {
+        // Ignore malformed matches and continue scanning.
+      }
+    }
+    match = pattern.exec(rawText);
+  }
+  return chunks;
+};
+
 const collectAudioFromStreamBody = async (body) => {
   if (!body || typeof body.getReader !== 'function') {
     return '';
@@ -259,6 +283,19 @@ const collectAudioFromStreamBody = async (body) => {
     if (audioBase64) {
       parts.push(audioBase64);
       const bytes = decodeBase64Chunk(audioBase64);
+      if (bytes && bytes.length > 0) {
+        chunkBytes.push(bytes);
+      }
+    }
+  }
+
+  const rawChunks = extractBase64ChunksFromRawJsonText(rawBody);
+  if (rawChunks.length > parts.length) {
+    parts.length = 0;
+    chunkBytes.length = 0;
+    for (const chunk of rawChunks) {
+      parts.push(chunk);
+      const bytes = decodeBase64Chunk(chunk);
       if (bytes && bytes.length > 0) {
         chunkBytes.push(bytes);
       }

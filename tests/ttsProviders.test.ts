@@ -60,6 +60,19 @@ describe('ttsProviders', () => {
     expect(base64).toBe('UklGRg==');
   });
 
+  it('extracts repeated audioContent keys from a single JSON response body', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"result":{"audioContent":"QQ==","audioContent":"Qg=="}}'));
+        controller.close();
+      }
+    });
+
+    const base64 = await collectAudioFromStreamBody(stream);
+    expect(Buffer.from(base64, 'base64').toString('utf8')).toBe('AB');
+  });
+
   it('normalizes and deduplicates inworld voices', () => {
     const sourceA = normalizeInworldVoice(
       { id: 'voice-1', displayName: 'Voice One', languages: ['en-US'], labels: ['calm'], tags: ['neutral'] },
