@@ -22,35 +22,46 @@ interface VoiceData {
   category: string;
   description: string;
   labels: string[];
+  tags: string[];
   source: string;
   isCustom: boolean;
 }
 
 const AVAILABLE_VOICES_DATA: VoiceData[] = [
-  { id: 'Aoede', name: 'Aoede', gender: 'Feminine', category: 'Calm', description: 'Smooth, confident, and professional. The "Narrator" type.', labels: ['calm'], source: 'legacy', isCustom: false },
-  { id: 'Callirrhoe', name: 'Callirrhoe', gender: 'Feminine', category: 'Warm', description: 'Gentle, warm, and slightly breathy. The "Friend".', labels: ['warm'], source: 'legacy', isCustom: false },
-  { id: 'Kore', name: 'Kore', gender: 'Feminine', category: 'Firm', description: 'Firm, clear, and direct. Good for reporters or pragmatic characters.', labels: ['firm'], source: 'legacy', isCustom: false },
-  { id: 'Sulafat', name: 'Sulafat', gender: 'Feminine', category: 'Warm', description: 'Warm, motherly, and assuring. A "Guide" figure.', labels: ['warm'], source: 'legacy', isCustom: false },
-  { id: 'Zephyr', name: 'Zephyr', gender: 'Feminine', category: 'High Energy', description: 'Breezy, cheerful, and fast. The "Sidekick".', labels: ['high-energy'], source: 'legacy', isCustom: false },
-  { id: 'Charon', name: 'Charon', gender: 'Masculine', category: 'Deep', description: 'Deep, resonant, and serious. The "Villain" or "Movie Trailer" voice.', labels: ['deep'], source: 'legacy', isCustom: false },
-  { id: 'Fenrir', name: 'Fenrir', gender: 'Masculine', category: 'High Energy', description: 'Excitable, fast, and intense. The "Action Hero".', labels: ['high-energy'], source: 'legacy', isCustom: false },
-  { id: 'Puck', name: 'Puck', gender: 'Masculine', category: 'High Energy', description: 'Playful, mischievous, and higher-pitch. The "Trickster".', labels: ['high-energy'], source: 'legacy', isCustom: false },
-  { id: 'Rasalgethi', name: 'Rasalgethi', gender: 'Masculine', category: 'Textured', description: 'Gravelly, informative, and older. The "Veteran".', labels: ['textured'], source: 'legacy', isCustom: false },
-  { id: 'Umbriel', name: 'Umbriel', gender: 'Masculine', category: 'Calm', description: 'Smooth, easy-going, and low-stress. The "Cool Guy".', labels: ['calm'], source: 'legacy', isCustom: false }
+  { id: 'Aoede', name: 'Aoede', gender: 'Feminine', category: 'Calm', description: 'Smooth, confident, and professional. The "Narrator" type.', labels: ['calm'], tags: ['calm'], source: 'legacy', isCustom: false },
+  { id: 'Callirrhoe', name: 'Callirrhoe', gender: 'Feminine', category: 'Warm', description: 'Gentle, warm, and slightly breathy. The "Friend".', labels: ['warm'], tags: ['warm'], source: 'legacy', isCustom: false },
+  { id: 'Kore', name: 'Kore', gender: 'Feminine', category: 'Firm', description: 'Firm, clear, and direct. Good for reporters or pragmatic characters.', labels: ['firm'], tags: ['firm'], source: 'legacy', isCustom: false },
+  { id: 'Sulafat', name: 'Sulafat', gender: 'Feminine', category: 'Warm', description: 'Warm, motherly, and assuring. A "Guide" figure.', labels: ['warm'], tags: ['warm'], source: 'legacy', isCustom: false },
+  { id: 'Zephyr', name: 'Zephyr', gender: 'Feminine', category: 'High Energy', description: 'Breezy, cheerful, and fast. The "Sidekick".', labels: ['high-energy'], tags: ['high-energy'], source: 'legacy', isCustom: false },
+  { id: 'Charon', name: 'Charon', gender: 'Masculine', category: 'Deep', description: 'Deep, resonant, and serious. The "Villain" or "Movie Trailer" voice.', labels: ['deep'], tags: ['deep'], source: 'legacy', isCustom: false },
+  { id: 'Fenrir', name: 'Fenrir', gender: 'Masculine', category: 'High Energy', description: 'Excitable, fast, and intense. The "Action Hero".', labels: ['high-energy'], tags: ['high-energy'], source: 'legacy', isCustom: false },
+  { id: 'Puck', name: 'Puck', gender: 'Masculine', category: 'High Energy', description: 'Playful, mischievous, and higher-pitch. The "Trickster".', labels: ['high-energy'], tags: ['high-energy'], source: 'legacy', isCustom: false },
+  { id: 'Rasalgethi', name: 'Rasalgethi', gender: 'Masculine', category: 'Textured', description: 'Gravelly, informative, and older. The "Veteran".', labels: ['textured'], tags: ['textured'], source: 'legacy', isCustom: false },
+  { id: 'Umbriel', name: 'Umbriel', gender: 'Masculine', category: 'Calm', description: 'Smooth, easy-going, and low-stress. The "Cool Guy".', labels: ['calm'], tags: ['calm'], source: 'legacy', isCustom: false }
 ];
 
 const FILTERS = ['All', 'Masculine', 'Feminine', 'High Energy', 'Calm', 'Deep'];
 const LEGACY_VOICE_MAP = new Map(AVAILABLE_VOICES_DATA.map((voice) => [voice.id, voice]));
+const formatTagLabel = (value: string) =>
+  value
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(' ');
 
 const toVoiceData = (voice: TtsVoice): VoiceData => {
   const legacy = LEGACY_VOICE_MAP.get(voice.id);
+  const labels = voice.labels.length > 0 ? voice.labels : (legacy?.labels || []);
+  const tags = voice.tags && voice.tags.length > 0 ? voice.tags : labels;
   return {
     id: voice.id,
     name: voice.displayName || legacy?.name || voice.id,
     gender: voice.gender || legacy?.gender || 'Unknown',
     category: voice.category || legacy?.category || (voice.isCustom ? 'Custom' : 'General'),
     description: voice.description || legacy?.description || 'Inworld voice.',
-    labels: voice.labels.length > 0 ? voice.labels : (legacy?.labels || []),
+    labels,
+    tags,
     source: voice.source,
     isCustom: voice.isCustom
   };
@@ -91,6 +102,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
             displayName: LEGACY_VOICE_MAP.get(currentVoiceId)?.name || currentVoiceId,
             source: 'legacy',
             labels: LEGACY_VOICE_MAP.get(currentVoiceId)?.labels || [],
+            tags: LEGACY_VOICE_MAP.get(currentVoiceId)?.labels || [],
             isCustom: false
           }), ...dynamic]
           : dynamic;
@@ -105,6 +117,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
         category: 'Legacy',
         description: 'Voice assigned from a previous catalog.',
         labels: [],
+        tags: [],
         source: 'legacy',
         isCustom: false
       }, ...fallback];
@@ -266,6 +279,21 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     <p className="text-xs text-gray-400 mb-4 leading-relaxed line-clamp-2 flex-1">
                       {voice.description}
                     </p>
+
+                    {voice.tags.length > 0 && (
+                      <div className="mb-4 flex flex-wrap gap-1.5">
+                        {voice.tags.slice(0, 4).map((tag) => (
+                          <span
+                            key={`${voice.id}-${tag}`}
+                            className={`px-1.5 py-0.5 rounded text-[10px] ${
+                              isSelected ? 'bg-indigo-500/25 text-indigo-200' : 'bg-gray-700/80 text-gray-300'
+                            }`}
+                          >
+                            {formatTagLabel(tag)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Assigned Status */}
                     <div className="mb-4 pt-3 border-t border-gray-700/50">

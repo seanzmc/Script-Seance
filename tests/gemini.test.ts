@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BlockType } from '../types';
-import { createSuggestPlotTwistRequest, generateScriptElement } from '../services/gemini';
+import { createGenerateSpeechRequest, createSuggestPlotTwistRequest, generateScriptElement } from '../services/gemini';
 
 type MockResponse = {
   ok: boolean;
@@ -68,5 +68,20 @@ describe('gemini API wrapper', () => {
 
     await vi.advanceTimersByTimeAsync(10);
     await expectation;
+  });
+
+  it('decodes URL-safe base64 audio payloads', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createMockResponse(200, {
+        data: {
+          audioBase64: '-_8='
+        }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = createGenerateSpeechRequest('hello', 'Alex');
+    const buffer = await request.promise;
+    expect(Array.from(new Uint8Array(buffer))).toEqual([251, 255]);
   });
 });

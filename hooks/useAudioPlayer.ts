@@ -573,14 +573,27 @@ export const useAudioPlayer = (
   };
 };
 
-// Helper: Decode Raw PCM from Gemini
+const tryDecodeAudioData = async (buffer: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer | null> => {
+  try {
+    // decodeAudioData may detach/consume the input buffer; always pass a copy.
+    return await ctx.decodeAudioData(buffer.slice(0));
+  } catch {
+    return null;
+  }
+};
+
+// Helper: Decode encoded audio first (WAV/MP3/etc.), then fall back to raw LINEAR16 PCM.
 const decodePCM = async (buffer: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer> => {
-  // Defensive copy
+  const decoded = await tryDecodeAudioData(buffer, ctx);
+  if (decoded) {
+    return decoded;
+  }
+
   const copy = buffer.slice(0);
-  
+  const safeByteLength = copy.byteLength - (copy.byteLength % 2);
   const numChannels = 1;
-  const sampleRate = 24000; // Gemini 2.5 TTS standard rate
-  const dataInt16 = new Int16Array(copy);
+  const sampleRate = 24000;
+  const dataInt16 = new Int16Array(copy, 0, safeByteLength / 2);
   const frameCount = dataInt16.length / numChannels;
   
   const audioBuffer = ctx.createBuffer(numChannels, frameCount, sampleRate);

@@ -191,6 +191,26 @@ const parseJsonLine = (line) => {
   }
 };
 
+const normalizeBase64Chunk = (value) => {
+  if (typeof value !== 'string') return '';
+  const withoutDataUrl = value.replace(/^data:[^;]+;base64,/i, '');
+  const compact = withoutDataUrl.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  if (!compact) return '';
+  const remainder = compact.length % 4;
+  if (remainder === 0) return compact;
+  return `${compact}${'='.repeat(4 - remainder)}`;
+};
+
+const decodeBase64Chunk = (value) => {
+  const normalized = normalizeBase64Chunk(value);
+  if (!normalized) return null;
+  try {
+    return Buffer.from(normalized, 'base64');
+  } catch {
+    return null;
+  }
+};
+
 const collectAudioFromStreamBody = async (body) => {
   if (!body || typeof body.getReader !== 'function') {
     return '';
@@ -198,12 +218,16 @@ const collectAudioFromStreamBody = async (body) => {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   const parts = [];
+  const chunkBytes = [];
   let buffered = '';
+  let rawBody = '';
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffered += decoder.decode(value, { stream: true });
+    const chunk = decoder.decode(value, { stream: true });
+    rawBody += chunk;
+    buffered += chunk;
 
     let newlineIndex = buffered.indexOf('\n');
     while (newlineIndex >= 0) {
@@ -216,12 +240,17 @@ const collectAudioFromStreamBody = async (body) => {
       const audioBase64 = extractAudioBase64FromPayload(parsed);
       if (audioBase64) {
         parts.push(audioBase64);
+        const bytes = decodeBase64Chunk(audioBase64);
+        if (bytes && bytes.length > 0) {
+          chunkBytes.push(bytes);
+        }
       }
     }
   }
 
   const finalChunk = decoder.decode();
   if (finalChunk) {
+    rawBody += finalChunk;
     buffered += finalChunk;
   }
   const parsedTail = parseJsonLine(buffered);
@@ -229,7 +258,29 @@ const collectAudioFromStreamBody = async (body) => {
     const audioBase64 = extractAudioBase64FromPayload(parsedTail);
     if (audioBase64) {
       parts.push(audioBase64);
+      const bytes = decodeBase64Chunk(audioBase64);
+      if (bytes && bytes.length > 0) {
+        chunkBytes.push(bytes);
+      }
     }
+  }
+
+  if (parts.length === 0) {
+    const parsedWhole = parseJsonLine(rawBody);
+    if (parsedWhole) {
+      const audioBase64 = extractAudioBase64FromPayload(parsedWhole);
+      if (audioBase64) {
+        parts.push(audioBase64);
+        const bytes = decodeBase64Chunk(audioBase64);
+        if (bytes && bytes.length > 0) {
+          chunkBytes.push(bytes);
+        }
+      }
+    }
+  }
+
+  if (parts.length > 0 && chunkBytes.length === parts.length) {
+    return Buffer.concat(chunkBytes).toString('base64');
   }
 
   return parts.join('');
@@ -267,19 +318,25 @@ const normalizeInworldVoice = (voice, source, isCustom) => {
   if (!id) return null;
 
   const displayName = normalizeString(record.displayName || record.name || record.voiceName || id);
+  const languages = asArray(record.languages).filter((entry) => typeof entry === 'string');
   const language = normalizeString(
     record.language ||
     record.languageCode ||
     record.locale ||
+    languages[0] ||
     record.metadata?.language
   );
   const gender = normalizeString(record.gender || record.metadata?.gender);
   const category = normalizeString(record.category || record.style || record.metadata?.category);
   const description = normalizeString(record.description || record.summary || record.metadata?.description);
-  const labels = mergeUniqueLabels([
-    ...(asArray(record.labels)),
+  const tags = mergeUniqueLabels([
     ...(asArray(record.tags)),
+    ...(asArray(record.labels)),
     ...(asArray(record.styles)),
+    ...(asArray(record.metadata?.tags))
+  ]);
+  const labels = mergeUniqueLabels([
+    ...tags,
     ...(category ? [category] : []),
     ...(gender ? [gender] : [])
   ]);
@@ -290,6 +347,7 @@ const normalizeInworldVoice = (voice, source, isCustom) => {
     source,
     language: language || undefined,
     labels,
+    tags,
     isCustom,
     gender: gender || undefined,
     category: category || undefined,
@@ -306,11 +364,14 @@ const dedupeVoices = (voices) => {
       continue;
     }
     const prev = byId.get(voice.id);
-    const merged = {
-      ...prev,
-      ...voice,
-      labels: mergeUniqueLabels([...(prev.labels || []), ...(voice.labels || [])])
-    };
+    const merged = { ...prev };
+    for (const [key, value] of Object.entries(voice)) {
+      if (value !== undefined) {
+        merged[key] = value;
+      }
+    }
+    merged.labels = mergeUniqueLabels([...(prev.labels || []), ...(voice.labels || [])]);
+    merged.tags = mergeUniqueLabels([...(prev.tags || []), ...(voice.tags || [])]);
     byId.set(voice.id, merged);
   }
   return [...byId.values()];

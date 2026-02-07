@@ -198,6 +198,42 @@ const waitWithCancel = (ms: number, item: TtsQueueItem<unknown>) =>
     item.delayReject = reject;
   });
 
+const normalizeBase64Audio = (value: string) => {
+  const withoutDataUrl = value.replace(/^data:[^;]+;base64,/i, '');
+  const compact = withoutDataUrl.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  if (!compact) return '';
+  const remainder = compact.length % 4;
+  if (remainder === 0) return compact;
+  return `${compact}${'='.repeat(4 - remainder)}`;
+};
+
+const decodeAudioBase64 = (value: string): ArrayBuffer => {
+  const normalized = normalizeBase64Audio(value);
+  if (!normalized) {
+    throw new Error('No audio data returned');
+  }
+  try {
+    const binaryString = atob(normalized);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch {
+    const error = new Error('Audio payload was not valid base64.') as Error & {
+      code?: string;
+      details?: Record<string, unknown>;
+    };
+    error.code = 'INVALID_AUDIO_BASE64';
+    error.details = {
+      length: normalized.length,
+      preview: normalized.slice(0, 48)
+    };
+    throw error;
+  }
+};
+
 const createAiRequest = <T>(
   kind: string,
   context: unknown,
@@ -457,14 +493,7 @@ export const createGenerateSpeechRequest = (
         if (!base64Audio) {
           throw new Error('No audio data returned');
         }
-
-        const binaryString = atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        return bytes.buffer;
+        return decodeAudioBase64(base64Audio);
       } catch (error: unknown) {
         item.inFlightCancel = null;
         if (item.cancelled) {

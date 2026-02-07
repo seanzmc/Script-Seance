@@ -64,6 +64,7 @@ export interface TtsVoice {
   source: 'inworld-premade' | 'inworld-custom' | 'legacy';
   language?: string;
   labels: string[];
+  tags?: string[];
   isCustom: boolean;
   gender?: string;
   category?: string;

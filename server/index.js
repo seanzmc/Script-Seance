@@ -471,7 +471,12 @@ const listInworldVoices = async () => {
     }
   }
 
-  const merged = dedupeVoices([...premadeVoices, ...customVoices, ...LEGACY_TTS_VOICES]);
+  const includeLegacyVoices = TTS_PROVIDER === 'dual';
+  const merged = dedupeVoices([
+    ...premadeVoices,
+    ...customVoices,
+    ...(includeLegacyVoices ? LEGACY_TTS_VOICES : [])
+  ]);
   voiceCatalogCache.expiresAt = now + VOICE_CATALOG_CACHE_TTL_MS;
   voiceCatalogCache.voices = merged;
   return merged;
@@ -511,10 +516,9 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
     model_id: TTS_INWORLD_MODEL,
     text: preparedText,
     voice_id: resolvedVoiceId,
-    output_audio_config: {
-      encoding: 'LINEAR16',
-      sample_rate_hertz: 24000,
-      channels: 1
+    audio_config: {
+      audio_encoding: 'LINEAR16',
+      sample_rate_hertz: 24000
     }
   };
 
