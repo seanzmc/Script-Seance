@@ -104,14 +104,17 @@ export function createLLMRouter() {
     const input = toGenerationInput(req.body);
 
     try {
+      let completed = false;
       const handle = generation.stream(input, {
         onToken(token) {
           res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
         },
         onComplete(response) {
+          completed = true;
           res.write(
             `data: ${JSON.stringify({
               type: 'done',
+              text: response.text,
               usage: response.usage,
               timing: response.timing,
               finishReason: response.finishReason
@@ -120,6 +123,7 @@ export function createLLMRouter() {
           res.end();
         },
         onError(error) {
+          completed = true;
           res.write(
             `data: ${JSON.stringify({
               type: 'error',
@@ -130,8 +134,11 @@ export function createLLMRouter() {
         }
       });
 
-      req.on('close', () => {
-        handle.abort();
+      // Abort only when the response stream disconnects unexpectedly.
+      res.on('close', () => {
+        if (!completed) {
+          handle.abort();
+        }
       });
     } catch (error) {
       res.write(

@@ -44,6 +44,8 @@ export interface LLMContinueInput {
 
 const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.|EST\.)/i;
 const TRANSITION_RE = /^(CUT TO:|FADE OUT\.?|FADE TO BLACK\.?|SMASH CUT:|DISSOLVE TO:|MATCH CUT:|WIPE TO:|BACK TO:)/i;
+const ACTION_DIALOGUE_BREAK_RE =
+  /^(THE |A |AN |SUDDENLY|OUTSIDE|INSIDE|ON |IN |AT |WITH |WITHOUT |NEAR |FROM |BEHIND )/i;
 
 const normalizeLine = (line: string) => line.replace(/\s+/g, ' ').trim();
 
@@ -94,6 +96,43 @@ const isLikelyCharacterCue = (line: string) => {
 };
 
 const isParenthetical = (line: string) => /^\(.*\)$/.test(line.trim());
+
+const buildCharacterPattern = (characters: string[]) => {
+  const tokens = characters
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (tokens.length === 0) return null;
+  return new RegExp(`^(${tokens.join('|')})\\b\\s+`, 'i');
+};
+
+const isLikelyActionAfterDialogue = (
+  line: string,
+  characterPattern: RegExp | null
+) => {
+  const normalized = line.trim();
+  if (!normalized) return false;
+  if (isParenthetical(normalized)) return false;
+  if (SCENE_HEADING_RE.test(normalized)) return false;
+  if (TRANSITION_RE.test(normalized)) return false;
+  if (isLikelyCharacterCue(normalized)) return false;
+
+  // Narrative/action lines often begin with environment cues or articles.
+  if (ACTION_DIALOGUE_BREAK_RE.test(normalized)) return true;
+
+  // If a full narrative sentence starts with a known character name + verb,
+  // treat it as action instead of dialogue continuation.
+  if (
+    characterPattern &&
+    characterPattern.test(normalized) &&
+    /[a-z]/.test(normalized) &&
+    /[.!?]$/.test(normalized)
+  ) {
+    return true;
+  }
+
+  return false;
+};
 
 export const extractSceneHeading = (text: string): string | null => {
   const lines = text.split('\n').map(normalizeLine).filter(Boolean);
@@ -177,7 +216,7 @@ export const buildContinueGenerationInput = (
 
 export const parseGeneratedSceneText = (
   rawText: string,
-  options: { fallbackHeading: string; summaryHint?: string }
+  options: { fallbackHeading: string; summaryHint?: string; characters?: string[] }
 ): Omit<Scene, 'id'> => {
   const text = rawText.replace(/\r\n/g, '\n').trim();
   const lines = text
@@ -187,6 +226,7 @@ export const parseGeneratedSceneText = (
 
   let heading = options.fallbackHeading;
   const blocks: ScriptBlock[] = [];
+  const characterPattern = buildCharacterPattern(options.characters ?? []);
 
   let i = 0;
   while (i < lines.length) {
@@ -236,6 +276,9 @@ export const parseGeneratedSceneText = (
           continue;
         }
         if (SCENE_HEADING_RE.test(nextLine) || TRANSITION_RE.test(nextLine) || isLikelyCharacterCue(nextLine)) {
+          break;
+        }
+        if (dialogueLines.length > 0 && isLikelyActionAfterDialogue(nextLine, characterPattern)) {
           break;
         }
 

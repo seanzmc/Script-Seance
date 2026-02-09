@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 interface StreamEvent {
   type: 'token' | 'done' | 'error';
   content?: string;
+  text?: string;
   message?: string;
   usage?: {
     promptTokens?: number;
@@ -130,6 +131,11 @@ export function useGeneration() {
             }
 
             if (event.type === 'done') {
+              if (!accumulated && typeof event.text === 'string') {
+                accumulated = event.text;
+                setState((current) => ({ ...current, streamedText: accumulated }));
+                onToken?.(accumulated);
+              }
               setState((current) => ({
                 ...current,
                 isGenerating: false,

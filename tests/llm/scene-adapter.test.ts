@@ -78,4 +78,42 @@ describe('llmSceneAdapter', () => {
     expect(parsed.blocks).toHaveLength(1);
     expect(parsed.blocks[0].type).toBe(BlockType.ACTION);
   });
+
+  it('splits action from dialogue when model omits blank line', () => {
+    const parsed = parseGeneratedSceneText(
+      [
+        'INT. CONTROL ROOM - NIGHT',
+        'ALEX',
+        'We are losing containment.',
+        'The console erupts with sparks.'
+      ].join('\n'),
+      {
+        fallbackHeading: 'INT. FALLBACK - DAY',
+        characters: ['ALEX', 'JENKINS']
+      }
+    );
+
+    expect(parsed.blocks.length).toBeGreaterThanOrEqual(2);
+    expect(parsed.blocks[0].type).toBe(BlockType.DIALOGUE);
+    expect(parsed.blocks.some((block) => block.type === BlockType.ACTION)).toBe(true);
+  });
+
+  it('treats known character-name narrative lines as action after dialogue', () => {
+    const parsed = parseGeneratedSceneText(
+      [
+        'INT. CONTROL ROOM - NIGHT',
+        'ALEX',
+        'I cannot hold it any longer.',
+        'JENKINS slams the emergency breaker.'
+      ].join('\n'),
+      {
+        fallbackHeading: 'INT. FALLBACK - DAY',
+        characters: ['ALEX', 'JENKINS']
+      }
+    );
+
+    expect(parsed.blocks.length).toBeGreaterThanOrEqual(2);
+    expect(parsed.blocks[0].type).toBe(BlockType.DIALOGUE);
+    expect(parsed.blocks[1].type).toBe(BlockType.ACTION);
+  });
 });

@@ -291,10 +291,22 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   useEffect(() => {
     if (!insertScrollTargetId) return;
-    const el = document.getElementById(`block-${insertScrollTargetId}`);
+    const isSceneTarget = insertScrollTargetId.startsWith('scene:');
+    const targetId = isSceneTarget
+      ? insertScrollTargetId.slice('scene:'.length)
+      : insertScrollTargetId;
+    const el = document.getElementById(
+      isSceneTarget ? `scene-${targetId}` : `block-${targetId}`
+    );
     requestAnimationFrame(() => {
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.scrollIntoView({
+          behavior: 'smooth',
+          block: isSceneTarget ? 'start' : 'center'
+        });
+        if (isSceneTarget) {
+          return;
+        }
       } else {
         const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
         if (scrollContainer) {
