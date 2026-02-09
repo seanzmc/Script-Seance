@@ -12,6 +12,7 @@ The app is functional end-to-end and in active UI iteration.
 - Voice casting and script playback with cached TTS generation.
 - Local draft autosave, undo/redo controls, and TXT/PDF export.
 - Automated tests for core reliability paths (client services, playback engine, server error handling).
+- New `/api/llm/*` provider-agnostic generation stack with local llama.cpp streaming support.
 
 UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
 
@@ -51,6 +52,42 @@ INWORLD_JWT_REFRESH_BUFFER_MS=60000
 
 `GEMINI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.  
 For Inworld TTS migration paths, set `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
+
+## Local Open-Source LLM (llama.cpp)
+
+The app now includes a local LLM path via `/api/llm/*` with provider toggling (`local` or `gemini`).
+
+1. Install llama.cpp:
+
+```bash
+brew install llama.cpp
+```
+
+2. Install Hugging Face CLI:
+
+```bash
+pip install "huggingface-hub[cli]"
+```
+
+3. Download default model (Llama 3.1 8B Instruct Q5_K_M):
+
+```bash
+bash scripts/download-model.sh
+```
+
+4. Start local server:
+
+```bash
+bash scripts/start-llama-server.sh
+```
+
+5. Configure `.env`:
+
+```bash
+LLM_PROVIDER=local
+LOCAL_LLM_BASE_URL=http://127.0.0.1:8080
+LOCAL_LLM_MODEL=default
+```
 
 ## Local Development
 

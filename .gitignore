@@ -33,3 +33,6 @@ docs/typedoc/*
 docs/typedoc/
 docs/dependency-graph.mmd
 docs/dependency-graph.svg
+models/
+!models/
+!models/.gitkeep

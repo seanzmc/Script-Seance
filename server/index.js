@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import cookie from 'cookie';
 import { GoogleGenAI, Type } from '@google/genai';
+import { createLLMRouter } from './llm/routes.js';
 import {
   LEGACY_TTS_VOICES,
   LEGACY_VOICE_IDS,
@@ -922,6 +923,7 @@ app.get('/api/auth/session', (req, res) => {
 });
 
 app.use('/api/ai', requireSession, rateLimitAi);
+app.use('/api/llm', requireSession, rateLimitAi, createLLMRouter());
 
 const handleAiGenerate = async (req, res) => {
   const payload = req.body || {};
