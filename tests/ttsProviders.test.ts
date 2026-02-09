@@ -133,4 +133,36 @@ describe('ttsProviders', () => {
     expect(voiceA?.tags).toEqual(['expressive']);
     expect(voiceA?.labels).toEqual(['expressive']);
   });
+
+  it('curates Inworld voice catalog to the supported eight voices with metadata', () => {
+    const sampleVoices = [
+      normalizeInworldVoice({ id: 'v-1', displayName: 'Alex', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-2', displayName: 'Hades', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-3', displayName: 'Luna', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-4', displayName: 'Mark', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-5', displayName: 'Olivia', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-6', displayName: 'Theodore', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-7', displayName: 'Hana', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-8', displayName: 'Clive', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-9', displayName: 'Blake', language: 'en-US' }, 'inworld-premade', false)
+    ].filter(Boolean);
+
+    const limited = limitInworldVoices(sampleVoices, 8);
+    expect(limited.map((voice) => voice.displayName)).toEqual([
+      'Hades',
+      'Mark',
+      'Olivia',
+      'Theodore',
+      'Hana',
+      'Clive',
+      'Blake',
+      'Luna'
+    ]);
+
+    const hades = limited[0];
+    expect(hades.gender).toBe('Masculine');
+    expect(hades.category).toBe('Deep');
+    expect(hades.tags).toEqual(expect.arrayContaining(['commanding', 'gruff']));
+    expect(hades.labels).toEqual(expect.arrayContaining(['commanding', 'gruff']));
+  });
 });

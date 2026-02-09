@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, AlertTriangle, Trash2 } from 'lucide-react';
 
 export interface PlaybackPanelProps {
   isPlaying: boolean;
@@ -16,6 +16,8 @@ export interface PlaybackPanelProps {
   onNext: () => void;
   onRetry: () => void;
   onSkip: () => void;
+  onRefreshAudio: () => void;
+  onPurgeAudio: () => void;
   bufferedCount: number;
   totalCount: number;
   currentSpeaker: string;
@@ -42,6 +44,8 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   onNext,
   onRetry,
   onSkip,
+  onRefreshAudio,
+  onPurgeAudio,
   bufferedCount,
   totalCount,
   currentSpeaker,
@@ -204,6 +208,24 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
               Audio generation: {progressCount}/{totalCount || 0}
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={onRefreshAudio}
+                disabled={totalCount === 0}
+                className="flex items-center gap-1.5 rounded-full border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Regenerate all script audio using current voice casting"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Refresh Audio
+              </button>
+              <button
+                onClick={onPurgeAudio}
+                disabled={!hasAudio}
+                className="flex items-center gap-1.5 rounded-full border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Clear generated playback blocks and cached audio"
+              >
+                <Trash2 className="w-3 h-3" />
+                Purge
+              </button>
               <span className="text-[10px] text-gray-500 uppercase tracking-widest">Speed</span>
               <span className="text-[11px] text-indigo-300 font-semibold">{playbackSpeed.toFixed(1)}x</span>
               <input

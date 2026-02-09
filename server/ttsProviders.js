@@ -115,9 +115,80 @@ const LEGACY_VOICE_IDS = new Set(LEGACY_TTS_VOICES.map((voice) => voice.id));
 const TTS_PROVIDER_SET = new Set(['gemini', 'inworld', 'dual']);
 const AUDIO_FIELD_KEYS = ['audioBase64', 'audio_base64', 'audioContent', 'audio_content', 'audio'];
 const DISALLOWED_INWORLD_TAGS = new Set(['unknown', 'general']);
+const CURATED_INWORLD_VOICES = [
+  {
+    key: 'hades',
+    displayName: 'Hades',
+    gender: 'Masculine',
+    category: 'Deep',
+    description: 'Commanding and gruff male voice, think an omniscient narrator or castle guard',
+    tags: ['commanding', 'gruff']
+  },
+  {
+    key: 'mark',
+    displayName: 'Mark',
+    gender: 'Masculine',
+    category: 'High Energy',
+    description: 'Energetic, expressive man with a rapid-fire delivery',
+    tags: ['articulate', 'engaging']
+  },
+  {
+    key: 'olivia',
+    displayName: 'Olivia',
+    gender: 'Feminine',
+    category: 'High Energy',
+    description: 'Young, British female with an upbeat, friendly tone',
+    tags: ['cute', 'upbeat', 'british']
+  },
+  {
+    key: 'theodore',
+    displayName: 'Theodore',
+    gender: 'Masculine',
+    category: 'Deep',
+    description: 'Gravelly male voice, with a time-worn quality',
+    tags: ['elderly', 'wise']
+  },
+  {
+    key: 'hana',
+    displayName: 'Hana',
+    gender: 'Feminine',
+    category: 'High Energy',
+    description: 'Bright, expressive young female voice, perfect for storytelling, gaming, and playful dialogue',
+    tags: ['bright', 'playful']
+  },
+  {
+    key: 'clive',
+    displayName: 'Clive',
+    gender: 'Masculine',
+    category: 'Calm',
+    description: 'British-accented English-language male voice with a calm, cordial quality',
+    tags: ['calm', 'friendly', 'british']
+  },
+  {
+    key: 'blake',
+    displayName: 'Blake',
+    gender: 'Masculine',
+    category: 'Calm',
+    description: 'Rich, intimate male voice, perfect for audiobooks, romantic content, and reassuring narration',
+    tags: ['intimate', 'romantic']
+  },
+  {
+    key: 'luna',
+    displayName: 'Luna',
+    gender: 'Feminine',
+    category: 'Calm',
+    description: 'Calm, relaxing female voice, perfect for meditations, sleep stories, and mindful content',
+    tags: ['calm', 'relaxing']
+  }
+];
+const CURATED_INWORLD_VOICE_BY_KEY = new Map(
+  CURATED_INWORLD_VOICES.map((voice) => [voice.key, voice])
+);
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const asArray = (value) => (Array.isArray(value) ? value : []);
+const normalizeVoiceLookupKey = (value) =>
+  normalizeString(value).toLowerCase().replace(/[^a-z0-9]+/g, '');
 const normalizeLanguageCode = (value) => normalizeString(value).toLowerCase();
 const isEnglishLanguageCode = (value) => {
   const code = normalizeLanguageCode(value);
@@ -359,11 +430,80 @@ const isEnglishVoice = (voice) => {
   return asArray(voice.languages).some((entry) => isEnglishLanguageCode(entry));
 };
 
+const getCuratedInworldSpec = (voice) => {
+  const candidates = [
+    normalizeVoiceLookupKey(voice.displayName),
+    normalizeVoiceLookupKey(voice.id),
+    normalizeVoiceLookupKey(voice.name),
+    normalizeVoiceLookupKey(voice.voiceName)
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const direct = CURATED_INWORLD_VOICE_BY_KEY.get(candidate);
+    if (direct) {
+      return direct;
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  for (const candidate of candidates) {
+    for (const spec of CURATED_INWORLD_VOICES) {
+      if (candidate.includes(spec.key)) {
+        return spec;
+      }
+    }
+  }
+
+  return null;
+};
+
+const applyCuratedInworldMeta = (voice, spec) => {
+  const tags = pruneInworldTags([...(voice.tags || []), ...(spec.tags || [])]);
+  const labels = pruneInworldTags([
+    ...(voice.labels || []),
+    ...(spec.tags || []),
+    spec.gender,
+    spec.category
+  ]);
+
+  return {
+    ...voice,
+    displayName: spec.displayName,
+    gender: spec.gender,
+    category: spec.category,
+    description: spec.description,
+    tags,
+    labels
+  };
+};
+
 const limitInworldVoices = (voices, maxCount = 20) => {
   const normalizedMax = Number.isFinite(maxCount) && maxCount > 0
     ? Math.floor(maxCount)
     : 20;
   const englishVoices = voices.filter((voice) => isEnglishVoice(voice));
+  const curated = [];
+  const usedIds = new Set();
+
+  for (const spec of CURATED_INWORLD_VOICES) {
+    const match = englishVoices.find((voice) => {
+      if (!voice || usedIds.has(voice.id)) return false;
+      const voiceSpec = getCuratedInworldSpec(voice);
+      return Boolean(voiceSpec && voiceSpec.key === spec.key);
+    });
+    if (match) {
+      usedIds.add(match.id);
+      curated.push(applyCuratedInworldMeta(match, spec));
+    }
+  }
+
+  if (curated.length > 0) {
+    return curated.slice(0, Math.min(normalizedMax, CURATED_INWORLD_VOICES.length));
+  }
+
   return englishVoices.slice(0, normalizedMax);
 };
 

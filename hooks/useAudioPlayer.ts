@@ -32,7 +32,7 @@ export const useAudioPlayer = (
   const audioDataMap = useRef<Map<string, AudioChunk>>(new Map()); // Buffer for arrived audio chunks
   const skippedBlockIdsRef = useRef<Set<string>>(new Set());
   const totalCountRef = useRef(0);
-  const bufferedScriptKeyRef = useRef<string | null>(null);
+  const bufferedAudioSignatureRef = useRef<string | null>(null);
   
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const activeBlockIdRef = useRef<string | null>(null);
@@ -106,7 +106,7 @@ export const useAudioPlayer = (
   const resetBuffer = useCallback(() => {
     audioDataMap.current.clear();
     skippedBlockIdsRef.current.clear();
-    bufferedScriptKeyRef.current = null;
+    bufferedAudioSignatureRef.current = null;
     updateBufferProgress(0);
     setBlockStatuses({});
   }, [updateBufferProgress]);
@@ -343,12 +343,25 @@ export const useAudioPlayer = (
 
   // --- Public Methods ---
 
-  const playScript = (blocks: ScriptBlock[]) => {
+  const getAudioGenerationSignature = useCallback((blocks: ScriptBlock[]) => {
+    return blocks
+      .filter((block) => PLAYABLE_BLOCKS.includes(block.type))
+      .map((block) => {
+        const config = getVoiceConfigForBlock(block);
+        const voiceId = config?.voiceId || 'Zephyr';
+        const expressive = config?.expressive ? 'expr' : 'plain';
+        return `${block.id}:${voiceId}:${expressive}`;
+      })
+      .join('|');
+  }, [getVoiceConfigForBlock]);
+
+  const playScript = (blocks: ScriptBlock[], options?: { forceRegenerate?: boolean }) => {
     const playableBlocks = getPlayableBlocks(blocks);
-    const bufferKey = playableBlocks.map(block => block.id).join('|');
+    const audioSignature = getAudioGenerationSignature(blocks);
     const canReuseBuffer =
-      bufferKey.length > 0 &&
-      bufferKey === bufferedScriptKeyRef.current &&
+      !options?.forceRegenerate &&
+      audioSignature.length > 0 &&
+      audioSignature === bufferedAudioSignatureRef.current &&
       audioDataMap.current.size > 0;
 
     stop({ clearBuffer: !canReuseBuffer });
@@ -356,7 +369,7 @@ export const useAudioPlayer = (
     currentIndexRef.current = 0;
     setCurrentBlockIndex(playableBlocks.length > 0 ? 0 : -1);
     setIsPaused(false);
-    bufferedScriptKeyRef.current = bufferKey || null;
+    bufferedAudioSignatureRef.current = audioSignature || null;
     updateBufferProgress(playableBlocks.length);
     setBlockStatuses(() => {
       const nextStatuses: Record<string, BlockAudioStatus> = {};
@@ -386,6 +399,13 @@ export const useAudioPlayer = (
       playNext(playbackRunIdRef.current);
     }, 10);
   };
+
+  const clearGeneratedAudio = useCallback((options?: { clearGlobalCache?: boolean }) => {
+    stop({ clearBuffer: true });
+    if (options?.clearGlobalCache) {
+      (engineRef.current as { clearAudioCache?: () => void } | null)?.clearAudioCache?.();
+    }
+  }, [stop]);
 
   const pause = useCallback(() => {
     if (!isPlayingRef.current) return;
@@ -562,6 +582,7 @@ export const useAudioPlayer = (
     totalBufferedCount,
     blockStatuses,
     playScript,
+    clearGeneratedAudio,
     playPreview,
     stop,
     pause,

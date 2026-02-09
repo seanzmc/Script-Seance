@@ -100,4 +100,54 @@ describe('useAudioPlayer', () => {
     expect(onSkip).toHaveBeenCalledWith(blocks[0], expect.any(Error));
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it('clears reusable generated blocks when a character voice changes', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
+    ];
+    const initialVoices: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+    ];
+    const updatedVoices: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'Aoede', speed: 1, pitch: 0 }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+    const { rerender } = render(<Harness ref={ref} voiceConfigs={initialVoices} />);
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    await act(async () => {
+      ref.current.stop();
+    });
+
+    await act(async () => {
+      if (!lastEngine) {
+        throw new Error('Engine not initialized');
+      }
+      lastEngine.emit('audio', {
+        blockId: 'block-1',
+        audioBuffer: new ArrayBuffer(8),
+        voiceId: 'Zephyr',
+        speed: 1,
+        pitch: 0,
+        expressive: false
+      });
+    });
+
+    expect(ref.current.blockStatuses['block-1']).toBe('ready');
+
+    rerender(<Harness ref={ref} voiceConfigs={updatedVoices} />);
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    expect(ref.current.blockStatuses['block-1']).toBe('generating');
+  });
 });

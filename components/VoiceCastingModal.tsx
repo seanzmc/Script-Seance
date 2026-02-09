@@ -42,6 +42,7 @@ const AVAILABLE_VOICES_DATA: VoiceData[] = [
 
 const FILTERS = ['All', 'Masculine', 'Feminine', 'High Energy', 'Calm', 'Deep'];
 const LEGACY_VOICE_MAP = new Map(AVAILABLE_VOICES_DATA.map((voice) => [voice.id, voice]));
+const PLACEHOLDER_META = new Set(['unknown', 'general']);
 const formatTagLabel = (value: string) =>
   value
     .replace(/[_-]+/g, ' ')
@@ -49,16 +50,34 @@ const formatTagLabel = (value: string) =>
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ');
+const sanitizeMetaValue = (value?: string) => {
+  const normalized = value?.trim();
+  if (!normalized) return '';
+  if (PLACEHOLDER_META.has(normalized.toLowerCase())) return '';
+  return normalized;
+};
+const sanitizeMetaList = (values?: string[]) => {
+  const next = new Set<string>();
+  (values || []).forEach((value) => {
+    const normalized = sanitizeMetaValue(value)?.toLowerCase();
+    if (normalized) {
+      next.add(normalized);
+    }
+  });
+  return [...next];
+};
 
 const toVoiceData = (voice: TtsVoice): VoiceData => {
   const legacy = LEGACY_VOICE_MAP.get(voice.id);
-  const labels = voice.labels.length > 0 ? voice.labels : (legacy?.labels || []);
-  const tags = voice.tags && voice.tags.length > 0 ? voice.tags : labels;
+  const labels = sanitizeMetaList(voice.labels.length > 0 ? voice.labels : (legacy?.labels || []));
+  const tags = sanitizeMetaList(voice.tags && voice.tags.length > 0 ? voice.tags : labels);
+  const gender = sanitizeMetaValue(voice.gender || legacy?.gender);
+  const category = sanitizeMetaValue(voice.category || legacy?.category || (voice.isCustom ? 'Custom' : ''));
   return {
     id: voice.id,
     name: voice.displayName || legacy?.name || voice.id,
-    gender: voice.gender || legacy?.gender || 'Unknown',
-    category: voice.category || legacy?.category || (voice.isCustom ? 'Custom' : 'General'),
+    gender,
+    category,
     description: voice.description || legacy?.description || 'Inworld voice.',
     labels,
     tags,
@@ -248,18 +267,24 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                         <h3 className={`font-bold text-base truncate ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                           {voice.name}
                         </h3>
-                        <div className="flex gap-1.5 mt-1">
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            isSelected ? 'bg-indigo-500/30 text-indigo-300' : 'bg-gray-700 text-gray-400'
-                          }`}>
-                            {voice.gender}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            isSelected ? 'bg-indigo-500/30 text-indigo-300' : 'bg-gray-700 text-gray-400'
-                          }`}>
-                            {voice.category}
-                          </span>
-                        </div>
+                        {(voice.gender || voice.category) && (
+                          <div className="flex gap-1.5 mt-1">
+                            {voice.gender && (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                isSelected ? 'bg-indigo-500/30 text-indigo-300' : 'bg-gray-700 text-gray-400'
+                              }`}>
+                                {voice.gender}
+                              </span>
+                            )}
+                            {voice.category && (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                isSelected ? 'bg-indigo-500/30 text-indigo-300' : 'bg-gray-700 text-gray-400'
+                              }`}>
+                                {voice.category}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Right Indicator: Selected Check or Now Playing */}

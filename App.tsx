@@ -451,6 +451,7 @@ export default function App() {
     totalBufferedCount,
     blockStatuses,
     playScript, 
+    clearGeneratedAudio,
     playPreview, 
     stop,
     pause,
@@ -1070,13 +1071,26 @@ export default function App() {
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
     const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
+    let shouldClearGeneratedAudio = false;
     setVoiceConfigs(prev => {
       const normalized = normalizeCharacterName(char);
       const existingIdx = prev.findIndex(c => normalizeCharacterName(c.name) === normalized);
       if (existingIdx >= 0) {
         const updated = [...prev];
-        updated[existingIdx] = { ...updated[existingIdx], ...updates };
+        const current = updated[existingIdx];
+        const nextConfig = { ...current, ...updates };
+        const voiceChanged = typeof updates.voiceId === 'string' && updates.voiceId !== current.voiceId;
+        const expressiveChanged =
+          typeof updates.expressive === 'boolean' &&
+          Boolean(updates.expressive) !== Boolean(current.expressive);
+        if (voiceChanged || expressiveChanged) {
+          shouldClearGeneratedAudio = true;
+        }
+        updated[existingIdx] = nextConfig;
         return updated;
+      }
+      if (typeof updates.voiceId === 'string' || typeof updates.expressive === 'boolean') {
+        shouldClearGeneratedAudio = true;
       }
       return [...prev, { 
         name: char, 
@@ -1087,6 +1101,12 @@ export default function App() {
         ...updates 
       } as VoiceConfig];
     });
+    if (shouldClearGeneratedAudio && totalBufferedCount > 0) {
+      clearGeneratedAudio();
+      setToast({
+        message: `Voice updated for ${char}. Generated playback was cleared.`
+      });
+    }
   };
 
   const handleGlobalSpeedChange = (speed: number) => {
@@ -1275,6 +1295,11 @@ export default function App() {
       onNext={goToNext}
       onRetry={retryCurrentBlock}
       onSkip={skipCurrentBlock}
+      onRefreshAudio={() => playScript(allBlocks, { forceRegenerate: true })}
+      onPurgeAudio={() => {
+        clearGeneratedAudio({ clearGlobalCache: true });
+        setToast({ message: 'Generated playback audio cleared.' });
+      }}
       bufferedCount={bufferedBlocks}
       totalCount={totalBufferedBlocks}
       currentSpeaker={currentSpeaker}
