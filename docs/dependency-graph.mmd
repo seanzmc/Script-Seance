@@ -21,38 +21,38 @@ subgraph B["services"]
 C["gemini.ts"]
 K["scriptEngine.ts"]
 L["audioCache.ts"]
-N["auth.ts"]
-O["llmSceneAdapter.ts"]
+M["auth.ts"]
+19["llmSceneAdapter.ts"]
 end
 subgraph I["hooks"]
 J["useAudioPlayer.ts"]
-M["useGeneration.ts"]
+N["useGeneration.ts"]
 end
-P["index.tsx"]
-subgraph Q["server"]
-R["index.js"]
-subgraph S["llm"]
-T["routes.js"]
-U["config.js"]
-V["generation-service.js"]
-W["instrumentation.js"]
-subgraph X["prompts"]
-Y["builder.js"]
-13["templates.js"]
+O["index.tsx"]
+subgraph P["server"]
+Q["index.js"]
+subgraph R["llm"]
+S["routes.js"]
+T["config.js"]
+U["generation-service.js"]
+V["instrumentation.js"]
+subgraph W["prompts"]
+X["builder.js"]
+12["templates.js"]
 end
-subgraph Z["memory"]
-10["packer.js"]
-11["script-state.js"]
-12["tokenizer.js"]
+subgraph Y["memory"]
+Z["packer.js"]
+10["script-state.js"]
+11["tokenizer.js"]
 end
-subgraph 14["providers"]
-15["index.js"]
-16["gemini.js"]
-17["local.js"]
+subgraph 13["providers"]
+14["index.js"]
+15["gemini.js"]
+16["local.js"]
 end
-19["interfaces.js"]
+18["interfaces.js"]
 end
-18["ttsProviders.js"]
+17["ttsProviders.js"]
 end
 subgraph 1A["tests"]
 1B["audioCache.test.ts"]
@@ -80,9 +80,7 @@ end
 0-->G
 0-->J
 0-->M
-0-->N
 0-->C
-0-->O
 0-->7
 2-->3
 5-->3
@@ -109,38 +107,38 @@ J-->7
 K-->7
 K-->L
 K-->C
-O-->7
-P-->0
-R-->T
-R-->18
-T-->U
-T-->V
-T-->W
-T-->15
-V-->W
-V-->Y
-Y-->10
-Y-->13
-10-->11
-10-->12
-15-->16
-15-->17
-16-->12
-17-->12
+O-->0
+Q-->S
+Q-->17
+S-->T
+S-->U
+S-->V
+S-->14
+U-->V
+U-->X
+X-->Z
+X-->12
+Z-->10
+Z-->11
+14-->15
+14-->16
+15-->11
+16-->11
+19-->7
 1B-->L
 1C-->0
 1C-->D
 1C-->7
 1D-->C
 1D-->7
-1F-->10
-1G-->Y
-1I-->O
+1F-->Z
+1G-->X
+1I-->19
 1I-->7
 1K-->K
 1K-->7
-1L-->R
-1M-->18
+1L-->Q
+1M-->17
 1N-->J
 1N-->7
 1O-->H
