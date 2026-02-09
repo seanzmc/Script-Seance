@@ -114,9 +114,17 @@ const LEGACY_TTS_VOICES = [
 const LEGACY_VOICE_IDS = new Set(LEGACY_TTS_VOICES.map((voice) => voice.id));
 const TTS_PROVIDER_SET = new Set(['gemini', 'inworld', 'dual']);
 const AUDIO_FIELD_KEYS = ['audioBase64', 'audio_base64', 'audioContent', 'audio_content', 'audio'];
+const DISALLOWED_INWORLD_TAGS = new Set(['unknown', 'general']);
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 const asArray = (value) => (Array.isArray(value) ? value : []);
+const normalizeLanguageCode = (value) => normalizeString(value).toLowerCase();
+const isEnglishLanguageCode = (value) => {
+  const code = normalizeLanguageCode(value);
+  return code === 'en' || code.startsWith('en-');
+};
+const pruneInworldTags = (tags) =>
+  mergeUniqueLabels(tags).filter((tag) => !DISALLOWED_INWORLD_TAGS.has(tag));
 
 const normalizeTtsProvider = (value, fallback = 'dual') => {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -340,6 +348,25 @@ const parseInworldVoiceList = (payload) => {
   return [];
 };
 
+const isEnglishVoice = (voice) => {
+  if (!voice || typeof voice !== 'object') {
+    return false;
+  }
+  const language = normalizeString(voice.language);
+  if (isEnglishLanguageCode(language)) {
+    return true;
+  }
+  return asArray(voice.languages).some((entry) => isEnglishLanguageCode(entry));
+};
+
+const limitInworldVoices = (voices, maxCount = 20) => {
+  const normalizedMax = Number.isFinite(maxCount) && maxCount > 0
+    ? Math.floor(maxCount)
+    : 20;
+  const englishVoices = voices.filter((voice) => isEnglishVoice(voice));
+  return englishVoices.slice(0, normalizedMax);
+};
+
 const normalizeInworldVoice = (voice, source, isCustom) => {
   if (!voice || typeof voice !== 'object') {
     return null;
@@ -363,16 +390,18 @@ const normalizeInworldVoice = (voice, source, isCustom) => {
     languages[0] ||
     record.metadata?.language
   );
-  const gender = normalizeString(record.gender || record.metadata?.gender);
-  const category = normalizeString(record.category || record.style || record.metadata?.category);
+  const rawGender = normalizeString(record.gender || record.metadata?.gender);
+  const rawCategory = normalizeString(record.category || record.style || record.metadata?.category);
+  const gender = DISALLOWED_INWORLD_TAGS.has(rawGender.toLowerCase()) ? '' : rawGender;
+  const category = DISALLOWED_INWORLD_TAGS.has(rawCategory.toLowerCase()) ? '' : rawCategory;
   const description = normalizeString(record.description || record.summary || record.metadata?.description);
-  const tags = mergeUniqueLabels([
+  const tags = pruneInworldTags([
     ...(asArray(record.tags)),
     ...(asArray(record.labels)),
     ...(asArray(record.styles)),
     ...(asArray(record.metadata?.tags))
   ]);
-  const labels = mergeUniqueLabels([
+  const labels = pruneInworldTags([
     ...tags,
     ...(category ? [category] : []),
     ...(gender ? [gender] : [])
@@ -407,8 +436,8 @@ const dedupeVoices = (voices) => {
         merged[key] = value;
       }
     }
-    merged.labels = mergeUniqueLabels([...(prev.labels || []), ...(voice.labels || [])]);
-    merged.tags = mergeUniqueLabels([...(prev.tags || []), ...(voice.tags || [])]);
+    merged.labels = pruneInworldTags([...(prev.labels || []), ...(voice.labels || [])]);
+    merged.tags = pruneInworldTags([...(prev.tags || []), ...(voice.tags || [])]);
     byId.set(voice.id, merged);
   }
   return [...byId.values()];
@@ -425,6 +454,8 @@ export {
   extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
   parseInworldVoiceList,
+  isEnglishVoice,
+  limitInworldVoices,
   normalizeInworldVoice,
   dedupeVoices,
   isInworldVoiceFetchErrorRecoverable

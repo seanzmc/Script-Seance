@@ -13,6 +13,7 @@ import {
   extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
   parseInworldVoiceList,
+  limitInworldVoices,
   normalizeInworldVoice,
   dedupeVoices,
   isInworldVoiceFetchErrorRecoverable
@@ -49,6 +50,7 @@ const INWORLD_API_SECRET = process.env.INWORLD_API_SECRET || '';
 const INWORLD_WORKSPACE_ID = process.env.INWORLD_WORKSPACE_ID || '';
 const INWORLD_API_BASE = process.env.INWORLD_API_BASE || 'https://api.inworld.ai';
 const INWORLD_ENGINE_HOST = process.env.INWORLD_ENGINE_HOST || 'api-engine.inworld.ai';
+const INWORLD_MAX_ENGLISH_VOICES = parsePositiveInt(process.env.INWORLD_MAX_ENGLISH_VOICES, 20);
 const VOICE_CATALOG_CACHE_TTL_MS = parsePositiveInt(process.env.VOICE_CATALOG_CACHE_TTL_MS, 5 * 60 * 1000);
 const INWORLD_JWT_REFRESH_BUFFER_MS = parsePositiveInt(process.env.INWORLD_JWT_REFRESH_BUFFER_MS, 60 * 1000);
 const INWORLD_TOKEN_METHOD = 'ai.inworld.engine.WorldEngine/GenerateToken';
@@ -217,6 +219,16 @@ const getTtsProviderOrder = () => {
     return ['inworld'];
   }
   return ['inworld', 'gemini'];
+};
+
+const getTtsProviderOrderForVoice = (voiceName) => {
+  const baseOrder = getTtsProviderOrder();
+  const requestedVoice = typeof voiceName === 'string' ? voiceName.trim() : '';
+  if (!LEGACY_VOICE_IDS.has(requestedVoice)) {
+    return baseOrder;
+  }
+  const providers = ['gemini', ...baseOrder.filter((provider) => provider !== 'gemini')];
+  return [...new Set(providers)];
 };
 
 const createUpstreamError = (message, status, code, details) => {
@@ -472,11 +484,13 @@ const listInworldVoices = async () => {
     }
   }
 
-  const includeLegacyVoices = TTS_PROVIDER === 'dual';
+  const curatedInworldVoices = limitInworldVoices(
+    dedupeVoices([...premadeVoices, ...customVoices]),
+    INWORLD_MAX_ENGLISH_VOICES
+  );
   const merged = dedupeVoices([
-    ...premadeVoices,
-    ...customVoices,
-    ...(includeLegacyVoices ? LEGACY_TTS_VOICES : [])
+    ...curatedInworldVoices,
+    ...LEGACY_TTS_VOICES
   ]);
   voiceCatalogCache.expiresAt = now + VOICE_CATALOG_CACHE_TTL_MS;
   voiceCatalogCache.voices = merged;
@@ -581,7 +595,7 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
 };
 
 const generateSpeechByProvider = async (ai, text, voiceName, expressive = false) => {
-  const providers = getTtsProviderOrder();
+  const providers = getTtsProviderOrderForVoice(voiceName);
   const startedAt = Date.now();
   const errors = [];
 

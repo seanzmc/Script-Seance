@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
+  limitInworldVoices,
   normalizeInworldVoice,
   dedupeVoices
 } from '../server/ttsProviders.js';
@@ -91,5 +92,45 @@ describe('ttsProviders', () => {
     expect(merged[0].language).toBe('en-US');
     expect(merged[0].labels).toEqual(expect.arrayContaining(['calm', 'narrator']));
     expect(merged[0].tags).toEqual(expect.arrayContaining(['neutral', 'narrator']));
+  });
+
+  it('limits catalog to english voices and strips unknown/general tags', () => {
+    const voiceA = normalizeInworldVoice(
+      {
+        id: 'voice-a',
+        displayName: 'Voice A',
+        languages: ['en-US'],
+        tags: ['general', 'expressive'],
+        category: 'General',
+        gender: 'Unknown'
+      },
+      'inworld-premade',
+      false
+    );
+    const voiceB = normalizeInworldVoice(
+      {
+        id: 'voice-b',
+        displayName: 'Voice B',
+        languages: ['es-ES'],
+        tags: ['warm']
+      },
+      'inworld-premade',
+      false
+    );
+    const voiceC = normalizeInworldVoice(
+      {
+        id: 'voice-c',
+        displayName: 'Voice C',
+        language: 'en-GB',
+        tags: ['calm']
+      },
+      'inworld-premade',
+      false
+    );
+
+    const limited = limitInworldVoices([voiceA, voiceB, voiceC].filter(Boolean), 2);
+    expect(limited.map((voice) => voice.id)).toEqual(['voice-a', 'voice-c']);
+    expect(voiceA?.tags).toEqual(['expressive']);
+    expect(voiceA?.labels).toEqual(['expressive']);
   });
 });
