@@ -5,6 +5,7 @@ MODEL="${LLAMA_MODEL_PATH:-./models/Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf}"
 PORT="${LLAMA_PORT:-8080}"
 CTX="${LLAMA_CTX:-6144}"
 GPU="${LLAMA_GPU_LAYERS:-99}"
+FLASH_ATTN="${LLAMA_FLASH_ATTN:-auto}"
 
 if ! command -v llama-server &>/dev/null; then
   echo "llama-server not found."
@@ -23,6 +24,7 @@ echo "Model: $MODEL"
 echo "Port : $PORT"
 echo "Ctx  : $CTX"
 echo "GPU  : $GPU layers"
+echo "FA   : $FLASH_ATTN"
 
 exec llama-server \
   --model "$MODEL" \
@@ -32,4 +34,4 @@ exec llama-server \
   --threads 8 \
   --parallel 1 \
   --cont-batching \
-  --flash-attn
+  --flash-attn "$FLASH_ATTN"

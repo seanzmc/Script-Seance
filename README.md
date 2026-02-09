@@ -69,6 +69,12 @@ brew install llama.cpp
 pip install "huggingface-hub[cli]"
 ```
 
+Authenticate once:
+
+```bash
+hf auth login
+```
+
 3. Download default model (Llama 3.1 8B Instruct Q5_K_M):
 
 ```bash
@@ -87,6 +93,18 @@ bash scripts/start-llama-server.sh
 LLM_PROVIDER=local
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8080
 LOCAL_LLM_MODEL=default
+```
+
+6. Verify local LLM server:
+
+```bash
+pnpm llm:check-server
+```
+
+7. Run authenticated end-to-end smoke test against `/api/llm/generate`:
+
+```bash
+ADMIN_PASSWORD=your_admin_password pnpm llm:smoke
 ```
 
 ## Local Development

@@ -8,6 +8,12 @@ DEST="./models"
 mkdir -p "$DEST"
 
 echo "Downloading $FILE from $REPO to $DEST/"
-huggingface-cli download "$REPO" "$FILE" --local-dir "$DEST"
+if ! command -v hf &>/dev/null; then
+  echo "hf CLI not found."
+  echo "Install with: pip install \"huggingface-hub[cli]\""
+  exit 1
+fi
+
+hf download "$REPO" "$FILE" --local-dir "$DEST"
 
 echo "Done. Model path: $DEST/$FILE"

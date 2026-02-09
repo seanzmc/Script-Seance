@@ -15,6 +15,12 @@ import {
   generateScriptElement,
   listVoices
 } from './services/gemini';
+import { useGeneration } from './hooks/useGeneration';
+import {
+  buildContinueGenerationInput,
+  extractSceneHeading,
+  parseGeneratedSceneText
+} from './services/llmSceneAdapter';
 import { getSession, login } from './services/auth';
 import {
   Scene,
@@ -152,6 +158,14 @@ const buildTitleContext = (setup: SetupFormState) => {
   return parts.join(' ');
 };
 
+const buildFallbackSceneHeading = (context: StoryContext) => {
+  const lastHeading = context.scenes[context.scenes.length - 1]?.heading?.trim();
+  if (lastHeading) {
+    return lastHeading.toUpperCase();
+  }
+  return 'INT. UNKNOWN - DAY';
+};
+
 export const buildScriptTextExport = (scenes: Scene[]) => (
   scenes
     .map(scene => {
@@ -231,6 +245,10 @@ export default function App() {
   const didHydrateDraftRef = useRef(false);
   const lastNonPrivacyPathRef = useRef('/');
   const autosaveFailureNotifiedRef = useRef(false);
+  const cancelStreamingRef = useRef(false);
+  const activeStreamingSceneIdRef = useRef<string | null>(null);
+
+  const { streamGenerate, cancel: cancelStreamGeneration } = useGeneration();
 
   const canRedo = redoCount > 0;
   const canUndo = undoCount > 0;
@@ -413,13 +431,25 @@ export default function App() {
   }, []);
 
   const cancelAiRequest = useCallback(() => {
+    cancelStreamingRef.current = true;
+    cancelStreamGeneration();
     if (activeAiRequestRef.current) {
       activeAiRequestRef.current.cancel();
       activeAiRequestRef.current = null;
     }
+    if (activeStreamingSceneIdRef.current) {
+      const streamingSceneId = activeStreamingSceneIdRef.current;
+      setContext(prev => {
+        if (!prev) return prev;
+        const nextScenes = prev.scenes.filter(scene => scene.id !== streamingSceneId);
+        if (nextScenes.length === prev.scenes.length) return prev;
+        return { ...prev, scenes: nextScenes };
+      });
+      activeStreamingSceneIdRef.current = null;
+    }
     setIsGenerating(false);
     setError(null);
-  }, []);
+  }, [cancelStreamGeneration]);
 
   const openPrivacy = () => {
     if (typeof window === 'undefined') return;
@@ -786,29 +816,132 @@ export default function App() {
 
   const handleGenerateNext = async () => {
     if (!context || isGenerating) return;
-    let request: CancellableRequest<Scene> | null = null;
+
+    const prompt = userInstruction || "Continue the story logically.";
+    const contextSnapshot = context;
+    const fallbackHeading = buildFallbackSceneHeading(contextSnapshot);
+    const streamingSceneId = crypto.randomUUID();
+    const streamingBlockId = crypto.randomUUID();
+
+    const updateStreamingScene = (partialText: string, heading: string) => {
+      setContext(prev => {
+        if (!prev) return prev;
+        const sceneIndex = prev.scenes.findIndex(scene => scene.id === streamingSceneId);
+        if (sceneIndex === -1) return prev;
+        const nextScenes = [...prev.scenes];
+        nextScenes[sceneIndex] = {
+          ...nextScenes[sceneIndex],
+          heading,
+          summary: 'Generating scene...',
+          blocks: [
+            {
+              id: streamingBlockId,
+              type: BlockType.ACTION,
+              text: partialText || ' '
+            }
+          ]
+        };
+        return { ...prev, scenes: nextScenes };
+      });
+    };
+
     try {
       clearRedo();
-      const prompt = userInstruction || "Continue the story logically.";
-      request = createGenerateSceneRequest(context, prompt, false);
-      startAiRequest(request);
-      const nextScene = await request.promise;
-      const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
-      const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
+
+      cancelStreamingRef.current = false;
+      activeStreamingSceneIdRef.current = streamingSceneId;
+      setIsGenerating(true);
+      setError(null);
+
       setContext(prev => {
         if (!prev) return null;
-        const updatedScenes = [...prev.scenes, normalizedScene];
-        return { ...prev, scenes: updatedScenes };
+        return {
+          ...prev,
+          scenes: [
+            ...prev.scenes,
+            {
+              id: streamingSceneId,
+              heading: fallbackHeading,
+              summary: 'Generating scene...',
+              blocks: [
+                {
+                  id: streamingBlockId,
+                  type: BlockType.ACTION,
+                  text: ' '
+                }
+              ]
+            }
+          ]
+        };
       });
+      setInsertScrollTargetId(streamingBlockId);
+      setInsertScrollToken(token => token + 1);
+
+      const streamInput = buildContinueGenerationInput(
+        contextSnapshot,
+        prompt,
+        setupState.style
+      );
+
+      const finalText = await streamGenerate(streamInput, (partialText) => {
+        const partialHeading = extractSceneHeading(partialText) || fallbackHeading;
+        updateStreamingScene(partialText, partialHeading);
+      });
+
+      if (cancelStreamingRef.current) {
+        setContext(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scenes: prev.scenes.filter(scene => scene.id !== streamingSceneId)
+          };
+        });
+        return;
+      }
+
+      if (!finalText.trim()) {
+        throw new Error('Model returned empty scene output.');
+      }
+
+      const parsedScene = parseGeneratedSceneText(finalText, {
+        fallbackHeading,
+        summaryHint: prompt
+      });
+
+      const finalizedScene = normalizeSceneCharacters(
+        { ...parsedScene, id: streamingSceneId },
+        contextSnapshot.characters
+      );
+
+      const lastBlockId = finalizedScene.blocks[finalizedScene.blocks.length - 1]?.id;
+      setContext(prev => {
+        if (!prev) return prev;
+        const sceneIndex = prev.scenes.findIndex(scene => scene.id === streamingSceneId);
+        const nextScenes = [...prev.scenes];
+        if (sceneIndex === -1) {
+          nextScenes.push(finalizedScene);
+        } else {
+          nextScenes[sceneIndex] = finalizedScene;
+        }
+        return { ...prev, scenes: nextScenes };
+      });
+
       setInsertScrollTargetId(lastBlockId ?? 'bottom');
       setInsertScrollToken(token => token + 1);
       setUserInstruction('');
     } catch (err: unknown) {
+      setContext(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scenes: prev.scenes.filter(scene => scene.id !== streamingSceneId)
+        };
+      });
       handleAiError(err, 'Failed to generate scene.');
     } finally {
-      if (request) {
-        finishAiRequest(request);
-      }
+      activeStreamingSceneIdRef.current = null;
+      cancelStreamingRef.current = false;
+      setIsGenerating(false);
     }
   };
 
