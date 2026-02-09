@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BlockType, StoryContext, ScriptBlock } from '../types';
+import { StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
@@ -7,7 +7,6 @@ import { SetupForm, SetupFormState } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { TitleEditModal } from './TitleEditModal';
 import { AlertCircle, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
-import { generateScriptElement } from '../services/gemini';
 
 export interface InsertTarget {
   sceneId: string;
@@ -45,7 +44,6 @@ export interface ScriptPaneProps {
   onSelectInsertTarget: (target: InsertTarget) => void;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   onInsertError: (error: unknown) => void;
-  onInsertAtTarget?: (target: InsertTarget, block: ScriptBlock) => void;
   onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
   onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
@@ -104,7 +102,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onSelectInsertTarget,
   onChangeSpeaker,
   onInsertError,
-  onInsertAtTarget,
   onRegenerate,
   onToggleLock,
   isGenerating,
@@ -139,8 +136,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [titleDraft, setTitleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
-  const [surpriseDraft, setSurpriseDraft] = useState('');
-  const [isSurpriseGenerating, setIsSurpriseGenerating] = useState(false);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -174,57 +169,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     </div>
   ) : null;
 
-  useEffect(() => {
-    if (!context) {
-      setSurpriseDraft('');
-    }
-  }, [context]);
-
   const handleStartSetupClick = () => {
     onOpenSetup();
-  };
-  const isSurpriseDraftReady = Boolean(surpriseDraft.trim());
-  const surpriseApplyLabel = insertTarget ? 'Insert at Selection' : 'Add to Script';
-  const handleGenerateSurpriseDraft = async () => {
-    if (!context || isSurpriseGenerating || isGenerating) return;
-    setIsSurpriseGenerating(true);
-    const promptContext = styleContext?.trim() ? styleContext : context.genre;
-    const instruction = userInstruction.trim()
-      ? `Surprise me with the next beat. Prompt: ${userInstruction.trim()}`
-      : 'Surprise me with a cinematic beat for the next moment.';
-
-    try {
-      const generatedText = await generateScriptElement(
-        BlockType.ACTION,
-        undefined,
-        instruction,
-        promptContext
-      );
-      if (generatedText.trim()) {
-        setSurpriseDraft(generatedText.trim());
-      }
-    } catch (err) {
-      console.error('Surprise draft generation failed', err);
-      onInsertError(err);
-    } finally {
-      setIsSurpriseGenerating(false);
-    }
-  };
-  const handleApplySurprise = () => {
-    const trimmedDraft = surpriseDraft.trim();
-    if (!trimmedDraft) return;
-    const block: ScriptBlock = {
-      id: crypto.randomUUID(),
-      type: BlockType.ACTION,
-      text: trimmedDraft
-    };
-    if (insertTarget && onInsertAtTarget) {
-      onInsertAtTarget(insertTarget, block);
-      setSurpriseDraft('');
-      return;
-    }
-    onAddBlock(block);
-    setSurpriseDraft('');
   };
   const startScreenCard = (
     <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]">
@@ -311,56 +257,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <PlusCircle className="w-4 h-4 mr-2" />
             Generate Next
           </Button>
-        </div>
-      </section>
-      <section className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-800 pt-3">
-          <div className="space-y-0.5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Surprise Draft</p>
-            <p className="text-[10px] text-gray-500">Playful one-click draft. Tweak, then apply.</p>
-          </div>
-          <Button
-            onClick={handleGenerateSurpriseDraft}
-            variant="secondary"
-            size="sm"
-            loading={isSurpriseGenerating}
-            disabled={isGenerating || isPlaying}
-            title="Generate a surprise draft without committing"
-          >
-            <Sparkles className="w-3 h-3 mr-2" />
-            {isSurpriseDraftReady ? 'Remix' : 'Surprise'}
-          </Button>
-        </div>
-        <div className="space-y-2">
-          <textarea
-            value={surpriseDraft}
-            onChange={(e) => setSurpriseDraft(e.target.value)}
-            placeholder="Surprise text will appear here..."
-            className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
-          />
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-[10px] text-gray-500">
-              {insertTarget ? 'Will apply at current insertion target.' : 'No insert target selected. Will append to end.'}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                onClick={handleApplySurprise}
-                size="sm"
-                disabled={!isSurpriseDraftReady}
-                title="Apply this surprise draft"
-              >
-                {surpriseApplyLabel}
-              </Button>
-              <Button
-                onClick={() => setSurpriseDraft('')}
-                variant="ghost"
-                size="sm"
-                disabled={!isSurpriseDraftReady}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
       {generationIndicator}

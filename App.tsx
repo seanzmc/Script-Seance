@@ -921,12 +921,6 @@ export default function App() {
     setInsertTarget(null);
   }, [clearRedo, pushUndoAction]);
 
-  const handleInsertAtTarget = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
-    setInsertScrollTargetId(block.id);
-    setInsertScrollToken(token => token + 1);
-    handleInsertAfter(target, block);
-  }, [handleInsertAfter]);
-
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
     setInsertScrollTargetId(pendingInsertBlock.id);
@@ -1350,7 +1344,6 @@ export default function App() {
         onSelectInsertTarget={handleSelectInsertTarget}
         onChangeSpeaker={handleChangeSpeaker}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
-        onInsertAtTarget={handleInsertAtTarget}
         onRegenerate={handleRegenerateBlock}
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
