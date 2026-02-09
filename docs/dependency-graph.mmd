@@ -25,21 +25,49 @@ M["auth.ts"]
 end
 subgraph I["hooks"]
 J["useAudioPlayer.ts"]
+N["useGeneration.ts"]
 end
-N["index.tsx"]
-subgraph O["server"]
-P["index.js"]
-Q["ttsProviders.js"]
+O["index.tsx"]
+subgraph P["server"]
+Q["index.js"]
+subgraph R["llm"]
+S["routes.js"]
+T["config.js"]
+U["generation-service.js"]
+V["instrumentation.js"]
+subgraph W["prompts"]
+X["builder.js"]
+12["templates.js"]
 end
-subgraph R["tests"]
-S["audioCache.test.ts"]
-T["exportAndSetup.test.tsx"]
-U["gemini.test.ts"]
-V["scriptEngine.test.ts"]
-W["serverReliability.test.ts"]
-X["ttsProviders.test.ts"]
-Y["useAudioPlayer.test.tsx"]
-Z["voiceManager.test.tsx"]
+subgraph Y["memory"]
+Z["packer.js"]
+10["script-state.js"]
+11["tokenizer.js"]
+end
+subgraph 13["providers"]
+14["index.js"]
+15["gemini.js"]
+16["local.js"]
+end
+18["interfaces.js"]
+end
+17["ttsProviders.js"]
+end
+subgraph 19["tests"]
+1A["audioCache.test.ts"]
+1B["exportAndSetup.test.tsx"]
+1C["gemini.test.ts"]
+subgraph 1D["llm"]
+1E["memory-packer.test.ts"]
+1F["prompt-builder.test.ts"]
+1G["provider-mock.test.ts"]
+1H["streaming-parser.test.ts"]
+end
+1I["scriptEngine.test.ts"]
+1J["serverReliability.test.ts"]
+1K["ttsProviders.test.ts"]
+1L["useAudioPlayer.test.tsx"]
+1M["voiceManager.test.tsx"]
 end
 0-->2
 0-->4
@@ -77,18 +105,35 @@ J-->7
 K-->7
 K-->L
 K-->C
-N-->0
-P-->Q
-S-->L
-T-->0
-T-->D
-T-->7
-U-->C
-U-->7
-V-->K
-V-->7
-W-->P
-X-->Q
-Y-->J
-Y-->7
-Z-->H
+O-->0
+Q-->S
+Q-->17
+S-->T
+S-->U
+S-->V
+S-->14
+U-->V
+U-->X
+X-->Z
+X-->12
+Z-->10
+Z-->11
+14-->15
+14-->16
+15-->11
+16-->11
+1A-->L
+1B-->0
+1B-->D
+1B-->7
+1C-->C
+1C-->7
+1E-->Z
+1F-->X
+1I-->K
+1I-->7
+1J-->Q
+1K-->17
+1L-->J
+1L-->7
+1M-->H
