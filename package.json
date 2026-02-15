@@ -7,7 +7,7 @@
     "scripts": {
         "server": "node server/index.js",
         "dev": "vite",
-        "start": "concurrently -k -n server,client -c green,cyan \"pnpm run server\" \"pnpm run dev\"",
+        "start": "bash scripts/start-stack.sh",
         "llm:download-model": "bash scripts/download-model.sh",
         "llm:start-server": "bash scripts/start-llama-server.sh",
         "llm:check-server": "bash scripts/check-llama-server.sh",

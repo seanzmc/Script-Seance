@@ -2,7 +2,16 @@
 set -euo pipefail
 
 MODEL="${LLAMA_MODEL_PATH:-./models/Qwen2.5-32B-Instruct-Q4_K_M.gguf}"
-PORT="${LLAMA_PORT:-8080}"
+BASE_URL="${LOCAL_LLM_BASE_URL:-http://127.0.0.1:8080}"
+
+DEFAULT_PORT="8080"
+if [ -n "${LLAMA_PORT:-}" ]; then
+  PORT="${LLAMA_PORT}"
+else
+  PARSED_PORT="$(printf '%s' "$BASE_URL" | sed -nE 's#^https?://[^:/]+:([0-9]+).*$#\1#p')"
+  PORT="${PARSED_PORT:-$DEFAULT_PORT}"
+fi
+
 CTX="${LLAMA_CTX:-32768}"
 GPU="${LLAMA_GPU_LAYERS:-99}"
 FLASH_ATTN="${LLAMA_FLASH_ATTN:-auto}"
