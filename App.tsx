@@ -8,13 +8,16 @@ import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
 import { PrivacyModal } from './components/PrivacyModal';
 import {
-  createGenerateSceneRequest,
-  createSuggestPlotTwistRequest,
-  createRegenerateScriptBlockRequest,
-  CancellableRequest,
-  generateScriptElement,
   listVoices
 } from './services/gemini';
+import { useGeneration } from './hooks/useGeneration';
+import {
+  buildContinueGenerationInput,
+  buildNewScriptInput,
+  buildRegenerateInput,
+  buildSurpriseInput,
+  parseGeneratedSceneText
+} from './services/llmSceneAdapter';
 import { getSession, login } from './services/auth';
 import {
   Scene,
@@ -152,6 +155,12 @@ const buildTitleContext = (setup: SetupFormState) => {
   return parts.join(' ');
 };
 
+const buildFallbackHeading = (genre: string, sceneNumber: number) => {
+  const genreToken = genre.trim() ? genre.trim().toUpperCase().replace(/[^A-Z0-9]+/g, ' ') : 'UNKNOWN';
+  const timeOfDay = sceneNumber % 2 === 0 ? 'NIGHT' : 'DAY';
+  return `INT. ${genreToken} LOCATION - ${timeOfDay}`;
+};
+
 export const buildScriptTextExport = (scenes: Scene[]) => (
   scenes
     .map(scene => {
@@ -183,7 +192,8 @@ export const buildScriptTextExport = (scenes: Scene[]) => (
 export default function App() {
   // State
   const [context, setContext] = useState<StoryContext | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { isGenerating, streamGenerate, cancel: cancelGeneration } = useGeneration();
+  const { streamGenerate: streamGenerateTitle, cancel: cancelTitleGeneration } = useGeneration();
   const [voiceConfigs, setVoiceConfigs] = useState<VoiceConfig[]>([]);
   const [availableVoices, setAvailableVoices] = useState<TtsVoice[]>([]);
   const [voiceCatalogState, setVoiceCatalogState] = useState<VoiceCatalogState>('idle');
@@ -198,7 +208,7 @@ export default function App() {
   const [suggestedTitle, setSuggestedTitle] = useState<string | null>(null);
   const [isSuggestingTitle, setIsSuggestingTitle] = useState(false);
   const [suggestedTitleDismissed, setSuggestedTitleDismissed] = useState(false);
-  const activeAiRequestRef = useRef<CancellableRequest<unknown> | null>(null);
+  const activeGenerationRunIdRef = useRef(0);
   const titleSuggestionTokenRef = useRef(0);
   const hasManualTitleRef = useRef(false);
 
@@ -396,30 +406,26 @@ export default function App() {
     setToast({ message: `Audio failed for ${label}${detail}` });
   }, []);
 
-  const startAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
-    if (activeAiRequestRef.current) {
-      activeAiRequestRef.current.cancel();
-    }
-    activeAiRequestRef.current = request as CancellableRequest<unknown>;
-    setIsGenerating(true);
+  const beginGenerationRun = useCallback(() => {
+    const runId = activeGenerationRunIdRef.current + 1;
+    activeGenerationRunIdRef.current = runId;
     setError(null);
+    return runId;
   }, []);
 
-  const finishAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
-    if (activeAiRequestRef.current === request) {
-      activeAiRequestRef.current = null;
-      setIsGenerating(false);
-    }
-  }, []);
+  const isGenerationRunCurrent = useCallback(
+    (runId: number) => activeGenerationRunIdRef.current === runId,
+    []
+  );
 
   const cancelAiRequest = useCallback(() => {
-    if (activeAiRequestRef.current) {
-      activeAiRequestRef.current.cancel();
-      activeAiRequestRef.current = null;
-    }
-    setIsGenerating(false);
+    activeGenerationRunIdRef.current += 1;
+    titleSuggestionTokenRef.current += 1;
+    void cancelGeneration();
+    void cancelTitleGeneration();
+    setIsSuggestingTitle(false);
     setError(null);
-  }, []);
+  }, [cancelGeneration, cancelTitleGeneration]);
 
   const openPrivacy = () => {
     if (typeof window === 'undefined') return;
@@ -701,13 +707,21 @@ export default function App() {
     titleSuggestionTokenRef.current = token;
     setIsSuggestingTitle(true);
     try {
-      const contextText = buildTitleContext(setup);
       const instruction = [
         'Create a concise, evocative screenplay title (2-6 words).',
         'Return only the title text, no quotes.',
         'Avoid scene headings like INT./EXT.'
       ].join(' ');
-      const rawTitle = await generateScriptElement(BlockType.ACTION, undefined, instruction, contextText);
+      const titleSeedContext: StoryContext = {
+        title: 'Untitled Screenplay',
+        genre: setup.genre,
+        premise: setup.premise,
+        characters: setup.characters.map((character) => character.trim()).filter(Boolean),
+        scenes: []
+      };
+      const rawTitle = await streamGenerateTitle(
+        buildNewScriptInput(titleSeedContext, `${buildTitleContext(setup)}\n\n${instruction}`)
+      );
       if (titleSuggestionTokenRef.current !== token) return;
       const cleanedTitle = sanitizeSuggestedTitle(rawTitle);
       const finalTitle = cleanedTitle || buildFallbackTitle(setup.premise, setup.genre);
@@ -727,7 +741,7 @@ export default function App() {
         setIsSuggestingTitle(false);
       }
     }
-  }, []);
+  }, [streamGenerateTitle]);
 
   // Handlers
   const handleStart = async () => {
@@ -739,8 +753,8 @@ export default function App() {
       setError('Add at least one character before generating a script.');
       return;
     }
-    let request: CancellableRequest<Scene> | null = null;
     try {
+      const runId = beginGenerationRun();
       closeSetup();
       resetUndoRedo();
       resetTitleSuggestionState();
@@ -760,14 +774,19 @@ export default function App() {
         title: DEFAULT_TITLE,
         scenes: [] 
       };
-      request = createGenerateSceneRequest(
-        initialContext,
-        instruction,
-        true
+      const generatedText = await streamGenerate(buildNewScriptInput(initialContext, instruction));
+      if (!isGenerationRunCurrent(runId)) return;
+      if (!generatedText.trim()) return;
+
+      const parsedScene = parseGeneratedSceneText(generatedText, {
+        fallbackHeading: buildFallbackHeading(initialContext.genre, 1),
+        summaryHint: instruction,
+        characters: initialContext.characters
+      });
+      const normalizedFirstScene = normalizeSceneCharacters(
+        { id: crypto.randomUUID(), ...parsedScene },
+        initialContext.characters
       );
-      startAiRequest(request);
-      const firstScene = await request.promise;
-      const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
       const initialLastBlockId = normalizedFirstScene.blocks[normalizedFirstScene.blocks.length - 1]?.id;
       setContext({
         ...initialContext,
@@ -777,23 +796,30 @@ export default function App() {
       setInsertScrollToken(token => token + 1);
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
-    } finally {
-      if (request) {
-        finishAiRequest(request);
-      }
     }
   };
 
   const handleGenerateNext = async () => {
     if (!context || isGenerating) return;
-    let request: CancellableRequest<Scene> | null = null;
     try {
+      const runId = beginGenerationRun();
       clearRedo();
       const prompt = userInstruction || "Continue the story logically.";
-      request = createGenerateSceneRequest(context, prompt, false);
-      startAiRequest(request);
-      const nextScene = await request.promise;
-      const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
+      const generatedText = await streamGenerate(
+        buildContinueGenerationInput(context, prompt, setupState.style.trim() || undefined)
+      );
+      if (!isGenerationRunCurrent(runId)) return;
+      if (!generatedText.trim()) return;
+
+      const parsedScene = parseGeneratedSceneText(generatedText, {
+        fallbackHeading: buildFallbackHeading(context.genre, context.scenes.length + 1),
+        summaryHint: prompt,
+        characters: context.characters
+      });
+      const normalizedScene = normalizeSceneCharacters(
+        { id: crypto.randomUUID(), ...parsedScene },
+        context.characters
+      );
       setContext(prev => {
         if (!prev) return null;
         const updatedScenes = [...prev.scenes, normalizedScene];
@@ -804,28 +830,38 @@ export default function App() {
       setUserInstruction('');
     } catch (err: unknown) {
       handleAiError(err, 'Failed to generate scene.');
-    } finally {
-      if (request) {
-        finishAiRequest(request);
-      }
     }
   };
 
   const handleTwist = async () => {
     if (!context || isGenerating) return;
-    let request: CancellableRequest<string> | null = null;
     try {
-      request = createSuggestPlotTwistRequest(context.genre);
-      startAiRequest(request);
-      const twist = await request.promise;
-      setUserInstruction(`PLOT TWIST: ${twist}`);
+      const runId = beginGenerationRun();
+      clearRedo();
+      const generatedText = await streamGenerate(
+        buildSurpriseInput(context, setupState.style.trim() || undefined)
+      );
+      if (!isGenerationRunCurrent(runId)) return;
+      if (!generatedText.trim()) return;
+
+      const parsedScene = parseGeneratedSceneText(generatedText, {
+        fallbackHeading: buildFallbackHeading(context.genre, context.scenes.length + 1),
+        summaryHint: 'Unexpected development',
+        characters: context.characters
+      });
+      const twistScene = normalizeSceneCharacters(
+        { id: crypto.randomUUID(), ...parsedScene },
+        context.characters
+      );
+      setContext(prev => {
+        if (!prev) return prev;
+        return { ...prev, scenes: [...prev.scenes, twistScene] };
+      });
+      setInsertScrollTargetId(`scene:${twistScene.id}`);
+      setInsertScrollToken(token => token + 1);
     } catch (err: unknown) {
       console.error(err);
       handleAiError(err, 'Failed to generate plot twist.');
-    } finally {
-      if (request) {
-        finishAiRequest(request);
-      }
     }
   };
 
@@ -996,11 +1032,12 @@ export default function App() {
 
   const resetTitleSuggestionState = useCallback(() => {
     titleSuggestionTokenRef.current += 1;
+    void cancelTitleGeneration();
     hasManualTitleRef.current = false;
     setSuggestedTitle(null);
     setSuggestedTitleDismissed(false);
     setIsSuggestingTitle(false);
-  }, []);
+  }, [cancelTitleGeneration]);
 
   const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string, rewriteGuidance?: string) => {
     if (!context || isGenerating) return;
@@ -1012,11 +1049,13 @@ export default function App() {
 
     const originalText = block.text;
 
-    let request: CancellableRequest<string> | null = null;
     try {
-      request = createRegenerateScriptBlockRequest(block, context.genre, context.premise, rewriteGuidance);
-      startAiRequest(request);
-      const newText = await request.promise;
+      const runId = beginGenerationRun();
+      const generatedText = await streamGenerate(
+        buildRegenerateInput(context, sceneId, blockId, block, rewriteGuidance)
+      );
+      if (!isGenerationRunCurrent(runId)) return;
+      const newText = generatedText.trim() || originalText;
       
       // Update state
       clearRedo();
@@ -1054,12 +1093,8 @@ export default function App() {
     } catch (err: unknown) {
       console.error(err);
       handleAiError(err, "Failed to regenerate block.");
-    } finally {
-      if (request) {
-        finishAiRequest(request);
-      }
     }
-  }, [clearRedo, context, finishAiRequest, handleAiError, isGenerating, startAiRequest]);
+  }, [beginGenerationRun, clearRedo, context, handleAiError, isGenerating, isGenerationRunCurrent, streamGenerate]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);

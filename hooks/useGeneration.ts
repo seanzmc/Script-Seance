@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import type { GenerateInput } from '../services/llmSceneAdapter';
 
 interface StreamEvent {
   type: 'token' | 'done' | 'error';
@@ -34,13 +35,6 @@ export interface GenerationHookState {
     completionTokens?: number;
     totalTokens?: number;
   } | null;
-}
-
-export interface GenerateInput {
-  action: unknown;
-  scriptState: unknown;
-  blocks: unknown[];
-  callbackNotes?: string[];
 }
 
 const API = '/api/llm';

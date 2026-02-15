@@ -125,6 +125,21 @@ describe('buildPrompt', () => {
     expect(userMessage?.content).toContain('noir detective');
   });
 
+  it('uses start template alias', () => {
+    const result = buildPrompt(
+      {
+        action: { type: 'start', instruction: 'A contained sci-fi thriller' },
+        scriptState: state(),
+        blocks: []
+      },
+      cfg()
+    );
+
+    const userMessage = result.messages.find((message) => message.role === 'user');
+    expect(userMessage?.content).toContain('opening');
+    expect(userMessage?.content).toContain('sci-fi thriller');
+  });
+
   it('uses surprise-me template', () => {
     const result = buildPrompt(
       {
@@ -138,5 +153,36 @@ describe('buildPrompt', () => {
     const userMessage = result.messages.find((message) => message.role === 'user');
     expect(userMessage?.content).toContain('unexpected');
     expect(userMessage?.content).toContain('dark twist');
+  });
+
+  it('uses surprise template alias', () => {
+    const result = buildPrompt(
+      {
+        action: { type: 'surprise', styleHint: 'bleak suspense' },
+        scriptState: state(),
+        blocks: []
+      },
+      cfg()
+    );
+
+    const userMessage = result.messages.find((message) => message.role === 'user');
+    expect(userMessage?.content).toContain('unexpected');
+    expect(userMessage?.content).toContain('bleak suspense');
+  });
+
+  it('uses surprise-setup template', () => {
+    const result = buildPrompt(
+      {
+        action: { type: 'surprise-setup', genreHint: 'Noir' },
+        scriptState: state(),
+        blocks: []
+      },
+      cfg()
+    );
+
+    const userMessage = result.messages.find((message) => message.role === 'user');
+    expect(userMessage?.content).toContain('JSON');
+    expect(userMessage?.content).toContain('genre');
+    expect(userMessage?.content).toContain('Noir');
   });
 });

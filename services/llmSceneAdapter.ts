@@ -30,16 +30,64 @@ export interface LLMScriptState {
   totalScenes: number;
 }
 
+export interface StartAction {
+  type: 'start';
+  instruction?: string;
+}
+
 export interface ContinueAction {
   type: 'continue';
   instruction?: string;
 }
 
-export interface LLMContinueInput {
-  action: ContinueAction;
+export interface InsertAction {
+  type: 'insert';
+  sceneId?: string;
+  insertAfterBlockId: string;
+  blockType?: LLMBlockType;
+  instruction?: string;
+  styleContext?: string;
+  insertAfterContext?: string;
+}
+
+export interface RegenerateAction {
+  type: 'regenerate';
+  sceneId?: string;
+  blockId: string;
+  instruction?: string;
+  rewriteGuidance?: string;
+  blockToReplace?: string;
+}
+
+export interface SurpriseAction {
+  type: 'surprise';
+  styleHint?: string;
+  instruction?: string;
+}
+
+export interface SurpriseSetupAction {
+  type: 'surprise-setup';
+  genreHint?: string;
+  instruction?: string;
+}
+
+export type LLMGenerationAction =
+  | StartAction
+  | ContinueAction
+  | InsertAction
+  | RegenerateAction
+  | SurpriseAction
+  | SurpriseSetupAction;
+
+export interface GenerateInput {
+  action: LLMGenerationAction;
   scriptState: LLMScriptState;
   blocks: LLMSceneBlock[];
   callbackNotes: string[];
+}
+
+export interface LLMContinueInput extends GenerateInput {
+  action: ContinueAction;
 }
 
 const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.|EST\.)/i;
@@ -83,6 +131,123 @@ const mapBlockType = (block: ScriptBlock): LLMBlockType => {
       return 'action';
   }
 };
+
+const flattenBlocks = (context: StoryContext): LLMSceneBlock[] => {
+  const flattenedBlocks: LLMSceneBlock[] = [];
+
+  context.scenes.forEach((scene, sceneIndex) => {
+    if (scene.heading?.trim()) {
+      flattenedBlocks.push({
+        id: `${scene.id}-heading`,
+        type: 'scene-heading',
+        content: scene.heading.trim(),
+        sceneIndex
+      });
+    }
+
+    scene.blocks.forEach((block) => {
+      const mappedType = mapBlockType(block);
+      const content = mappedType === 'dialogue' ? formatDialogueContent(block) : block.text?.trim() ?? '';
+
+      if (!content) return;
+
+      flattenedBlocks.push({
+        id: block.id,
+        type: mappedType,
+        content,
+        sceneIndex
+      });
+    });
+  });
+
+  return flattenedBlocks;
+};
+
+const buildPlotThreads = (context: StoryContext) => {
+  const threads = context.scenes
+    .slice(-5)
+    .map((scene, index) => ({
+      id: `thread-${index}`,
+      description: scene.summary?.trim() || `Scene ${context.scenes.length - (4 - index)} progression`,
+      status: 'active' as const
+    }));
+
+  if (threads.length === 0 && context.premise.trim()) {
+    threads.push({
+      id: 'thread-0',
+      description: context.premise.trim(),
+      status: 'active'
+    });
+  }
+
+  return threads;
+};
+
+const buildCanonFacts = (context: StoryContext) => {
+  const facts = context.scenes
+    .slice(-8)
+    .map((scene) => scene.summary?.trim() || scene.heading?.trim() || 'Scene event established')
+    .filter(Boolean);
+
+  if (context.premise.trim()) {
+    facts.unshift(context.premise.trim());
+  }
+
+  const deduped = Array.from(new Set(facts));
+  return deduped.map((fact) => ({ fact }));
+};
+
+const buildCallbackNotes = (context: StoryContext) => {
+  const notes = context.scenes
+    .slice(-4)
+    .map((scene) => scene.summary?.trim())
+    .filter((value): value is string => Boolean(value));
+
+  if (notes.length === 0 && context.premise.trim()) {
+    notes.push(context.premise.trim());
+  }
+
+  return notes;
+};
+
+const resolveTone = (toneHint?: string) => toneHint?.trim() || 'cinematic';
+
+const buildScriptState = (
+  context: StoryContext,
+  options?: {
+    toneHint?: string;
+    currentSceneOutline?: string;
+  }
+): LLMScriptState => ({
+  title: context.title?.trim() || 'Untitled Screenplay',
+  characters: context.characters.map((name) => ({ name })),
+  style: {
+    genre: context.genre?.trim() || 'unknown',
+    tone: resolveTone(options?.toneHint)
+  },
+  plotThreads: buildPlotThreads(context),
+  canonFacts: buildCanonFacts(context),
+  currentSceneOutline: options?.currentSceneOutline,
+  totalScenes: context.scenes.length
+});
+
+const buildGenerationInput = (
+  context: StoryContext,
+  action: LLMGenerationAction,
+  options?: {
+    toneHint?: string;
+    currentSceneOutline?: string;
+    callbackNotes?: string[];
+  }
+): GenerateInput => ({
+  action,
+  scriptState: buildScriptState(context, {
+    toneHint: options?.toneHint,
+    currentSceneOutline: options?.currentSceneOutline
+  }),
+  blocks: flattenBlocks(context),
+  callbackNotes: options?.callbackNotes ?? buildCallbackNotes(context)
+});
 
 const isLikelyCharacterCue = (line: string) => {
   const normalized = line.trim();
@@ -145,72 +310,128 @@ export const buildContinueGenerationInput = (
   instruction: string,
   toneHint?: string
 ): LLMContinueInput => {
-  const flattenedBlocks: LLMSceneBlock[] = [];
-
-  context.scenes.forEach((scene, sceneIndex) => {
-    if (scene.heading?.trim()) {
-      flattenedBlocks.push({
-        id: `${scene.id}-heading`,
-        type: 'scene-heading',
-        content: scene.heading.trim(),
-        sceneIndex
-      });
-    }
-
-    scene.blocks.forEach((block) => {
-      const mappedType = mapBlockType(block);
-      const content =
-        mappedType === 'dialogue'
-          ? formatDialogueContent(block)
-          : block.text?.trim() ?? '';
-
-      if (!content) return;
-
-      flattenedBlocks.push({
-        id: block.id,
-        type: mappedType,
-        content,
-        sceneIndex
-      });
-    });
-  });
-
-  const plotThreads = context.scenes
-    .slice(-5)
-    .map((scene, index) => ({
-      id: `thread-${index}`,
-      description: scene.summary?.trim() || `Scene ${context.scenes.length - (4 - index)} progression`,
-      status: 'active' as const
-    }));
-
-  const canonFacts = context.scenes
-    .slice(-8)
-    .map((scene) => ({ fact: scene.summary?.trim() || scene.heading?.trim() || 'Scene event established' }));
-
-  const callbackNotes = context.scenes
-    .slice(-4)
-    .map((scene) => scene.summary?.trim())
-    .filter((value): value is string => Boolean(value));
-
-  return {
-    action: {
+  return buildGenerationInput(
+    context,
+    {
       type: 'continue',
       instruction
     },
-    scriptState: {
-      title: context.title,
-      characters: context.characters.map((name) => ({ name })),
-      style: {
-        genre: context.genre,
-        tone: toneHint?.trim() || 'cinematic'
-      },
-      plotThreads,
-      canonFacts,
-      currentSceneOutline: instruction,
-      totalScenes: context.scenes.length
+    {
+      toneHint,
+      currentSceneOutline: instruction
+    }
+  ) as LLMContinueInput;
+};
+
+export const buildNewScriptInput = (context: StoryContext, instruction: string): GenerateInput =>
+  buildGenerationInput(
+    context,
+    {
+      type: 'start',
+      instruction
     },
-    blocks: flattenedBlocks,
-    callbackNotes
+    {
+      currentSceneOutline: instruction
+    }
+  );
+
+export const buildSurpriseInput = (context: StoryContext, styleHint?: string): GenerateInput =>
+  buildGenerationInput(
+    context,
+    {
+      type: 'surprise',
+      styleHint,
+      instruction: 'Generate an unexpected but earned story development.'
+    },
+    {
+      toneHint: styleHint
+    }
+  );
+
+const scriptBlockToContent = (block: ScriptBlock) => {
+  const mappedType = mapBlockType(block);
+  return mappedType === 'dialogue' ? formatDialogueContent(block) : block.text?.trim() ?? '';
+};
+
+export const buildRegenerateInput = (
+  context: StoryContext,
+  sceneId: string,
+  blockId: string,
+  block: ScriptBlock,
+  rewriteGuidance?: string
+): GenerateInput =>
+  buildGenerationInput(
+    context,
+    {
+      type: 'regenerate',
+      sceneId,
+      blockId,
+      rewriteGuidance,
+      instruction: rewriteGuidance,
+      blockToReplace: scriptBlockToContent(block)
+    },
+    {
+      currentSceneOutline: rewriteGuidance
+    }
+  );
+
+export const buildInsertInput = (
+  context: StoryContext,
+  sceneId: string,
+  insertAfterBlockId: string,
+  blockType: BlockType,
+  instruction: string,
+  styleContext?: string
+): GenerateInput => {
+  const blocks = flattenBlocks(context);
+  const after = blocks.find((block) => block.id === insertAfterBlockId);
+  const mappedBlockType = mapBlockType({
+    id: 'insert-target',
+    type: blockType,
+    text: '',
+    character: undefined
+  });
+
+  return buildGenerationInput(
+    context,
+    {
+      type: 'insert',
+      sceneId,
+      insertAfterBlockId,
+      blockType: mappedBlockType,
+      instruction,
+      styleContext,
+      insertAfterContext: after?.content ?? '[start of script]'
+    },
+    {
+      toneHint: styleContext,
+      currentSceneOutline: instruction
+    }
+  );
+};
+
+export const buildSurpriseSetupInput = (genreHint?: string): GenerateInput => {
+  const normalizedGenre = genreHint?.trim();
+
+  return {
+    action: {
+      type: 'surprise-setup',
+      genreHint: normalizedGenre
+    },
+    scriptState: {
+      title: 'Untitled Screenplay',
+      characters: [],
+      style: {
+        genre: normalizedGenre || 'random',
+        tone: 'inventive'
+      },
+      plotThreads: [],
+      canonFacts: [],
+      currentSceneOutline: undefined,
+      totalScenes: 0
+    },
+    blocks: [],
+    callbackNotes: normalizedGenre ? [`Prefer genre: ${normalizedGenre}`] : []
   };
 };
 

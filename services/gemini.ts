@@ -1,4 +1,5 @@
 import { Scene, StoryContext, BlockType, ScriptBlock, TtsVoice } from '../types';
+import { buildInsertInput, buildSurpriseSetupInput, type GenerateInput } from './llmSceneAdapter';
 
 type ApiError = {
   message: string;
@@ -341,6 +342,93 @@ const requestAi = async <T>(
   return promise;
 };
 
+const requestLlm = async <T>(
+  input: GenerateInput,
+  options: RequestOptions = {}
+): Promise<T> => {
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let abortReason: 'cancel' | 'timeout' | null = null;
+
+  if (timeoutMs > 0) {
+    timeoutId = setTimeout(() => {
+      abortReason = 'timeout';
+      controller.abort();
+    }, timeoutMs);
+  }
+
+  try {
+    const response = await fetch('/api/llm/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      signal: controller.signal,
+      body: JSON.stringify(input)
+    });
+
+    let payload = {} as T & { error?: string };
+    if (typeof (response as Response).text === 'function') {
+      const raw = await response.text();
+      if (raw) {
+        try {
+          payload = JSON.parse(raw) as T & { error?: string };
+        } catch {
+          payload = {} as T & { error?: string };
+        }
+      }
+    } else if (typeof (response as Response).json === 'function') {
+      payload = (await response.json().catch(() => ({}))) as T & { error?: string };
+    }
+
+    if (!response.ok) {
+      const apiError =
+        payload && typeof payload.error === 'object' && payload.error !== null
+          ? (payload.error as { message?: string; code?: string })
+          : null;
+      const statusMessage =
+        response.status === 401
+          ? 'Authentication required. Please log in to continue.'
+          : response.status === 429
+          ? 'Rate limit exceeded. Please wait and try again.'
+          : null;
+      const payloadMessage = typeof payload.error === 'string' ? payload.error : apiError?.message;
+      const message = statusMessage || payloadMessage || `HTTP ${response.status}`;
+      const error = new Error(message) as Error & {
+        code?: string;
+        status?: number;
+      };
+      if (apiError?.code) {
+        error.code = apiError.code;
+      }
+      error.status = response.status;
+      throw error;
+    }
+
+    if (payload.error) {
+      if (typeof payload.error === 'string') {
+        throw new Error(payload.error);
+      }
+      const apiError = payload.error as { message?: string };
+      throw new Error(apiError.message || 'LLM request failed.');
+    }
+
+    return payload as T;
+  } catch (error: unknown) {
+    if (getErrorName(error) === 'AbortError') {
+      const message = abortReason === 'timeout' ? 'Request timed out.' : 'Request canceled.';
+      const abortError = new Error(message) as Error & { code?: string };
+      abortError.code = abortReason === 'timeout' ? 'REQUEST_TIMEOUT' : 'REQUEST_ABORTED';
+      throw abortError;
+    }
+    throw error;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
 // --- Text Generation ---
 
 export const generateScene = async (
@@ -386,13 +474,26 @@ export const generateScriptElement = async (
   styleContext: string,
   options?: RequestOptions
 ): Promise<string> => {
-  const data = await requestAi<{ text: string }>('generateScriptElement', {
-    type,
-    character,
-    instruction,
-    styleContext
-  }, options);
+  const syntheticContext: StoryContext = {
+    title: 'Untitled Screenplay',
+    genre: styleContext?.trim() || 'Screenplay',
+    premise: instruction?.trim() || 'Generate a screenplay block.',
+    characters: character ? [character] : [],
+    scenes: []
+  };
 
+  const input = buildInsertInput(
+    syntheticContext,
+    'scene-0',
+    'insert-root',
+    type,
+    [instruction, character ? `Character: ${character}.` : '', 'Return only the block text.']
+      .filter(Boolean)
+      .join(' '),
+    styleContext
+  );
+
+  const data = await requestLlm<{ text?: string }>(input, options);
   return data.text?.trim() || '';
 };
 
@@ -413,15 +514,85 @@ export const regenerateScriptBlock = async (
   return data.text?.trim() || block.text;
 };
 
+const parseSurpriseSetupText = (
+  rawText: string,
+  targetGenre?: string
+): { genre: string; premise: string; characters: string[] } => {
+  const fallbackGenre = targetGenre?.trim() || 'Drama';
+  const fallback = {
+    genre: fallbackGenre,
+    premise: `A gripping ${fallbackGenre} story with unexpected twists.`,
+    characters: ['Protagonist', 'Antagonist', 'The Catalyst']
+  };
+
+  const normalized = rawText.trim();
+  if (!normalized) return fallback;
+
+  const parseJson = (value: string) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  };
+
+  const parsedDirect = parseJson(normalized);
+  const objectMatch = normalized.match(/\{[\s\S]*\}/);
+  const parsedMatched = objectMatch ? parseJson(objectMatch[0]) : null;
+  const candidate = (parsedDirect && typeof parsedDirect === 'object' ? parsedDirect : parsedMatched) as
+    | {
+        genre?: unknown;
+        premise?: unknown;
+        characters?: unknown;
+      }
+    | null;
+
+  if (candidate) {
+    const genre = typeof candidate.genre === 'string' && candidate.genre.trim() ? candidate.genre.trim() : fallback.genre;
+    const premise = typeof candidate.premise === 'string' && candidate.premise.trim() ? candidate.premise.trim() : fallback.premise;
+    const characters = Array.isArray(candidate.characters)
+      ? candidate.characters
+          .filter((entry): entry is string => typeof entry === 'string')
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : [];
+    if (characters.length >= 2) {
+      return { genre, premise, characters: characters.slice(0, 4) };
+    }
+  }
+
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
+  const genreLine = lines.find((line) => /^genre\s*:/i.test(line));
+  const premiseLine = lines.find((line) => /^premise\s*:/i.test(line));
+  const charactersLine = lines.find((line) => /^characters?\s*:/i.test(line));
+
+  const parsedGenre = genreLine ? genreLine.replace(/^genre\s*:\s*/i, '').trim() : '';
+  const parsedPremise = premiseLine ? premiseLine.replace(/^premise\s*:\s*/i, '').trim() : '';
+  const parsedCharacters = charactersLine
+    ? charactersLine
+        .replace(/^characters?\s*:\s*/i, '')
+        .split(/[,|]/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    : [];
+
+  if (parsedCharacters.length >= 2) {
+    return {
+      genre: parsedGenre || fallback.genre,
+      premise: parsedPremise || fallback.premise,
+      characters: parsedCharacters.slice(0, 4)
+    };
+  }
+
+  return fallback;
+};
+
 export const generateSurpriseSetup = async (
   targetGenre?: string,
   options?: RequestOptions
 ): Promise<{ genre: string; premise: string; characters: string[] }> => {
-  return requestAi<{ genre: string; premise: string; characters: string[] }>(
-    'generateSurpriseSetup',
-    { targetGenre },
-    options
-  );
+  const response = await requestLlm<{ text?: string }>(buildSurpriseSetupInput(targetGenre), options);
+  return parseSurpriseSetupText(response.text ?? '', targetGenre);
 };
 
 // --- TTS Generation ---

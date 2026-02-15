@@ -77,3 +77,24 @@ Write the next beat of the story with an engaging twist or development that:
 
 Write 1-2 scenes of screenplay content.`;
 }
+
+export function surpriseSetupTemplate(genreHint) {
+  return `Create a fresh screenplay setup and respond as JSON only.
+
+${genreHint ? `TARGET GENRE: ${genreHint}` : 'Choose a random genre that supports strong dramatic conflict.'}
+
+Return exactly one JSON object with this schema:
+{
+  "genre": "string",
+  "premise": "1-2 sentence premise",
+  "characters": ["Character Name", "Character Name"]
+}
+
+Constraints:
+- "characters" must contain 2 to 4 names.
+- Keep names concise and human-readable.
+- Premise should be cinematic and specific.
+- Output valid JSON only.
+- Do not use markdown code fences.
+- Do not include any extra text before or after the JSON.`;
+}

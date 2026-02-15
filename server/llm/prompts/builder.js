@@ -5,7 +5,8 @@ import {
   continueSceneTemplate,
   insertBlockTemplate,
   regenerateBlockTemplate,
-  surpriseMeTemplate
+  surpriseMeTemplate,
+  surpriseSetupTemplate
 } from './templates.js';
 
 export function buildPrompt(input, config) {
@@ -25,6 +26,7 @@ export function buildPrompt(input, config) {
 
 function instructionForAction(action, blocks) {
   switch (action.type) {
+    case 'start':
     case 'new-script':
       return newScriptStartTemplate(action.instruction);
 
@@ -33,16 +35,27 @@ function instructionForAction(action, blocks) {
 
     case 'insert': {
       const after = blocks.find((block) => block.id === action.insertAfterBlockId);
-      return insertBlockTemplate(action.instruction, after?.content ?? '[start of script]');
+      const defaultInstruction = `Write a ${action.blockType ?? 'screenplay'} block that fits the local context.`;
+      return insertBlockTemplate(
+        action.instruction ?? defaultInstruction,
+        action.insertAfterContext ?? after?.content ?? '[start of script]'
+      );
     }
 
     case 'regenerate': {
       const target = blocks.find((block) => block.id === action.blockId);
-      return regenerateBlockTemplate(action.instruction ?? '', target?.content ?? '');
+      return regenerateBlockTemplate(
+        action.rewriteGuidance ?? action.instruction ?? '',
+        action.blockToReplace ?? target?.content ?? ''
+      );
     }
 
+    case 'surprise':
     case 'surprise-me':
       return surpriseMeTemplate(action.styleHint ?? '');
+
+    case 'surprise-setup':
+      return surpriseSetupTemplate(action.genreHint ?? '');
 
     default:
       throw new Error(`Unsupported generation action: ${action?.type ?? 'unknown'}`);

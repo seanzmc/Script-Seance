@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildContinueGenerationInput, extractSceneHeading, parseGeneratedSceneText } from '../../services/llmSceneAdapter';
+import {
+  buildContinueGenerationInput,
+  buildInsertInput,
+  buildNewScriptInput,
+  buildRegenerateInput,
+  buildSurpriseInput,
+  buildSurpriseSetupInput,
+  extractSceneHeading,
+  parseGeneratedSceneText
+} from '../../services/llmSceneAdapter';
 import { BlockType } from '../../types';
 
 describe('llmSceneAdapter', () => {
@@ -39,6 +48,83 @@ describe('llmSceneAdapter', () => {
     expect(input.scriptState.style.tone).toBe('tense');
     expect(input.blocks.length).toBeGreaterThan(0);
     expect(input.blocks.some((block) => block.type === 'scene-heading')).toBe(true);
+  });
+
+  it('builds start and surprise actions', () => {
+    const context = {
+      title: 'Test',
+      genre: 'Noir',
+      premise: 'A detective chases a ghost signal.',
+      characters: ['ALEX', 'JENKINS'],
+      scenes: []
+    };
+
+    const start = buildNewScriptInput(context, 'Write an opening');
+    const surprise = buildSurpriseInput(context, 'tense');
+
+    expect(start.action.type).toBe('start');
+    expect(surprise.action.type).toBe('surprise');
+  });
+
+  it('builds regenerate input with target block content', () => {
+    const context = {
+      title: 'Test',
+      genre: 'Noir',
+      premise: 'A detective chases a ghost signal.',
+      characters: ['ALEX', 'JENKINS'],
+      scenes: [
+        {
+          id: 's1',
+          heading: 'INT. CONTROL ROOM - NIGHT',
+          summary: 'Alex finds a corrupted signal.',
+          blocks: [
+            {
+              id: 'b1',
+              type: BlockType.ACTION,
+              text: 'ALEX watches the monitor.'
+            }
+          ]
+        }
+      ]
+    };
+
+    const input = buildRegenerateInput(
+      context,
+      's1',
+      'b1',
+      { id: 'b1', type: BlockType.ACTION, text: 'ALEX watches the monitor.' },
+      'Make it more urgent'
+    );
+
+    expect(input.action.type).toBe('regenerate');
+    if (input.action.type === 'regenerate') {
+      expect(input.action.blockToReplace).toContain('ALEX watches');
+      expect(input.action.blockId).toBe('b1');
+    }
+  });
+
+  it('builds insert and surprise-setup input payloads', () => {
+    const context = {
+      title: 'Test',
+      genre: 'Noir',
+      premise: 'A detective chases a ghost signal.',
+      characters: ['ALEX', 'JENKINS'],
+      scenes: []
+    };
+
+    const insert = buildInsertInput(context, 's1', 'after-1', BlockType.ACTION, 'Add a beat', 'cinematic');
+    const setup = buildSurpriseSetupInput('Horror');
+
+    expect(insert.action.type).toBe('insert');
+    if (insert.action.type === 'insert') {
+      expect(insert.action.insertAfterBlockId).toBe('after-1');
+      expect(insert.action.blockType).toBe('action');
+    }
+
+    expect(setup.action.type).toBe('surprise-setup');
+    if (setup.action.type === 'surprise-setup') {
+      expect(setup.action.genreHint).toBe('Horror');
+    }
   });
 
   it('extracts scene heading from screenplay text', () => {
