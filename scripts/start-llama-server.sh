@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODEL="${LLAMA_MODEL_PATH:-./models/Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf}"
+MODEL="${LLAMA_MODEL_PATH:-./models/qwen2.5-32b-instruct-q4_k_m.gguf}"
 PORT="${LLAMA_PORT:-8080}"
-CTX="${LLAMA_CTX:-6144}"
+CTX="${LLAMA_CTX:-32768}"
 GPU="${LLAMA_GPU_LAYERS:-99}"
 FLASH_ATTN="${LLAMA_FLASH_ATTN:-auto}"
 

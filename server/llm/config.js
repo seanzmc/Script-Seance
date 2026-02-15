@@ -54,11 +54,11 @@ export function loadLLMConfig() {
 
     local: {
       baseUrl: readEnv('LOCAL_LLM_BASE_URL', 'http://127.0.0.1:8080'),
-      model: readEnv('LOCAL_LLM_MODEL', 'default'),
+      model: readEnv('LOCAL_LLM_MODEL', 'qwen2.5-32b-instruct'),
       temperature: toFloat(readEnv('LOCAL_LLM_TEMPERATURE', '0.7'), 0.7),
       topP: toFloat(readEnv('LOCAL_LLM_TOP_P', '0.9'), 0.9),
-      maxTokens: toInt(readEnv('LOCAL_LLM_MAX_TOKENS', '1024'), 1024),
-      contextWindow: toInt(readEnv('LOCAL_LLM_CONTEXT_WINDOW', '6144'), 6144)
+      maxTokens: toInt(readEnv('LOCAL_LLM_MAX_TOKENS', '4096'), 4096),
+      contextWindow: toInt(readEnv('LOCAL_LLM_CONTEXT_WINDOW', '32768'), 32768)
     },
 
     gemini: {
@@ -70,10 +70,10 @@ export function loadLLMConfig() {
     },
 
     generation: {
-      maxInputTokens: toInt(readEnv('LLM_MAX_INPUT_TOKENS', '5120'), 5120),
+      maxInputTokens: toInt(readEnv('LLM_MAX_INPUT_TOKENS', '24000'), 24000),
       maxOutputTokens: toInt(readEnv('LLM_MAX_OUTPUT_TOKENS', '1024'), 1024),
-      scriptStateBudget: toInt(readEnv('LLM_STATE_BUDGET', '800'), 800),
-      recentBlocksBudget: toInt(readEnv('LLM_BLOCKS_BUDGET', '3000'), 3000),
+      scriptStateBudget: toInt(readEnv('LLM_STATE_BUDGET', '6000'), 6000),
+      recentBlocksBudget: toInt(readEnv('LLM_BLOCKS_BUDGET', '8000'), 8000),
       systemPromptBudget: toInt(readEnv('LLM_SYSTEM_BUDGET', '500'), 500),
       instructionBudget: toInt(readEnv('LLM_INSTRUCTION_BUDGET', '300'), 300)
     },

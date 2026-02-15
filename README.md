@@ -75,11 +75,13 @@ Authenticate once:
 hf auth login
 ```
 
-3. Download default model (Llama 3.1 8B Instruct Q5_K_M):
+3. Download default model (Qwen 2.5 32B Instruct Q4_K_M):
 
 ```bash
 bash scripts/download-model.sh
 ```
+
+This model requires ~20GB of disk space and ~20GB of unified memory. Ensure your Mac has at least 64GB RAM for comfortable operation.
 
 4. Start local server:
 
@@ -92,7 +94,7 @@ bash scripts/start-llama-server.sh
 ```bash
 LLM_PROVIDER=local
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8080
-LOCAL_LLM_MODEL=default
+LOCAL_LLM_MODEL=qwen2.5-32b-instruct
 ```
 
 6. Verify local LLM server:

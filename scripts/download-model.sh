@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${LLAMA_HF_REPO:-bartowski/Meta-Llama-3.1-8B-Instruct-GGUF}"
-FILE="${LLAMA_HF_FILE:-Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf}"
+REPO="${LLAMA_HF_REPO:-Qwen/Qwen2.5-32B-Instruct-GGUF}"
+FILE="${LLAMA_HF_FILE:-qwen2.5-32b-instruct-q4_k_m.gguf}"
 DEST="./models"
 
 mkdir -p "$DEST"
