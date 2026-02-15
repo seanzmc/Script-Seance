@@ -1,19 +1,19 @@
 import { BlockType, Scene, ScriptBlock, StoryContext } from '../types';
 
-type LLMBlockType = 'scene-heading' | 'action' | 'dialogue' | 'transition' | 'parenthetical';
+export type LLMBlockType = 'scene-heading' | 'action' | 'dialogue' | 'transition' | 'parenthetical';
 
-interface LLMSceneBlock {
+export interface LLMSceneBlock {
   id: string;
   type: LLMBlockType;
   content: string;
   sceneIndex?: number;
 }
 
-interface LLMCharacter {
+export interface LLMCharacter {
   name: string;
 }
 
-interface LLMScriptState {
+export interface LLMScriptState {
   title: string;
   characters: LLMCharacter[];
   style: {
@@ -30,7 +30,7 @@ interface LLMScriptState {
   totalScenes: number;
 }
 
-interface ContinueAction {
+export interface ContinueAction {
   type: 'continue';
   instruction?: string;
 }

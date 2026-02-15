@@ -43,7 +43,7 @@ type GenerateSpeechContext = {
   [key: string]: unknown;
 };
 
-type GenerateSpeechExtraContext = {
+export type GenerateSpeechExtraContext = {
   expressive?: boolean;
   [key: string]: unknown;
 };
