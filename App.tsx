@@ -746,6 +746,10 @@ export default function App() {
   // Handlers
   const handleStart = async () => {
     if (isGenerating) return;
+    const setupSnapshot: SetupFormState = {
+      ...setupState,
+      characters: [...setupState.characters]
+    };
     const normalizedCharacters = setupState.characters
       .map(character => character.trim())
       .filter(Boolean);
@@ -758,7 +762,6 @@ export default function App() {
       closeSetup();
       resetUndoRedo();
       resetTitleSuggestionState();
-      void requestTitleSuggestion(setupState);
       const setupNotes: string[] = [];
       if (setupState.style.trim()) {
         setupNotes.push(`Style: ${setupState.style.trim()}.`);
@@ -794,6 +797,7 @@ export default function App() {
       });
       setInsertScrollTargetId(initialLastBlockId ?? 'bottom');
       setInsertScrollToken(token => token + 1);
+      void requestTitleSuggestion(setupSnapshot);
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
     }
