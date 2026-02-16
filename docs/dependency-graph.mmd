@@ -18,10 +18,11 @@ H["VoiceManager.tsx"]
 end
 7["types.ts"]
 subgraph B["services"]
-C["gemini.ts"]
+C["ai.ts"]
 K["scriptEngine.ts"]
 L["audioCache.ts"]
 M["auth.ts"]
+W["gemini.ts"]
 end
 subgraph I["hooks"]
 J["useAudioPlayer.ts"]
@@ -29,17 +30,24 @@ end
 N["index.tsx"]
 subgraph O["server"]
 P["index.js"]
-Q["ttsProviders.js"]
+subgraph Q["llm"]
+R["llmClient.js"]
+S["textGeneration.js"]
+T["promptBuilders.js"]
+U["types.js"]
 end
-subgraph R["tests"]
-S["audioCache.test.ts"]
-T["exportAndSetup.test.tsx"]
-U["gemini.test.ts"]
-V["scriptEngine.test.ts"]
-W["serverReliability.test.ts"]
-X["ttsProviders.test.ts"]
-Y["useAudioPlayer.test.tsx"]
-Z["voiceManager.test.tsx"]
+V["ttsProviders.js"]
+end
+subgraph X["tests"]
+Y["audioCache.test.ts"]
+Z["exportAndSetup.test.tsx"]
+10["gemini.test.ts"]
+11["openaiTextSmoke.test.ts"]
+12["scriptEngine.test.ts"]
+13["serverReliability.test.ts"]
+14["ttsProviders.test.ts"]
+15["useAudioPlayer.test.tsx"]
+16["voiceManager.test.tsx"]
 end
 0-->2
 0-->4
@@ -49,8 +57,8 @@ end
 0-->F
 0-->G
 0-->J
-0-->M
 0-->C
+0-->M
 0-->7
 2-->3
 5-->3
@@ -75,20 +83,28 @@ H-->7
 J-->K
 J-->7
 K-->7
-K-->L
 K-->C
+K-->L
 N-->0
-P-->Q
-S-->L
-T-->0
-T-->D
-T-->7
-U-->C
-U-->7
-V-->K
-V-->7
-W-->P
-X-->Q
-Y-->J
-Y-->7
-Z-->H
+P-->R
+P-->S
+P-->U
+P-->V
+S-->R
+S-->T
+S-->U
+W-->C
+Y-->L
+Z-->0
+Z-->D
+Z-->7
+10-->C
+10-->7
+11-->P
+12-->K
+12-->7
+13-->P
+14-->V
+15-->J
+15-->7
+16-->H
