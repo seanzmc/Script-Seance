@@ -20,6 +20,10 @@ const parsePositiveInt = (value, fallback) => {
 };
 const OPENAI_SCENE_MAX_OUTPUT_TOKENS = parsePositiveInt(process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS, 2200);
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP = parsePositiveInt(process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP, 5000);
+const OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS = parsePositiveInt(
+  process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS,
+  2
+);
 
 const SCENE_JSON_SCHEMA = {
   type: 'object',
@@ -263,7 +267,7 @@ const requestOpenAiText = async ({
       retryOnMaxOutputTokens &&
       response?.status === 'incomplete' &&
       incompleteReason === 'max_output_tokens' &&
-      attempt < 1 &&
+      attempt < OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS &&
       outputTokenLimit < OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP;
     if (canRetryForMaxTokens) {
       const nextLimit = Math.min(
@@ -288,10 +292,23 @@ const requestOpenAiText = async ({
     const cacheHitRatio = totalInputTokens > 0
       ? Number((cachedInputTokens / totalInputTokens).toFixed(3))
       : 0;
+    const text = extractOpenAiText(response);
     if (response?.status && response.status !== 'completed') {
-      const error = new Error('AI response was not completed.');
-      error.code = 'UPSTREAM_ERROR';
-      error.details = {
+      if (!text || !text.trim()) {
+        const error = new Error('AI response was not completed.');
+        error.code = 'UPSTREAM_ERROR';
+        error.details = {
+          kind,
+          provider: 'openai',
+          model,
+          status: response.status,
+          incompleteDetails: response.incomplete_details ?? null,
+          maxOutputTokens: outputTokenLimit,
+          attempts: attempt + 1
+        };
+        throw error;
+      }
+      console.warn('[text-gen] response incomplete but text present; proceeding', {
         kind,
         provider: 'openai',
         model,
@@ -299,8 +316,7 @@ const requestOpenAiText = async ({
         incompleteDetails: response.incomplete_details ?? null,
         maxOutputTokens: outputTokenLimit,
         attempts: attempt + 1
-      };
-      throw error;
+      });
     }
     console.info('[text-gen] completed', {
       kind,
@@ -312,7 +328,6 @@ const requestOpenAiText = async ({
       attempts: attempt + 1
     });
 
-    const text = extractOpenAiText(response);
     if (!text || !text.trim()) {
       throw new Error('No response from AI');
     }
