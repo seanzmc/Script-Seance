@@ -146,6 +146,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const styleLabel = setupState.style.trim();
+  const toolLabelClass = 'text-[10px] font-bold uppercase tracking-widest text-gray-400';
+  const toolSectionClass = 'rounded-lg border border-gray-800 bg-gray-900/35 p-2.5 space-y-2';
+  const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner';
   const generationIndicator = isGenerating ? (
     <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
       <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
@@ -209,10 +212,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     </div>
   );
   const generateContent = context ? (
-    <div className="space-y-3">
-      <section className="space-y-3">
+    <div className="h-full min-h-0 flex flex-col gap-2">
+      <div className={toolSectionClass}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Prompt</h3>
+          <h3 className={toolLabelClass}>Prompt</h3>
           <span className={`text-[10px] ${promptWarning ? 'text-amber-400' : 'text-gray-500'}`}>
             {promptCount}/{PROMPT_CHAR_LIMIT} chars
           </span>
@@ -221,9 +224,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           value={userInstruction}
           onChange={(e) => onInstructionChange(e.target.value)}
           placeholder="Suggest an action, or leave empty for AI to decide..."
-          className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+          className={`${toolInputClass} h-16 sm:h-[68px]`}
         />
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] text-gray-500">
+        <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
           <p className="flex items-center gap-2">
             <span>Keep prompts concise.</span>
             <button
@@ -234,31 +237,31 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               Privacy
             </button>
           </p>
-          {promptWarning && <span>Trim prompts to reduce latency.</span>}
+          {promptWarning && <span>Trim prompts.</span>}
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
-          <Button
-            onClick={onPlotTwist}
-            variant="secondary"
-            size="sm"
-            disabled={isGenerating}
-            title="Generate a plot twist"
-          >
-            <Sparkles className="w-3 h-3 mr-2" />
-            Plot Twist
-          </Button>
-          <Button
-            onClick={onGenerateNext}
-            loading={isGenerating}
-            disabled={isPlaying}
-            className="shadow-lg shadow-indigo-500/20"
-            title="Generate the next scene"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Generate Next
-          </Button>
-        </div>
-      </section>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Button
+          onClick={onPlotTwist}
+          variant="secondary"
+          size="sm"
+          disabled={isGenerating}
+          title="Generate a plot twist"
+        >
+          <Sparkles className="w-3 h-3 mr-2" />
+          Plot Twist
+        </Button>
+        <Button
+          onClick={onGenerateNext}
+          loading={isGenerating}
+          disabled={isPlaying}
+          className="shadow-lg shadow-indigo-500/20"
+          title="Generate the next scene"
+        >
+          <PlusCircle className="w-4 h-4 mr-2" />
+          Generate Next
+        </Button>
+      </div>
       {generationIndicator}
     </div>
   ) : (
@@ -415,21 +418,22 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [rewriteOptions, rewriteTarget]);
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
-    <div className="space-y-3">
-      <p className="text-[10px] text-gray-500">
+    <div className="h-full min-h-0 flex flex-col gap-2">
+      <div className={`${toolSectionClass} flex-1 min-h-0 flex flex-col`}>
+      <p className="text-[10px] text-gray-500 shrink-0">
         Click a block in the script to target rewrite.
       </p>
-      <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-3 py-2 space-y-1">
-        <p className="text-[10px] uppercase tracking-widest text-gray-500">Selected Block</p>
-        <p className="text-xs text-gray-200">
+      <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-3 py-2 space-y-1 shrink-0">
+        <p className={toolLabelClass}>Selected Block</p>
+        <p className="text-xs text-gray-200 truncate" title={selectedRewrite?.label}>
           {selectedRewrite ? selectedRewrite.label : 'No block selected.'}
         </p>
         {selectedRewrite?.locked && (
           <p className="text-[10px] text-amber-300">This block is locked and cannot be regenerated.</p>
         )}
       </div>
-      <div className="space-y-1">
-        <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+      <div className="space-y-1 flex-1 min-h-0">
+        <label className={toolLabelClass}>
           Guidance (optional)
         </label>
         <textarea
@@ -437,10 +441,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           onChange={(event) => setRewriteGuidance(event.target.value)}
           maxLength={220}
           placeholder="Tone, intent, constraints..."
-          className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm h-20 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+          className={`${toolInputClass} h-[104px] resize-none`}
         />
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 shrink-0">
         <p className="text-[10px] text-gray-500">{rewriteGuidance.length}/220 chars</p>
         <Button
           onClick={() => {
@@ -456,6 +460,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         >
           Regenerate
         </Button>
+      </div>
       </div>
     </div>
   ) : (

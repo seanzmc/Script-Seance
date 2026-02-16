@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
 import { generateScriptElement } from '../services/ai';
-import { PenTool } from 'lucide-react';
 
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
@@ -103,10 +102,10 @@ export interface InsertBlockProps {
 }
 
 const HINTS: Record<BlockType, string> = {
-  [BlockType.ACTION]: "Describes physical movement, setting details, or non-verbal events.",
-  [BlockType.DIALOGUE]: "The spoken words of a character, including tone instructions.",
-  [BlockType.TRANSITION]: "Cinematic indicators like CUT TO: or FADE OUT:.",
-  [BlockType.HEADING]: "Starts a new scene with location and time (e.g. INT. OFFICE - DAY)."
+  [BlockType.ACTION]: "One visual action beat.",
+  [BlockType.DIALOGUE]: "One spoken line.",
+  [BlockType.TRANSITION]: "One transition cue.",
+  [BlockType.HEADING]: "One scene heading."
 };
 
 export const InsertBlock: React.FC<InsertBlockProps> = ({ 
@@ -121,6 +120,10 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   insertTarget,
   styleContext
 }) => {
+  const labelClass = 'text-[10px] uppercase font-bold text-gray-400 tracking-widest';
+  const sectionClass = 'rounded-lg border border-gray-800 bg-gray-900/35 p-2.5';
+  const selectClass = 'bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
+  const textareaClass = 'w-full h-full min-h-[56px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner';
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
@@ -213,80 +216,72 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-gray-300 flex items-center gap-2 uppercase tracking-[0.3em]">
-          <PenTool className="w-4 h-4" />
-          Insert Block
-        </h3>
+    <div className="h-full min-h-0 flex flex-col gap-1.5">
+      <div className={sectionClass}>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-end">
+          <div className={`grid gap-1.5 ${elementType === BlockType.DIALOGUE ? 'grid-cols-1' : 'grid-cols-1'}`}>
+            <div className="space-y-1">
+              <label className={labelClass}>Type</label>
+              <select
+                value={elementType}
+                onChange={(e) => setElementType(e.target.value as BlockType)}
+                className={selectClass}
+              >
+                <option value={BlockType.ACTION}>Action</option>
+                <option value={BlockType.DIALOGUE}>Dialogue</option>
+                <option value={BlockType.TRANSITION}>Transition</option>
+                <option value={BlockType.HEADING}>New Scene</option>
+              </select>
+            </div>
+            {elementType === BlockType.DIALOGUE && (
+              <div className="space-y-1">
+                <label className={labelClass}>Character</label>
+                <select
+                  value={selectedChar}
+                  onChange={(e) => setSelectedChar(e.target.value)}
+                  className={selectClass}
+                >
+                  {characters.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2">
           <Button
             onClick={handleSurpriseMe}
             disabled={disabled || isGenerating}
             size="sm"
             variant="secondary"
             loading={isGenerating}
+            className="w-auto whitespace-nowrap"
             title="Generate a new block in the editor"
           >
             Surprise
           </Button>
         </div>
-      </div>
-
-      {insertTarget && (
-        <p className="text-[10px] text-indigo-300">
-          Insertion point selected.
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)] gap-3">
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Type</label>
-          <div className="space-y-2">
-            <select
-              value={elementType}
-              onChange={(e) => setElementType(e.target.value as BlockType)}
-              className="bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
-            >
-              <option value={BlockType.ACTION}>Action</option>
-              <option value={BlockType.DIALOGUE}>Dialogue</option>
-              <option value={BlockType.TRANSITION}>Transition</option>
-              <option value={BlockType.HEADING}>New Scene</option>
-            </select>
-
-            {elementType === BlockType.DIALOGUE && (
-              <select
-                value={selectedChar}
-                onChange={(e) => setSelectedChar(e.target.value)}
-                className="bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
-              >
-                {characters.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
-          </div>
-          <p className="text-[10px] text-gray-500 italic">
-            {HINTS[elementType]}
+        {insertTarget && (
+          <p className="mt-1 text-[10px] text-indigo-300">
+            Insertion point selected.
           </p>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Content</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Type your block content here..."
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm h-24 focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner"
-          />
-        </div>
+        )}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-[10px] text-gray-500">
-          Add to the end or enter insert mode to pick a point in the script.
-        </p>
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-end gap-2">
-          <div className="flex flex-col gap-1 w-full sm:w-auto">
+      <div className={`${sectionClass} grid grid-rows-[auto_minmax(0,1fr)] gap-1 flex-1 min-h-0`}>
+        <div className="flex items-start justify-between gap-2">
+          <label className={labelClass}>Content</label>
+          <p className="text-[10px] leading-snug text-gray-500 italic text-right max-w-[55%]">{HINTS[elementType]}</p>
+        </div>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Type your block content here..."
+          className={textareaClass}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1 shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          <div className="flex flex-col gap-1 min-w-0">
             <Button
               onClick={handleAddBlock}
               disabled={disabled || isGenerating}
@@ -301,7 +296,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
               <span className="text-[10px] text-amber-300">{addMessage}</span>
             )}
           </div>
-          <div className="flex flex-col gap-1 w-full sm:w-auto sm:items-end">
+          <div className="flex flex-col gap-1 min-w-0">
             <Button
               onClick={handleInsertMode}
               disabled={disabled || isGenerating || insertModeActive}
