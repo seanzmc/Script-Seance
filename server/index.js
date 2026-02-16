@@ -42,6 +42,10 @@ const AI_RPM = parsePositiveInt(process.env.AI_RPM, 30);
 const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
 const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
 const AI_UPSTREAM_TIMEOUT_MS = parsePositiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 30000);
+const AI_UPSTREAM_TIMEOUT_MS_SCENE = parsePositiveInt(
+  process.env.AI_UPSTREAM_TIMEOUT_MS_SCENE,
+  Math.max(AI_UPSTREAM_TIMEOUT_MS, 90000)
+);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const RATE_LIMIT_MINUTE_MS = 60 * 1000;
 const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
@@ -651,7 +655,9 @@ const listVoicesByProvider = async () => {
       }
       console.warn('[tts] voice catalog fallback to legacy voices', {
         status: error?.status,
-        code: error?.code
+        code: error?.code,
+        name: error?.name,
+        message: error?.message
       });
     }
   }
@@ -1033,6 +1039,9 @@ const handleAiGenerate = async (req, res) => {
       }
 
       const textProvider = getTextProvider();
+      const textTimeoutMs = kind === 'generateScene'
+        ? AI_UPSTREAM_TIMEOUT_MS_SCENE
+        : AI_UPSTREAM_TIMEOUT_MS;
       const generationResult = await generateTextByKind({
         kind,
         context,
@@ -1041,7 +1050,7 @@ const handleAiGenerate = async (req, res) => {
         openai: textProvider === 'openai' ? getOpenAIClient() : null,
         geminiAi: textProvider === 'gemini' ? getGeminiClient() : null,
         withTimeout,
-        timeoutMs: AI_UPSTREAM_TIMEOUT_MS
+        timeoutMs: textTimeoutMs
       });
       data = generationResult.data;
       rawAiResponse = generationResult.meta?.rawAiResponse;
@@ -1087,7 +1096,12 @@ const handleAiGenerate = async (req, res) => {
     const isConfigError = error?.code === 'CONFIG_ERROR';
 
     if (!IS_PROD && isInvalidAi && kind === 'generateScene') {
-      const rawSnippet = typeof rawAiResponse === 'string' ? rawAiResponse.slice(0, 2000) : null;
+      const rawFromError = error?.details?.rawResponse;
+      const rawSnippet = typeof rawAiResponse === 'string'
+        ? rawAiResponse.slice(0, 2000)
+        : typeof rawFromError === 'string'
+        ? rawFromError.slice(0, 2000)
+        : null;
       console.warn('[ai/generate] Invalid AI response', {
         requestId,
         kind,

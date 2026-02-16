@@ -32,6 +32,7 @@ Copy `.env.example` to `.env` and set:
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-5.2
 OPENAI_FAST_MODEL=gpt-5-nano
+# Prompt cache retention: in-memory or 24h
 OPENAI_PROMPT_CACHE_RETENTION=24h
 TEXT_LLM_PROVIDER=openai
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
@@ -45,6 +46,7 @@ AI_RPM=30
 AI_RPD=500
 AI_MAX_PROMPT_CHARS=8000
 AI_UPSTREAM_TIMEOUT_MS=30000
+AI_UPSTREAM_TIMEOUT_MS_SCENE=90000
 TRUST_PROXY=0
 TTS_PROVIDER=dual
 TTS_INWORLD_MODEL=inworld-tts-1.5-max

@@ -1,4 +1,5 @@
 import { Type } from '@google/genai';
+import crypto from 'node:crypto';
 import {
   SCRIPT_ELEMENT_SYSTEM_INSTRUCTION,
   buildGenerateScenePrompt,
@@ -12,6 +13,42 @@ import { isTextGenerationKind } from './types.js';
 
 const OPENAI_PROMPT_CACHE_PREFIX = 'script-seance:text-gen';
 const DEFAULT_OPENAI_PROMPT_CACHE_RETENTION = process.env.OPENAI_PROMPT_CACHE_RETENTION || '24h';
+const MAX_RAW_RESPONSE_LOG_CHARS = 2000;
+
+const SCENE_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    heading: { type: 'string' },
+    summary: { type: 'string' },
+    blocks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          type: { type: 'string', enum: ['heading', 'action', 'dialogue', 'transition'] },
+          character: { type: ['string', 'null'] },
+          parenthetical: { type: ['string', 'null'] },
+          text: { type: 'string' }
+        },
+        required: ['type', 'text']
+      }
+    }
+  },
+  required: ['heading', 'summary', 'blocks']
+};
+
+const SURPRISE_SETUP_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    genre: { type: 'string' },
+    premise: { type: 'string' },
+    characters: { type: 'array', items: { type: 'string' } }
+  },
+  required: ['genre', 'premise', 'characters']
+};
 
 const createInvalidAiResponseError = (kind, reason) => {
   const error = new Error('AI response did not match expected format.');
@@ -38,7 +75,12 @@ const parseJsonObject = (value, kind) => {
   try {
     return JSON.parse(normalized);
   } catch {
-    throw createInvalidAiResponseError(kind, 'Invalid JSON payload.');
+    const error = createInvalidAiResponseError(kind, 'Invalid JSON payload.');
+    error.details = {
+      ...(error.details ?? {}),
+      rawResponse: normalized.slice(0, MAX_RAW_RESPONSE_LOG_CHARS)
+    };
+    throw error;
   }
 };
 
@@ -98,7 +140,7 @@ const supportsExtendedPromptCacheRetention = (model) => {
 const resolvePromptCacheRetention = (model, retentionOverride) => {
   const normalized = typeof retentionOverride === 'string' ? retentionOverride.trim().toLowerCase() : '';
   if (!normalized) return null;
-  if (normalized === 'in_memory') return 'in_memory';
+  if (normalized === 'in-memory' || normalized === 'in_memory') return 'in-memory';
   if (normalized === '24h' && supportsExtendedPromptCacheRetention(model)) return '24h';
   return null;
 };
@@ -114,8 +156,10 @@ const shouldApplySamplingControls = (model, reasoningEffort) => {
 };
 const buildPromptCacheKey = (kind, discriminator, model) => {
   const suffix = discriminator ? `:${discriminator}` : '';
-  const modelSegment = normalizeModelName(model).replace(/[^a-z0-9.-]/g, '');
-  return `${OPENAI_PROMPT_CACHE_PREFIX}:${modelSegment || 'model'}:${kind}${suffix}:v1`;
+  const modelSegment = normalizeModelName(model).replace(/[^a-z0-9.-]/g, '') || 'model';
+  const rawKey = `${OPENAI_PROMPT_CACHE_PREFIX}:${modelSegment}:${kind}${suffix}:v1`;
+  const digest = crypto.createHash('sha256').update(rawKey).digest('hex').slice(0, 40);
+  return `ss:tg:v1:${digest}`;
 };
 const getCachedInputTokens = (response) =>
   response?.usage?.input_tokens_details?.cached_tokens ??
@@ -134,9 +178,16 @@ const requestOpenAiText = async ({
   topP,
   cacheKey,
   cacheRetention,
+  jsonSchemaFormat,
   withTimeout,
   timeoutMs
 }) => {
+  console.info('[text-gen] request', {
+    kind,
+    provider: 'openai',
+    model,
+    timeoutMs
+  });
   const reasoningEffort = getReasoningEffortForModel(model);
   const shouldApplySampling = shouldApplySamplingControls(model, reasoningEffort);
   const requestPayload = {
@@ -146,6 +197,17 @@ const requestOpenAiText = async ({
     store: false,
     prompt_cache_key: cacheKey || buildPromptCacheKey(kind, undefined, model)
   };
+  if (jsonSchemaFormat) {
+    requestPayload.text = {
+      format: {
+        type: 'json_schema',
+        name: jsonSchemaFormat.name,
+        schema: jsonSchemaFormat.schema,
+        strict: true,
+        ...(jsonSchemaFormat.description ? { description: jsonSchemaFormat.description } : {})
+      }
+    };
+  }
 
   const resolvedRetention = resolvePromptCacheRetention(model, cacheRetention);
   if (resolvedRetention) {
@@ -166,7 +228,22 @@ const requestOpenAiText = async ({
   }
 
   const startedAt = Date.now();
-  const response = await withTimeout(openai.responses.create(requestPayload), timeoutMs);
+  let response;
+  try {
+    response = await withTimeout(openai.responses.create(requestPayload), timeoutMs);
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'UPSTREAM_TIMEOUT') {
+      error.details = {
+        ...(error.details && typeof error.details === 'object' ? error.details : {}),
+        kind,
+        provider: 'openai',
+        model,
+        timeoutMs
+      };
+      console.warn('[text-gen] timeout', error.details);
+    }
+    throw error;
+  }
 
   const latencyMs = Date.now() - startedAt;
   const cachedInputTokens = getCachedInputTokens(response);
@@ -174,6 +251,18 @@ const requestOpenAiText = async ({
   const cacheHitRatio = totalInputTokens > 0
     ? Number((cachedInputTokens / totalInputTokens).toFixed(3))
     : 0;
+  if (response?.status && response.status !== 'completed') {
+    const error = new Error('AI response was not completed.');
+    error.code = 'UPSTREAM_ERROR';
+    error.details = {
+      kind,
+      provider: 'openai',
+      model,
+      status: response.status,
+      incompleteDetails: response.incomplete_details ?? null
+    };
+    throw error;
+  }
   console.info('[text-gen] completed', {
     kind,
     provider: 'openai',
@@ -199,12 +288,33 @@ const requestGeminiText = async ({
   withTimeout,
   timeoutMs
 }) => {
-  const startedAt = Date.now();
-  const response = await withTimeout(geminiAi.models.generateContent({
+  console.info('[text-gen] request', {
+    kind,
+    provider: 'gemini',
     model,
-    contents,
-    ...(config ? { config } : {})
-  }), timeoutMs);
+    timeoutMs
+  });
+  const startedAt = Date.now();
+  let response;
+  try {
+    response = await withTimeout(geminiAi.models.generateContent({
+      model,
+      contents,
+      ...(config ? { config } : {})
+    }), timeoutMs);
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'UPSTREAM_TIMEOUT') {
+      error.details = {
+        ...(error.details && typeof error.details === 'object' ? error.details : {}),
+        kind,
+        provider: 'gemini',
+        model,
+        timeoutMs
+      };
+      console.warn('[text-gen] timeout', error.details);
+    }
+    throw error;
+  }
 
   const latencyMs = Date.now() - startedAt;
   console.info('[text-gen] completed', {
@@ -300,6 +410,11 @@ export const generateTextByKind = async ({
           topP: 0.95,
           cacheKey: buildPromptCacheKey(kind, isFirstScene ? 'opening' : 'next', models.openai),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
+          jsonSchemaFormat: {
+            name: 'scene_output',
+            description: 'Structured screenplay scene output.',
+            schema: SCENE_JSON_SCHEMA
+          },
           withTimeout,
           timeoutMs
         })
@@ -467,6 +582,11 @@ export const generateTextByKind = async ({
         topP: 0.98,
         cacheKey: buildPromptCacheKey(kind, context.targetGenre ? 'targeted' : 'freeform', models.openai),
         cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
+        jsonSchemaFormat: {
+          name: 'surprise_setup_output',
+          description: 'Structured surprise setup response.',
+          schema: SURPRISE_SETUP_JSON_SCHEMA
+        },
         withTimeout,
         timeoutMs
       })
