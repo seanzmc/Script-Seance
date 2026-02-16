@@ -27,25 +27,21 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
 }) => {
   return (
     <div className="h-full min-h-0 flex flex-col gap-2">
-      <div className="rounded-lg border border-gray-800 bg-gray-900/35 p-2.5 space-y-1.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Voice Casting</p>
-        <p className="text-[10px] text-gray-500">
-          Assign voices and preview reads. Defaults are auto-assigned.
-        </p>
-      </div>
-      <div className="rounded-lg border border-gray-800 bg-gray-900/35 p-2.5 flex-1 min-h-0">
-        <VoiceManager
-          characters={characters}
-          availableVoices={availableVoices}
-          voiceConfigs={voiceConfigs}
-          onUpdateConfig={onUpdateConfig}
-          onOpenCasting={onOpenCasting}
-          onPreview={onPreview}
-          onStop={onStop}
-          isAudioPlaying={isAudioPlaying}
-          isLoading={isLoading}
-        />
-      </div>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Voice Casting</p>
+      <p className="text-[10px] text-gray-500">
+        Assign voices and preview reads. Defaults are auto-assigned.
+      </p>
+      <VoiceManager
+        characters={characters}
+        availableVoices={availableVoices}
+        voiceConfigs={voiceConfigs}
+        onUpdateConfig={onUpdateConfig}
+        onOpenCasting={onOpenCasting}
+        onPreview={onPreview}
+        onStop={onStop}
+        isAudioPlaying={isAudioPlaying}
+        isLoading={isLoading}
+      />
     </div>
   );
 };

@@ -62,46 +62,48 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const hasActivePanel = Boolean(activeTool);
   const panelAllowsScroll = activeTool === 'voices';
   const panelHeightClass = activeTool === 'insert'
-    ? 'h-[356px] sm:h-[332px] lg:h-[304px]'
+    ? 'h-[334px] sm:h-[320px] lg:h-[300px]'
     : activeTool === 'generate'
       ? 'h-[292px] sm:h-[300px] lg:h-[286px]'
       : activeTool === 'export'
         ? 'h-[196px] sm:h-[204px]'
         : 'h-[318px] sm:h-[334px]';
-  const panelBodyPaddingClass = activeTool === 'export' ? 'px-4 py-2' : 'px-4 py-3';
+  const panelBodyPaddingClass = activeTool === 'export'
+    ? 'px-4 py-2'
+    : activeTool === 'insert'
+      ? 'px-4 py-2'
+      : 'px-4 py-3';
 
   const panelBodyContent = hasExportPanel
     ? (
-      <div className="h-full min-h-0 flex flex-col">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/35 p-2.5 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Export Options</p>
-            <p className="text-[10px] text-gray-500">Current draft only</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+      <div className="h-full min-h-0 flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Export Options</p>
+          <p className="text-[10px] text-gray-500">Current draft only</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onExportTxt}
+            disabled={exportDisabled || !onExportTxt}
+            className="w-full text-xs"
+            title="Export script as a .txt file"
+          >
+            <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
+          </Button>
+          {onExportPdf && (
             <Button
               variant="secondary"
               size="sm"
-              onClick={onExportTxt}
-              disabled={exportDisabled || !onExportTxt}
+              onClick={onExportPdf}
+              disabled={exportDisabled}
               className="w-full text-xs"
-              title="Export script as a .txt file"
+              title="Export script as a PDF via print dialog"
             >
-              <Download className="w-3 h-3 mr-2" /> Export Script (.txt)
+              <FileDown className="w-3 h-3 mr-2" /> Export PDF
             </Button>
-            {onExportPdf && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onExportPdf}
-                disabled={exportDisabled}
-                className="w-full text-xs"
-                title="Export script as a PDF via print dialog"
-              >
-                <FileDown className="w-3 h-3 mr-2" /> Export PDF
-              </Button>
-            )}
-          </div>
+          )}
         </div>
       </div>
     )

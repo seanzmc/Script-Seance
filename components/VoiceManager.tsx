@@ -79,10 +79,10 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
     const isNarrator = options?.variant === 'narrator';
     const isEvenRow = typeof options?.index === 'number' && options.index % 2 === 0;
     const rowTone = isNarrator
-      ? 'border-indigo-500/30 bg-indigo-500/10'
+      ? 'border-indigo-500/25 bg-indigo-500/10'
       : isEvenRow
-        ? 'border-gray-800/60 bg-gray-900/50'
-        : 'border-gray-800/60 bg-gray-900/40';
+        ? 'border-gray-800 bg-gray-950/55'
+        : 'border-gray-800 bg-gray-950/45';
 
     return (
       <div key={char} className="space-y-1.5">
@@ -111,14 +111,14 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             </select>
             <button
               onClick={() => onOpenCasting(char)}
-              className="p-2 text-gray-400 hover:text-indigo-300 hover:bg-gray-800/70 rounded-md"
+              className="p-2 text-gray-400 hover:text-indigo-300 hover:bg-gray-800/80 border border-transparent hover:border-gray-700 rounded-md"
               title="Cast a different voice"
             >
               <Settings2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => toggleExpand(char)}
-              className={`p-2 text-gray-500 hover:text-gray-300 rounded-md ${isExpanded ? 'bg-gray-800/70' : ''}`}
+              className={`p-2 text-gray-500 hover:text-gray-300 border border-transparent hover:border-gray-700 rounded-md ${isExpanded ? 'bg-gray-800/70 border-gray-700' : ''}`}
               title="Adjust speed and pitch"
             >
               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -126,10 +126,10 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
           </div>
           <button
             onClick={() => handlePreview(char, config)}
-            className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
+            className={`px-2.5 py-1.5 rounded-md border text-[11px] font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
               (isThisLoading || isThisPlaying)
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-300 hover:text-white hover:bg-indigo-600'
+                ? 'bg-red-600/85 border-red-500 text-white'
+                : 'bg-gray-800/80 border-gray-700 text-gray-300 hover:text-white hover:border-indigo-500/70 hover:bg-indigo-600/70'
             }`}
             title={isThisPlaying ? 'Stop preview' : 'Preview voice'}
           >
@@ -145,7 +145,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
         </div>
 
         {isExpanded && (
-          <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-800 bg-black/20 px-3 py-2">
+          <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-800 bg-gray-900/35 px-3 py-2">
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-[9px] uppercase font-bold text-gray-500 tracking-wider">Speed</label>
@@ -192,18 +192,18 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="h-full min-h-0 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
           <Sliders className="w-4 h-4" />
-          Voices
+          Assignments
         </h4>
         {showSaved && (
           <span className="text-[10px] text-emerald-400 font-semibold">Saved</span>
         )}
       </div>
 
-      <div className="sticky top-0 z-10 bg-gray-950/95 pb-1">
+      <div className="sticky top-0 z-10 bg-gray-900/95 pb-1">
         <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto] items-center gap-2 px-2.5 text-[10px] uppercase tracking-widest text-gray-500">
           <span>Character</span>
           <span>Voice</span>
@@ -211,7 +211,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 pb-1">
         {renderRow('Narrator', { variant: 'narrator' })}
 
         {characters.map((char, index) => renderRow(char, { variant: 'cast', index }))}

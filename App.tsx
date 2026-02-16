@@ -1265,12 +1265,12 @@ export default function App() {
   const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
 
   const voicesContent = context ? (
-    <div className="space-y-2">
+    <div className="h-full min-h-0 flex flex-col gap-2">
       {voiceCatalogState === 'loading' && (
         <p className="text-[10px] text-gray-500">Loading available voices...</p>
       )}
       {voiceCatalogState === 'error' && (
-        <p className="text-[10px] text-amber-400">Voice catalog unavailable. Using fallback voices.</p>
+        <p className="text-[10px] text-amber-300">Voice catalog unavailable. Using fallback voices.</p>
       )}
       <VoicesPanel
         characters={context.characters}

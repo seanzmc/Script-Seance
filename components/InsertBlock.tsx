@@ -121,9 +121,8 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   styleContext
 }) => {
   const labelClass = 'text-[10px] uppercase font-bold text-gray-400 tracking-widest';
-  const sectionClass = 'rounded-lg border border-gray-800 bg-gray-900/35 p-2.5';
-  const selectClass = 'bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
-  const textareaClass = 'w-full h-full min-h-[56px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner';
+  const selectClass = 'h-9 bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
+  const textareaClass = 'w-full h-full min-h-[72px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner';
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
@@ -216,60 +215,61 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-1.5">
-      <div className={sectionClass}>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-end">
-          <div className={`grid gap-1.5 ${elementType === BlockType.DIALOGUE ? 'grid-cols-1' : 'grid-cols-1'}`}>
-            <div className="space-y-1">
-              <label className={labelClass}>Type</label>
-              <select
-                value={elementType}
-                onChange={(e) => setElementType(e.target.value as BlockType)}
-                className={selectClass}
-              >
-                <option value={BlockType.ACTION}>Action</option>
-                <option value={BlockType.DIALOGUE}>Dialogue</option>
-                <option value={BlockType.TRANSITION}>Transition</option>
-                <option value={BlockType.HEADING}>New Scene</option>
-              </select>
-            </div>
-            {elementType === BlockType.DIALOGUE && (
-              <div className="space-y-1">
-                <label className={labelClass}>Character</label>
-                <select
-                  value={selectedChar}
-                  onChange={(e) => setSelectedChar(e.target.value)}
-                  className={selectClass}
-                >
-                  {characters.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-
-          <Button
-            onClick={handleSurpriseMe}
-            disabled={disabled || isGenerating}
-            size="sm"
-            variant="secondary"
-            loading={isGenerating}
-            className="w-auto whitespace-nowrap"
-            title="Generate a new block in the editor"
+    <div className="h-full min-h-0 flex flex-col gap-2">
+      <div
+        className={`grid gap-2 ${
+          elementType === BlockType.DIALOGUE
+            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]'
+            : 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]'
+        }`}
+      >
+        <div className="space-y-1">
+          <label className={labelClass}>Type</label>
+          <select
+            value={elementType}
+            onChange={(e) => setElementType(e.target.value as BlockType)}
+            className={selectClass}
           >
-            Surprise
-          </Button>
+            <option value={BlockType.ACTION}>Action</option>
+            <option value={BlockType.DIALOGUE}>Dialogue</option>
+            <option value={BlockType.TRANSITION}>Transition</option>
+            <option value={BlockType.HEADING}>New Scene</option>
+          </select>
         </div>
+        {elementType === BlockType.DIALOGUE && (
+          <div className="space-y-1">
+            <label className={labelClass}>Character</label>
+            <select
+              value={selectedChar}
+              onChange={(e) => setSelectedChar(e.target.value)}
+              className={selectClass}
+            >
+              {characters.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
+        <Button
+          onClick={handleSurpriseMe}
+          disabled={disabled || isGenerating}
+          size="sm"
+          variant="secondary"
+          loading={isGenerating}
+          className="w-full lg:w-auto whitespace-nowrap lg:self-end"
+          title="Generate a new block in the editor"
+        >
+          Surprise
+        </Button>
         {insertTarget && (
-          <p className="mt-1 text-[10px] text-indigo-300">
+          <p className={`text-[10px] text-indigo-300 ${elementType === BlockType.DIALOGUE ? 'md:col-span-2 lg:col-span-3' : 'lg:col-span-2'}`}>
             Insertion point selected.
           </p>
         )}
       </div>
 
-      <div className={`${sectionClass} grid grid-rows-[auto_minmax(0,1fr)] gap-1 flex-1 min-h-0`}>
-        <div className="flex items-start justify-between gap-2">
+      <div className="grid grid-rows-[auto_minmax(0,1fr)] gap-1 flex-1 min-h-0">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
           <label className={labelClass}>Content</label>
-          <p className="text-[10px] leading-snug text-gray-500 italic text-right max-w-[55%]">{HINTS[elementType]}</p>
+          <p className="text-[10px] leading-snug text-gray-500 italic sm:text-right sm:max-w-[55%]">{HINTS[elementType]}</p>
         </div>
         <textarea
           value={content}

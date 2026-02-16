@@ -147,7 +147,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const styleLabel = setupState.style.trim();
   const toolLabelClass = 'text-[10px] font-bold uppercase tracking-widest text-gray-400';
-  const toolSectionClass = 'rounded-lg border border-gray-800 bg-gray-900/35 p-2.5 space-y-2';
+  const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner';
   const generationIndicator = isGenerating ? (
     <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
@@ -423,7 +423,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <p className="text-[10px] text-gray-500 shrink-0">
         Click a block in the script to target rewrite.
       </p>
-      <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-3 py-2 space-y-1 shrink-0">
+      <div className="px-0.5 py-0.5 space-y-1 shrink-0">
         <p className={toolLabelClass}>Selected Block</p>
         <p className="text-xs text-gray-200 truncate" title={selectedRewrite?.label}>
           {selectedRewrite ? selectedRewrite.label : 'No block selected.'}
