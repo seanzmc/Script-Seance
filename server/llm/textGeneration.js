@@ -32,7 +32,7 @@ const SCENE_JSON_SCHEMA = {
           parenthetical: { type: ['string', 'null'] },
           text: { type: 'string' }
         },
-        required: ['type', 'text']
+        required: ['type', 'character', 'parenthetical', 'text']
       }
     }
   },
