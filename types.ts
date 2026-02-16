@@ -22,12 +22,16 @@ export interface Scene {
   summary: string;
 }
 
+export type SceneLengthOption = 'Short' | 'Medium' | 'Long';
+
 export interface StoryContext {
   title: string;
   genre: string;
   premise: string;
   characters: string[];
   scenes: Scene[];
+  style?: string;
+  targetLength?: SceneLengthOption;
 }
 
 export interface VoiceConfig {

@@ -71,6 +71,7 @@ const GENRES = [
 const ALLOWED_VOICES = LEGACY_VOICE_IDS;
 
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
+const VALID_SCENE_LENGTHS = new Set(['Short', 'Medium', 'Long']);
 const sessions = new Map();
 const rateBuckets = new Map();
 const loginBuckets = new Map();
@@ -966,13 +967,27 @@ const handleAiGenerate = async (req, res) => {
           return sendError(res, 400, 'Invalid generateScene context.', 'INVALID_REQUEST');
         }
 
-        const { genre, premise, characters } = storyContext;
+        const { genre, premise, characters, style, targetLength } = storyContext;
         if (!isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000) || !Array.isArray(characters)) {
           return sendError(res, 400, 'Invalid story context.', 'INVALID_REQUEST');
         }
 
         if (characters.some((c) => !isNonEmptyString(c, 120))) {
           return sendError(res, 400, 'Invalid character list.', 'INVALID_REQUEST');
+        }
+        if (
+          style !== undefined &&
+          style !== null &&
+          !isNonEmptyString(style, 400)
+        ) {
+          return sendError(res, 400, 'Invalid story style.', 'INVALID_REQUEST');
+        }
+        if (
+          targetLength !== undefined &&
+          targetLength !== null &&
+          (typeof targetLength !== 'string' || !VALID_SCENE_LENGTHS.has(targetLength))
+        ) {
+          return sendError(res, 400, 'Invalid target length.', 'INVALID_REQUEST');
         }
       } else if (kind === 'suggestPlotTwist') {
         const { genre } = context;

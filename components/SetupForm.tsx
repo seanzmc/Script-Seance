@@ -170,15 +170,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isLengthBlank = !length;
   const lengthHint = (() => {
     if (isLengthBlank) {
-      return 'Defaults to a balanced scene count.';
+      return 'Defaults to a balanced scene size.';
     }
     if (length === 'Short') {
-      return 'Short aims for fewer scenes (roughly 1–2).';
+      return 'Short scenes are concise and punchy.';
     }
     if (length === 'Medium') {
-      return 'Medium aims for a few scenes (roughly 3–5).';
+      return 'Medium scenes keep a balanced pace and detail.';
     }
-    return 'Long aims for more scenes (roughly 6+).';
+    return 'Long scenes allow fuller beats and richer detail.';
   })();
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;

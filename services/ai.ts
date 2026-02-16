@@ -31,6 +31,7 @@ export type CancellableRequest<T> = {
 };
 
 const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_SCENE_TIMEOUT_MS = 95000;
 const DEFAULT_VOICE_NAME = 'Zephyr';
 const TTS_MAX_ATTEMPTS = 5;
 const TTS_BASE_DELAY_MS = 1000;
@@ -240,7 +241,8 @@ const createAiRequest = <T>(
   options: RequestOptions = {}
 ): CancellableRequest<T> => {
   const controller = new AbortController();
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const kindDefaultTimeout = kind === 'generateScene' ? DEFAULT_SCENE_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? kindDefaultTimeout;
   let abortReason: 'cancel' | 'timeout' | null = null;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 

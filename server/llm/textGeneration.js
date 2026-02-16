@@ -19,13 +19,25 @@ const parsePositiveInt = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 const OPENAI_SCENE_MAX_OUTPUT_TOKENS = parsePositiveInt(process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS, 2200);
+const OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT = parsePositiveInt(
+  process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT,
+  Math.max(600, Math.floor(OPENAI_SCENE_MAX_OUTPUT_TOKENS * 0.55))
+);
+const OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM = parsePositiveInt(
+  process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM,
+  OPENAI_SCENE_MAX_OUTPUT_TOKENS
+);
+const OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG = parsePositiveInt(
+  process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG,
+  Math.max(OPENAI_SCENE_MAX_OUTPUT_TOKENS + 600, Math.floor(OPENAI_SCENE_MAX_OUTPUT_TOKENS * 1.35))
+);
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP = parsePositiveInt(process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP, 5000);
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS = parsePositiveInt(
   process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS,
   2
 );
 
-const SCENE_JSON_SCHEMA = {
+const buildSceneJsonSchema = (lengthProfile) => ({
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -33,6 +45,8 @@ const SCENE_JSON_SCHEMA = {
     summary: { type: 'string' },
     blocks: {
       type: 'array',
+      minItems: lengthProfile.minBlocks,
+      maxItems: lengthProfile.maxBlocks,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -47,7 +61,7 @@ const SCENE_JSON_SCHEMA = {
     }
   },
   required: ['heading', 'summary', 'blocks']
-};
+});
 
 const SURPRISE_SETUP_JSON_SCHEMA = {
   type: 'object',
@@ -176,6 +190,18 @@ const getCachedInputTokens = (response) =>
   response?.usage?.prompt_tokens_details?.cached_tokens ??
   response?.usage?.input_tokens_details?.cachedTokens ??
   0;
+const getOutputTokens = (response) =>
+  response?.usage?.output_tokens ??
+  response?.usage?.completion_tokens ??
+  0;
+const resolveSceneMaxOutputTokens = (lengthProfile) => {
+  if (!lengthProfile || typeof lengthProfile !== 'object') {
+    return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM;
+  }
+  if (lengthProfile.key === 'short') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT;
+  if (lengthProfile.key === 'long') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG;
+  return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM;
+};
 
 const requestOpenAiText = async ({
   openai,
@@ -289,6 +315,8 @@ const requestOpenAiText = async ({
     const latencyMs = Date.now() - startedAt;
     const cachedInputTokens = getCachedInputTokens(response);
     const totalInputTokens = response?.usage?.input_tokens ?? response?.usage?.prompt_tokens ?? 0;
+    const outputTokens = getOutputTokens(response);
+    const totalTokens = response?.usage?.total_tokens ?? (totalInputTokens + outputTokens);
     const cacheHitRatio = totalInputTokens > 0
       ? Number((cachedInputTokens / totalInputTokens).toFixed(3))
       : 0;
@@ -323,6 +351,10 @@ const requestOpenAiText = async ({
       provider: 'openai',
       model,
       latencyMs,
+      inputTokens: totalInputTokens,
+      outputTokens,
+      totalTokens,
+      outputChars: text?.length ?? 0,
       cachedInputTokens,
       cacheHitRatio,
       attempts: attempt + 1
@@ -400,7 +432,9 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
       characters: storyContext?.characters || [],
       scenes: storyContext?.scenes || [],
       userInstruction: userInstruction || '',
-      isFirstScene: Boolean(isFirstScene)
+      isFirstScene: Boolean(isFirstScene),
+      style: storyContext?.style || '',
+      targetLength: storyContext?.targetLength || ''
     });
     return promptSize;
   }
@@ -446,14 +480,17 @@ export const generateTextByKind = async ({
 
   if (kind === 'generateScene') {
     const { storyContext, userInstruction, isFirstScene } = context;
-    const { prompt } = buildGenerateScenePrompt({
+    const { prompt, lengthProfile } = buildGenerateScenePrompt({
       genre: storyContext.genre,
       premise: storyContext.premise,
       characters: storyContext.characters,
       scenes: storyContext.scenes,
       userInstruction,
-      isFirstScene
+      isFirstScene,
+      style: storyContext.style,
+      targetLength: storyContext.targetLength
     });
+    const sceneMaxOutputTokens = resolveSceneMaxOutputTokens(lengthProfile);
 
     const rawText = provider === 'openai'
       ? await requestOpenAiText({
@@ -461,15 +498,19 @@ export const generateTextByKind = async ({
           kind,
           model: models.openai,
           prompt,
-          maxOutputTokens: OPENAI_SCENE_MAX_OUTPUT_TOKENS,
+          maxOutputTokens: sceneMaxOutputTokens,
           temperature: 0.82,
           topP: 0.95,
-          cacheKey: buildPromptCacheKey(kind, isFirstScene ? 'opening' : 'next', models.openai),
+          cacheKey: buildPromptCacheKey(
+            kind,
+            `${isFirstScene ? 'opening' : 'next'}:${lengthProfile.key}:${storyContext.style ? 'styled' : 'unstyled'}`,
+            models.openai
+          ),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
           jsonSchemaFormat: {
             name: 'scene_output',
             description: 'Structured screenplay scene output.',
-            schema: SCENE_JSON_SCHEMA
+            schema: buildSceneJsonSchema(lengthProfile)
           },
           retryOnMaxOutputTokens: true,
           withTimeout,
@@ -509,6 +550,15 @@ export const generateTextByKind = async ({
         });
 
     const data = parseJsonObject(rawText, kind);
+    const sceneBlockCount = Array.isArray(data?.blocks) ? data.blocks.length : 0;
+    console.info('[text-gen] scene parsed', {
+      kind,
+      targetLength: lengthProfile.label,
+      maxOutputTokens: sceneMaxOutputTokens,
+      blocks: sceneBlockCount,
+      headingChars: typeof data?.heading === 'string' ? data.heading.length : 0,
+      summaryChars: typeof data?.summary === 'string' ? data.summary.length : 0
+    });
     return {
       data,
       meta: {

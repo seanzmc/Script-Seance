@@ -18,6 +18,7 @@ import {
 import { getSession, login } from './services/auth';
 import {
   Scene,
+  SceneLengthOption,
   StoryContext,
   VoiceConfig,
   LEGACY_VOICE_IDS,
@@ -59,18 +60,34 @@ const DEFAULT_SETUP_STATE: SetupFormState = {
   style: '',
   length: 'Medium'
 };
+const SCENE_LENGTH_OPTIONS = new Set<SceneLengthOption>(['Short', 'Medium', 'Long']);
+
+const normalizeTargetLength = (value: unknown): SceneLengthOption => (
+  typeof value === 'string' && SCENE_LENGTH_OPTIONS.has(value as SceneLengthOption)
+    ? value as SceneLengthOption
+    : 'Medium'
+);
 
 const isStoryContext = (value: unknown): value is StoryContext => {
   if (!value || typeof value !== 'object') {
     return false;
   }
   const record = value as Record<string, unknown>;
+  const style = record.style;
+  const targetLength = record.targetLength;
+  const styleOk = style === undefined || style === null || typeof style === 'string';
+  const targetLengthOk =
+    targetLength === undefined ||
+    targetLength === null ||
+    (typeof targetLength === 'string' && SCENE_LENGTH_OPTIONS.has(targetLength as SceneLengthOption));
   return (
     typeof record.title === 'string' &&
     typeof record.genre === 'string' &&
     typeof record.premise === 'string' &&
     Array.isArray(record.characters) &&
-    Array.isArray(record.scenes)
+    Array.isArray(record.scenes) &&
+    styleOk &&
+    targetLengthOk
   );
 };
 
@@ -515,7 +532,9 @@ export default function App() {
         ...prev,
         genre: context.genre,
         premise: context.premise,
-        characters: context.characters
+        characters: context.characters,
+        style: typeof context.style === 'string' ? context.style : prev.style,
+        length: normalizeTargetLength(context.targetLength)
       }));
     }
   }, [context]);
@@ -745,20 +764,15 @@ export default function App() {
       resetUndoRedo();
       resetTitleSuggestionState();
       void requestTitleSuggestion(setupState);
-      const setupNotes: string[] = [];
-      if (setupState.style.trim()) {
-        setupNotes.push(`Style: ${setupState.style.trim()}.`);
-      }
-      if (setupState.length.trim()) {
-        setupNotes.push(`Target length: ${setupState.length.trim()}.`);
-      }
-      const instruction = `${setupNotes.join(' ')} Write the opening scene setting the tone.`.trim();
+      const instruction = 'Write the opening scene setting the tone.';
       const initialContext: StoryContext = { 
         genre: setupState.genre,
         premise: setupState.premise,
         characters: normalizedCharacters,
         title: DEFAULT_TITLE,
-        scenes: [] 
+        scenes: [],
+        style: setupState.style.trim() || undefined,
+        targetLength: normalizeTargetLength(setupState.length)
       };
       request = createGenerateSceneRequest(
         initialContext,
