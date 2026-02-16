@@ -134,7 +134,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   }, [hasActivePanel, onCloseTool]);
 
   return (
-    <div className="w-full shrink-0 px-4 pb-3">
+    <div className="w-full shrink-0 px-3 pb-2">
       <div className="mx-auto w-full max-w-6xl flex flex-col">
         {hasActivePanel && (
           <div className={`rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelHeightClass} flex-col overflow-hidden`}>
@@ -154,8 +154,8 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
             </div>
           </div>
         )}
-        <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-3 py-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
-          <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5 text-gray-400">
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+          <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 text-gray-400">
             {TOOL_ORDER.map((tool) => {
               const isActive = activeTool === tool;
               const config = TOOL_CONFIG[tool];
@@ -166,7 +166,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                   onClick={() => onSelectTool(tool)}
                   aria-label={config.label}
                   aria-pressed={isActive}
-                  className={`group w-full min-h-[50px] lg:min-h-[56px] rounded-xl lg:rounded-2xl px-2.5 lg:px-3 py-2.5 text-[10px] lg:text-[11px] font-semibold uppercase tracking-[0.18em] transition-all duration-200 ease-out transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 border inline-flex items-center justify-center gap-2.5 touch-manipulation active:scale-[0.98] ${
+                  className={`group w-full min-h-[44px] lg:min-h-[48px] rounded-xl lg:rounded-2xl px-2 lg:px-2.5 py-2 text-[10px] lg:text-[11px] font-semibold uppercase tracking-[0.16em] transition-all duration-200 ease-out transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 border inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98] ${
                     isActive
                       ? 'bg-indigo-500 text-white border-indigo-400 shadow-[0_10px_24px_rgba(99,102,241,0.38)]'
                       : 'text-gray-300 border-gray-800 bg-gray-900/45 hover:bg-gray-800/85 hover:text-white hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,0.35)]'
