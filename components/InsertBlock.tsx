@@ -10,6 +10,84 @@ const resolveCharacterName = (value: string, characters: string[]) => {
   const normalized = normalizeCharacterName(value);
   return characters.find(char => normalizeCharacterName(char) === normalized) || value;
 };
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const collapseWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
+const toSingleSentence = (value: string) => {
+  const compact = collapseWhitespace(value);
+  if (!compact) return '';
+  const sentenceMatch = compact.match(/^(.+?[.!?])(?:\s|$)/);
+  return sentenceMatch?.[1]?.trim() || compact;
+};
+const removeDialogueSpeakerPrefix = (value: string, character: string) => {
+  const escaped = escapeRegExp(character.trim());
+  if (!escaped) return value.trim();
+
+  const withColonRemoved = value.replace(new RegExp(`^${escaped}\\s*[:\\-–—]\\s*`, 'i'), '');
+  const lines = withColonRemoved
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (lines.length >= 2) {
+    const firstLineNormalized = normalizeCharacterName(lines[0]);
+    if (firstLineNormalized === normalizeCharacterName(character)) {
+      return lines.slice(1).join(' ');
+    }
+  }
+  return lines.join(' ');
+};
+const sanitizeGeneratedDialogue = (rawText: string, character: string) => {
+  const withoutSpeaker = removeDialogueSpeakerPrefix(rawText, character);
+  const noQuotes = withoutSpeaker.replace(/^["'“”]+|["'“”]+$/g, '');
+  return collapseWhitespace(noQuotes);
+};
+const looksLikeTransition = (line: string) =>
+  /^(CUT TO|SMASH CUT TO|MATCH CUT TO|DISSOLVE TO|FADE IN|FADE OUT|WIPE TO|JUMP CUT TO)\b/i.test(line) ||
+  /:\s*$/.test(line);
+const looksLikeSpeakerLabel = (line: string) =>
+  /^[A-Z][A-Z0-9 .'\-()]{1,40}$/.test(line) || /^[A-Z][A-Z0-9 .'\-()]{1,40}\s*:/.test(line);
+const sanitizeGeneratedAction = (rawText: string) => {
+  const lines = rawText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  const filtered = lines.filter(line => !looksLikeTransition(line) && !looksLikeSpeakerLabel(line));
+  const base = filtered[0] || lines[0] || '';
+  return toSingleSentence(base);
+};
+const sanitizeGeneratedText = (type: BlockType, rawText: string, character: string) => {
+  if (type === BlockType.DIALOGUE) {
+    return sanitizeGeneratedDialogue(rawText, character);
+  }
+  if (type === BlockType.ACTION) {
+    return sanitizeGeneratedAction(rawText);
+  }
+  if (type === BlockType.TRANSITION || type === BlockType.HEADING) {
+    return rawText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)[0] || '';
+  }
+  return collapseWhitespace(rawText);
+};
+const buildSurpriseInstruction = (
+  type: BlockType,
+  baseInstruction: string,
+  character: string
+) => {
+  const trimmed = baseInstruction.trim();
+  if (trimmed) return trimmed;
+  if (type === BlockType.DIALOGUE) {
+    return `Write exactly one line of dialogue for "${character}". Output only the spoken words; do not include the character name, parentheticals, or extra lines.`;
+  }
+  if (type === BlockType.ACTION) {
+    return 'Write exactly one screenplay action line. Do not include dialogue, character labels, scene headings, or transitions.';
+  }
+  if (type === BlockType.TRANSITION) {
+    return 'Write exactly one screenplay transition.';
+  }
+  return 'Write exactly one scene heading (slugline) in screenplay format.';
+};
 
 export interface InsertBlockProps {
   characters: string[];
@@ -113,8 +191,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   const handleSurpriseMe = async () => {
     if (disabled || isGenerating) return;
     setIsGenerating(true);
-    const instruction =
-      content.trim() || `Surprise me with a ${elementType} block.`;
+    const instruction = buildSurpriseInstruction(elementType, content, selectedChar);
 
     try {
       const promptContext = styleContext?.trim() ? styleContext : genre;
@@ -124,8 +201,9 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         instruction,
         promptContext
       );
-      if (!generatedText.trim()) return;
-      setContent(generatedText.trim());
+      const sanitized = sanitizeGeneratedText(elementType, generatedText, selectedChar);
+      if (!sanitized) return;
+      setContent(sanitized);
     } catch (e) {
       console.error("Generation failed", e);
       onError?.(e);
