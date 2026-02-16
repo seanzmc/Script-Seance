@@ -14,6 +14,12 @@ import { isTextGenerationKind } from './types.js';
 const OPENAI_PROMPT_CACHE_PREFIX = 'script-seance:text-gen';
 const DEFAULT_OPENAI_PROMPT_CACHE_RETENTION = process.env.OPENAI_PROMPT_CACHE_RETENTION || '24h';
 const MAX_RAW_RESPONSE_LOG_CHARS = 2000;
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+const OPENAI_SCENE_MAX_OUTPUT_TOKENS = parsePositiveInt(process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS, 2200);
+const OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP = parsePositiveInt(process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP, 5000);
 
 const SCENE_JSON_SCHEMA = {
   type: 'object',
@@ -179,6 +185,7 @@ const requestOpenAiText = async ({
   cacheKey,
   cacheRetention,
   jsonSchemaFormat,
+  retryOnMaxOutputTokens = false,
   withTimeout,
   timeoutMs
 }) => {
@@ -190,93 +197,127 @@ const requestOpenAiText = async ({
   });
   const reasoningEffort = getReasoningEffortForModel(model);
   const shouldApplySampling = shouldApplySamplingControls(model, reasoningEffort);
-  const requestPayload = {
-    model,
-    input: createOpenAiInput(prompt, systemInstruction),
-    max_output_tokens: maxOutputTokens,
-    store: false,
-    prompt_cache_key: cacheKey || buildPromptCacheKey(kind, undefined, model)
-  };
-  if (jsonSchemaFormat) {
-    requestPayload.text = {
-      format: {
-        type: 'json_schema',
-        name: jsonSchemaFormat.name,
-        schema: jsonSchemaFormat.schema,
-        strict: true,
-        ...(jsonSchemaFormat.description ? { description: jsonSchemaFormat.description } : {})
-      }
-    };
-  }
-
-  const resolvedRetention = resolvePromptCacheRetention(model, cacheRetention);
-  if (resolvedRetention) {
-    requestPayload.prompt_cache_retention = resolvedRetention;
-  }
-
-  if (reasoningEffort) {
-    requestPayload.reasoning = { effort: reasoningEffort };
-  }
-
-  if (shouldApplySampling) {
-    if (typeof temperature === 'number') {
-      requestPayload.temperature = temperature;
-    }
-    if (typeof topP === 'number') {
-      requestPayload.top_p = topP;
-    }
-  }
-
   const startedAt = Date.now();
-  let response;
-  try {
-    response = await withTimeout(openai.responses.create(requestPayload), timeoutMs);
-  } catch (error) {
-    if (error && typeof error === 'object' && error.code === 'UPSTREAM_TIMEOUT') {
-      error.details = {
-        ...(error.details && typeof error.details === 'object' ? error.details : {}),
+  let attempt = 0;
+  let outputTokenLimit = maxOutputTokens;
+
+  while (true) {
+    const requestPayload = {
+      model,
+      input: createOpenAiInput(prompt, systemInstruction),
+      max_output_tokens: outputTokenLimit,
+      store: false,
+      prompt_cache_key: cacheKey || buildPromptCacheKey(kind, undefined, model)
+    };
+    if (jsonSchemaFormat) {
+      requestPayload.text = {
+        format: {
+          type: 'json_schema',
+          name: jsonSchemaFormat.name,
+          schema: jsonSchemaFormat.schema,
+          strict: true,
+          ...(jsonSchemaFormat.description ? { description: jsonSchemaFormat.description } : {})
+        }
+      };
+    }
+
+    const resolvedRetention = resolvePromptCacheRetention(model, cacheRetention);
+    if (resolvedRetention) {
+      requestPayload.prompt_cache_retention = resolvedRetention;
+    }
+
+    if (reasoningEffort) {
+      requestPayload.reasoning = { effort: reasoningEffort };
+    }
+
+    if (shouldApplySampling) {
+      if (typeof temperature === 'number') {
+        requestPayload.temperature = temperature;
+      }
+      if (typeof topP === 'number') {
+        requestPayload.top_p = topP;
+      }
+    }
+
+    let response;
+    try {
+      response = await withTimeout(openai.responses.create(requestPayload), timeoutMs);
+    } catch (error) {
+      if (error && typeof error === 'object' && error.code === 'UPSTREAM_TIMEOUT') {
+        error.details = {
+          ...(error.details && typeof error.details === 'object' ? error.details : {}),
+          kind,
+          provider: 'openai',
+          model,
+          timeoutMs,
+          attempt: attempt + 1,
+          maxOutputTokens: outputTokenLimit
+        };
+        console.warn('[text-gen] timeout', error.details);
+      }
+      throw error;
+    }
+
+    const incompleteReason = response?.incomplete_details?.reason;
+    const canRetryForMaxTokens =
+      retryOnMaxOutputTokens &&
+      response?.status === 'incomplete' &&
+      incompleteReason === 'max_output_tokens' &&
+      attempt < 1 &&
+      outputTokenLimit < OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP;
+    if (canRetryForMaxTokens) {
+      const nextLimit = Math.min(
+        OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP,
+        Math.max(outputTokenLimit + 400, Math.ceil(outputTokenLimit * 1.6))
+      );
+      console.warn('[text-gen] retrying after max_output_tokens', {
         kind,
         provider: 'openai',
         model,
-        timeoutMs
-      };
-      console.warn('[text-gen] timeout', error.details);
+        previousMaxOutputTokens: outputTokenLimit,
+        nextMaxOutputTokens: nextLimit
+      });
+      outputTokenLimit = nextLimit;
+      attempt += 1;
+      continue;
     }
-    throw error;
-  }
 
-  const latencyMs = Date.now() - startedAt;
-  const cachedInputTokens = getCachedInputTokens(response);
-  const totalInputTokens = response?.usage?.input_tokens ?? response?.usage?.prompt_tokens ?? 0;
-  const cacheHitRatio = totalInputTokens > 0
-    ? Number((cachedInputTokens / totalInputTokens).toFixed(3))
-    : 0;
-  if (response?.status && response.status !== 'completed') {
-    const error = new Error('AI response was not completed.');
-    error.code = 'UPSTREAM_ERROR';
-    error.details = {
+    const latencyMs = Date.now() - startedAt;
+    const cachedInputTokens = getCachedInputTokens(response);
+    const totalInputTokens = response?.usage?.input_tokens ?? response?.usage?.prompt_tokens ?? 0;
+    const cacheHitRatio = totalInputTokens > 0
+      ? Number((cachedInputTokens / totalInputTokens).toFixed(3))
+      : 0;
+    if (response?.status && response.status !== 'completed') {
+      const error = new Error('AI response was not completed.');
+      error.code = 'UPSTREAM_ERROR';
+      error.details = {
+        kind,
+        provider: 'openai',
+        model,
+        status: response.status,
+        incompleteDetails: response.incomplete_details ?? null,
+        maxOutputTokens: outputTokenLimit,
+        attempts: attempt + 1
+      };
+      throw error;
+    }
+    console.info('[text-gen] completed', {
       kind,
       provider: 'openai',
       model,
-      status: response.status,
-      incompleteDetails: response.incomplete_details ?? null
-    };
-    throw error;
-  }
-  console.info('[text-gen] completed', {
-    kind,
-    provider: 'openai',
-    model,
-    latencyMs,
-    cachedInputTokens,
-    cacheHitRatio
-  });
+      latencyMs,
+      cachedInputTokens,
+      cacheHitRatio,
+      attempts: attempt + 1
+    });
 
-  const text = extractOpenAiText(response);
-  if (!text || !text.trim()) {
-    throw new Error('No response from AI');
+    const text = extractOpenAiText(response);
+    if (!text || !text.trim()) {
+      throw new Error('No response from AI');
+    }
+    return text;
   }
-  return text;
 };
 
 const requestGeminiText = async ({
@@ -405,7 +446,7 @@ export const generateTextByKind = async ({
           kind,
           model: models.openai,
           prompt,
-          maxOutputTokens: 1400,
+          maxOutputTokens: OPENAI_SCENE_MAX_OUTPUT_TOKENS,
           temperature: 0.82,
           topP: 0.95,
           cacheKey: buildPromptCacheKey(kind, isFirstScene ? 'opening' : 'next', models.openai),
@@ -415,6 +456,7 @@ export const generateTextByKind = async ({
             description: 'Structured screenplay scene output.',
             schema: SCENE_JSON_SCHEMA
           },
+          retryOnMaxOutputTokens: true,
           withTimeout,
           timeoutMs
         })

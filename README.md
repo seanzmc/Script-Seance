@@ -34,6 +34,8 @@ OPENAI_MODEL=gpt-5.2
 OPENAI_FAST_MODEL=gpt-5-nano
 # Prompt cache retention: in-memory or 24h
 OPENAI_PROMPT_CACHE_RETENTION=24h
+OPENAI_SCENE_MAX_OUTPUT_TOKENS=2200
+OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP=5000
 TEXT_LLM_PROVIDER=openai
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
 INWORLD_API_KEY=your_inworld_api_key_here
