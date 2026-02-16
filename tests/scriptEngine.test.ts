@@ -33,7 +33,7 @@ const { pendingRequests, createGenerateSpeechRequest } = vi.hoisted(() => {
   return { pendingRequests, createGenerateSpeechRequest };
 });
 
-vi.mock('../services/gemini', () => ({ createGenerateSpeechRequest }));
+vi.mock('../services/ai', () => ({ createGenerateSpeechRequest }));
 
 const flushPromises = () => new Promise<void>((resolve) => queueMicrotask(resolve));
 

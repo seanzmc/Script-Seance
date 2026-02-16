@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
-import { generateScriptElement } from '../services/gemini';
+import { generateScriptElement } from '../services/ai';
 import { PenTool } from 'lucide-react';
 
 const normalizeCharacterName = (value: string) =>

@@ -4,7 +4,13 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import cookie from 'cookie';
-import { GoogleGenAI, Type } from '@google/genai';
+import {
+  getGeminiClient,
+  getOpenAIClient,
+  getTextProvider
+} from './llm/llmClient.js';
+import { generateTextByKind, getPromptSizeEstimate } from './llm/textGeneration.js';
+import { isTextGenerationKind } from './llm/types.js';
 import {
   LEGACY_TTS_VOICES,
   LEGACY_VOICE_IDS,
@@ -498,6 +504,9 @@ const listInworldVoices = async () => {
 };
 
 const generateSpeechWithGemini = async (ai, text, voiceName) => {
+  if (!ai) {
+    throw createUpstreamError('Server missing GEMINI_API_KEY.', 500, 'CONFIG_ERROR');
+  }
   if (!ALLOWED_VOICES.has(voiceName)) {
     throw createUpstreamError('Invalid voice selection for Gemini provider.', 400, 'INVALID_VOICE');
   }
@@ -595,6 +604,7 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
 };
 
 const generateSpeechByProvider = async (ai, text, voiceName, expressive = false) => {
+  let geminiAi = ai;
   const providers = getTtsProviderOrderForVoice(voiceName);
   const startedAt = Date.now();
   const errors = [];
@@ -604,7 +614,12 @@ const generateSpeechByProvider = async (ai, text, voiceName, expressive = false)
     try {
       const result = provider === 'inworld'
         ? await generateSpeechWithInworld(text, voiceName, expressive)
-        : await generateSpeechWithGemini(ai, text, voiceName);
+        : await (async () => {
+            if (!geminiAi) {
+              geminiAi = getGeminiClient();
+            }
+            return generateSpeechWithGemini(geminiAi, text, voiceName);
+          })();
       const latencyMs = Date.now() - startedAt;
       return { ...result, latencyMs };
     } catch (error) {
@@ -935,289 +950,102 @@ const handleAiGenerate = async (req, res) => {
     return sendError(res, 400, 'Invalid request payload.', 'INVALID_REQUEST');
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return sendError(res, 500, 'Server missing GEMINI_API_KEY.', 'CONFIG_ERROR');
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
   try {
     let data;
 
-    if (kind === 'generateScene') {
-      const { storyContext, userInstruction, isFirstScene } = context;
-      if (!isObject(storyContext) || !isNonEmptyString(userInstruction, 2000) || typeof isFirstScene !== 'boolean') {
-        return sendError(res, 400, 'Invalid generateScene context.', 'INVALID_REQUEST');
+    if (isTextGenerationKind(kind)) {
+      if (kind === 'generateScene') {
+        const { storyContext, userInstruction, isFirstScene } = context;
+        if (!isObject(storyContext) || !isNonEmptyString(userInstruction, 2000) || typeof isFirstScene !== 'boolean') {
+          return sendError(res, 400, 'Invalid generateScene context.', 'INVALID_REQUEST');
+        }
+
+        const { genre, premise, characters } = storyContext;
+        if (!isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000) || !Array.isArray(characters)) {
+          return sendError(res, 400, 'Invalid story context.', 'INVALID_REQUEST');
+        }
+
+        if (characters.some((c) => !isNonEmptyString(c, 120))) {
+          return sendError(res, 400, 'Invalid character list.', 'INVALID_REQUEST');
+        }
+      } else if (kind === 'suggestPlotTwist') {
+        const { genre } = context;
+        if (!isNonEmptyString(genre, 120)) {
+          return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
+        }
+      } else if (kind === 'generateScriptElement') {
+        const { type, character, instruction, styleContext } = context;
+        if (
+          !isNonEmptyString(type, 24) ||
+          !VALID_BLOCK_TYPES.has(type) ||
+          !isNonEmptyString(instruction, 2000) ||
+          !isNonEmptyString(styleContext, 4000)
+        ) {
+          return sendError(res, 400, 'Invalid generateScriptElement context.', 'INVALID_REQUEST');
+        }
+
+        const hasCharacter = character !== undefined && character !== null;
+        if (
+          (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
+          (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
+        ) {
+          return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+        }
+      } else if (kind === 'regenerateScriptBlock') {
+        const { block, genre, premise, rewriteGuidance } = context;
+        if (!isObject(block) || !isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000)) {
+          return sendError(res, 400, 'Invalid regenerateScriptBlock context.', 'INVALID_REQUEST');
+        }
+        if (
+          rewriteGuidance !== undefined &&
+          rewriteGuidance !== null &&
+          !isNonEmptyString(rewriteGuidance, 1200)
+        ) {
+          return sendError(res, 400, 'Invalid rewrite guidance.', 'INVALID_REQUEST');
+        }
+
+        const { type, text, character } = block;
+        if (
+          !isNonEmptyString(type, 24) ||
+          !VALID_BLOCK_TYPES.has(type) ||
+          !isNonEmptyString(text, 2000)
+        ) {
+          return sendError(res, 400, 'Invalid block data.', 'INVALID_REQUEST');
+        }
+
+        const hasCharacter = character !== undefined && character !== null;
+        if (
+          (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
+          (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
+        ) {
+          return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+        }
+      } else if (kind === 'generateSurpriseSetup') {
+        const { targetGenre } = context;
+        if (targetGenre !== undefined && targetGenre !== null && !isNonEmptyString(targetGenre, 120)) {
+          return sendError(res, 400, 'Invalid generateSurpriseSetup context.', 'INVALID_REQUEST');
+        }
       }
 
-      const { genre, premise, characters, scenes } = storyContext;
-      if (!isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000) || !Array.isArray(characters)) {
-        return sendError(res, 400, 'Invalid story context.', 'INVALID_REQUEST');
-      }
-
-      if (characters.some((c) => !isNonEmptyString(c, 120))) {
-        return sendError(res, 400, 'Invalid character list.', 'INVALID_REQUEST');
-      }
-
-      const previousScenesSummary = Array.isArray(scenes)
-        ? scenes
-            .map((scene, index) =>
-              isObject(scene) && isNonEmptyString(scene.summary, 1200)
-                ? `Scene ${index + 1}: ${scene.summary}`
-                : null
-            )
-            .filter(Boolean)
-            .join('\n')
-        : '';
-
-      const charactersList = characters.join(', ');
-      const promptSize = [
-        genre,
-        premise,
-        charactersList,
-        userInstruction,
-        previousScenesSummary
-      ].filter(Boolean).join('\n').length;
+      const promptSize = getPromptSizeEstimate({ kind, context, genres: GENRES });
       if (!ensurePromptSize(res, promptSize)) {
         return;
       }
 
-      const prompt = `
-    You are a professional screenwriter. Write the ${isFirstScene ? 'opening' : 'next'} scene for a screenplay.
-    
-    Genre: ${genre}
-    Premise: ${premise}
-    Characters: ${charactersList}
-    
-    ${previousScenesSummary ? `Previous Story Context:\n${previousScenesSummary}` : ''}
-    
-    User Instruction for this scene: "${userInstruction}"
-    
-    IMPORTANT: Return ONLY a JSON object representing the scene. Do not include markdown formatting or extra text.
-    
-    The JSON schema is:
-    {
-      "heading": "INT. LOCATION - TIME",
-      "summary": "A one sentence summary of what happens in this scene for context tracking.",
-      "blocks": [
-        {
-          "type": "heading" | "action" | "dialogue" | "transition",
-          "character": "CHARACTER NAME (only for dialogue)",
-          "parenthetical": "(optional parenthetical instruction)",
-          "text": "The content of the block"
-        }
-      ]
-    }
-
-    Ensure the output is valid JSON.
-  `;
-
-      const response = await withTimeout(ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              heading: { type: Type.STRING },
-              summary: { type: Type.STRING },
-              blocks: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    type: { type: Type.STRING, enum: ['heading', 'action', 'dialogue', 'transition'] },
-                    character: { type: Type.STRING, nullable: true },
-                    parenthetical: { type: Type.STRING, nullable: true },
-                    text: { type: Type.STRING }
-                  },
-                  required: ['type', 'text']
-                }
-              }
-            },
-            required: ['heading', 'summary', 'blocks']
-          }
-        }
-      }), AI_UPSTREAM_TIMEOUT_MS);
-
-      const text = response.text;
-      if (!text) {
-        throw new Error('No response from AI');
-      }
-      rawAiResponse = text;
-
-      try {
-        data = JSON.parse(text);
-        parsedAiKeys = data && typeof data === 'object' ? Object.keys(data) : [];
-      } catch {
-        createAiValidationError(kind, 'Invalid JSON payload.');
-      }
-    } else if (kind === 'suggestPlotTwist') {
-      const { genre } = context;
-      if (!isNonEmptyString(genre, 120)) {
-        return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
-      }
-
-      const response = await withTimeout(ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: `Give me a short, shocking, single-sentence plot twist idea for a ${genre} story.`
-      }), AI_UPSTREAM_TIMEOUT_MS);
-
-      data = { text: response.text || 'Suddenly, everything changes.' };
-    } else if (kind === 'generateScriptElement') {
-      const { type, character, instruction, styleContext } = context;
-      if (
-        !isNonEmptyString(type, 24) ||
-        !VALID_BLOCK_TYPES.has(type) ||
-        !isNonEmptyString(instruction, 2000) ||
-        !isNonEmptyString(styleContext, 4000)
-      ) {
-        return sendError(res, 400, 'Invalid generateScriptElement context.', 'INVALID_REQUEST');
-      }
-      if (!ensurePromptSize(res, `${instruction}\n${styleContext}`.length)) {
-        return;
-      }
-
-      const hasCharacter = character !== undefined && character !== null;
-      if (
-        (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
-        (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
-      ) {
-        return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
-      }
-
-      let userPrompt = '';
-      if (type === 'dialogue') {
-        userPrompt = `Write a single line of dialogue for character "${character}". Context: ${styleContext}. Instruction: ${instruction}`;
-      } else if (type === 'action') {
-        userPrompt = `Write a concise screenplay action line. Context: ${styleContext}. Instruction: ${instruction}`;
-      } else if (type === 'transition') {
-        userPrompt = `Write a screenplay transition (e.g. CUT TO:). Context: ${styleContext}. Instruction: ${instruction}`;
-      } else if (type === 'heading') {
-        userPrompt = `Write a scene heading (slugline) like INT. HOUSE - DAY. Context: ${styleContext}. Instruction: ${instruction}`;
-      }
-
-      const response = await withTimeout(ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: userPrompt,
-        config: {
-          systemInstruction:
-            'You are a screenwriting assistant. Output ONLY the raw script text requested. Do not add quotes, prefixes, or formatting.',
-          maxOutputTokens: 100,
-          temperature: 0.7
-        }
-      }), AI_UPSTREAM_TIMEOUT_MS);
-
-      data = { text: response.text?.trim() || '' };
-    } else if (kind === 'regenerateScriptBlock') {
-      const { block, genre, premise, rewriteGuidance } = context;
-      if (!isObject(block) || !isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000)) {
-        return sendError(res, 400, 'Invalid regenerateScriptBlock context.', 'INVALID_REQUEST');
-      }
-      if (
-        rewriteGuidance !== undefined &&
-        rewriteGuidance !== null &&
-        !isNonEmptyString(rewriteGuidance, 1200)
-      ) {
-        return sendError(res, 400, 'Invalid rewrite guidance.', 'INVALID_REQUEST');
-      }
-
-      const { type, text, character } = block;
-      if (
-        !isNonEmptyString(type, 24) ||
-        !VALID_BLOCK_TYPES.has(type) ||
-        !isNonEmptyString(text, 2000)
-      ) {
-        return sendError(res, 400, 'Invalid block data.', 'INVALID_REQUEST');
-      }
-
-      const hasCharacter = character !== undefined && character !== null;
-      if (
-        (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
-        (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
-      ) {
-        return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
-      }
-
-      const guidanceText = typeof rewriteGuidance === 'string' ? rewriteGuidance.trim() : '';
-      if (!ensurePromptSize(res, `${premise}\n${text}\n${guidanceText}`.length)) {
-        return;
-      }
-
-      let prompt = '';
-      if (type === 'dialogue') {
-        prompt = `Rewrite this dialogue line for ${character} to be more impactful, witty, or dramatic, fitting the genre "${genre}". 
-    Premise: ${premise}.
-    Original line: "${text}".
-    ${guidanceText ? `Additional direction: ${guidanceText}.` : ''}
-    Output ONLY the new dialogue text.`;
-      } else {
-        prompt = `Rewrite this screenplay ${type} block to be more descriptive and engaging. 
-    Genre: ${genre}.
-    Premise: ${premise}.
-    Original text: "${text}".
-    ${guidanceText ? `Additional direction: ${guidanceText}.` : ''}
-    Output ONLY the new text.`;
-      }
-
-      const response = await withTimeout(ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: prompt,
-        config: {
-          maxOutputTokens: 150,
-          temperature: 0.8
-        }
-      }), AI_UPSTREAM_TIMEOUT_MS);
-
-      data = { text: response.text?.trim() || text };
-    } else if (kind === 'generateSurpriseSetup') {
-      const { targetGenre } = context;
-      if (targetGenre !== undefined && targetGenre !== null && !isNonEmptyString(targetGenre, 120)) {
-        return sendError(res, 400, 'Invalid generateSurpriseSetup context.', 'INVALID_REQUEST');
-      }
-
-      const genreInstruction = targetGenre
-        ? `The genre MUST be "${targetGenre}".`
-        : `Pick a genre from this list if suitable: ${GENRES.join(', ')}, otherwise choose a fitting one.`;
-
-      const prompt = `
-    Generate a creative, unique, and interesting movie premise. 
-    ${genreInstruction}
-    Return a JSON object with: 
-    'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''}, 
-    'premise' (string, 1-2 sentences), 
-    'characters' (array of 3 character names with brief role description, e.g. "John (The Detective)").
-  `;
-
-      const response = await withTimeout(ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              genre: { type: Type.STRING },
-              premise: { type: Type.STRING },
-              characters: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ['genre', 'premise', 'characters']
-          }
-        }
-      }), AI_UPSTREAM_TIMEOUT_MS);
-
-      const text = response.text;
-      if (!text) {
-        throw new Error('No response from AI');
-      }
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        createAiValidationError(kind, 'Invalid JSON payload.');
-      }
+      const textProvider = getTextProvider();
+      const generationResult = await generateTextByKind({
+        kind,
+        context,
+        genres: GENRES,
+        provider: textProvider,
+        openai: textProvider === 'openai' ? getOpenAIClient() : null,
+        geminiAi: textProvider === 'gemini' ? getGeminiClient() : null,
+        withTimeout,
+        timeoutMs: AI_UPSTREAM_TIMEOUT_MS
+      });
+      data = generationResult.data;
+      rawAiResponse = generationResult.meta?.rawAiResponse;
+      parsedAiKeys = generationResult.meta?.parsedAiKeys;
     } else if (kind === 'generateSpeech') {
       const { text, voiceName, expressive } = context;
       if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
@@ -1226,7 +1054,7 @@ const handleAiGenerate = async (req, res) => {
       if (!ensurePromptSize(res, text.length)) {
         return;
       }
-      const result = await generateSpeechByProvider(ai, text, voiceName, Boolean(expressive));
+      const result = await generateSpeechByProvider(null, text, voiceName, Boolean(expressive));
       data = { audioBase64: result.audioBase64 };
       console.info('[tts] generated', {
         provider: result.provider,
@@ -1250,11 +1078,13 @@ const handleAiGenerate = async (req, res) => {
     const message = error?.message || '';
     const normalizedMessage = message.toLowerCase();
     const isRateLimit =
+      error?.status === 429 ||
       normalizedMessage.includes('429') ||
       normalizedMessage.includes('resource_exhausted') ||
       normalizedMessage.includes('rate limit');
     const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
     const isInvalidAi = error?.code === 'INVALID_AI_RESPONSE';
+    const isConfigError = error?.code === 'CONFIG_ERROR';
 
     if (!IS_PROD && isInvalidAi && kind === 'generateScene') {
       const rawSnippet = typeof rawAiResponse === 'string' ? rawAiResponse.slice(0, 2000) : null;
@@ -1270,13 +1100,17 @@ const handleAiGenerate = async (req, res) => {
     console.error('[ai/generate] Failed', error);
     return sendError(
       res,
-      isTimeout ? 504 : isRateLimit ? 429 : 502,
+      isConfigError ? 500 : isTimeout ? 504 : isRateLimit ? 429 : 502,
       isTimeout
         ? 'AI request timed out.'
+        : isConfigError
+        ? error?.message || 'Server configuration error.'
         : isInvalidAi
         ? 'AI response did not match expected format.'
         : 'AI request failed.',
-      isTimeout
+      isConfigError
+        ? 'CONFIG_ERROR'
+        : isTimeout
         ? 'UPSTREAM_TIMEOUT'
         : isRateLimit
         ? 'RATE_LIMITED'

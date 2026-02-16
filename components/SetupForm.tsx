@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { Users, Plus, Trash2, Shuffle, ChevronDown } from "lucide-react";
-import { generateSurpriseSetup } from "../services/gemini";
+import { generateSurpriseSetup } from "../services/ai";
 
 export type SetupFormState = {
   genre: string;

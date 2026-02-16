@@ -1,6 +1,6 @@
 # Script Seance
 
-Script Seance is a React + Node app for AI-assisted screenplay drafting, rewriting, and voice playback using Gemini through a server-side proxy.
+Script Seance is a React + Node app for AI-assisted screenplay drafting, rewriting, and voice playback using OpenAI text generation through a server-side proxy.
 
 ## Current Status
 
@@ -20,7 +20,8 @@ UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
 - React 19 + TypeScript
 - Vite 6
 - Express 5 API server
-- Google GenAI SDK (`@google/genai`)
+- OpenAI SDK (`openai`)
+- Google GenAI SDK (`@google/genai`) for Gemini TTS fallback
 - Vitest + Testing Library
 
 ## Environment Variables
@@ -28,6 +29,11 @@ UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
 Copy `.env.example` to `.env` and set:
 
 ```bash
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-5.2
+OPENAI_FAST_MODEL=gpt-5-nano
+OPENAI_PROMPT_CACHE_RETENTION=24h
+TEXT_LLM_PROVIDER=openai
 GEMINI_API_KEY=your_google_ai_studio_api_key_here
 INWORLD_API_KEY=your_inworld_api_key_here
 INWORLD_API_SECRET=your_inworld_api_secret_here
@@ -49,8 +55,9 @@ INWORLD_MAX_ENGLISH_VOICES=8
 INWORLD_JWT_REFRESH_BUFFER_MS=60000
 ```
 
-`GEMINI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.  
+`OPENAI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.  
 For Inworld TTS migration paths, set `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
+`GEMINI_API_KEY` is optional unless you use Gemini text fallback (`TEXT_LLM_PROVIDER=gemini`) or Gemini TTS.
 
 ## Local Development
 
@@ -94,7 +101,7 @@ pnpm build
 
 ## Production Notes
 
-- Keep Gemini keys server-side only.
+- Keep OpenAI keys server-side only.
 - Serve `dist/` and reverse-proxy `/api` to the Node server.
 - Set `NODE_ENV=production` for secure cookies and production security headers.
 - Configure HTTPS + security headers at the edge/proxy.

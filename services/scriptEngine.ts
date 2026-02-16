@@ -1,5 +1,5 @@
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
-import { createGenerateSpeechRequest } from './gemini';
+import { createGenerateSpeechRequest } from './ai';
 import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from './audioCache';
 
 // Global Content-Addressable Cache (persists across plays)
@@ -246,7 +246,7 @@ export class ScriptEngine {
     }
   }
 
-  // --- Gemini Integration & Caching ---
+  // --- AI Integration & Caching ---
 
   private async fetchAudio(
     text: string,

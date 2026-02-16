@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BlockType } from '../types';
-import { createGenerateSpeechRequest, createSuggestPlotTwistRequest, generateScriptElement } from '../services/gemini';
+import { createGenerateSpeechRequest, createSuggestPlotTwistRequest, generateScriptElement } from '../services/ai';
 
 type MockResponse = {
   ok: boolean;
@@ -19,7 +19,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('gemini API wrapper', () => {
+describe('AI API wrapper', () => {
   it('surfaces API error responses with a friendly status message', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createMockResponse(429, {

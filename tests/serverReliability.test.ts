@@ -22,6 +22,7 @@ vi.mock('@google/genai', () => ({
 beforeAll(async () => {
   process.env.ADMIN_PASSWORD = 'test-password';
   process.env.GEMINI_API_KEY = 'test-key';
+  process.env.TEXT_LLM_PROVIDER = 'gemini';
   process.env.TTS_PROVIDER = 'gemini';
   process.env.INWORLD_API_KEY = '';
   process.env.INWORLD_API_SECRET = '';

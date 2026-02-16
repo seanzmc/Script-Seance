@@ -14,7 +14,7 @@ import {
   CancellableRequest,
   generateScriptElement,
   listVoices
-} from './services/gemini';
+} from './services/ai';
 import { getSession, login } from './services/auth';
 import {
   Scene,
