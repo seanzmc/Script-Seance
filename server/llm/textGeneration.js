@@ -31,10 +31,19 @@ const OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG = parsePositiveInt(
   process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG,
   Math.max(OPENAI_SCENE_MAX_OUTPUT_TOKENS + 600, Math.floor(OPENAI_SCENE_MAX_OUTPUT_TOKENS * 1.35))
 );
+const OPENAI_SCENE_COMPLETION_BUFFER_TOKENS = parsePositiveInt(
+  process.env.OPENAI_SCENE_COMPLETION_BUFFER_TOKENS,
+  180
+);
+const OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS = parsePositiveInt(
+  process.env.OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS,
+  2600
+);
+const OPENAI_SCENE_USE_MINI_FOR_LONG = (process.env.OPENAI_SCENE_USE_MINI_FOR_LONG || '1') !== '0';
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP = parsePositiveInt(process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP, 5000);
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS = parsePositiveInt(
   process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS,
-  2
+  3
 );
 
 const buildSceneJsonSchema = (lengthProfile) => ({
@@ -195,12 +204,80 @@ const getOutputTokens = (response) =>
   response?.usage?.completion_tokens ??
   0;
 const resolveSceneMaxOutputTokens = (lengthProfile) => {
+  const completionBuffer = Math.max(0, OPENAI_SCENE_COMPLETION_BUFFER_TOKENS);
   if (!lengthProfile || typeof lengthProfile !== 'object') {
-    return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM;
+    return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM + completionBuffer;
   }
-  if (lengthProfile.key === 'short') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT;
-  if (lengthProfile.key === 'long') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG;
-  return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM;
+  if (lengthProfile.key === 'short') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT + completionBuffer;
+  if (lengthProfile.key === 'long') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG + completionBuffer;
+  return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM + completionBuffer;
+};
+const resolveSceneModel = (models, lengthProfile, sceneMaxOutputTokens) => {
+  const baseModel = models?.openai;
+  const balancedModel = models?.openaiBalanced || baseModel;
+  const shouldUseBalancedForLength = OPENAI_SCENE_USE_MINI_FOR_LONG && lengthProfile?.key === 'long';
+  const shouldUseBalancedForBudget = sceneMaxOutputTokens >= OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS;
+  return shouldUseBalancedForLength || shouldUseBalancedForBudget ? balancedModel : baseModel;
+};
+const SENTENCE_END_RE = /[.!?…]["')\]]*$/;
+const TRANSITION_END_RE = /[:.!?]["')\]]*$/;
+const trimToCompleteSentence = (text) => {
+  const trimmed = typeof text === 'string' ? text.trim() : '';
+  if (!trimmed) return '';
+  const sentenceEnds = ['.', '!', '?']
+    .map((char) => trimmed.lastIndexOf(char))
+    .filter((index) => index >= 0);
+  const lastSentenceEnd = sentenceEnds.length ? Math.max(...sentenceEnds) : -1;
+  if (lastSentenceEnd >= Math.floor(trimmed.length * 0.45)) {
+    return trimmed.slice(0, lastSentenceEnd + 1).trim();
+  }
+  return `${trimmed}.`;
+};
+const normalizeSceneBlockText = (block) => {
+  if (!block || typeof block !== 'object') {
+    return { block, adjusted: false };
+  }
+  if (typeof block.text !== 'string') {
+    return { block, adjusted: false };
+  }
+  const text = block.text.trim();
+  const blockType = typeof block.type === 'string' ? block.type : '';
+  if (!text) {
+    return { block: { ...block, text }, adjusted: block.text !== text };
+  }
+
+  if (blockType === 'action' || blockType === 'dialogue') {
+    if (SENTENCE_END_RE.test(text)) {
+      return { block: { ...block, text }, adjusted: block.text !== text };
+    }
+    const normalizedText = trimToCompleteSentence(text);
+    return { block: { ...block, text: normalizedText }, adjusted: normalizedText !== block.text };
+  }
+
+  if (blockType === 'transition') {
+    if (TRANSITION_END_RE.test(text)) {
+      return { block: { ...block, text }, adjusted: block.text !== text };
+    }
+    const normalizedText = text.endsWith('TO') ? `${text}:` : `${text}.`;
+    return { block: { ...block, text: normalizedText }, adjusted: normalizedText !== block.text };
+  }
+
+  return { block: { ...block, text }, adjusted: block.text !== text };
+};
+const normalizeSceneThoughtCompletion = (data) => {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.blocks)) {
+    return { data, adjustedBlocks: 0 };
+  }
+  let adjustedBlocks = 0;
+  const blocks = data.blocks.map((block) => {
+    const normalized = normalizeSceneBlockText(block);
+    if (normalized.adjusted) adjustedBlocks += 1;
+    return normalized.block;
+  });
+  return {
+    data: { ...data, blocks },
+    adjustedBlocks
+  };
 };
 
 const requestOpenAiText = async ({
@@ -298,7 +375,7 @@ const requestOpenAiText = async ({
     if (canRetryForMaxTokens) {
       const nextLimit = Math.min(
         OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP,
-        Math.max(outputTokenLimit + 400, Math.ceil(outputTokenLimit * 1.6))
+        Math.max(outputTokenLimit + 600, Math.ceil(outputTokenLimit * 1.75))
       );
       console.warn('[text-gen] retrying after max_output_tokens', {
         kind,
@@ -491,12 +568,15 @@ export const generateTextByKind = async ({
       targetLength: storyContext.targetLength
     });
     const sceneMaxOutputTokens = resolveSceneMaxOutputTokens(lengthProfile);
+    const sceneModel = provider === 'openai'
+      ? resolveSceneModel(models, lengthProfile, sceneMaxOutputTokens)
+      : models.gemini;
 
     const rawText = provider === 'openai'
       ? await requestOpenAiText({
           openai,
           kind,
-          model: models.openai,
+          model: sceneModel,
           prompt,
           maxOutputTokens: sceneMaxOutputTokens,
           temperature: 0.82,
@@ -504,7 +584,7 @@ export const generateTextByKind = async ({
           cacheKey: buildPromptCacheKey(
             kind,
             `${isFirstScene ? 'opening' : 'next'}:${lengthProfile.key}:${storyContext.style ? 'styled' : 'unstyled'}`,
-            models.openai
+            sceneModel
           ),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
           jsonSchemaFormat: {
@@ -550,20 +630,25 @@ export const generateTextByKind = async ({
         });
 
     const data = parseJsonObject(rawText, kind);
-    const sceneBlockCount = Array.isArray(data?.blocks) ? data.blocks.length : 0;
+    const normalizedScene = normalizeSceneThoughtCompletion(data);
+    const sceneBlockCount = Array.isArray(normalizedScene.data?.blocks) ? normalizedScene.data.blocks.length : 0;
     console.info('[text-gen] scene parsed', {
       kind,
+      model: sceneModel,
       targetLength: lengthProfile.label,
       maxOutputTokens: sceneMaxOutputTokens,
       blocks: sceneBlockCount,
-      headingChars: typeof data?.heading === 'string' ? data.heading.length : 0,
-      summaryChars: typeof data?.summary === 'string' ? data.summary.length : 0
+      normalizedTrailingBlocks: normalizedScene.adjustedBlocks,
+      headingChars: typeof normalizedScene.data?.heading === 'string' ? normalizedScene.data.heading.length : 0,
+      summaryChars: typeof normalizedScene.data?.summary === 'string' ? normalizedScene.data.summary.length : 0
     });
     return {
-      data,
+      data: normalizedScene.data,
       meta: {
         rawAiResponse: rawText,
-        parsedAiKeys: data && typeof data === 'object' ? Object.keys(data) : []
+        parsedAiKeys: normalizedScene.data && typeof normalizedScene.data === 'object'
+          ? Object.keys(normalizedScene.data)
+          : []
       }
     };
   }

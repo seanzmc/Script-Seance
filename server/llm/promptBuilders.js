@@ -93,6 +93,8 @@ export const buildGenerateScenePrompt = ({
     - Aim for roughly ${lengthProfile.wordRange} words unless the user explicitly asks otherwise.
     - Prefer ${lengthProfile.minBlocks}-${lengthProfile.maxBlocks} screenplay blocks.
     - Keep each block tight and playable.
+    - If you are nearing token limits, reduce detail and end early with complete thoughts.
+    - Never end a block in a cut-off sentence or dangling fragment.
 
     IMPORTANT: Return ONLY a JSON object representing the scene. Do not include markdown formatting or extra text.
 

@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 const DEFAULT_TEXT_PROVIDER = 'openai';
 const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || process.env.VITE_OPENAI_MODEL || 'gpt-5.2';
 const DEFAULT_OPENAI_FAST_MODEL = process.env.OPENAI_FAST_MODEL || 'gpt-5-nano';
+const DEFAULT_OPENAI_BALANCED_MODEL = process.env.OPENAI_BALANCED_MODEL || 'gpt-5-mini';
 const DEFAULT_GEMINI_SCENE_MODEL = process.env.GEMINI_TEXT_MODEL_SCENE || 'gemini-2.5-flash';
 const DEFAULT_GEMINI_FAST_MODEL = process.env.GEMINI_TEXT_MODEL_FAST || 'gemini-2.5-flash-lite';
 
@@ -23,6 +24,7 @@ export const getTextModels = (kind) => {
   const isScene = kind === 'generateScene';
   return {
     openai: isScene ? DEFAULT_OPENAI_MODEL : DEFAULT_OPENAI_FAST_MODEL,
+    openaiBalanced: DEFAULT_OPENAI_BALANCED_MODEL,
     gemini: isScene ? DEFAULT_GEMINI_SCENE_MODEL : DEFAULT_GEMINI_FAST_MODEL
   };
 };
