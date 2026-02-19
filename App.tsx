@@ -238,7 +238,8 @@ export default function App() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
-  // Casting Modal State
+  // Voices tool view state
+  const [voicesView, setVoicesView] = useState<'list' | 'casting'>('list');
   const [castingCharacter, setCastingCharacter] = useState<string | null>(null);
   const [previewVoiceId, setPreviewVoiceId] = useState<string | null>(null);
 
@@ -660,6 +661,26 @@ export default function App() {
       }
     };
   }, [context, userInstruction]);
+
+  useEffect(() => {
+    if (!context) {
+      setVoicesView('list');
+      setCastingCharacter(null);
+      return;
+    }
+    if (!castingCharacter) {
+      setVoicesView('list');
+      return;
+    }
+    const isKnownCharacter = normalizeCharacterName(castingCharacter) === normalizeCharacterName('Narrator')
+      || context.characters.some((character) => (
+        normalizeCharacterName(character) === normalizeCharacterName(castingCharacter)
+      ));
+    if (!isKnownCharacter) {
+      setVoicesView('list');
+      setCastingCharacter(null);
+    }
+  }, [castingCharacter, context]);
 
   useEffect(() => {
     if (!context || !suggestedTitle || suggestedTitleDismissed) return;
@@ -1238,6 +1259,18 @@ export default function App() {
     await playPreview(text, config);
   };
 
+  const handleOpenCasting = (character: string) => {
+    setCastingCharacter(character);
+    setVoicesView('casting');
+  };
+
+  const handleCloseCasting = () => {
+    stop();
+    setPreviewVoiceId(null);
+    setVoicesView('list');
+    setCastingCharacter(null);
+  };
+
   const blockLookup = useMemo(() => {
     if (!context) return new Map<string, ScriptBlock>();
     const lookup = new Map<string, ScriptBlock>();
@@ -1272,17 +1305,41 @@ export default function App() {
       {voiceCatalogState === 'error' && (
         <p className="text-[10px] text-amber-300">Voice catalog unavailable. Using fallback voices.</p>
       )}
-      <VoicesPanel
-        characters={context.characters}
-        availableVoices={availableVoices}
-        voiceConfigs={voiceConfigs}
-        onUpdateConfig={updateVoiceConfig}
-        onOpenCasting={setCastingCharacter}
-        onPreview={(config) => playPreview(getPreviewText(config.name), config)}
-        onStop={stop}
-        isAudioPlaying={isPreviewPlaying && !castingCharacter}
-        isLoading={isLoadingAudio && !isPlaying && !castingCharacter}
-      />
+      {voicesView === 'casting' && castingCharacter ? (
+        <VoiceCastingModal
+          isOpen={true}
+          embedded
+          onClose={handleCloseCasting}
+          onBack={handleCloseCasting}
+          characterName={castingCharacter}
+          currentVoiceId={
+            voiceConfigs.find((config) => (
+              normalizeCharacterName(config.name) === normalizeCharacterName(castingCharacter)
+            ))?.voiceId || defaultVoiceId
+          }
+          availableVoices={availableVoices}
+          voiceConfigs={voiceConfigs}
+          onSelect={(voiceId) => {
+            updateVoiceConfig(castingCharacter, { voiceId });
+            handleCloseCasting();
+          }}
+          onPreview={handleModalPreview}
+          isPreviewing={isPreviewPlaying || isLoadingAudio}
+          previewVoiceId={previewVoiceId}
+        />
+      ) : (
+        <VoicesPanel
+          characters={context.characters}
+          availableVoices={availableVoices}
+          voiceConfigs={voiceConfigs}
+          onUpdateConfig={updateVoiceConfig}
+          onOpenCasting={handleOpenCasting}
+          onPreview={(config) => playPreview(getPreviewText(config.name), config)}
+          onStop={stop}
+          isAudioPlaying={isPreviewPlaying}
+          isLoading={isLoadingAudio && !isPlaying}
+        />
+      )}
     </div>
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
@@ -1400,28 +1457,6 @@ export default function App() {
             </button>
           )}
         </div>
-      )}
-
-      {castingCharacter && (
-        <VoiceCastingModal
-          isOpen={true}
-          onClose={() => {
-            stop();
-            setCastingCharacter(null);
-          }}
-          characterName={castingCharacter}
-          currentVoiceId={voiceConfigs.find(c => c.name === castingCharacter)?.voiceId || defaultVoiceId}
-          availableVoices={availableVoices}
-          voiceConfigs={voiceConfigs}
-          onSelect={(voiceId) => {
-            updateVoiceConfig(castingCharacter, { voiceId });
-            stop();
-            setCastingCharacter(null);
-          }}
-          onPreview={handleModalPreview}
-          isPreviewing={isPreviewPlaying || isLoadingAudio}
-          previewVoiceId={previewVoiceId}
-        />
       )}
 
       <LoginModal

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Play, Check, Mic, User, Pause, Info } from 'lucide-react';
+import { X, Play, Check, Mic, User, Pause, Info, ChevronLeft } from 'lucide-react';
 import { VoiceConfig, TtsVoice, LEGACY_VOICE_IDS } from '../types';
 
 export interface VoiceCastingModalProps {
@@ -13,6 +13,8 @@ export interface VoiceCastingModalProps {
   onPreview: (voiceId: string) => void;
   isPreviewing?: boolean;
   previewVoiceId?: string | null;
+  embedded?: boolean;
+  onBack?: () => void;
 }
 
 interface VoiceData {
@@ -96,7 +98,9 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
   onSelect,
   onPreview,
   isPreviewing,
-  previewVoiceId
+  previewVoiceId,
+  embedded = false,
+  onBack
 }) => {
   const [activeFilter, setActiveFilter] = useState('All');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -167,42 +171,65 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    onClose();
+  };
 
-      {/* Modal Content */}
+  const containerClassName = embedded
+    ? 'h-full min-h-0 flex flex-col'
+    : 'fixed inset-0 z-[60] flex items-center justify-center p-4';
+  const contentClassName = embedded
+    ? 'relative bg-gray-900 h-full w-full flex flex-col overflow-hidden'
+    : 'relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200';
+
+  return (
+    <div className={containerClassName}>
+      {!embedded && (
+        <div
+          className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
       <div
-        className="relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className={contentClassName}
         role="dialog"
-        aria-modal="true"
+        aria-modal={embedded ? undefined : true}
         aria-label={`Voice casting for ${characterName}`}
       >
-        
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gray-900/50">
-          <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Mic className="w-5 h-5 text-indigo-400" />
-              Voice Casting: <span className="text-indigo-400">{characterName}</span>
+        <div className={`flex items-center justify-between border-b border-gray-800 bg-gray-900/50 ${embedded ? 'px-3 py-2.5' : 'p-6'}`}>
+          <div className="min-w-0">
+            {embedded && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="mb-1 inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Back
+              </button>
+            )}
+            <h2 className={`font-bold text-white flex items-center gap-2 ${embedded ? 'text-base' : 'text-xl'}`}>
+              <Mic className={`${embedded ? 'w-4 h-4' : 'w-5 h-5'} text-indigo-400`} />
+              Voice Casting: <span className="text-indigo-400 truncate">{characterName}</span>
             </h2>
-            <p className="text-sm text-gray-400 mt-1">Assign a voice to your character.</p>
+            <p className={`${embedded ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-gray-400`}>Assign a voice to your character.</p>
           </div>
-          <button 
+          <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors"
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors shrink-0"
             aria-label="Close voice casting"
           >
-            <X className="w-6 h-6" />
+            <X className={embedded ? 'w-5 h-5' : 'w-6 h-6'} />
           </button>
         </div>
 
-        {/* Filters & Toggles */}
-        <div className="px-6 py-4 border-b border-gray-800 bg-gray-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className={`${embedded ? 'px-3 py-2.5' : 'px-6 py-4'} border-b border-gray-800 bg-gray-900/50 flex flex-col md:flex-row md:items-center justify-between gap-3`}>
           <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
             {FILTERS.map(filter => (
               <button
@@ -234,8 +261,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto p-6 bg-black/20">
+        <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'p-3' : 'p-6'} bg-black/20`}>
           {filteredVoices.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-500 space-y-2">
               <Mic className="w-12 h-12 opacity-20" />
@@ -369,17 +395,17 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-800 bg-gray-900/50 flex justify-between items-center">
+        <div className={`${embedded ? 'px-3 py-2.5' : 'p-4'} border-t border-gray-800 bg-gray-900/50 flex justify-between items-center`}>
            <div className="text-xs text-gray-500 flex items-center gap-2">
              <Info className="w-3.5 h-3.5" />
              Previewing {characterName}&apos;s existing lines.
            </div>
-           <button 
-             onClick={onClose}
+           <button
+             type="button"
+             onClick={handleBack}
              className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
            >
-             Close
+             {embedded ? 'Back to Voices' : 'Close'}
            </button>
         </div>
 
