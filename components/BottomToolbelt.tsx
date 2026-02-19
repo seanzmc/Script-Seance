@@ -30,6 +30,7 @@ export interface BottomToolbeltProps {
   onSelectTool: (tool: ToolKey) => void;
   onCloseTool: () => void;
   showSelector?: boolean;
+  edgeToEdge?: boolean;
   className?: string;
   mobileExpanded?: boolean;
   onExportTxt?: () => void;
@@ -47,6 +48,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   onSelectTool,
   onCloseTool,
   showSelector = true,
+  edgeToEdge = false,
   className = '',
   mobileExpanded = false,
   onExportTxt,
@@ -233,10 +235,10 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   };
 
   return (
-    <div className={`w-full px-3 max-[640px]:px-2 ${mobileExpanded ? 'flex-1 min-h-0 pb-1' : 'shrink-0 pb-2'} ${className}`}>
-      <div className={`mx-auto w-full max-w-6xl flex flex-col ${mobileExpanded ? 'h-full min-h-0' : ''}`}>
+    <div className={`w-full ${edgeToEdge ? 'px-0' : 'px-3 max-[640px]:px-2'} ${mobileExpanded ? 'flex-1 min-h-0 pb-1' : 'shrink-0 pb-2'} ${className}`}>
+      <div className={`${edgeToEdge ? 'w-full' : 'mx-auto w-full max-w-6xl'} flex flex-col ${mobileExpanded ? 'h-full min-h-0' : ''}`}>
         {hasActivePanel && (
-          <div className={`rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelLayoutClass} flex-col overflow-hidden`}>
+          <div className={`rounded-2xl border border-gray-800 bg-gray-950 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelLayoutClass} flex-col overflow-hidden`}>
             <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{activeLabel}</p>
               <div className="flex items-center">
@@ -257,7 +259,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
           </div>
         )}
         {showSelector && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+          <div className="rounded-2xl border border-gray-800 bg-gray-950 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
             {isNarrowViewport ? (
               <button
                 ref={toolsTriggerRef}
@@ -272,7 +274,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                 aria-haspopup="dialog"
                 aria-expanded={isToolsOpen}
                 aria-controls="tools-drawer"
-                className="w-full min-h-[44px] rounded-xl border border-gray-700 bg-gray-900/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="w-full min-h-[44px] rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
                 Tools
               </button>
@@ -298,7 +300,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               role="dialog"
               aria-modal="true"
               aria-label="Tools"
-              className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_22px_56px_rgba(0,0,0,0.45)] h-[min(70vh,420px)] max-h-[70vh] flex flex-col overflow-hidden"
+              className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-800 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.45)] h-[min(70vh,420px)] max-h-[70vh] flex flex-col overflow-hidden"
               data-testid="tools-drawer"
             >
               <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-2.5">

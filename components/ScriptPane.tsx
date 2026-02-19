@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
@@ -78,6 +78,7 @@ const PROMPT_CHAR_LIMIT = 320;
 const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
 const MOBILE_TOOLS_DOCK_HEIGHT_CLASS = 'pb-[calc(4.75rem+env(safe-area-inset-bottom))]';
 const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))]';
+const MOBILE_TOOLS_DOCK_BOTTOM = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -155,6 +156,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [titleDraft, setTitleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
+  const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -357,6 +359,24 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setToolsSheet('collapsed');
     }
   }, [currentTool, isNarrowViewport, toolsSheet]);
+
+  useEffect(() => {
+    if (!isNarrowViewport || currentTool !== 'insert') return;
+    if (insertModeActive) {
+      setToolsSheet('collapsed');
+    }
+  }, [currentTool, insertModeActive, isNarrowViewport]);
+
+  useEffect(() => {
+    if (!isNarrowViewport || currentTool !== 'insert') {
+      lastInsertCompleteTokenRef.current = insertCompleteToken;
+      return;
+    }
+    if (insertCompleteToken > lastInsertCompleteTokenRef.current) {
+      setToolsSheet('tool');
+    }
+    lastInsertCompleteTokenRef.current = insertCompleteToken;
+  }, [currentTool, insertCompleteToken, isNarrowViewport]);
 
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
   const mobileSheetEnabled = isNarrowViewport && Boolean(context);
@@ -685,7 +705,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+      <div className={`${context && isToolSheetOpen ? 'hidden' : 'flex-1 min-h-0 min-w-0 overflow-hidden'}`}>
         {context ? (
           <div className={contentWrapperClassName}>
             {isMobileRewriteSelectMode && (
@@ -731,12 +751,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       {isMenuSheetOpen && (
         <>
           <div
-            className="fixed inset-0 z-[75] bg-black/45 backdrop-blur-[1px]"
+            className="fixed inset-x-0 top-0 z-[75] bg-black/45 backdrop-blur-[1px]"
+            style={{ bottom: MOBILE_TOOLS_DOCK_BOTTOM }}
             onClick={() => setToolsSheet('collapsed')}
             aria-hidden="true"
           />
-          <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76] px-3`}>
-            <div className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_22px_56px_rgba(0,0,0,0.45)] max-h-[50vh] overflow-hidden">
+          <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76]`}>
+            <div className="w-full rounded-t-2xl border border-gray-800 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.45)] max-h-[50vh] overflow-hidden">
               <div className="border-b border-gray-800 px-4 py-2.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gray-400">Tools</p>
               </div>
@@ -766,13 +787,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </>
       )}
       {isToolSheetOpen && currentTool && (
-        <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76] px-3`}>
-          <div className="mx-auto w-full max-w-6xl h-[min(72vh,460px)] max-h-[72vh]">
+        <div
+          className="fixed inset-x-0 top-0 z-[76]"
+          style={{ bottom: MOBILE_TOOLS_DOCK_BOTTOM }}
+        >
+          <div className="h-full w-full">
             <BottomToolbelt
               activeTool={currentTool}
               onSelectTool={handleDesktopToolSelect}
               onCloseTool={handleToolClose}
               showSelector={false}
+              edgeToEdge
               mobileExpanded
               className="h-full px-0 pb-0"
               onExportTxt={onExportTxt}
@@ -788,8 +813,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
       {mobileSheetEnabled && (
-        <div className="fixed inset-x-0 bottom-0 z-[74] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-700 bg-gray-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.38)]">
+        <div className="fixed inset-x-0 bottom-0 z-[74] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="w-full border-t border-gray-700 bg-gray-950 shadow-[0_16px_40px_rgba(0,0,0,0.38)]">
             <div className="flex items-center gap-2 px-2.5 py-2">
               <button
                 type="button"
