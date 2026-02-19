@@ -1,5 +1,5 @@
 {
-  "name": "Script Seance",
-  "description": "An interactive screenplay generator that writes and performs scenes with distinct character voices using Gemini AI.",
-  "requestFramePermissions": []
+    "name": "Script Seance",
+    "description": "An interactive screenplay generator that writes and performs scenes with distinct character voices using AI.",
+    "requestFramePermissions": []
 }
