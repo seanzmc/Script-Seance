@@ -41,7 +41,7 @@ export const TitleEditModal: React.FC<TitleEditModalProps> = ({
     <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl"
+        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Edit title"

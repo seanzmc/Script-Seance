@@ -60,14 +60,13 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
   const hasActivePanel = Boolean(activeTool);
-  const panelAllowsScroll = activeTool === 'voices';
   const panelHeightClass = activeTool === 'insert'
-    ? 'h-[334px] sm:h-[320px] lg:h-[300px]'
+    ? 'h-[52vh] max-h-[334px] sm:h-[320px] sm:max-h-none lg:h-[300px]'
     : activeTool === 'generate'
-      ? 'h-[292px] sm:h-[300px] lg:h-[286px]'
+      ? 'h-[48vh] max-h-[292px] sm:h-[300px] sm:max-h-none lg:h-[286px]'
       : activeTool === 'export'
-        ? 'h-[196px] sm:h-[204px]'
-        : 'h-[318px] sm:h-[334px]';
+        ? 'h-[40vh] max-h-[196px] sm:h-[204px] sm:max-h-none'
+        : 'h-[52vh] max-h-[318px] sm:h-[334px] sm:max-h-none';
   const panelBodyPaddingClass = activeTool === 'export'
     ? 'px-4 py-2'
     : activeTool === 'insert'
@@ -120,7 +119,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               : activePlaceholder;
   const panelBodyNode = typeof panelBodyContent === 'string'
     ? <p className="text-sm text-gray-300">{panelBodyContent}</p>
-    : <div className={panelAllowsScroll ? '' : 'h-full min-h-0'}>{panelBodyContent}</div>;
+    : <div className="h-full min-h-0">{panelBodyContent}</div>;
 
   useEffect(() => {
     if (!hasActivePanel) return;
@@ -134,7 +133,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   }, [hasActivePanel, onCloseTool]);
 
   return (
-    <div className="w-full shrink-0 px-3 pb-2">
+    <div className="w-full shrink-0 px-3 pb-2 max-[640px]:px-2">
       <div className="mx-auto w-full max-w-6xl flex flex-col">
         {hasActivePanel && (
           <div className={`rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelHeightClass} flex-col overflow-hidden`}>
@@ -149,13 +148,13 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className={`${panelBodyPaddingClass} flex-1 min-h-0 ${panelAllowsScroll ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+            <div className={`${panelBodyPaddingClass} flex-1 min-h-0 overflow-y-auto`}>
               {panelBodyNode}
             </div>
           </div>
         )}
         <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
-          <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 text-gray-400">
+          <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1 text-gray-400 sm:max-h-none sm:overflow-visible sm:pr-0 lg:flex-nowrap">
             {TOOL_ORDER.map((tool) => {
               const isActive = activeTool === tool;
               const config = TOOL_CONFIG[tool];
@@ -166,7 +165,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                   onClick={() => onSelectTool(tool)}
                   aria-label={config.label}
                   aria-pressed={isActive}
-                  className={`group w-full min-h-[44px] lg:min-h-[48px] rounded-xl lg:rounded-2xl px-2 lg:px-2.5 py-2 text-[10px] lg:text-[11px] font-semibold uppercase tracking-[0.16em] transition-all duration-200 ease-out transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 border inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98] ${
+                  className={`group min-w-0 basis-[calc(50%-0.25rem)] sm:basis-[calc(33.333%-0.5rem)] lg:basis-0 lg:flex-1 min-h-[44px] lg:min-h-[48px] rounded-xl lg:rounded-2xl px-2 lg:px-2.5 py-2 text-[10px] lg:text-[11px] font-semibold uppercase tracking-[0.16em] transition-all duration-200 ease-out transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 border inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98] ${
                     isActive
                       ? 'bg-indigo-500 text-white border-indigo-400 shadow-[0_10px_24px_rgba(99,102,241,0.38)]'
                       : 'text-gray-300 border-gray-800 bg-gray-900/45 hover:bg-gray-800/85 hover:text-white hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,0.35)]'

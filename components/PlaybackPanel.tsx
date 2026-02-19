@@ -197,7 +197,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
               </button>
             </div>
 
-            <div className="min-w-[160px] flex-1 flex items-center gap-3 justify-end">
+            <div className="min-w-0 sm:min-w-[160px] flex-1 flex items-center gap-3 justify-start sm:justify-end">
               <div className="text-right">
                 <p className="text-[11px] font-semibold text-white">{statusHeadline}</p>
                 <p className="text-[10px] text-gray-400">{statusDetail}</p>
@@ -209,7 +209,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
             <div className="text-[10px] text-gray-400">
               Audio generation: {progressCount}/{totalCount || 0}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 onClick={onRefreshAudio}
                 disabled={totalCount === 0}

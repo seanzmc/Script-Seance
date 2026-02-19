@@ -305,7 +305,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
 
-  const contentWrapperClassName = 'max-w-7xl mx-auto px-6 py-2 h-full min-h-0 flex flex-col gap-2';
+  const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -489,9 +489,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
         >
-          <div className="max-w-7xl mx-auto px-6 py-2.5">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
-              <div className="space-y-1">
+          <div className="max-w-7xl mx-auto px-6 max-[900px]:px-4 max-[640px]:px-3 py-2.5">
+            <div className="grid grid-cols-1 gap-3 max-[900px]:gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
+              <div className="space-y-1 min-w-0">
                 <h1 className="text-xl md:text-2xl font-semibold tracking-[0.22em] text-white">SCRIPT SEANCE</h1>
                 <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
                   <span>{genreLabel}</span>
@@ -513,10 +513,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </div>
                 )}
               </div>
-              <div className="flex flex-col items-center justify-center gap-1 text-center">
+              <div className="flex flex-col items-center justify-center gap-1 text-center min-w-0">
                 <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Draft Title</span>
                 <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-                  <span className="text-base font-semibold text-white">
+                  <span className="text-base font-semibold text-white break-words">
                     {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
                   </span>
                   <button
@@ -529,7 +529,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-start lg:justify-end">
+              <div className="flex items-center justify-start lg:justify-end min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
@@ -566,14 +566,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {context ? (
           <div className={contentWrapperClassName}>
             {errorBanner}
 
-            <div className="flex flex-col gap-2 flex-1 min-h-0">
+            <div className="flex flex-col gap-2 flex-1 min-h-0 min-w-0">
               {insertModeToolbar}
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 min-w-0">
                 {previewSection}
               </div>
             </div>

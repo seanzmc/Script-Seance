@@ -17,7 +17,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
         onClick={onClose}
       />
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         aria-labelledby="privacy-modal-title"

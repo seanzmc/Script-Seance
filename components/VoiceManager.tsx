@@ -86,7 +86,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
 
     return (
       <div key={char} className="space-y-1.5">
-        <div className={`grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto] items-center gap-2 rounded-lg border px-2.5 py-2 ${rowTone} ${
+        <div className={`grid grid-cols-1 gap-2 rounded-lg border px-2.5 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto] md:items-center ${rowTone} ${
           isActive ? 'ring-1 ring-indigo-500/40' : ''
         }`}>
           <div className="min-w-0">
@@ -95,11 +95,11 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
               <span className="text-[9px] uppercase tracking-widest text-indigo-200">Narrator</span>
             )}
           </div>
-          <div className="min-w-0 flex items-center gap-2">
+          <div className="min-w-0 flex flex-wrap items-center gap-2 md:flex-nowrap">
             <select
               value={config.voiceId}
               onChange={(e) => onUpdateConfig(char, { voiceId: e.target.value })}
-              className="min-w-0 flex-1 bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-md px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none appearance-none"
+              className="min-w-0 w-full md:flex-1 bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-md px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none appearance-none"
             >
               {voiceOptions.map(voice => (
                 <option key={voice} value={voice}>
@@ -126,7 +126,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
           </div>
           <button
             onClick={() => handlePreview(char, config)}
-            className={`px-2.5 py-1.5 rounded-md border text-[11px] font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
+            className={`justify-self-start md:justify-self-auto px-2.5 py-1.5 rounded-md border text-[11px] font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
               (isThisLoading || isThisPlaying)
                 ? 'bg-red-600/85 border-red-500 text-white'
                 : 'bg-gray-800/80 border-gray-700 text-gray-300 hover:text-white hover:border-indigo-500/70 hover:bg-indigo-600/70'
@@ -145,7 +145,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
         </div>
 
         {isExpanded && (
-          <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-800 bg-gray-900/35 px-3 py-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-gray-800 bg-gray-900/35 px-3 py-2">
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-[9px] uppercase font-bold text-gray-500 tracking-wider">Speed</label>
@@ -203,7 +203,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
         )}
       </div>
 
-      <div className="sticky top-0 z-10 bg-gray-900/95 pb-1">
+      <div className="sticky top-0 z-10 bg-gray-900/95 pb-1 hidden md:block">
         <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_auto] items-center gap-2 px-2.5 text-[10px] uppercase tracking-widest text-gray-500">
           <span>Character</span>
           <span>Voice</span>
