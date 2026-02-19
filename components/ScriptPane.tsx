@@ -75,6 +75,7 @@ export interface ScriptPaneProps {
 }
 
 const PROMPT_CHAR_LIMIT = 320;
+const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
 
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
@@ -132,6 +133,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertScrollToken
 }) => {
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
+  const [mobileFocus, setMobileFocus] = useState<'tools' | 'script'>('script');
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() => (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(MOBILE_FOCUS_QUERY).matches
+  ));
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
@@ -305,7 +312,37 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mediaQuery = window.matchMedia(MOBILE_FOCUS_QUERY);
+    const handleViewportChange = (event: MediaQueryListEvent) => {
+      setIsNarrowViewport(event.matches);
+    };
+
+    setIsNarrowViewport(mediaQuery.matches);
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleViewportChange);
+      return () => mediaQuery.removeEventListener('change', handleViewportChange);
+    }
+    mediaQuery.addListener(handleViewportChange);
+    return () => mediaQuery.removeListener(handleViewportChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isNarrowViewport) {
+      setMobileFocus('script');
+      return;
+    }
+    if (activeTool) {
+      setMobileFocus('tools');
+    }
+  }, [activeTool, isNarrowViewport]);
+
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
+  const mobileFocusEnabled = isNarrowViewport && Boolean(context);
+  const isToolFocus = mobileFocusEnabled && mobileFocus === 'tools';
+  const isScriptFocus = !mobileFocusEnabled || mobileFocus === 'script';
+  const showMobileViewToolsButton = mobileFocusEnabled && mobileFocus === 'script';
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -361,6 +398,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : null;
   const handleToolClose = () => {
     setActiveTool(null);
+    if (isNarrowViewport) {
+      setMobileFocus('script');
+    }
     requestAnimationFrame(() => {
       const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
       scrollContainer?.focus({ preventScroll: true });
@@ -372,6 +412,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       return;
     }
     setActiveTool(tool);
+    if (isNarrowViewport) {
+      setMobileFocus('tools');
+    }
   };
   const handleOpenTitleModal = () => {
     setTitleDraft(context?.title ?? '');
@@ -566,9 +609,20 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
-        {context ? (
+      <div className={`${context && isToolFocus ? 'hidden' : 'flex-1 min-h-0 min-w-0 overflow-hidden'}`}>
+        {context && isScriptFocus ? (
           <div className={contentWrapperClassName}>
+            {showMobileViewToolsButton && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setMobileFocus('tools')}
+                  className="inline-flex items-center rounded-md border border-gray-700 bg-gray-900/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-200 hover:bg-gray-800 transition-colors"
+                >
+                  View Tools
+                </button>
+              </div>
+            )}
             {errorBanner}
 
             <div className="flex flex-col gap-2 flex-1 min-h-0 min-w-0">
@@ -578,7 +632,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               </div>
             </div>
           </div>
-        ) : (
+        ) : !context ? (
           <>
             <div className="flex-1 flex items-center justify-center px-6 py-10">
               <div className="w-full max-w-2xl space-y-6">
@@ -587,13 +641,16 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               </div>
             </div>
           </>
-        )}
+        ) : null}
       </div>
-      {context && (
+      {context && (!mobileFocusEnabled || isToolFocus) && (
         <BottomToolbelt
           activeTool={activeTool}
           onSelectTool={handleToolSelect}
           onCloseTool={handleToolClose}
+          onViewScript={() => setMobileFocus('script')}
+          showViewScriptButton={mobileFocusEnabled && isToolFocus}
+          mobileExpanded={mobileFocusEnabled && isToolFocus}
           onExportTxt={onExportTxt}
           onExportPdf={onExportPdf}
           exportDisabled={!canExport}

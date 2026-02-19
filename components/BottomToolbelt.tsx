@@ -29,6 +29,10 @@ export interface BottomToolbeltProps {
   activeTool: ToolKey | null;
   onSelectTool: (tool: ToolKey) => void;
   onCloseTool: () => void;
+  onViewScript?: () => void;
+  showViewScriptButton?: boolean;
+  className?: string;
+  mobileExpanded?: boolean;
   onExportTxt?: () => void;
   onExportPdf?: () => void;
   exportDisabled?: boolean;
@@ -43,6 +47,10 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   activeTool,
   onSelectTool,
   onCloseTool,
+  onViewScript,
+  showViewScriptButton = false,
+  className = '',
+  mobileExpanded = false,
   onExportTxt,
   onExportPdf,
   exportDisabled = false,
@@ -131,6 +139,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const panelBodyNode = typeof panelBodyContent === 'string'
     ? <p className="text-sm text-gray-300">{panelBodyContent}</p>
     : <div className="min-h-full">{panelBodyContent}</div>;
+  const panelLayoutClass = mobileExpanded && hasActivePanel ? 'flex-1 min-h-0' : panelHeightClass;
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -226,21 +235,32 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   };
 
   return (
-    <div className="w-full shrink-0 px-3 pb-2 max-[640px]:px-2">
-      <div className="mx-auto w-full max-w-6xl flex flex-col">
+    <div className={`w-full px-3 max-[640px]:px-2 ${mobileExpanded ? 'flex-1 min-h-0 pb-1' : 'shrink-0 pb-2'} ${className}`}>
+      <div className={`mx-auto w-full max-w-6xl flex flex-col ${mobileExpanded ? 'h-full min-h-0' : ''}`}>
         {hasActivePanel && (
-          <div className={`rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelHeightClass} flex-col overflow-hidden`}>
+          <div className={`rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelLayoutClass} flex-col overflow-hidden`}>
             <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{activeLabel}</p>
-              <button
-                type="button"
-                onClick={onCloseTool}
-                ref={panelCloseButtonRef}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-                aria-label="Close tool panel"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {showViewScriptButton && onViewScript && (
+                  <button
+                    type="button"
+                    onClick={onViewScript}
+                    className="inline-flex h-8 items-center rounded-md border border-gray-700 bg-gray-900/60 px-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800"
+                  >
+                    View Script
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onCloseTool}
+                  ref={panelCloseButtonRef}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                  aria-label="Close tool panel"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className={`${panelBodyPaddingClass} flex-1 min-h-0 overflow-y-auto overscroll-contain`}>
               {panelBodyNode}
