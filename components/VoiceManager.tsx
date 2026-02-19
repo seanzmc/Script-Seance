@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VoiceConfig, TtsVoice, LEGACY_VOICE_IDS, DEFAULT_NARRATOR_VOICE_ID } from '../types';
-import { Volume2, Loader, Square, Settings2, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
+import { Volume2, Loader, Square, List, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 
 export interface VoiceManagerProps {
   characters: string[];
@@ -114,7 +114,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
               className="p-2 text-gray-400 hover:text-indigo-300 hover:bg-gray-800/80 border border-transparent hover:border-gray-700 rounded-md"
               title="Cast a different voice"
             >
-              <Settings2 className="w-4 h-4" />
+              <List className="w-4 h-4" />
             </button>
             <button
               onClick={() => toggleExpand(char)}
