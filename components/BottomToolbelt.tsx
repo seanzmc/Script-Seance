@@ -29,6 +29,7 @@ export interface BottomToolbeltProps {
   activeTool: ToolKey | null;
   onSelectTool: (tool: ToolKey) => void;
   onCloseTool: () => void;
+  showSelector?: boolean;
   className?: string;
   mobileExpanded?: boolean;
   onExportTxt?: () => void;
@@ -45,6 +46,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   activeTool,
   onSelectTool,
   onCloseTool,
+  showSelector = true,
   className = '',
   mobileExpanded = false,
   onExportTxt,
@@ -254,33 +256,35 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
             </div>
           </div>
         )}
-        <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
-          {isNarrowViewport ? (
-            <button
-              ref={toolsTriggerRef}
-              type="button"
-              onClick={() => {
-                if (isToolsOpen) {
-                  closeDrawer();
-                  return;
-                }
-                setIsToolsOpen(true);
-              }}
-              aria-haspopup="dialog"
-              aria-expanded={isToolsOpen}
-              aria-controls="tools-drawer"
-              className="w-full min-h-[44px] rounded-xl border border-gray-700 bg-gray-900/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-            >
-              Tools
-            </button>
-          ) : (
-            <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1 text-gray-400 sm:max-h-none sm:overflow-visible sm:pr-0 lg:flex-nowrap">
-              {TOOL_ORDER.map((tool, index) => renderToolButton(tool, 'inline', index))}
-            </div>
-          )}
-        </div>
+        {showSelector && (
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+            {isNarrowViewport ? (
+              <button
+                ref={toolsTriggerRef}
+                type="button"
+                onClick={() => {
+                  if (isToolsOpen) {
+                    closeDrawer();
+                    return;
+                  }
+                  setIsToolsOpen(true);
+                }}
+                aria-haspopup="dialog"
+                aria-expanded={isToolsOpen}
+                aria-controls="tools-drawer"
+                className="w-full min-h-[44px] rounded-xl border border-gray-700 bg-gray-900/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              >
+                Tools
+              </button>
+            ) : (
+              <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1 text-gray-400 sm:max-h-none sm:overflow-visible sm:pr-0 lg:flex-nowrap">
+                {TOOL_ORDER.map((tool, index) => renderToolButton(tool, 'inline', index))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      {isNarrowViewport && isToolsOpen && (
+      {showSelector && isNarrowViewport && isToolsOpen && (
         <>
           <div
             className="fixed inset-0 z-[72] bg-black/70 backdrop-blur-sm"

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StoryContext, ScriptBlock } from '../types';
+import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
@@ -77,6 +77,8 @@ export interface ScriptPaneProps {
 const PROMPT_CHAR_LIMIT = 320;
 const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
 const MOBILE_TOOLS_DOCK_HEIGHT_CLASS = 'pb-[calc(4.75rem+env(safe-area-inset-bottom))]';
+const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))]';
+const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
   insert: 'Insert',
@@ -141,8 +143,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertScrollTargetId,
   insertScrollToken
 }) => {
-  const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
-  const [mobileFocus, setMobileFocus] = useState<'tools' | 'script'>('script');
+  const [currentTool, setCurrentTool] = useState<ToolKey | null>(null);
+  const [toolsSheet, setToolsSheet] = useState<'collapsed' | 'menu' | 'tool'>('collapsed');
   const [rewriteMode, setRewriteMode] = useState<'select' | 'configure'>('configure');
   const [isNarrowViewport, setIsNarrowViewport] = useState(() => (
     typeof window !== 'undefined' &&
@@ -286,11 +288,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
   const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     setRewriteTarget(target);
-    if (isNarrowViewport && activeTool === 'rewrite') {
+    if (isNarrowViewport && currentTool === 'rewrite') {
       setRewriteMode('configure');
-      setMobileFocus('tools');
+      setToolsSheet('tool');
     }
-  }, [activeTool, isNarrowViewport]);
+  }, [currentTool, isNarrowViewport]);
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -305,7 +307,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       characters={context.characters}
       insertTarget={insertTarget}
       rewriteTarget={rewriteTarget}
-      rewriteModeActive={activeTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
+      rewriteModeActive={currentTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
       onSelectRewriteTarget={handleSelectRewriteTarget}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
@@ -347,32 +349,26 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
 
   useEffect(() => {
     if (!isNarrowViewport) {
-      setMobileFocus('script');
+      setToolsSheet('collapsed');
       setRewriteMode('configure');
       return;
     }
-    if (!activeTool) {
-      return;
+    if (!currentTool && toolsSheet === 'tool') {
+      setToolsSheet('collapsed');
     }
-    if (activeTool === 'rewrite') {
-      setRewriteMode('select');
-      setRewriteTarget(null);
-      setMobileFocus('script');
-      return;
-    }
-    setRewriteMode('configure');
-    setMobileFocus('tools');
-  }, [activeTool, isNarrowViewport]);
+  }, [currentTool, isNarrowViewport, toolsSheet]);
 
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
-  const mobileFocusEnabled = isNarrowViewport && Boolean(context);
-  const isToolFocus = mobileFocusEnabled && mobileFocus === 'tools';
-  const isScriptFocus = !mobileFocusEnabled || mobileFocus === 'script';
-  const isMobileRewriteSelectMode = mobileFocusEnabled && activeTool === 'rewrite' && rewriteMode === 'select';
-  const activeToolLabel = activeTool ? TOOL_LABELS[activeTool] : null;
-  const mobileDockLabel = isToolFocus
-    ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
-    : activeToolLabel ? `View ${activeToolLabel}` : 'View Tools';
+  const mobileSheetEnabled = isNarrowViewport && Boolean(context);
+  const isMenuSheetOpen = mobileSheetEnabled && toolsSheet === 'menu';
+  const isToolSheetOpen = mobileSheetEnabled && toolsSheet === 'tool' && Boolean(currentTool);
+  const isMobileRewriteSelectMode = mobileSheetEnabled && currentTool === 'rewrite' && rewriteMode === 'select';
+  const activeToolLabel = currentTool ? TOOL_LABELS[currentTool] : null;
+  const mobileDockLabel = isMenuSheetOpen
+    ? 'Choose a tool'
+    : isToolSheetOpen
+      ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
+      : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -427,34 +423,43 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     </div>
   ) : null;
   const handleToolClose = () => {
-    setActiveTool(null);
-    if (isNarrowViewport) {
-      setMobileFocus('script');
-    }
+    setCurrentTool(null);
+    setToolsSheet('collapsed');
     requestAnimationFrame(() => {
       const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
       scrollContainer?.focus({ preventScroll: true });
     });
   };
-  const handleToolSelect = (tool: ToolKey) => {
-    if (activeTool === tool) {
+  const handleDesktopToolSelect = (tool: ToolKey) => {
+    if (currentTool === tool) {
       handleToolClose();
       return;
     }
-    setActiveTool(tool);
-    if (tool === 'rewrite' && isNarrowViewport) {
+    setCurrentTool(tool);
+    setRewriteMode('configure');
+  };
+  const handleSelectToolFromMenu = (tool: ToolKey) => {
+    setCurrentTool(tool);
+    if (tool === 'rewrite') {
       setRewriteMode('select');
       setRewriteTarget(null);
-      setMobileFocus('script');
+      setToolsSheet('collapsed');
       return;
     }
-    if (isNarrowViewport) {
-      setMobileFocus('tools');
-    }
+    setRewriteMode('configure');
+    setToolsSheet('tool');
   };
   const handleToggleMobileDock = () => {
-    if (!mobileFocusEnabled) return;
-    setMobileFocus(isToolFocus ? 'script' : 'tools');
+    if (!mobileSheetEnabled) return;
+    if (toolsSheet === 'collapsed') {
+      setToolsSheet('menu');
+      return;
+    }
+    if (toolsSheet === 'menu') {
+      setToolsSheet('collapsed');
+      return;
+    }
+    setToolsSheet('menu');
   };
   const handleOpenTitleModal = () => {
     setTitleDraft(context?.title ?? '');
@@ -473,16 +478,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     return context.scenes.flatMap((scene, sceneIndex) => (
       scene.blocks.map((block, blockIndex) => {
         const typeLabel = block.type.charAt(0).toUpperCase() + block.type.slice(1);
-        const fullSnippet = block.text.replace(/\s+/g, ' ').trim();
-        const snippet = fullSnippet.slice(0, 36);
-        const suffix = fullSnippet.length > 36 ? '…' : '';
-        const label = `Scene ${sceneIndex + 1}: ${scene.heading} — ${typeLabel} ${blockIndex + 1}${snippet ? ` · ${snippet}${suffix}` : ''}`;
+        const label = `Scene ${sceneIndex + 1}: ${scene.heading} — ${typeLabel} ${blockIndex + 1}`;
+        const dialogueText = [
+          block.character?.trim() ? block.character.trim().toUpperCase() : '',
+          block.parenthetical?.trim() || '',
+          block.text
+        ].filter(Boolean).join('\n');
+        const displayText = block.type === BlockType.DIALOGUE ? dialogueText : block.text;
         return {
           sceneId: scene.id,
           blockId: block.id,
           label,
           locked: Boolean(block.locked),
-          snippet
+          displayText: displayText || '(No text)'
         };
       })
     ));
@@ -493,7 +501,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       return;
     }
     // Mobile rewrite select mode requires explicit target selection.
-    if (isNarrowViewport && activeTool === 'rewrite' && rewriteMode === 'select') {
+    if (isNarrowViewport && currentTool === 'rewrite' && rewriteMode === 'select') {
       return;
     }
     if (!rewriteTarget || !rewriteOptions.some(option => option.blockId === rewriteTarget.blockId)) {
@@ -502,7 +510,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         setRewriteTarget({ sceneId: first.sceneId, blockId: first.blockId });
       }
     }
-  }, [activeTool, isNarrowViewport, rewriteMode, rewriteOptions, rewriteTarget]);
+  }, [currentTool, isNarrowViewport, rewriteMode, rewriteOptions, rewriteTarget]);
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
     <div className="h-full min-h-0 flex flex-col gap-2">
@@ -514,9 +522,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </p>
         <div className="px-0.5 py-0.5 space-y-1 shrink-0">
           <p className={toolLabelClass}>Selected Block</p>
-          <p className="text-xs text-gray-200 truncate" title={selectedRewrite?.label}>
-            {selectedRewrite ? selectedRewrite.label : 'No block selected.'}
-          </p>
+          <p className="text-[11px] text-gray-400 break-words">{selectedRewrite?.label}</p>
+          {selectedRewrite && (
+            <div className="max-h-[34vh] overflow-y-auto overscroll-contain rounded-lg border border-gray-800 bg-gray-950/65 px-2.5 py-2">
+              <p className="text-xs text-gray-200 whitespace-pre-wrap break-words">
+                {selectedRewrite.displayText}
+              </p>
+            </div>
+          )}
+          {!selectedRewrite && (
+            <p className="text-xs text-gray-400">No block selected.</p>
+          )}
           {selectedRewrite?.locked && (
             <p className="text-[10px] text-amber-300">This block is locked and cannot be regenerated.</p>
           )}
@@ -541,7 +557,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 type="button"
                 onClick={() => {
                   setRewriteMode('select');
-                  setMobileFocus('script');
+                  setToolsSheet('collapsed');
                 }}
                 className="inline-flex items-center rounded-md border border-gray-700 bg-gray-900/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800"
               >
@@ -587,7 +603,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
 
   return (
-    <section className={`flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a] ${mobileFocusEnabled ? MOBILE_TOOLS_DOCK_HEIGHT_CLASS : ''}`}>
+    <section className={`flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a] ${mobileSheetEnabled ? MOBILE_TOOLS_DOCK_HEIGHT_CLASS : ''}`}>
       {context && (
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
@@ -669,8 +685,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
 
-      <div className={`${context && isToolFocus ? 'hidden' : 'flex-1 min-h-0 min-w-0 overflow-hidden'}`}>
-        {context && isScriptFocus ? (
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+        {context ? (
           <div className={contentWrapperClassName}>
             {isMobileRewriteSelectMode && (
               <div className="rounded-lg border border-indigo-500/35 bg-indigo-500/10 px-3 py-2 text-[11px] text-indigo-100">
@@ -686,7 +702,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               </div>
             </div>
           </div>
-        ) : !context ? (
+        ) : (
           <>
             <div className="flex-1 flex items-center justify-center px-6 py-10">
               <div className="w-full max-w-2xl space-y-6">
@@ -695,14 +711,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               </div>
             </div>
           </>
-        ) : null}
+        )}
       </div>
-      {context && (!mobileFocusEnabled || isToolFocus) && (
+      {context && !mobileSheetEnabled && (
         <BottomToolbelt
-          activeTool={activeTool}
-          onSelectTool={handleToolSelect}
+          activeTool={currentTool}
+          onSelectTool={handleDesktopToolSelect}
           onCloseTool={handleToolClose}
-          mobileExpanded={mobileFocusEnabled && isToolFocus}
           onExportTxt={onExportTxt}
           onExportPdf={onExportPdf}
           exportDisabled={!canExport}
@@ -713,7 +728,66 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           insertContent={insertContent}
         />
       )}
-      {mobileFocusEnabled && (
+      {isMenuSheetOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[75] bg-black/45 backdrop-blur-[1px]"
+            onClick={() => setToolsSheet('collapsed')}
+            aria-hidden="true"
+          />
+          <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76] px-3`}>
+            <div className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_22px_56px_rgba(0,0,0,0.45)] max-h-[50vh] overflow-hidden">
+              <div className="border-b border-gray-800 px-4 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gray-400">Tools</p>
+              </div>
+              <div className="max-h-[calc(50vh-48px)] overflow-y-auto p-3">
+                <div className="grid grid-cols-1 gap-2">
+                  {TOOL_ORDER.map((tool) => {
+                    const isActive = currentTool === tool;
+                    return (
+                      <button
+                        key={tool}
+                        type="button"
+                        onClick={() => handleSelectToolFromMenu(tool)}
+                        className={`min-h-[44px] rounded-xl border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                          isActive
+                            ? 'border-indigo-400 bg-indigo-500 text-white'
+                            : 'border-gray-700 bg-gray-900/55 text-gray-200 hover:bg-gray-800'
+                        }`}
+                      >
+                        {TOOL_LABELS[tool]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      {isToolSheetOpen && currentTool && (
+        <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76] px-3`}>
+          <div className="mx-auto w-full max-w-6xl h-[min(72vh,460px)] max-h-[72vh]">
+            <BottomToolbelt
+              activeTool={currentTool}
+              onSelectTool={handleDesktopToolSelect}
+              onCloseTool={handleToolClose}
+              showSelector={false}
+              mobileExpanded
+              className="h-full px-0 pb-0"
+              onExportTxt={onExportTxt}
+              onExportPdf={onExportPdf}
+              exportDisabled={!canExport}
+              generateContent={generateContent}
+              rewriteContent={rewriteContent}
+              playbackContent={playbackContent}
+              voicesContent={voicesContent}
+              insertContent={insertContent}
+            />
+          </div>
+        </div>
+      )}
+      {mobileSheetEnabled && (
         <div className="fixed inset-x-0 bottom-0 z-[74] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-700 bg-gray-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.38)]">
             <div className="flex items-center gap-2 px-2.5 py-2">
@@ -725,7 +799,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-200">Tools</p>
                 <p className="text-[11px] text-gray-400">{mobileDockLabel}</p>
               </button>
-              {isToolFocus && activeTool && (
+              {currentTool && (
                 <button
                   type="button"
                   onClick={(event) => {
