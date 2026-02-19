@@ -1,0 +1,1158 @@
+{
+  "generatedAt": "2026-02-17T19:30:33.036Z",
+  "componentCount": 15,
+  "components": [
+    {
+      "componentName": "App",
+      "filePath": "App.tsx",
+      "line": 200,
+      "category": "pages/screens",
+      "exported": true,
+      "defaultExport": true,
+      "propsType": "none",
+      "extends": [],
+      "props": [],
+      "usedBy": [
+        "index.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "BottomToolbelt",
+      "filePath": "components/BottomToolbelt.tsx",
+      "line": 41,
+      "category": "layout",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "BottomToolbeltProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "activeTool",
+          "type": "ToolKey | null",
+          "optional": false
+        },
+        {
+          "name": "onSelectTool",
+          "type": "(tool: ToolKey) => void",
+          "optional": false
+        },
+        {
+          "name": "onCloseTool",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onExportTxt",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "onExportPdf",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "exportDisabled",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "generateContent",
+          "type": "React.ReactNode",
+          "optional": true
+        },
+        {
+          "name": "rewriteContent",
+          "type": "React.ReactNode",
+          "optional": true
+        },
+        {
+          "name": "playbackContent",
+          "type": "React.ReactNode",
+          "optional": true
+        },
+        {
+          "name": "voicesContent",
+          "type": "React.ReactNode",
+          "optional": true
+        },
+        {
+          "name": "insertContent",
+          "type": "React.ReactNode",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "components/ScriptPane.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "Button",
+      "filePath": "components/Button.tsx",
+      "line": 9,
+      "category": "primitives",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "ButtonProps",
+      "extends": [
+        "React.ButtonHTMLAttributes<HTMLButtonElement>"
+      ],
+      "props": [
+        {
+          "name": "variant",
+          "type": "'primary' | 'secondary' | 'danger' | 'ghost' | 'accent'",
+          "optional": true
+        },
+        {
+          "name": "size",
+          "type": "'sm' | 'md' | 'lg'",
+          "optional": true
+        },
+        {
+          "name": "loading",
+          "type": "boolean",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "components/BottomToolbelt.tsx",
+        "components/InsertBlock.tsx",
+        "components/LoginModal.tsx",
+        "components/PrivacyModal.tsx",
+        "components/ScriptPane.tsx",
+        "components/SetupForm.tsx",
+        "components/TitleEditModal.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "InsertBlock",
+      "filePath": "components/InsertBlock.tsx",
+      "line": 111,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "InsertBlockProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "characters",
+          "type": "string[]",
+          "optional": false
+        },
+        {
+          "name": "genre",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "onAddBlock",
+          "type": "(block: ScriptBlock) => void",
+          "optional": false
+        },
+        {
+          "name": "onStartInsertMode",
+          "type": "(block: ScriptBlock) => void",
+          "optional": false
+        },
+        {
+          "name": "insertModeActive",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "insertCompleteToken",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "onError",
+          "type": "(error: unknown) => void",
+          "optional": true
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "insertTarget",
+          "type": "{ sceneId: string; blockId: string } | null",
+          "optional": true
+        },
+        {
+          "name": "styleContext",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "components/ScriptPane.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "LoginModal",
+      "filePath": "components/LoginModal.tsx",
+      "line": 12,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "LoginModalProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isLoading",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "error",
+          "type": "string | null",
+          "optional": true
+        },
+        {
+          "name": "onLogin",
+          "type": "(password: string) => void",
+          "optional": false
+        }
+      ],
+      "usedBy": [
+        "App.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "PlaybackPanel",
+      "filePath": "components/PlaybackPanel.tsx",
+      "line": 32,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "PlaybackPanelProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "isPlaying",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isPaused",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isLoadingAudio",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "currentBlockId",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "currentBlockIndex",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "blockStatuses",
+          "type": "Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>",
+          "optional": false
+        },
+        {
+          "name": "onPlay",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onPause",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onResume",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onStop",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onPrev",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onNext",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onRetry",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onSkip",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onRefreshAudio",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onPurgeAudio",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "bufferedCount",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "totalCount",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "currentSpeaker",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "playbackSpeed",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "onPlaybackSpeedChange",
+          "type": "(speed: number) => void",
+          "optional": false
+        },
+        {
+          "name": "showHighlights",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onToggleHighlights",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "autoScroll",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onToggleAutoScroll",
+          "type": "() => void",
+          "optional": false
+        }
+      ],
+      "usedBy": [
+        "App.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "HighlightIcon",
+      "filePath": "components/PlaybackPanel.tsx",
+      "line": 318,
+      "category": "primitives",
+      "exported": false,
+      "defaultExport": false,
+      "propsType": "inline",
+      "extends": [],
+      "props": [
+        {
+          "name": "className",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "usedBy": [],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "PrivacyModal",
+      "filePath": "components/PrivacyModal.tsx",
+      "line": 10,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "PrivacyModalProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onClose",
+          "type": "() => void",
+          "optional": false
+        }
+      ],
+      "usedBy": [
+        "App.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "ScriptDisplay",
+      "filePath": "components/ScriptDisplay.tsx",
+      "line": 222,
+      "category": "layout",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "ScriptDisplayProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "scenes",
+          "type": "Scene[]",
+          "optional": false
+        },
+        {
+          "name": "currentBlockId",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "currentBlockIndex",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "blockStatuses",
+          "type": "Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>",
+          "optional": false
+        },
+        {
+          "name": "showHighlights",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "autoScroll",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onToggleLock",
+          "type": "(sceneId: string, blockId: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onSelectInsertTarget",
+          "type": "(target: { sceneId: string; blockId: string }) => void",
+          "optional": false
+        },
+        {
+          "name": "onChangeSpeaker",
+          "type": "(sceneId: string, blockId: string, character: string) => void",
+          "optional": false
+        },
+        {
+          "name": "characters",
+          "type": "string[]",
+          "optional": false
+        },
+        {
+          "name": "insertTarget",
+          "type": "{ sceneId: string; blockId: string } | null",
+          "optional": true
+        },
+        {
+          "name": "rewriteTarget",
+          "type": "{ sceneId: string; blockId: string } | null",
+          "optional": true
+        },
+        {
+          "name": "rewriteModeActive",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "onSelectRewriteTarget",
+          "type": "(target: { sceneId: string; blockId: string }) => void",
+          "optional": true
+        },
+        {
+          "name": "insertModeActive",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "pendingInsertBlock",
+          "type": "ScriptBlock | null",
+          "optional": true
+        },
+        {
+          "name": "onConfirmInsertMode",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "onCancelInsertMode",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "className",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "scrollable",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "insertScrollTargetId",
+          "type": "string | null",
+          "optional": true
+        },
+        {
+          "name": "insertScrollToken",
+          "type": "number",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "components/ScriptPane.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "ScriptPane",
+      "filePath": "components/ScriptPane.tsx",
+      "line": 79,
+      "category": "layout",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "ScriptPaneProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "context",
+          "type": "StoryContext | null",
+          "optional": false
+        },
+        {
+          "name": "titleInputRef",
+          "type": "React.RefObject<HTMLInputElement>",
+          "optional": false
+        },
+        {
+          "name": "onTitleChange",
+          "type": "(title: string) => void",
+          "optional": false
+        },
+        {
+          "name": "suggestedTitle",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "isSuggestingTitle",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "suggestedTitleDismissed",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onUseSuggestedTitle",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onDismissSuggestedTitle",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onClearDraft",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "autosaveError",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "error",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "userInstruction",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "onInstructionChange",
+          "type": "(value: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onGenerateNext",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onPlotTwist",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onAddBlock",
+          "type": "(block: ScriptBlock) => void",
+          "optional": false
+        },
+        {
+          "name": "onUndo",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onRedo",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "canUndo",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "canRedo",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "insertTarget",
+          "type": "InsertTarget | null",
+          "optional": false
+        },
+        {
+          "name": "insertModeActive",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "pendingInsertBlock",
+          "type": "ScriptBlock | null",
+          "optional": false
+        },
+        {
+          "name": "onStartInsertMode",
+          "type": "(block: ScriptBlock) => void",
+          "optional": false
+        },
+        {
+          "name": "onCancelInsertMode",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onConfirmInsertMode",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "insertCompleteToken",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "onSelectInsertTarget",
+          "type": "(target: InsertTarget) => void",
+          "optional": false
+        },
+        {
+          "name": "onChangeSpeaker",
+          "type": "(sceneId: string, blockId: string, character: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onInsertError",
+          "type": "(error: unknown) => void",
+          "optional": false
+        },
+        {
+          "name": "onRegenerate",
+          "type": "(sceneId: string, blockId: string, rewriteGuidance?: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onToggleLock",
+          "type": "(sceneId: string, blockId: string) => void",
+          "optional": false
+        },
+        {
+          "name": "isGenerating",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isPlaying",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isRegenerating",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onCancelGenerate",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "currentBlockId",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "currentBlockIndex",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "blockStatuses",
+          "type": "Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>",
+          "optional": false
+        },
+        {
+          "name": "showHighlights",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "autoScroll",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onOpenPrivacy",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onOpenSetup",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "isSetupOpen",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onCloseSetup",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "setupState",
+          "type": "SetupFormState",
+          "optional": false
+        },
+        {
+          "name": "onSetupChange",
+          "type": "(next: Partial<SetupFormState>) => void",
+          "optional": false
+        },
+        {
+          "name": "onStartSetup",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "setupAutoSurprise",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "styleContext",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "onSetupError",
+          "type": "(error: unknown, fallbackMessage: string) => boolean",
+          "optional": true
+        },
+        {
+          "name": "onExportTxt",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onExportPdf",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "canExport",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "playbackContent",
+          "type": "React.ReactNode",
+          "optional": true
+        },
+        {
+          "name": "voicesContent",
+          "type": "React.ReactNode",
+          "optional": true
+        },
+        {
+          "name": "insertScrollTargetId",
+          "type": "string | null",
+          "optional": false
+        },
+        {
+          "name": "insertScrollToken",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "usedBy": [
+        "App.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "SetupForm",
+      "filePath": "components/SetupForm.tsx",
+      "line": 39,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "SetupFormProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "value",
+          "type": "SetupFormState",
+          "optional": false
+        },
+        {
+          "name": "onChange",
+          "type": "(next: Partial<SetupFormState>) => void",
+          "optional": false
+        },
+        {
+          "name": "onStart",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "isLoading",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onError",
+          "type": "(error: unknown, fallbackMessage: string) => boolean",
+          "optional": true
+        },
+        {
+          "name": "isLocked",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "showSubmit",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "onEditSetup",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "onClearDraft",
+          "type": "() => void",
+          "optional": true
+        },
+        {
+          "name": "variant",
+          "type": "\"full\" | \"summary\"",
+          "optional": true
+        },
+        {
+          "name": "autoSurprise",
+          "type": "boolean",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "components/ScriptPane.tsx",
+        "tests/exportAndSetup.test.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "TitleEditModal",
+      "filePath": "components/TitleEditModal.tsx",
+      "line": 13,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "TitleEditModalProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "onChange",
+          "type": "(value: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onSave",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "onClose",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "inputRef",
+          "type": "React.RefObject<HTMLInputElement>",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "components/ScriptPane.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "VoiceCastingModal",
+      "filePath": "components/VoiceCastingModal.tsx",
+      "line": 89,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "VoiceCastingModalProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "isOpen",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "onClose",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "characterName",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "currentVoiceId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "availableVoices",
+          "type": "TtsVoice[]",
+          "optional": false
+        },
+        {
+          "name": "voiceConfigs",
+          "type": "VoiceConfig[]",
+          "optional": false
+        },
+        {
+          "name": "onSelect",
+          "type": "(voiceId: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onPreview",
+          "type": "(voiceId: string) => void",
+          "optional": false
+        },
+        {
+          "name": "isPreviewing",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "previewVoiceId",
+          "type": "string | null",
+          "optional": true
+        }
+      ],
+      "usedBy": [
+        "App.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "VoiceManager",
+      "filePath": "components/VoiceManager.tsx",
+      "line": 17,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "VoiceManagerProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "characters",
+          "type": "string[]",
+          "optional": false
+        },
+        {
+          "name": "availableVoices",
+          "type": "TtsVoice[]",
+          "optional": false
+        },
+        {
+          "name": "voiceConfigs",
+          "type": "VoiceConfig[]",
+          "optional": false
+        },
+        {
+          "name": "onUpdateConfig",
+          "type": "(character: string, updates: Partial<VoiceConfig>) => void",
+          "optional": false
+        },
+        {
+          "name": "onOpenCasting",
+          "type": "(character: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onPreview",
+          "type": "(config: VoiceConfig) => Promise<void>",
+          "optional": false
+        },
+        {
+          "name": "onStop",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "isAudioPlaying",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isLoading",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
+      "usedBy": [
+        "components/VoicesPanel.tsx",
+        "tests/voiceManager.test.tsx"
+      ],
+      "appearsUnused": false
+    },
+    {
+      "componentName": "VoicesPanel",
+      "filePath": "components/VoicesPanel.tsx",
+      "line": 17,
+      "category": "composed widgets",
+      "exported": true,
+      "defaultExport": false,
+      "propsType": "VoicesPanelProps",
+      "extends": [],
+      "props": [
+        {
+          "name": "characters",
+          "type": "string[]",
+          "optional": false
+        },
+        {
+          "name": "availableVoices",
+          "type": "TtsVoice[]",
+          "optional": false
+        },
+        {
+          "name": "voiceConfigs",
+          "type": "VoiceConfig[]",
+          "optional": false
+        },
+        {
+          "name": "onUpdateConfig",
+          "type": "(character: string, updates: Partial<VoiceConfig>) => void",
+          "optional": false
+        },
+        {
+          "name": "onOpenCasting",
+          "type": "(character: string) => void",
+          "optional": false
+        },
+        {
+          "name": "onPreview",
+          "type": "(config: VoiceConfig) => Promise<void>",
+          "optional": false
+        },
+        {
+          "name": "onStop",
+          "type": "() => void",
+          "optional": false
+        },
+        {
+          "name": "isAudioPlaying",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "isLoading",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
+      "usedBy": [
+        "App.tsx"
+      ],
+      "appearsUnused": false
+    }
+  ]
+}

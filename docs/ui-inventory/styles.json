@@ -1,0 +1,494 @@
+{
+  "stylingApproach": {
+    "primary": "Tailwind utility classes in TSX",
+    "globalCss": [
+      "index.css"
+    ],
+    "cssInJs": [
+      "components/ScriptDisplay.tsx (print/export style string)",
+      "components/VoiceCastingModal.tsx (inline keyframes)"
+    ],
+    "detectedLibraries": {
+      "tailwind": true,
+      "cssModules": false,
+      "styledComponents": false,
+      "mui": false
+    }
+  },
+  "tokenSources": [
+    {
+      "path": "tailwind.config.js",
+      "description": "Tailwind content paths and fontFamily extension."
+    },
+    {
+      "path": "index.css",
+      "description": "Global body colors/fonts and scrollbar styling."
+    },
+    {
+      "path": "index.html",
+      "description": "Google font loading (Inter, Courier Prime)."
+    },
+    {
+      "path": "components/ScriptDisplay.tsx",
+      "description": "Export/print typography and paper styling constants."
+    }
+  ],
+  "repeatedValues": {
+    "spacing": [
+      {
+        "token": "gap-2",
+        "count": 55
+      },
+      {
+        "token": "py-2",
+        "count": 17
+      },
+      {
+        "token": "px-3",
+        "count": 16
+      },
+      {
+        "token": "px-4",
+        "count": 14
+      },
+      {
+        "token": "gap-3",
+        "count": 14
+      },
+      {
+        "token": "space-y-1",
+        "count": 12
+      },
+      {
+        "token": "gap-1",
+        "count": 12
+      },
+      {
+        "token": "p-4",
+        "count": 11
+      },
+      {
+        "token": "gap-1.5",
+        "count": 10
+      },
+      {
+        "token": "px-2.5",
+        "count": 10
+      },
+      {
+        "token": "py-1",
+        "count": 10
+      },
+      {
+        "token": "mb-4",
+        "count": 9
+      },
+      {
+        "token": "space-y-2",
+        "count": 9
+      },
+      {
+        "token": "py-1.5",
+        "count": 9
+      },
+      {
+        "token": "mr-2",
+        "count": 7
+      },
+      {
+        "token": "px-6",
+        "count": 7
+      },
+      {
+        "token": "mx-auto",
+        "count": 6
+      },
+      {
+        "token": "p-2.5",
+        "count": 6
+      }
+    ],
+    "radius": [
+      {
+        "token": "rounded-full",
+        "count": 22
+      },
+      {
+        "token": "rounded-lg",
+        "count": 19
+      },
+      {
+        "token": "rounded-md",
+        "count": 18
+      },
+      {
+        "token": "rounded-2xl",
+        "count": 11
+      },
+      {
+        "token": "rounded-xl",
+        "count": 8
+      },
+      {
+        "token": "rounded",
+        "count": 7
+      },
+      {
+        "token": "rounded-3xl",
+        "count": 3
+      },
+      {
+        "token": "rounded-t-xl",
+        "count": 1
+      }
+    ],
+    "shadow": [
+      {
+        "token": "shadow-lg",
+        "count": 7
+      },
+      {
+        "token": "shadow-2xl",
+        "count": 5
+      },
+      {
+        "token": "shadow-inner",
+        "count": 3
+      },
+      {
+        "token": "shadow-sm",
+        "count": 3
+      },
+      {
+        "token": "shadow-indigo-500/20",
+        "count": 2
+      },
+      {
+        "token": "shadow-[0_20px_60px_rgba(0,0,0,0.4)]",
+        "count": 1
+      },
+      {
+        "token": "shadow-[0_16px_40px_rgba(0,0,0,0.35)]",
+        "count": 1
+      },
+      {
+        "token": "shadow-[0_10px_24px_rgba(99,102,241,0.38)]",
+        "count": 1
+      },
+      {
+        "token": "shadow-indigo-900/40",
+        "count": 1
+      },
+      {
+        "token": "shadow-indigo-900/30",
+        "count": 1
+      },
+      {
+        "token": "shadow-[0_0_30px_rgba(79,70,229,0.25)]",
+        "count": 1
+      },
+      {
+        "token": "shadow-[0_0_60px_rgba(15,23,42,0.6)]",
+        "count": 1
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "id": "tool_button_chip",
+      "name": "Toolbelt Chip Button",
+      "description": "Uppercase compact buttons used in toolbelt and utility strips.",
+      "count": 13,
+      "occurrences": [
+        {
+          "filePath": "components/BottomToolbelt.tsx:169",
+          "classSnippet": "group w-full min-h-[44px] lg:min-h-[48px] rounded-xl lg:rounded-2xl px-2 lg:px-2.5 py-2 text-[10px] lg:text-[11px] font-semibold uppercase tracking-[0.16em] transition-all duration-200 ease-out transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 border inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.98]"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:216",
+          "classSnippet": "flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:225",
+          "classSnippet": "flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:266",
+          "classSnippet": "flex items-center gap-1.5 rounded-md border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:273",
+          "classSnippet": "flex items-center gap-1.5 rounded-md border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:292",
+          "classSnippet": "flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:304",
+          "classSnippet": "flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
+        },
+        {
+          "filePath": "components/ScriptDisplay.tsx:407",
+          "classSnippet": "px-3 py-1 text-[10px] uppercase tracking-widest rounded-md bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+        },
+        {
+          "filePath": "components/ScriptDisplay.tsx:416",
+          "classSnippet": "px-3 py-1 text-[10px] uppercase tracking-widest rounded-md border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:538",
+          "classSnippet": "inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:548",
+          "classSnippet": "inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:558",
+          "classSnippet": "inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-red-200 transition-colors hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/VoiceManager.tsx:179",
+          "classSnippet": "col-span-2 flex items-center justify-between rounded-md border border-gray-700 bg-gray-900/60 px-2 py-1.5 text-[10px] uppercase tracking-widest text-gray-400"
+        }
+      ]
+    },
+    {
+      "id": "button_secondary",
+      "name": "Secondary Button",
+      "description": "Gray utility buttons with subtle hover and border.",
+      "count": 9,
+      "occurrences": [
+        {
+          "filePath": "components/BottomToolbelt.tsx:172",
+          "classSnippet": "text-gray-300 border-gray-800 bg-gray-900/45 hover:bg-gray-800/85 hover:text-white hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,0.35)]"
+        },
+        {
+          "filePath": "components/Button.tsx:22",
+          "classSnippet": "bg-gray-700 text-gray-100 hover:bg-gray-600 focus:ring-gray-500"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:538",
+          "classSnippet": "inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:548",
+          "classSnippet": "inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:314",
+          "classSnippet": "bg-gray-700/80 text-gray-300"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:343",
+          "classSnippet": "bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white"
+        },
+        {
+          "filePath": "components/VoiceManager.tsx:132",
+          "classSnippet": "bg-gray-800/80 border-gray-700 text-gray-300 hover:text-white hover:border-indigo-500/70 hover:bg-indigo-600/70"
+        },
+        {
+          "filePath": "components/VoiceManager.tsx:152",
+          "classSnippet": "text-[10px] text-gray-300 bg-gray-700 px-1 rounded"
+        },
+        {
+          "filePath": "components/VoiceManager.tsx:167",
+          "classSnippet": "text-[10px] text-gray-300 bg-gray-700 px-1 rounded"
+        }
+      ]
+    },
+    {
+      "id": "card_dark_container",
+      "name": "Dark Card Container",
+      "description": "Rounded dark cards with border and shadow used for panels and shells.",
+      "count": 6,
+      "occurrences": [
+        {
+          "filePath": "components/BottomToolbelt.tsx:140",
+          "classSnippet": "rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden"
+        },
+        {
+          "filePath": "components/BottomToolbelt.tsx:157",
+          "classSnippet": "rounded-2xl border border-gray-800 bg-gray-950/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+        },
+        {
+          "filePath": "components/LoginModal.tsx:38",
+          "classSnippet": "relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        },
+        {
+          "filePath": "components/PrivacyModal.tsx:20",
+          "classSnippet": "relative w-full max-w-lg rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        },
+        {
+          "filePath": "components/TitleEditModal.tsx:44",
+          "classSnippet": "relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:180",
+          "classSnippet": "relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        }
+      ]
+    },
+    {
+      "id": "button_primary",
+      "name": "Primary Button",
+      "description": "Indigo CTA buttons with white text and hover state.",
+      "count": 6,
+      "occurrences": [
+        {
+          "filePath": "components/Button.tsx:21",
+          "classSnippet": "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500"
+        },
+        {
+          "filePath": "components/PlaybackPanel.tsx:172",
+          "classSnippet": "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40"
+        },
+        {
+          "filePath": "components/ScriptDisplay.tsx:407",
+          "classSnippet": "px-3 py-1 text-[10px] uppercase tracking-widest rounded-md bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:213",
+          "classSnippet": "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:343",
+          "classSnippet": "bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white"
+        },
+        {
+          "filePath": "components/VoiceManager.tsx:132",
+          "classSnippet": "bg-gray-800/80 border-gray-700 text-gray-300 hover:text-white hover:border-indigo-500/70 hover:bg-indigo-600/70"
+        }
+      ]
+    },
+    {
+      "id": "modal_overlay",
+      "name": "Modal Backdrop Overlay",
+      "description": "Fixed full-screen backdrop with dimming and blur.",
+      "count": 5,
+      "occurrences": [
+        {
+          "filePath": "components/LoginModal.tsx:36",
+          "classSnippet": "absolute inset-0 bg-black/70 backdrop-blur-sm"
+        },
+        {
+          "filePath": "components/PrivacyModal.tsx:16",
+          "classSnippet": "absolute inset-0 bg-black/70 backdrop-blur-sm"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:324",
+          "classSnippet": "absolute inset-0 bg-black/75 backdrop-blur-md"
+        },
+        {
+          "filePath": "components/TitleEditModal.tsx:42",
+          "classSnippet": "absolute inset-0 bg-black/70 backdrop-blur-sm"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:174",
+          "classSnippet": "absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+        }
+      ]
+    },
+    {
+      "id": "button_ghost",
+      "name": "Ghost Button",
+      "description": "Low-emphasis text action with transparent background and hover tint.",
+      "count": 5,
+      "occurrences": [
+        {
+          "filePath": "components/BottomToolbelt.tsx:146",
+          "classSnippet": "flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+        },
+        {
+          "filePath": "components/Button.tsx:24",
+          "classSnippet": "text-gray-400 hover:text-white hover:bg-gray-800"
+        },
+        {
+          "filePath": "components/PrivacyModal.tsx:38",
+          "classSnippet": "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:197",
+          "classSnippet": "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors"
+        },
+        {
+          "filePath": "components/VoiceManager.tsx:114",
+          "classSnippet": "p-2 text-gray-400 hover:text-indigo-300 hover:bg-gray-800/80 border border-transparent hover:border-gray-700 rounded-md"
+        }
+      ]
+    },
+    {
+      "id": "modal_surface",
+      "name": "Modal Surface",
+      "description": "Centered dialog panel with radius, border, and heavy shadow.",
+      "count": 4,
+      "occurrences": [
+        {
+          "filePath": "components/LoginModal.tsx:38",
+          "classSnippet": "relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        },
+        {
+          "filePath": "components/PrivacyModal.tsx:20",
+          "classSnippet": "relative w-full max-w-lg rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
+        },
+        {
+          "filePath": "components/TitleEditModal.tsx:44",
+          "classSnippet": "relative w-full max-w-md rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl"
+        },
+        {
+          "filePath": "components/VoiceCastingModal.tsx:180",
+          "classSnippet": "relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        }
+      ]
+    },
+    {
+      "id": "input_dark_field",
+      "name": "Dark Input Field",
+      "description": "Input/textarea controls using dark fill, gray border, and indigo focus ring.",
+      "count": 4,
+      "occurrences": [
+        {
+          "filePath": "components/InsertBlock.tsx:124",
+          "classSnippet": "h-9 bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none"
+        },
+        {
+          "filePath": "components/InsertBlock.tsx:125",
+          "classSnippet": "w-full h-full min-h-[72px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner"
+        },
+        {
+          "filePath": "components/ScriptPane.tsx:151",
+          "classSnippet": "w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner"
+        },
+        {
+          "filePath": "components/TitleEditModal.tsx:59",
+          "classSnippet": "w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-base text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+        }
+      ]
+    },
+    {
+      "id": "script_paper_canvas",
+      "name": "Script Paper Canvas",
+      "description": "Off-white screenplay canvas with border, texture, and drop shadow.",
+      "count": 1,
+      "occurrences": [
+        {
+          "filePath": "components/ScriptDisplay.tsx:38",
+          "classSnippet": "* { box-sizing: border-box; } html, body { margin: 0; padding: 0; } body { font-family: \"Courier Prime\", monospace; background: #111827; color: #111111; line-height: 1.5; } .font-screenplay { font-family: \"Courier Prime\", monospace; } .script-export-root { position: relative; max-width: 900px; margin: 24px auto; padding: 72px 72px; background: #f6f1e7; color: #111111; border: 1px solid #d6cdbd; border-radius: 12px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25); overflow: visible !important; } .script-export-content { position: relative; z-index: 1; overflow: visible !important; } .script-export-texture { position: absolute; inset: 0; pointer-events: none; opacity: 0.03; background-repeat: repeat; background-image: url('/textures/cream-paper.svg'); } .script-scene { margin-bottom: 32px; } .script-scene-heading { font-weight: 700; text-transform: uppercase; font-size: 17px; letter-spacing: 0.03em; border-bottom: 1px solid #d1d5db; padding-bottom: 6px; margin-bottom: 16px; } .script-block { margin: 0 0 18px; break-inside: avoid; page-break-inside: avoid; } .script-block[data-block-type=\"action\"] { line-height: 1.55; } .script-block[data-block-type=\"dialogue\"] { max-width: 4.2in; margin: 12px auto 20px; text-align: center; } .script-dialogue-character { margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; } .script-dialogue-parenthetical { font-style: italic; font-size: 0.92rem; margin: 2px 0; } .script-dialogue-text { white-space: pre-wrap; margin: 2px 0 14px; } .script-block[data-block-type=\"transition\"] { text-align: right; text-transform: uppercase; font-weight: 700; padding-right: 8px; } .script-export-chrome { display: none !important; } .script-block-active { background: transparent !important; box-shadow: none !important; } @media print { body { background: #ffffff; } .script-export-root { margin: 0; padding: 0; border: none; border-radius: 0; box-shadow: none; max-width: none; background: #ffffff; } .script-export-texture { display: none !important; } @page { size: letter; margin: 0.9in 0.8in 0.9in 1in; } }"
+        }
+      ]
+    },
+    {
+      "id": "toggle_switch",
+      "name": "Toggle Switch",
+      "description": "Two-state switch with rounded track and sliding knob.",
+      "count": 1,
+      "occurrences": [
+        {
+          "filePath": "components/PlaybackPanel.tsx:142",
+          "classSnippet": "ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors"
+        }
+      ]
+    }
+  ]
+}

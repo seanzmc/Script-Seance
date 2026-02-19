@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" fill="none">
+  <rect x="0" y="0" width="1280" height="720" fill="#111827"/>
+  <rect x="48" y="32" width="1184" height="72" rx="12" fill="#1f2937" stroke="#374151"/>
+  <rect x="48" y="120" width="1184" height="500" rx="12" fill="#0b1220" stroke="#374151"/>
+  <rect x="48" y="640" width="1184" height="48" rx="12" fill="#111827" stroke="#374151"/>
+  <text x="72" y="76" font-size="20" fill="#f9fafb" font-family="Inter, sans-serif">AppShell</text>
+
+</svg>
