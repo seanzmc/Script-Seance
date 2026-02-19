@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
@@ -134,6 +134,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
 }) => {
   const [activeTool, setActiveTool] = useState<ToolKey | null>(null);
   const [mobileFocus, setMobileFocus] = useState<'tools' | 'script'>('script');
+  const [rewriteMode, setRewriteMode] = useState<'select' | 'configure'>('configure');
   const [isNarrowViewport, setIsNarrowViewport] = useState(() => (
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -274,6 +275,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[11px] text-gray-500">Start a script to generate new scenes.</p>
   );
+  const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
+    setRewriteTarget(target);
+    if (isNarrowViewport && activeTool === 'rewrite') {
+      setRewriteMode('configure');
+      setMobileFocus('tools');
+    }
+  }, [activeTool, isNarrowViewport]);
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -288,8 +296,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       characters={context.characters}
       insertTarget={insertTarget}
       rewriteTarget={rewriteTarget}
-      rewriteModeActive={activeTool === 'rewrite'}
-      onSelectRewriteTarget={setRewriteTarget}
+      rewriteModeActive={activeTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
+      onSelectRewriteTarget={handleSelectRewriteTarget}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
@@ -331,18 +339,28 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   useEffect(() => {
     if (!isNarrowViewport) {
       setMobileFocus('script');
+      setRewriteMode('configure');
       return;
     }
-    if (activeTool) {
-      setMobileFocus('tools');
+    if (!activeTool) {
+      return;
     }
+    if (activeTool === 'rewrite') {
+      setRewriteMode('select');
+      setRewriteTarget(null);
+      setMobileFocus('script');
+      return;
+    }
+    setRewriteMode('configure');
+    setMobileFocus('tools');
   }, [activeTool, isNarrowViewport]);
 
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
   const mobileFocusEnabled = isNarrowViewport && Boolean(context);
   const isToolFocus = mobileFocusEnabled && mobileFocus === 'tools';
   const isScriptFocus = !mobileFocusEnabled || mobileFocus === 'script';
-  const showMobileViewToolsButton = mobileFocusEnabled && mobileFocus === 'script';
+  const isMobileRewriteSelectMode = mobileFocusEnabled && activeTool === 'rewrite' && rewriteMode === 'select';
+  const showMobileViewToolsButton = mobileFocusEnabled && mobileFocus === 'script' && !isMobileRewriteSelectMode;
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -412,6 +430,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       return;
     }
     setActiveTool(tool);
+    if (tool === 'rewrite' && isNarrowViewport) {
+      setRewriteMode('select');
+      setRewriteTarget(null);
+      setMobileFocus('script');
+      return;
+    }
     if (isNarrowViewport) {
       setMobileFocus('tools');
     }
@@ -452,58 +476,78 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setRewriteTarget(null);
       return;
     }
+    // Mobile rewrite select mode requires explicit target selection.
+    if (isNarrowViewport && activeTool === 'rewrite' && rewriteMode === 'select') {
+      return;
+    }
     if (!rewriteTarget || !rewriteOptions.some(option => option.blockId === rewriteTarget.blockId)) {
       const [first] = rewriteOptions;
       if (first) {
         setRewriteTarget({ sceneId: first.sceneId, blockId: first.blockId });
       }
     }
-  }, [rewriteOptions, rewriteTarget]);
+  }, [activeTool, isNarrowViewport, rewriteMode, rewriteOptions, rewriteTarget]);
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
     <div className="h-full min-h-0 flex flex-col gap-2">
       <div className={`${toolSectionClass} flex-1 min-h-0 flex flex-col`}>
-      <p className="text-[10px] text-gray-500 shrink-0">
-        Click a block in the script to target rewrite.
-      </p>
-      <div className="px-0.5 py-0.5 space-y-1 shrink-0">
-        <p className={toolLabelClass}>Selected Block</p>
-        <p className="text-xs text-gray-200 truncate" title={selectedRewrite?.label}>
-          {selectedRewrite ? selectedRewrite.label : 'No block selected.'}
+        <p className="text-[10px] text-gray-500 shrink-0">
+          {isNarrowViewport
+            ? 'Selected block appears below. Use Change selection to pick another block.'
+            : 'Click a block in the script to target rewrite.'}
         </p>
-        {selectedRewrite?.locked && (
-          <p className="text-[10px] text-amber-300">This block is locked and cannot be regenerated.</p>
-        )}
-      </div>
-      <div className="space-y-1 flex-1 min-h-0">
-        <label className={toolLabelClass}>
-          Guidance (optional)
-        </label>
-        <textarea
-          value={rewriteGuidance}
-          onChange={(event) => setRewriteGuidance(event.target.value)}
-          maxLength={220}
-          placeholder="Tone, intent, constraints..."
-          className={`${toolInputClass} h-[104px] resize-none`}
-        />
-      </div>
-      <div className="flex items-center justify-between gap-3 shrink-0">
-        <p className="text-[10px] text-gray-500">{rewriteGuidance.length}/220 chars</p>
-        <Button
-          onClick={() => {
-            if (rewriteTarget) {
-              const guidance = rewriteGuidance.trim();
-              onRegenerate(rewriteTarget.sceneId, rewriteTarget.blockId, guidance || undefined);
-            }
-          }}
-          disabled={!rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
-          size="sm"
-          className="shadow-lg shadow-indigo-500/20"
-          title="Regenerate the selected block"
-        >
-          Regenerate
-        </Button>
-      </div>
+        <div className="px-0.5 py-0.5 space-y-1 shrink-0">
+          <p className={toolLabelClass}>Selected Block</p>
+          <p className="text-xs text-gray-200 truncate" title={selectedRewrite?.label}>
+            {selectedRewrite ? selectedRewrite.label : 'No block selected.'}
+          </p>
+          {selectedRewrite?.locked && (
+            <p className="text-[10px] text-amber-300">This block is locked and cannot be regenerated.</p>
+          )}
+        </div>
+        <div className="space-y-1 flex-1 min-h-0">
+          <label className={toolLabelClass}>
+            Guidance (optional)
+          </label>
+          <textarea
+            value={rewriteGuidance}
+            onChange={(event) => setRewriteGuidance(event.target.value)}
+            maxLength={220}
+            placeholder="Tone, intent, constraints..."
+            className={`${toolInputClass} h-[104px] resize-none`}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] text-gray-500">{rewriteGuidance.length}/220 chars</p>
+            {isNarrowViewport && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRewriteMode('select');
+                  setMobileFocus('script');
+                }}
+                className="inline-flex items-center rounded-md border border-gray-700 bg-gray-900/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800"
+              >
+                Change selection
+              </button>
+            )}
+          </div>
+          <Button
+            onClick={() => {
+              if (rewriteTarget) {
+                const guidance = rewriteGuidance.trim();
+                onRegenerate(rewriteTarget.sceneId, rewriteTarget.blockId, guidance || undefined);
+              }
+            }}
+            disabled={!rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
+            size="sm"
+            className="shadow-lg shadow-indigo-500/20"
+            title="Regenerate the selected block"
+          >
+            Regenerate
+          </Button>
+        </div>
       </div>
     </div>
   ) : (
@@ -612,6 +656,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <div className={`${context && isToolFocus ? 'hidden' : 'flex-1 min-h-0 min-w-0 overflow-hidden'}`}>
         {context && isScriptFocus ? (
           <div className={contentWrapperClassName}>
+            {isMobileRewriteSelectMode && (
+              <div className="rounded-lg border border-indigo-500/35 bg-indigo-500/10 px-3 py-2 text-[11px] text-indigo-100">
+                Select rewrite target: tap a block in the script.
+              </div>
+            )}
             {showMobileViewToolsButton && (
               <div className="flex justify-end">
                 <button
