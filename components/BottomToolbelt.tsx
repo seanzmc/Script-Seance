@@ -29,8 +29,6 @@ export interface BottomToolbeltProps {
   activeTool: ToolKey | null;
   onSelectTool: (tool: ToolKey) => void;
   onCloseTool: () => void;
-  onViewScript?: () => void;
-  showViewScriptButton?: boolean;
   className?: string;
   mobileExpanded?: boolean;
   onExportTxt?: () => void;
@@ -47,8 +45,6 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   activeTool,
   onSelectTool,
   onCloseTool,
-  onViewScript,
-  showViewScriptButton = false,
   className = '',
   mobileExpanded = false,
   onExportTxt,
@@ -241,16 +237,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
           <div className={`rounded-2xl border border-gray-800 bg-gray-950/95 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelLayoutClass} flex-col overflow-hidden`}>
             <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{activeLabel}</p>
-              <div className="flex items-center gap-2">
-                {showViewScriptButton && onViewScript && (
-                  <button
-                    type="button"
-                    onClick={onViewScript}
-                    className="inline-flex h-8 items-center rounded-md border border-gray-700 bg-gray-900/60 px-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-200 transition-colors hover:bg-gray-800"
-                  >
-                    View Script
-                  </button>
-                )}
+              <div className="flex items-center">
                 <button
                   type="button"
                   onClick={onCloseTool}

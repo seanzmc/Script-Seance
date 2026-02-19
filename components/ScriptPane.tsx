@@ -76,6 +76,15 @@ export interface ScriptPaneProps {
 
 const PROMPT_CHAR_LIMIT = 320;
 const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
+const MOBILE_TOOLS_DOCK_HEIGHT_CLASS = 'pb-[calc(4.75rem+env(safe-area-inset-bottom))]';
+const TOOL_LABELS: Record<ToolKey, string> = {
+  generate: 'Generate',
+  insert: 'Insert',
+  rewrite: 'Rewrite',
+  voices: 'Voices',
+  playback: 'Playback',
+  export: 'Export'
+};
 
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
@@ -360,7 +369,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const isToolFocus = mobileFocusEnabled && mobileFocus === 'tools';
   const isScriptFocus = !mobileFocusEnabled || mobileFocus === 'script';
   const isMobileRewriteSelectMode = mobileFocusEnabled && activeTool === 'rewrite' && rewriteMode === 'select';
-  const showMobileViewToolsButton = mobileFocusEnabled && mobileFocus === 'script' && !isMobileRewriteSelectMode;
+  const activeToolLabel = activeTool ? TOOL_LABELS[activeTool] : null;
+  const mobileDockLabel = isToolFocus
+    ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
+    : activeToolLabel ? `View ${activeToolLabel}` : 'View Tools';
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -439,6 +451,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     if (isNarrowViewport) {
       setMobileFocus('tools');
     }
+  };
+  const handleToggleMobileDock = () => {
+    if (!mobileFocusEnabled) return;
+    setMobileFocus(isToolFocus ? 'script' : 'tools');
   };
   const handleOpenTitleModal = () => {
     setTitleDraft(context?.title ?? '');
@@ -571,7 +587,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
 
   return (
-    <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
+    <section className={`flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a] ${mobileFocusEnabled ? MOBILE_TOOLS_DOCK_HEIGHT_CLASS : ''}`}>
       {context && (
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
@@ -661,17 +677,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 Select rewrite target: tap a block in the script.
               </div>
             )}
-            {showMobileViewToolsButton && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setMobileFocus('tools')}
-                  className="inline-flex items-center rounded-md border border-gray-700 bg-gray-900/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-200 hover:bg-gray-800 transition-colors"
-                >
-                  View Tools
-                </button>
-              </div>
-            )}
             {errorBanner}
 
             <div className="flex flex-col gap-2 flex-1 min-h-0 min-w-0">
@@ -697,8 +702,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           activeTool={activeTool}
           onSelectTool={handleToolSelect}
           onCloseTool={handleToolClose}
-          onViewScript={() => setMobileFocus('script')}
-          showViewScriptButton={mobileFocusEnabled && isToolFocus}
           mobileExpanded={mobileFocusEnabled && isToolFocus}
           onExportTxt={onExportTxt}
           onExportPdf={onExportPdf}
@@ -709,6 +712,36 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           voicesContent={voicesContent}
           insertContent={insertContent}
         />
+      )}
+      {mobileFocusEnabled && (
+        <div className="fixed inset-x-0 bottom-0 z-[74] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto w-full max-w-6xl rounded-2xl border border-gray-700 bg-gray-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.38)]">
+            <div className="flex items-center gap-2 px-2.5 py-2">
+              <button
+                type="button"
+                onClick={handleToggleMobileDock}
+                className="flex-1 min-h-[42px] rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-left transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-200">Tools</p>
+                <p className="text-[11px] text-gray-400">{mobileDockLabel}</p>
+              </button>
+              {isToolFocus && activeTool && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleToolClose();
+                  }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                  aria-label="Close active tool"
+                  title="Close active tool"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       <TitleEditModal
         isOpen={isTitleModalOpen}

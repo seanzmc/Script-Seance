@@ -215,15 +215,4 @@ describe('BottomToolbelt responsive tools drawer', () => {
     expect(screen.getByText('Generate panel body')).toBeTruthy();
   });
 
-  it('renders View Script action in tool header when enabled', () => {
-    const onViewScript = vi.fn();
-    renderToolbelt({
-      activeTool: 'insert',
-      showViewScriptButton: true,
-      onViewScript
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'View Script' }));
-    expect(onViewScript).toHaveBeenCalledTimes(1);
-  });
 });
