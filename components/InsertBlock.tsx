@@ -122,7 +122,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
 }) => {
   const labelClass = 'text-[10px] uppercase font-bold text-gray-400 tracking-widest';
   const selectClass = 'h-9 bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
-  const textareaClass = 'w-full h-full min-h-[72px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner';
+  const textareaClass = 'w-full min-h-[104px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner';
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
@@ -215,7 +215,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-2">
+    <div className="min-h-full flex flex-col gap-2">
       <div
         className={`grid gap-2 ${
           elementType === BlockType.DIALOGUE
@@ -266,7 +266,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         )}
       </div>
 
-      <div className="grid grid-rows-[auto_minmax(0,1fr)] gap-1 flex-1 min-h-0">
+      <div className="grid gap-1">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
           <label className={labelClass}>Content</label>
           <p className="text-[10px] leading-snug text-gray-500 italic sm:text-right sm:max-w-[55%]">{HINTS[elementType]}</p>

@@ -130,7 +130,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               : activePlaceholder;
   const panelBodyNode = typeof panelBodyContent === 'string'
     ? <p className="text-sm text-gray-300">{panelBodyContent}</p>
-    : <div className="h-full min-h-0">{panelBodyContent}</div>;
+    : <div className="min-h-full">{panelBodyContent}</div>;
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -242,7 +242,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className={`${panelBodyPaddingClass} flex-1 min-h-0 overflow-y-auto`}>
+            <div className={`${panelBodyPaddingClass} flex-1 min-h-0 overflow-y-auto overscroll-contain`}>
               {panelBodyNode}
             </div>
           </div>
