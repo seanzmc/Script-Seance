@@ -201,26 +201,31 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
         aria-modal={embedded ? undefined : true}
         aria-label={`Cast voices for ${characterName}`}
       >
-        <div className={`flex items-center justify-between border-b border-gray-800 bg-gray-900/50 ${embedded ? 'px-3 py-2.5' : 'p-6'}`}>
-          <div className="min-w-0">
-            {embedded && (
-              <button
-                type="button"
-                onClick={handleBack}
-                className="mb-1 inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/70 px-2 py-1 text-[11px] font-semibold text-gray-200 transition-colors hover:bg-gray-800"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                Back
-              </button>
-            )}
-            <h2 className={`font-bold text-white flex items-center gap-2 ${embedded ? 'text-base' : 'text-xl'}`}>
-              <Mic className={`${embedded ? 'w-4 h-4' : 'w-5 h-5'} text-indigo-400`} />
-              CAST VOICES
-            </h2>
-            <p className={`${embedded ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-gray-300`}>
-              Casting: <span className="text-indigo-300 font-semibold truncate">{characterName}</span>
+        <div className={`flex items-center justify-between border-b border-gray-800 bg-gray-900/50 ${embedded ? 'px-3 py-1.5' : 'px-6 py-4'}`}>
+          <div className="min-w-0 space-y-0.5">
+            <div className="flex items-center gap-2">
+              {embedded && (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="inline-flex h-8 items-center gap-1 rounded-md border border-gray-700 bg-gray-900/70 px-1.5 text-[10px] font-semibold text-gray-200 transition-colors hover:bg-gray-800"
+                >
+                  <ChevronLeft className="h-3 w-3" />
+                  Back
+                </button>
+              )}
+              <h2 className={`font-bold text-white flex items-center gap-1.5 ${embedded ? 'text-sm' : 'text-lg'}`}>
+                <Mic className={`${embedded ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-indigo-400`} />
+                CAST VOICES
+              </h2>
+            </div>
+            <p
+              className={`${embedded ? 'text-[11px]' : 'text-sm'} text-gray-300 truncate`}
+              title={`Casting: ${characterName}`}
+            >
+              Casting: <span className="text-indigo-300 font-semibold">{characterName}</span>
             </p>
-            <p className={`${embedded ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-gray-400`}>Assign a voice to your character.</p>
+            <p className={`${embedded ? 'text-[11px] leading-tight' : 'text-sm'} text-gray-400`}>Assign a voice to your character.</p>
           </div>
           {!embedded && (
             <button
@@ -234,13 +239,13 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
           )}
         </div>
 
-        <div className={`${embedded ? 'px-3 py-2.5' : 'px-6 py-4'} border-b border-gray-800 bg-gray-900/50 flex flex-col md:flex-row md:items-center justify-between gap-3`}>
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+        <div className={`${embedded ? 'px-3 py-1.5' : 'px-6 py-3'} border-b border-gray-800 bg-gray-900/50 flex flex-col md:flex-row md:items-center justify-between gap-2`}>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 md:pb-0">
             {FILTERS.map(filter => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                className={`h-8 px-3 rounded-full text-[11px] font-medium transition-all whitespace-nowrap ${
                   activeFilter === filter
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
                     : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
@@ -251,29 +256,35 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowAvailableOnly(!showAvailableOnly)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-2 ${
+              aria-pressed={showAvailableOnly}
+              className={`h-8 rounded-full px-2.5 text-[11px] font-medium transition-all inline-flex items-center gap-1.5 ${
                 showAvailableOnly
                   ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/50'
                   : 'bg-gray-800 text-gray-400 border border-transparent hover:bg-gray-700'
               }`}
             >
               <Info className="w-3 h-3" />
-              Available only
+              <span>Available only</span>
+              <span className={`relative inline-flex h-4 w-8 rounded-full transition-colors ${showAvailableOnly ? 'bg-emerald-500/70' : 'bg-gray-600/90'}`}>
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${showAvailableOnly ? 'translate-x-4' : 'translate-x-0.5'}`}
+                />
+              </span>
             </button>
           </div>
         </div>
 
-        <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'p-3' : 'p-6'} bg-black/20`}>
+        <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'p-2' : 'p-4'} bg-black/20`}>
           {filteredVoices.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-500 space-y-2">
               <Mic className="w-12 h-12 opacity-20" />
               <p>No voices match your filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               {filteredVoices.map((voice) => {
                 const isSelected = currentVoiceId === voice.id;
                 const isPlaying = isPreviewing && previewVoiceId === voice.id;
@@ -284,7 +295,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                   <div
                     key={voice.id}
                     onClick={() => onSelect(voice.id)}
-                    className={`group relative flex flex-col p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
+                    className={`group relative flex flex-col p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
                       isSelected
                         ? 'bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/30'
                         : isPlaying
@@ -293,13 +304,13 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     }`}
                   >
                     {/* Top Row: Name & Active State */}
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start mb-1">
                       <div className="overflow-hidden">
-                        <h3 className={`font-bold text-base truncate ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                        <h3 className={`font-bold text-sm truncate ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                           {voice.name}
                         </h3>
                         {(voice.gender || voice.category) && (
-                          <div className="flex gap-1.5 mt-1">
+                          <div className="flex gap-1 mt-0.5">
                             {voice.gender && (
                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
                                 isSelected ? 'bg-indigo-500/30 text-indigo-300' : 'bg-gray-700 text-gray-400'
@@ -332,16 +343,16 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     </div>
 
                     {/* Description */}
-                    <p className="text-xs text-gray-400 mb-4 leading-relaxed line-clamp-2 flex-1">
+                    <p className="text-[11px] text-gray-400 mb-2 leading-snug line-clamp-2 flex-1">
                       {voice.description}
                     </p>
 
                     {voice.tags.length > 0 && (
-                      <div className="mb-4 flex flex-wrap gap-1.5">
+                      <div className="mb-2 flex flex-wrap gap-1">
                         {voice.tags.slice(0, 4).map((tag) => (
                           <span
                             key={`${voice.id}-${tag}`}
-                            className={`px-1.5 py-0.5 rounded text-[10px] ${
+                            className={`px-1.5 py-0 rounded text-[10px] ${
                               isSelected ? 'bg-indigo-500/25 text-indigo-200' : 'bg-gray-700/80 text-gray-300'
                             }`}
                           >
@@ -352,7 +363,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     )}
 
                     {/* Assigned Status */}
-                    <div className="mb-4 pt-3 border-t border-gray-700/50">
+                    <div className="mb-2 pt-2 border-t border-gray-700/50">
                       <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-tight">
                         <User className={`w-3 h-3 ${isAssignedElsewhere ? 'text-indigo-400' : 'text-emerald-400'}`} />
                         <span className={isAssignedElsewhere ? 'text-indigo-300' : 'text-emerald-400'}>
@@ -369,7 +380,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                           onPreview(voice.id);
                         }}
                         aria-label={isPlaying ? 'Stop preview' : 'Preview'}
-                        className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all inline-flex items-center gap-1.5 ${
+                        className={`h-9 px-2.5 rounded-md text-[11px] font-semibold transition-all inline-flex items-center gap-1.5 ${
                           isPlaying 
                             ? 'bg-indigo-500 text-white shadow-inner' 
                             : 'bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white'
@@ -402,7 +413,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
           )}
         </div>
 
-        <div className={`${embedded ? 'px-3 py-2.5' : 'p-4'} border-t border-gray-800 bg-gray-900/50 flex justify-between items-center`}>
+        <div className={`${embedded ? 'px-3 py-2' : 'p-4'} border-t border-gray-800 bg-gray-900/50 flex justify-between items-center`}>
            <div className="text-xs text-gray-500 flex items-center gap-2">
              <Info className="w-3.5 h-3.5" />
              Previewing {characterName}&apos;s existing lines.
