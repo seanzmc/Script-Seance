@@ -3,7 +3,7 @@ import { SetupFormState } from './components/SetupForm';
 import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
 import { VoicesPanel } from './components/VoicesPanel';
-import { PlaybackPanel } from './components/PlaybackPanel';
+import type { PlaybackPanelProps } from './components/PlaybackPanel';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
 import { PrivacyModal } from './components/PrivacyModal';
@@ -1344,40 +1344,36 @@ export default function App() {
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
   );
-  const playbackContent = context ? (
-    <PlaybackPanel
-      isPlaying={isPlaying}
-      isPaused={isPaused}
-      isLoadingAudio={isLoadingAudio}
-      currentBlockId={currentBlockId}
-      currentBlockIndex={currentBlockIndex}
-      blockStatuses={blockStatuses}
-      onPlay={handlePlay}
-      onPause={pause}
-      onResume={resume}
-      onStop={stop}
-      onPrev={goToPrevious}
-      onNext={goToNext}
-      onRetry={retryCurrentBlock}
-      onSkip={skipCurrentBlock}
-      onRefreshAudio={() => playScript(allBlocks, { forceRegenerate: true })}
-      onPurgeAudio={() => {
-        clearGeneratedAudio({ clearGlobalCache: true });
-        setToast({ message: 'Generated playback audio cleared.' });
-      }}
-      bufferedCount={bufferedBlocks}
-      totalCount={totalBufferedBlocks}
-      currentSpeaker={currentSpeaker}
-      playbackSpeed={playbackSpeed}
-      onPlaybackSpeedChange={handleGlobalSpeedChange}
-      showHighlights={showHighlights}
-      onToggleHighlights={() => setShowHighlights(!showHighlights)}
-      autoScroll={autoScroll}
-      onToggleAutoScroll={() => setAutoScroll(!autoScroll)}
-    />
-  ) : (
-    <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
-  );
+  const playbackProps: PlaybackPanelProps = {
+    isPlaying,
+    isPaused,
+    isLoadingAudio,
+    currentBlockId,
+    currentBlockIndex,
+    blockStatuses,
+    onPlay: handlePlay,
+    onPause: pause,
+    onResume: resume,
+    onStop: stop,
+    onPrev: goToPrevious,
+    onNext: goToNext,
+    onRetry: retryCurrentBlock,
+    onSkip: skipCurrentBlock,
+    onRefreshAudio: () => playScript(allBlocks, { forceRegenerate: true }),
+    onPurgeAudio: () => {
+      clearGeneratedAudio({ clearGlobalCache: true });
+      setToast({ message: 'Generated playback audio cleared.' });
+    },
+    bufferedCount: bufferedBlocks,
+    totalCount: totalBufferedBlocks,
+    currentSpeaker,
+    playbackSpeed,
+    onPlaybackSpeedChange: handleGlobalSpeedChange,
+    showHighlights,
+    onToggleHighlights: () => setShowHighlights(!showHighlights),
+    autoScroll,
+    onToggleAutoScroll: () => setAutoScroll(!autoScroll)
+  };
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
   );
@@ -1439,7 +1435,7 @@ export default function App() {
         onExportTxt={handleDownload}
         onExportPdf={handleExportPdf}
         canExport={Boolean(context)}
-        playbackContent={playbackContent}
+        playbackProps={context ? playbackProps : undefined}
         voicesContent={voicesContent}
         insertScrollTargetId={insertScrollTargetId}
         insertScrollToken={insertScrollToken}

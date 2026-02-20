@@ -1,5 +1,18 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Loader2, ScrollText, AlertTriangle, Trash2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import {
+  AlertTriangle,
+  ChevronUp,
+  Loader2,
+  Pause,
+  Play,
+  RotateCcw,
+  ScrollText,
+  SkipBack,
+  SkipForward,
+  Square,
+  Trash2,
+  X
+} from 'lucide-react';
 
 export interface PlaybackPanelProps {
   isPlaying: boolean;
@@ -29,35 +42,49 @@ export interface PlaybackPanelProps {
   onToggleAutoScroll: () => void;
 }
 
-export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
+export interface PlaybackMiniPlayerProps extends PlaybackPanelProps {
+  onExpand: () => void;
+  onClose: () => void;
+}
+
+type PlaybackState = 'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error';
+
+interface PlaybackViewModel {
+  currentStatus: 'notGenerated' | 'generating' | 'ready' | 'error' | undefined;
+  progressCount: number;
+  totalCount: number;
+  progress: number;
+  hasAudio: boolean;
+  canNavigate: boolean;
+  atStart: boolean;
+  atEnd: boolean;
+  statusHeadline: string;
+  statusDetail: string;
+  activeBlockNumber: number;
+  errorCount: number;
+}
+
+const buildPlaybackViewModel = ({
   isPlaying,
   isPaused,
   isLoadingAudio,
   currentBlockId,
   currentBlockIndex,
   blockStatuses,
-  onPlay,
-  onPause,
-  onResume,
-  onStop,
-  onPrev,
-  onNext,
-  onRetry,
-  onSkip,
-  onRefreshAudio,
-  onPurgeAudio,
   bufferedCount,
-  totalCount,
-  currentSpeaker,
-  playbackSpeed,
-  onPlaybackSpeedChange,
-  showHighlights,
-  onToggleHighlights,
-  autoScroll,
-  onToggleAutoScroll
-}) => {
-  const [playbackState, setPlaybackState] = useState<'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error'>('idle');
-  const statusValues = useMemo(() => Object.values(blockStatuses), [blockStatuses]);
+  totalCount
+}: Pick<
+  PlaybackPanelProps,
+  | 'isPlaying'
+  | 'isPaused'
+  | 'isLoadingAudio'
+  | 'currentBlockId'
+  | 'currentBlockIndex'
+  | 'blockStatuses'
+  | 'bufferedCount'
+  | 'totalCount'
+>): PlaybackViewModel => {
+  const statusValues = Object.values(blockStatuses);
   const readyCount = statusValues.filter(status => status === 'ready').length;
   const errorCount = statusValues.filter(status => status === 'error').length;
   const progressCount = Math.min(Math.max(readyCount + errorCount, bufferedCount), totalCount);
@@ -71,45 +98,15 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   const atStart = currentBlockIndex <= 0;
   const atEnd = currentBlockIndex >= totalCount - 1;
 
-  useEffect(() => {
-    if (!hasAudio) {
-      setPlaybackState('idle');
-      return;
-    }
-    if (currentStatus === 'error') {
-      setPlaybackState('error');
-      return;
-    }
-    if (isPaused) {
-      setPlaybackState('paused');
-      return;
-    }
-    if (isLoadingAudio || (!isPlaying && progressCount < totalCount)) {
-      setPlaybackState('generating');
-      return;
-    }
-    if (isPlaying) {
-      setPlaybackState('playing');
-      return;
-    }
-    if (progressCount >= totalCount) {
-      setPlaybackState('ready');
-      return;
-    }
-    setPlaybackState('idle');
-  }, [currentStatus, hasAudio, isLoadingAudio, isPaused, isPlaying, progressCount, totalCount]);
-
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      onPause();
-      return;
-    }
-    if (isPaused) {
-      onResume();
-      return;
-    }
-    onPlay();
-  };
+  const playbackState: PlaybackState = (() => {
+    if (!hasAudio) return 'idle';
+    if (currentStatus === 'error') return 'error';
+    if (isPaused) return 'paused';
+    if (isLoadingAudio || (!isPlaying && progressCount < totalCount)) return 'generating';
+    if (isPlaying) return 'playing';
+    if (progressCount >= totalCount) return 'ready';
+    return 'idle';
+  })();
 
   const statusHeadline = (() => {
     if (playbackState === 'playing') return 'Playback running';
@@ -138,6 +135,88 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
     }
     return 'Audio not generated yet.';
   })();
+
+  return {
+    currentStatus,
+    progressCount,
+    totalCount,
+    progress,
+    hasAudio,
+    canNavigate,
+    atStart,
+    atEnd,
+    statusHeadline,
+    statusDetail,
+    activeBlockNumber,
+    errorCount
+  };
+};
+
+export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
+  isPlaying,
+  isPaused,
+  isLoadingAudio,
+  currentBlockId,
+  currentBlockIndex,
+  blockStatuses,
+  onPlay,
+  onPause,
+  onResume,
+  onStop,
+  onPrev,
+  onNext,
+  onRetry,
+  onSkip,
+  onRefreshAudio,
+  onPurgeAudio,
+  bufferedCount,
+  totalCount,
+  currentSpeaker,
+  playbackSpeed,
+  onPlaybackSpeedChange,
+  showHighlights,
+  onToggleHighlights,
+  autoScroll,
+  onToggleAutoScroll
+}) => {
+  const {
+    currentStatus,
+    progressCount,
+    progress,
+    hasAudio,
+    canNavigate,
+    atStart,
+    atEnd,
+    statusHeadline,
+    statusDetail,
+    activeBlockNumber,
+    errorCount
+  } = useMemo(
+    () =>
+      buildPlaybackViewModel({
+        isPlaying,
+        isPaused,
+        isLoadingAudio,
+        currentBlockId,
+        currentBlockIndex,
+        blockStatuses,
+        bufferedCount,
+        totalCount
+      }),
+    [isPlaying, isPaused, isLoadingAudio, currentBlockId, currentBlockIndex, blockStatuses, bufferedCount, totalCount]
+  );
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      onPause();
+      return;
+    }
+    if (isPaused) {
+      onResume();
+      return;
+    }
+    onPlay();
+  };
   const controlButtonClass = 'flex items-center justify-center h-8 w-8 rounded-md border border-gray-700 bg-gray-900/50 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed';
   const toggleTrackClass = 'ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors';
 
@@ -310,6 +389,138 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
             <span className={`w-3.5 h-3.5 bg-white rounded-full transition-transform ${showHighlights ? 'translate-x-4' : ''}`} />
           </span>
         </button>
+      </div>
+    </div>
+  );
+};
+
+export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
+  isPlaying,
+  isPaused,
+  isLoadingAudio,
+  currentBlockId,
+  currentBlockIndex,
+  blockStatuses,
+  onPlay,
+  onPause,
+  onResume,
+  onStop,
+  onPrev,
+  onNext,
+  bufferedCount,
+  totalCount,
+  currentSpeaker,
+  onExpand,
+  onClose
+}) => {
+  const {
+    progressCount,
+    canNavigate,
+    atStart,
+    atEnd,
+    statusDetail
+  } = useMemo(
+    () =>
+      buildPlaybackViewModel({
+        isPlaying,
+        isPaused,
+        isLoadingAudio,
+        currentBlockId,
+        currentBlockIndex,
+        blockStatuses,
+        bufferedCount,
+        totalCount
+      }),
+    [isPlaying, isPaused, isLoadingAudio, currentBlockId, currentBlockIndex, blockStatuses, bufferedCount, totalCount]
+  );
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      onPause();
+      return;
+    }
+    if (isPaused) {
+      onResume();
+      return;
+    }
+    onPlay();
+  };
+
+  const controlButtonClass = 'flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:border-gray-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+  const speakerLabel = currentSpeaker?.trim() || 'None';
+
+  return (
+    <div className="rounded-2xl border border-gray-800 bg-gray-950/95 px-3 py-2 shadow-[0_18px_38px_rgba(0,0,0,0.45)] backdrop-blur">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={!canNavigate || atStart}
+            className={controlButtonClass}
+            title="Previous block"
+          >
+            <SkipBack className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handlePlayPause}
+            aria-pressed={isPlaying}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${
+              isPlaying
+                ? 'border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-500'
+                : 'border-indigo-400 bg-indigo-500/90 text-white hover:bg-indigo-500'
+            }`}
+            title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
+          >
+            {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
+          </button>
+          <button
+            type="button"
+            onClick={onStop}
+            className={controlButtonClass}
+            title="Stop playback"
+          >
+            <Square className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!canNavigate || atEnd}
+            className={controlButtonClass}
+            title="Next block"
+          >
+            <SkipForward className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
+          Speaking: <span className="text-gray-200">{speakerLabel}</span>
+        </p>
+        <button
+          type="button"
+          onClick={onExpand}
+          className="inline-flex h-8 items-center gap-1 rounded-md border border-gray-700 bg-gray-900/55 px-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-200 transition-colors hover:bg-gray-800"
+          aria-label="Open playback details"
+          title="Open playback details"
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+          Details
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+          aria-label="Close playback mini-player"
+          title="Close playback mini-player"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[11px] text-gray-300">{statusDetail}</p>
+        <span className="shrink-0 text-[10px] text-gray-500">
+          Audio generation: {progressCount}/{totalCount || 0}
+        </span>
       </div>
     </div>
   );

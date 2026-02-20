@@ -5,6 +5,7 @@ import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
+import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
 import { TitleEditModal } from './TitleEditModal';
 import { AlertCircle, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
@@ -68,7 +69,7 @@ export interface ScriptPaneProps {
   onExportTxt: () => void;
   onExportPdf?: () => void;
   canExport: boolean;
-  playbackContent?: React.ReactNode;
+  playbackProps?: PlaybackPanelProps;
   voicesContent?: React.ReactNode;
   insertScrollTargetId: string | null;
   insertScrollToken: number;
@@ -76,9 +77,10 @@ export interface ScriptPaneProps {
 
 const PROMPT_CHAR_LIMIT = 320;
 const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
-const MOBILE_TOOLS_DOCK_HEIGHT_CLASS = 'pb-[calc(4.75rem+env(safe-area-inset-bottom))]';
 const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))]';
 const MOBILE_TOOLS_DOCK_BOTTOM = 'calc(4.75rem + env(safe-area-inset-bottom))';
+const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
+const MOBILE_PLAYBACK_MINI_HEIGHT = '5.5rem';
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -139,7 +141,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onExportTxt,
   onExportPdf,
   canExport,
-  playbackContent,
+  playbackProps,
   voicesContent,
   insertScrollTargetId,
   insertScrollToken
@@ -442,13 +444,36 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </div>
     </div>
   ) : null;
-  const handleToolClose = () => {
-    setCurrentTool(null);
-    setToolsSheet('collapsed');
+  const focusScriptScroll = () => {
     requestAnimationFrame(() => {
       const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
       scrollContainer?.focus({ preventScroll: true });
     });
+  };
+  const handleToolClose = () => {
+    setCurrentTool(null);
+    setToolsSheet('collapsed');
+    focusScriptScroll();
+  };
+  const handlePlaybackMiniClose = () => {
+    playbackProps?.onStop();
+    setCurrentTool(null);
+    setToolsSheet('collapsed');
+    focusScriptScroll();
+  };
+  const handleMobileToolPanelClose = () => {
+    if (mobileSheetEnabled && currentTool === 'playback') {
+      setToolsSheet('collapsed');
+      return;
+    }
+    handleToolClose();
+  };
+  const handleActiveToolDismiss = () => {
+    if (mobileSheetEnabled && currentTool === 'playback') {
+      handlePlaybackMiniClose();
+      return;
+    }
+    handleToolClose();
   };
   const handleDesktopToolSelect = (tool: ToolKey) => {
     if (currentTool === tool) {
@@ -463,6 +488,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     if (tool === 'rewrite') {
       setRewriteMode('select');
       setRewriteTarget(null);
+      setToolsSheet('collapsed');
+      return;
+    }
+    if (tool === 'playback') {
+      setRewriteMode('configure');
       setToolsSheet('collapsed');
       return;
     }
@@ -621,9 +651,28 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to unlock insert mode.</p>
   );
+  const playbackContent = context && playbackProps ? (
+    <PlaybackPanel {...playbackProps} />
+  ) : (
+    <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
+  );
+  const isMobilePlaybackMiniVisible = mobileSheetEnabled
+    && currentTool === 'playback'
+    && toolsSheet === 'collapsed'
+    && Boolean(playbackProps);
+  const mobileBottomPadding = mobileSheetEnabled
+    ? (
+      isMobilePlaybackMiniVisible
+        ? `calc(4.75rem + env(safe-area-inset-bottom) + ${MOBILE_PLAYBACK_MINI_HEIGHT})`
+        : MOBILE_TOOLS_DOCK_PADDING
+    )
+    : undefined;
 
   return (
-    <section className={`flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a] ${mobileSheetEnabled ? MOBILE_TOOLS_DOCK_HEIGHT_CLASS : ''}`}>
+    <section
+      className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#1a1a1a]"
+      style={mobileBottomPadding ? { paddingBottom: mobileBottomPadding } : undefined}
+    >
       {context && (
         <div
           className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
@@ -795,7 +844,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <BottomToolbelt
               activeTool={currentTool}
               onSelectTool={handleDesktopToolSelect}
-              onCloseTool={handleToolClose}
+              onCloseTool={handleMobileToolPanelClose}
               showSelector={false}
               edgeToEdge
               mobileExpanded
@@ -810,6 +859,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               insertContent={insertContent}
             />
           </div>
+        </div>
+      )}
+      {isMobilePlaybackMiniVisible && playbackProps && (
+        <div
+          className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5`}
+          data-testid="playback-mini-player"
+        >
+          <PlaybackMiniPlayer
+            {...playbackProps}
+            onExpand={() => setToolsSheet('tool')}
+            onClose={handlePlaybackMiniClose}
+          />
         </div>
       )}
       {mobileSheetEnabled && (
@@ -829,7 +890,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    handleToolClose();
+                    handleActiveToolDismiss();
                   }}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
                   aria-label="Close active tool"

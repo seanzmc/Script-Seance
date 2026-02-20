@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { SetupFormState } from '../components/SetupForm';
+import { PlaybackPanelProps } from '../components/PlaybackPanel';
 import { BlockType, StoryContext } from '../types';
 
 type MatchMediaListener = (event: MediaQueryListEvent) => void;
@@ -123,6 +124,35 @@ const setupStateFixture: SetupFormState = {
   length: 'Medium'
 };
 
+const createPlaybackProps = (overrides: Partial<PlaybackPanelProps> = {}): PlaybackPanelProps => ({
+  isPlaying: false,
+  isPaused: false,
+  isLoadingAudio: false,
+  currentBlockId: null,
+  currentBlockIndex: -1,
+  blockStatuses: {},
+  onPlay: vi.fn(),
+  onPause: vi.fn(),
+  onResume: vi.fn(),
+  onStop: vi.fn(),
+  onPrev: vi.fn(),
+  onNext: vi.fn(),
+  onRetry: vi.fn(),
+  onSkip: vi.fn(),
+  onRefreshAudio: vi.fn(),
+  onPurgeAudio: vi.fn(),
+  bufferedCount: 0,
+  totalCount: 0,
+  currentSpeaker: 'None',
+  playbackSpeed: 1,
+  onPlaybackSpeedChange: vi.fn(),
+  showHighlights: true,
+  onToggleHighlights: vi.fn(),
+  autoScroll: false,
+  onToggleAutoScroll: vi.fn(),
+  ...overrides
+});
+
 const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps => ({
   context: contextFixture,
   titleInputRef: createRef<HTMLInputElement>(),
@@ -177,7 +207,7 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onExportTxt: vi.fn(),
   onExportPdf: vi.fn(),
   canExport: true,
-  playbackContent: <div>Playback panel body</div>,
+  playbackProps: createPlaybackProps(),
   voicesContent: <div>Voices panel body</div>,
   insertScrollTargetId: null,
   insertScrollToken: 0,
@@ -257,5 +287,38 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
     });
+  });
+
+  it('390x844: playback opens mini-player, expands to details, collapses back, and close stops playback', async () => {
+    const onStop = vi.fn();
+    render(<ScriptPane {...createProps({ playbackProps: createPlaybackProps({ onStop }) })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Playback' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
+    });
+    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open playback details' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close tool panel' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
+    });
+    expect(onStop).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close playback mini-player' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('playback-mini-player')).toBeNull();
+    });
+    expect(onStop).toHaveBeenCalledTimes(1);
   });
 });
