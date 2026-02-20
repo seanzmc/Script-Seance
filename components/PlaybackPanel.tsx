@@ -47,6 +47,7 @@ export interface PlaybackMiniPlayerProps extends PlaybackPanelProps {
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onClose: () => void;
+  detailsContentRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 type PlaybackState = 'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error';
@@ -424,7 +425,8 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
   onToggleAutoScroll,
   isExpanded,
   onToggleExpanded,
-  onClose
+  onClose,
+  detailsContentRef
 }) => {
   const {
     currentStatus,
@@ -539,7 +541,10 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
       </div>
       {isExpanded && (
         <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-2">
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+          <div
+            ref={detailsContentRef}
+            className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5"
+          >
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={onRefreshAudio}

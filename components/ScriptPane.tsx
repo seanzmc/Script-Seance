@@ -80,9 +80,9 @@ const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
 const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))]';
 const MOBILE_TOOLS_DOCK_BOTTOM = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
-const MOBILE_PLAYBACK_SHEET_COLLAPSED_HEIGHT = '5.5rem';
-const MOBILE_PLAYBACK_SHEET_EXPANDED_HEIGHT = 'min(56vh, 30rem)';
-const MOBILE_PLAYBACK_SHEET_MIN_HEIGHT_PX = 88;
+const MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX = 88;
+const MOBILE_PLAYBACK_MAX_VIEWPORT_RATIO = 0.6;
+const MOBILE_PLAYBACK_MIN_SCRIPT_MARGIN_PX = 96;
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -161,9 +161,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
+  const [playbackCollapsedHeight, setPlaybackCollapsedHeight] = useState(MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX);
+  const [playbackDetailsNaturalHeight, setPlaybackDetailsNaturalHeight] = useState(0);
   const [playbackSheetHeight, setPlaybackSheetHeight] = useState(0);
+  const [playbackViewportHeight, setPlaybackViewportHeight] = useState(() => (
+    typeof window !== 'undefined' ? window.innerHeight : 0
+  ));
+  const [playbackTopInset, setPlaybackTopInset] = useState(() => (
+    typeof window !== 'undefined' && window.visualViewport ? window.visualViewport.offsetTop : 0
+  ));
   const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
   const playbackSheetRef = useRef<HTMLDivElement>(null);
+  const playbackDetailsRef = useRef<HTMLDivElement>(null);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -679,6 +688,28 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const measureViewport = () => {
+      setPlaybackViewportHeight(window.innerHeight);
+      setPlaybackTopInset(window.visualViewport?.offsetTop ?? 0);
+    };
+    measureViewport();
+    window.addEventListener('resize', measureViewport);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', measureViewport);
+      window.visualViewport.addEventListener('scroll', measureViewport);
+    }
+    return () => {
+      window.removeEventListener('resize', measureViewport);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', measureViewport);
+        window.visualViewport.removeEventListener('scroll', measureViewport);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (currentTool !== 'playback') {
       setIsPlaybackExpanded(false);
@@ -700,7 +731,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     const node = playbackSheetRef.current;
     if (!node) return;
     const measure = () => {
-      setPlaybackSheetHeight(node.offsetHeight);
+      const height = node.offsetHeight;
+      setPlaybackSheetHeight(height);
+      if (!isPlaybackExpanded) {
+        setPlaybackCollapsedHeight(height);
+      }
     };
     const rafId = window.requestAnimationFrame(measure);
     if (typeof ResizeObserver === 'function') {
@@ -720,8 +755,50 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     };
   }, [isMobilePlaybackMiniVisible, isPlaybackExpanded]);
 
+  useEffect(() => {
+    if (!isMobilePlaybackMiniVisible || !isPlaybackExpanded) {
+      setPlaybackDetailsNaturalHeight(0);
+      return;
+    }
+    const detailsNode = playbackDetailsRef.current;
+    if (!detailsNode) return;
+    const measureDetails = () => {
+      setPlaybackDetailsNaturalHeight(detailsNode.scrollHeight);
+    };
+    const rafId = window.requestAnimationFrame(measureDetails);
+    if (typeof ResizeObserver === 'function') {
+      const resizeObserver = new ResizeObserver(() => {
+        measureDetails();
+      });
+      resizeObserver.observe(detailsNode);
+      return () => {
+        window.cancelAnimationFrame(rafId);
+        resizeObserver.disconnect();
+      };
+    }
+    window.addEventListener('resize', measureDetails);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measureDetails);
+    };
+  }, [isMobilePlaybackMiniVisible, isPlaybackExpanded, playbackViewportHeight]);
+
+  const playbackMaxHeight = Math.max(
+    playbackCollapsedHeight,
+    Math.min(
+      playbackViewportHeight * MOBILE_PLAYBACK_MAX_VIEWPORT_RATIO,
+      playbackViewportHeight - playbackTopInset - MOBILE_PLAYBACK_MIN_SCRIPT_MARGIN_PX
+    )
+  );
+  const playbackExpandedHeight = Math.min(
+    playbackCollapsedHeight + playbackDetailsNaturalHeight,
+    playbackMaxHeight
+  );
+  const playbackTargetHeight = isMobilePlaybackMiniVisible
+    ? (isPlaybackExpanded ? playbackExpandedHeight : playbackCollapsedHeight)
+    : 0;
   const mobilePlaybackPaddingPx = isMobilePlaybackMiniVisible
-    ? Math.max(playbackSheetHeight, MOBILE_PLAYBACK_SHEET_MIN_HEIGHT_PX)
+    ? playbackSheetHeight || playbackTargetHeight || MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX
     : 0;
   const mobileBottomPadding = mobileSheetEnabled
     ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobilePlaybackPaddingPx}px)`
@@ -923,11 +1000,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       {isMobilePlaybackMiniVisible && playbackProps && (
         <div
           ref={playbackSheetRef}
-          className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] transition-[height] duration-200 ease-out`}
+          className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5 transition-[height] duration-200 ease-out`}
           style={{
-            height: isPlaybackExpanded
-              ? MOBILE_PLAYBACK_SHEET_EXPANDED_HEIGHT
-              : MOBILE_PLAYBACK_SHEET_COLLAPSED_HEIGHT
+            height: `${Math.max(playbackTargetHeight, MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX)}px`
           }}
           data-testid="playback-mini-player"
         >
@@ -936,6 +1011,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             isExpanded={isPlaybackExpanded}
             onToggleExpanded={() => setIsPlaybackExpanded(prev => !prev)}
             onClose={handlePlaybackMiniClose}
+            detailsContentRef={playbackDetailsRef}
           />
         </div>
       )}
