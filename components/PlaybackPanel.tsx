@@ -47,7 +47,11 @@ export interface PlaybackMiniPlayerProps extends PlaybackPanelProps {
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onClose: () => void;
+  collapsedContentRef?: React.RefObject<HTMLDivElement | null>;
+  detailsWrapperRef?: React.RefObject<HTMLDivElement | null>;
   detailsContentRef?: React.RefObject<HTMLDivElement | null>;
+  detailsViewportHeight?: number;
+  detailsShouldScroll?: boolean;
 }
 
 type PlaybackState = 'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error';
@@ -426,7 +430,11 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
   isExpanded,
   onToggleExpanded,
   onClose,
-  detailsContentRef
+  collapsedContentRef,
+  detailsWrapperRef,
+  detailsContentRef,
+  detailsViewportHeight,
+  detailsShouldScroll = false
 }) => {
   const {
     currentStatus,
@@ -468,82 +476,90 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-t-2xl border border-gray-800 border-b-0 bg-gray-950/95 px-3 py-2 shadow-[0_-18px_38px_rgba(0,0,0,0.45)] backdrop-blur">
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5">
+      <div ref={collapsedContentRef} className="shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onPrev}
+              disabled={!canNavigate || atStart}
+              className={controlButtonClass}
+              title="Previous block"
+            >
+              <SkipBack className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handlePlayPause}
+              aria-pressed={isPlaying}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${
+                isPlaying
+                  ? 'border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-500'
+                  : 'border-indigo-400 bg-indigo-500/90 text-white hover:bg-indigo-500'
+              }`}
+              title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
+            >
+              {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
+            </button>
+            <button
+              type="button"
+              onClick={onStop}
+              className={controlButtonClass}
+              title="Stop playback"
+            >
+              <Square className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={!canNavigate || atEnd}
+              className={controlButtonClass}
+              title="Next block"
+            >
+              <SkipForward className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
+            Speaking: <span className="text-gray-200">{speakerLabel}</span>
+          </p>
           <button
             type="button"
-            onClick={onPrev}
-            disabled={!canNavigate || atStart}
-            className={controlButtonClass}
-            title="Previous block"
+            onClick={onToggleExpanded}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-gray-700 bg-gray-900/55 px-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-200 transition-colors hover:bg-gray-800"
+            aria-label={isExpanded ? 'Collapse playback details' : 'Expand playback details'}
+            title={isExpanded ? 'Collapse playback details' : 'Expand playback details'}
           >
-            <SkipBack className="h-4 w-4" />
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            {isExpanded ? 'Less' : 'More'}
           </button>
           <button
             type="button"
-            onClick={handlePlayPause}
-            aria-pressed={isPlaying}
-            className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${
-              isPlaying
-                ? 'border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-500'
-                : 'border-indigo-400 bg-indigo-500/90 text-white hover:bg-indigo-500'
-            }`}
-            title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+            aria-label="Close playback mini-player"
+            title="Close playback mini-player"
           >
-            {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
-          </button>
-          <button
-            type="button"
-            onClick={onStop}
-            className={controlButtonClass}
-            title="Stop playback"
-          >
-            <Square className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={!canNavigate || atEnd}
-            className={controlButtonClass}
-            title="Next block"
-          >
-            <SkipForward className="h-4 w-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
-          Speaking: <span className="text-gray-200">{speakerLabel}</span>
-        </p>
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          className="inline-flex h-8 items-center gap-1 rounded-md border border-gray-700 bg-gray-900/55 px-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-200 transition-colors hover:bg-gray-800"
-          aria-label={isExpanded ? 'Collapse playback details' : 'Expand playback details'}
-          title={isExpanded ? 'Collapse playback details' : 'Expand playback details'}
-        >
-          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-          {isExpanded ? 'Less' : 'More'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-          aria-label="Close playback mini-player"
-          title="Close playback mini-player"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[11px] text-gray-300">{statusDetail}</p>
-        <span className="shrink-0 text-[10px] text-gray-500">
-          Audio generation: {progressCount}/{totalCount || 0}
-        </span>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-[11px] text-gray-300">{statusDetail}</p>
+          <span className="shrink-0 text-[10px] text-gray-500">
+            Audio generation: {progressCount}/{totalCount || 0}
+          </span>
+        </div>
       </div>
       {isExpanded && (
-        <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-2">
+        <div
+          ref={detailsWrapperRef}
+          className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-2"
+        >
           <div
             ref={detailsContentRef}
-            className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5"
+            className={`min-h-0 flex-1 space-y-2 pr-0.5 ${
+              detailsShouldScroll ? 'overflow-y-auto overscroll-contain' : 'overflow-y-hidden'
+            }`}
+            style={detailsViewportHeight !== undefined ? { height: 'var(--playback-details-height)' } : undefined}
           >
             <div className="flex flex-wrap items-center gap-2">
               <button
