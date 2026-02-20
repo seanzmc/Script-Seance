@@ -289,7 +289,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     });
   });
 
-  it('390x844: playback opens mini-player, expands to details, collapses back, and close stops playback', async () => {
+  it('390x844: playback expands in-place via More/Less and never opens full-screen tool panel', async () => {
     const onStop = vi.fn();
     render(<ScriptPane {...createProps({ playbackProps: createPlaybackProps({ onStop }) })} />);
 
@@ -301,17 +301,21 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     });
     expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open playback details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand playback details' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
+      expect(screen.getByText('Refresh Audio')).toBeTruthy();
     });
+    expect(screen.getByText('Less')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close tool panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse playback details' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
     });
+    expect(screen.queryByText('Refresh Audio')).toBeNull();
+    expect(screen.getByText('More')).toBeTruthy();
     expect(onStop).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Close playback mini-player' }));

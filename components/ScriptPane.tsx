@@ -80,7 +80,9 @@ const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
 const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))]';
 const MOBILE_TOOLS_DOCK_BOTTOM = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
-const MOBILE_PLAYBACK_MINI_HEIGHT = '5.5rem';
+const MOBILE_PLAYBACK_SHEET_COLLAPSED_HEIGHT = '5.5rem';
+const MOBILE_PLAYBACK_SHEET_EXPANDED_HEIGHT = 'min(56vh, 30rem)';
+const MOBILE_PLAYBACK_SHEET_MIN_HEIGHT_PX = 88;
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -158,7 +160,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [titleDraft, setTitleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
+  const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
+  const [playbackSheetHeight, setPlaybackSheetHeight] = useState(0);
   const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
+  const playbackSheetRef = useRef<HTMLDivElement>(null);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -383,14 +388,23 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
   const mobileSheetEnabled = isNarrowViewport && Boolean(context);
   const isMenuSheetOpen = mobileSheetEnabled && toolsSheet === 'menu';
-  const isToolSheetOpen = mobileSheetEnabled && toolsSheet === 'tool' && Boolean(currentTool);
+  const isToolSheetOpen = mobileSheetEnabled
+    && toolsSheet === 'tool'
+    && Boolean(currentTool)
+    && currentTool !== 'playback';
+  const isMobilePlaybackMiniVisible = mobileSheetEnabled
+    && currentTool === 'playback'
+    && toolsSheet === 'collapsed'
+    && Boolean(playbackProps);
   const isMobileRewriteSelectMode = mobileSheetEnabled && currentTool === 'rewrite' && rewriteMode === 'select';
   const activeToolLabel = currentTool ? TOOL_LABELS[currentTool] : null;
   const mobileDockLabel = isMenuSheetOpen
     ? 'Choose a tool'
     : isToolSheetOpen
       ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
-      : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
+      : currentTool === 'playback'
+        ? isPlaybackExpanded ? 'Playback details open' : 'Playback mini-player open'
+        : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
   const insertModeToolbar = isInsertModeView ? (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
       <div className="space-y-1">
@@ -453,12 +467,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const handleToolClose = () => {
     setCurrentTool(null);
     setToolsSheet('collapsed');
+    setIsPlaybackExpanded(false);
     focusScriptScroll();
   };
   const handlePlaybackMiniClose = () => {
     playbackProps?.onStop();
     setCurrentTool(null);
     setToolsSheet('collapsed');
+    setIsPlaybackExpanded(false);
     focusScriptScroll();
   };
   const handleMobileToolPanelClose = () => {
@@ -480,11 +496,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       handleToolClose();
       return;
     }
+    if (tool !== 'playback') {
+      setIsPlaybackExpanded(false);
+    }
     setCurrentTool(tool);
     setRewriteMode('configure');
   };
   const handleSelectToolFromMenu = (tool: ToolKey) => {
     setCurrentTool(tool);
+    if (tool !== 'playback') {
+      setIsPlaybackExpanded(false);
+    }
     if (tool === 'rewrite') {
       setRewriteMode('select');
       setRewriteTarget(null);
@@ -493,6 +515,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     }
     if (tool === 'playback') {
       setRewriteMode('configure');
+      setIsPlaybackExpanded(false);
       setToolsSheet('collapsed');
       return;
     }
@@ -656,16 +679,52 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
   );
-  const isMobilePlaybackMiniVisible = mobileSheetEnabled
-    && currentTool === 'playback'
-    && toolsSheet === 'collapsed'
-    && Boolean(playbackProps);
+  useEffect(() => {
+    if (currentTool !== 'playback') {
+      setIsPlaybackExpanded(false);
+    }
+  }, [currentTool]);
+
+  useEffect(() => {
+    if (!isNarrowViewport || currentTool !== 'playback') return;
+    if (toolsSheet === 'tool') {
+      setToolsSheet('collapsed');
+    }
+  }, [currentTool, isNarrowViewport, toolsSheet]);
+
+  useEffect(() => {
+    if (!isMobilePlaybackMiniVisible) {
+      setPlaybackSheetHeight(0);
+      return;
+    }
+    const node = playbackSheetRef.current;
+    if (!node) return;
+    const measure = () => {
+      setPlaybackSheetHeight(node.offsetHeight);
+    };
+    const rafId = window.requestAnimationFrame(measure);
+    if (typeof ResizeObserver === 'function') {
+      const resizeObserver = new ResizeObserver(() => {
+        measure();
+      });
+      resizeObserver.observe(node);
+      return () => {
+        window.cancelAnimationFrame(rafId);
+        resizeObserver.disconnect();
+      };
+    }
+    window.addEventListener('resize', measure);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measure);
+    };
+  }, [isMobilePlaybackMiniVisible, isPlaybackExpanded]);
+
+  const mobilePlaybackPaddingPx = isMobilePlaybackMiniVisible
+    ? Math.max(playbackSheetHeight, MOBILE_PLAYBACK_SHEET_MIN_HEIGHT_PX)
+    : 0;
   const mobileBottomPadding = mobileSheetEnabled
-    ? (
-      isMobilePlaybackMiniVisible
-        ? `calc(4.75rem + env(safe-area-inset-bottom) + ${MOBILE_PLAYBACK_MINI_HEIGHT})`
-        : MOBILE_TOOLS_DOCK_PADDING
-    )
+    ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobilePlaybackPaddingPx}px)`
     : undefined;
 
   return (
@@ -863,12 +922,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       )}
       {isMobilePlaybackMiniVisible && playbackProps && (
         <div
-          className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5`}
+          ref={playbackSheetRef}
+          className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] transition-[height] duration-200 ease-out`}
+          style={{
+            height: isPlaybackExpanded
+              ? MOBILE_PLAYBACK_SHEET_EXPANDED_HEIGHT
+              : MOBILE_PLAYBACK_SHEET_COLLAPSED_HEIGHT
+          }}
           data-testid="playback-mini-player"
         >
           <PlaybackMiniPlayer
             {...playbackProps}
-            onExpand={() => setToolsSheet('tool')}
+            isExpanded={isPlaybackExpanded}
+            onToggleExpanded={() => setIsPlaybackExpanded(prev => !prev)}
             onClose={handlePlaybackMiniClose}
           />
         </div>
