@@ -199,7 +199,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
         className={contentClassName}
         role="dialog"
         aria-modal={embedded ? undefined : true}
-        aria-label={`Voice casting for ${characterName}`}
+        aria-label={`Cast voices for ${characterName}`}
       >
         <div className={`flex items-center justify-between border-b border-gray-800 bg-gray-900/50 ${embedded ? 'px-3 py-2.5' : 'p-6'}`}>
           <div className="min-w-0">
@@ -207,7 +207,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
               <button
                 type="button"
                 onClick={handleBack}
-                className="mb-1 inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800"
+                className="mb-1 inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/70 px-2 py-1 text-[11px] font-semibold text-gray-200 transition-colors hover:bg-gray-800"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 Back
@@ -215,18 +215,23 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
             )}
             <h2 className={`font-bold text-white flex items-center gap-2 ${embedded ? 'text-base' : 'text-xl'}`}>
               <Mic className={`${embedded ? 'w-4 h-4' : 'w-5 h-5'} text-indigo-400`} />
-              Voice Casting: <span className="text-indigo-400 truncate">{characterName}</span>
+              CAST VOICES
             </h2>
+            <p className={`${embedded ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-gray-300`}>
+              Casting: <span className="text-indigo-300 font-semibold truncate">{characterName}</span>
+            </p>
             <p className={`${embedded ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-gray-400`}>Assign a voice to your character.</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors shrink-0"
-            aria-label="Close voice casting"
-          >
-            <X className={embedded ? 'w-5 h-5' : 'w-6 h-6'} />
-          </button>
+          {!embedded && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors shrink-0"
+              aria-label="Close voice casting"
+            >
+              <X className={embedded ? 'w-5 h-5' : 'w-6 h-6'} />
+            </button>
+          )}
         </div>
 
         <div className={`${embedded ? 'px-3 py-2.5' : 'px-6 py-4'} border-b border-gray-800 bg-gray-900/50 flex flex-col md:flex-row md:items-center justify-between gap-3`}>
@@ -357,24 +362,26 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onPreview(voice.id);
                         }}
-                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
+                        aria-label={isPlaying ? 'Stop preview' : 'Preview'}
+                        className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all inline-flex items-center gap-1.5 ${
                           isPlaying 
                             ? 'bg-indigo-500 text-white shadow-inner' 
                             : 'bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white'
                         }`}
-                        title={isPlaying ? "Stop Preview" : "Preview Voice"}
+                        title={isPlaying ? 'Stop preview' : 'Preview'}
                       >
                         {isPlaying ? (
                           <Pause className="w-3.5 h-3.5 fill-current" />
                         ) : (
                           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                         )}
+                        <span>{isPlaying ? 'Stop' : 'Preview'}</span>
                       </button>
                       
                       <div className={`text-[11px] font-bold uppercase tracking-wider ${isSelected ? 'text-indigo-400' : 'text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity'}`}>
@@ -400,13 +407,15 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
              <Info className="w-3.5 h-3.5" />
              Previewing {characterName}&apos;s existing lines.
            </div>
-           <button
-             type="button"
-             onClick={handleBack}
-             className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
-           >
-             {embedded ? 'Back to Voices' : 'Close'}
-           </button>
+           {!embedded && (
+             <button
+               type="button"
+               onClick={handleBack}
+               className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
+             >
+               Close
+             </button>
+           )}
         </div>
 
       </div>

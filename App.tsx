@@ -239,7 +239,7 @@ export default function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
   // Voices tool view state
-  const [voicesView, setVoicesView] = useState<'list' | 'casting'>('list');
+  const [voicesView, setVoicesView] = useState<'assignments' | 'casting'>('assignments');
   const [castingCharacter, setCastingCharacter] = useState<string | null>(null);
   const [previewVoiceId, setPreviewVoiceId] = useState<string | null>(null);
 
@@ -664,12 +664,12 @@ export default function App() {
 
   useEffect(() => {
     if (!context) {
-      setVoicesView('list');
+      setVoicesView('assignments');
       setCastingCharacter(null);
       return;
     }
     if (!castingCharacter) {
-      setVoicesView('list');
+      setVoicesView('assignments');
       return;
     }
     const isKnownCharacter = normalizeCharacterName(castingCharacter) === normalizeCharacterName('Narrator')
@@ -677,7 +677,7 @@ export default function App() {
         normalizeCharacterName(character) === normalizeCharacterName(castingCharacter)
       ));
     if (!isKnownCharacter) {
-      setVoicesView('list');
+      setVoicesView('assignments');
       setCastingCharacter(null);
     }
   }, [castingCharacter, context]);
@@ -1267,7 +1267,7 @@ export default function App() {
   const handleCloseCasting = () => {
     stop();
     setPreviewVoiceId(null);
-    setVoicesView('list');
+    setVoicesView('assignments');
     setCastingCharacter(null);
   };
 
