@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 
 const DEFAULT_TEXT_PROVIDER = 'openai';
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || process.env.VITE_OPENAI_MODEL || 'gpt-5.2';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.2';
 const DEFAULT_OPENAI_FAST_MODEL = process.env.OPENAI_FAST_MODEL || 'gpt-5-nano';
 const DEFAULT_OPENAI_BALANCED_MODEL = process.env.OPENAI_BALANCED_MODEL || 'gpt-5-mini';
 const DEFAULT_GEMINI_SCENE_MODEL = process.env.GEMINI_TEXT_MODEL_SCENE || 'gemini-2.5-flash';
@@ -46,7 +46,11 @@ export const getOpenAIClient = () => {
   if (cachedOpenAiClient) {
     return cachedOpenAiClient;
   }
-  cachedOpenAiClient = new OpenAI({ apiKey });
+  cachedOpenAiClient = new OpenAI({
+    apiKey,
+    // Retries are handled by our upstream retry policy to avoid nested retry loops.
+    maxRetries: 0
+  });
   return cachedOpenAiClient;
 };
 

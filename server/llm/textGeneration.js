@@ -451,22 +451,9 @@ const requestOpenAiText = async ({
       ? Number((cachedInputTokens / totalInputTokens).toFixed(3))
       : 0;
     const text = extractOpenAiText(response);
+    const requireCompletedResponse = Boolean(jsonSchemaFormat);
     if (response?.status && response.status !== 'completed') {
-      if (!text || !text.trim()) {
-        const error = new Error('AI response was not completed.');
-        error.code = 'UPSTREAM_ERROR';
-        error.details = {
-          kind,
-          provider: 'openai',
-          model,
-          status: response.status,
-          incompleteDetails: response.incomplete_details ?? null,
-          maxOutputTokens: outputTokenLimit,
-          attempts: attempt + 1
-        };
-        throw error;
-      }
-      console.warn('[text-gen] response incomplete but text present; proceeding', {
+      const statusDetails = {
         kind,
         provider: 'openai',
         model,
@@ -474,7 +461,14 @@ const requestOpenAiText = async ({
         incompleteDetails: response.incomplete_details ?? null,
         maxOutputTokens: outputTokenLimit,
         attempts: attempt + 1
-      });
+      };
+      if (requireCompletedResponse || !text || !text.trim()) {
+        const error = new Error('AI response was not completed.');
+        error.code = 'UPSTREAM_ERROR';
+        error.details = statusDetails;
+        throw error;
+      }
+      console.warn('[text-gen] response incomplete but text present; proceeding', statusDetails);
     }
     console.info('[text-gen] completed', {
       kind,
