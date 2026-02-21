@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { SetupForm, SetupFormState } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
+import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from './ToolPanelShell';
 import { TitleEditModal } from './TitleEditModal';
 import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
@@ -85,14 +86,10 @@ const MOBILE_PLAYBACK_SHEET_EXPANDED_PX = 200;
 const MOBILE_PLAYBACK_SHEET_EXPANDED_MAX = `min(${MOBILE_PLAYBACK_SHEET_EXPANDED_PX}px, 34vh)`;
 const MOBILE_EXPORT_SHEET_ESTIMATED_PX = 152;
 const MOBILE_EXPORT_SHEET_ESTIMATED_HEIGHT = `${MOBILE_EXPORT_SHEET_ESTIMATED_PX}px`;
-const MOBILE_EXPORT_SHEET_MAX_HEIGHT = 'min(208px, 40vh)';
-const MOBILE_EXPORT_SHEET_BODY_MAX_HEIGHT = 'calc(min(208px, 40vh) - 48px)';
-const MOBILE_GENERATE_SHEET_MAX_HEIGHT = '60vh';
-const MOBILE_GENERATE_SHEET_BODY_MAX_HEIGHT = 'calc(60vh - 48px)';
-const MOBILE_TOOL_SHEET_MAX_HEIGHT = '70vh';
-const MOBILE_TOOL_SHEET_BODY_MAX_HEIGHT = 'calc(70vh - 48px)';
+const MOBILE_EXPORT_SHEET_MAX_HEIGHT = getToolPanelMaxHeight('mobile-sheet', 'compact');
+const MOBILE_GENERATE_SHEET_MAX_HEIGHT = getToolPanelMaxHeight('mobile-sheet', 'medium');
+const MOBILE_TOOL_SHEET_MAX_HEIGHT = getToolPanelMaxHeight('mobile-sheet', 'default');
 const MOBILE_MENU_SHEET_MAX_HEIGHT = '50vh';
-const MOBILE_MENU_SHEET_BODY_MAX_HEIGHT = 'calc(50vh - 48px)';
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -106,7 +103,6 @@ const TOOL_LABELS: Record<ToolKey, string> = {
 interface MobileBottomSheetProps {
   title: string;
   maxHeight: string;
-  bodyMaxHeight: string;
   bodyClassName?: string;
   onClose?: () => void;
   onBackdropClick?: () => void;
@@ -118,7 +114,6 @@ interface MobileBottomSheetProps {
 const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
   title,
   maxHeight,
-  bodyMaxHeight,
   bodyClassName = 'p-3',
   onClose,
   onBackdropClick,
@@ -134,29 +129,18 @@ const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
       aria-hidden="true"
     />
     <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76]`}>
-      <div
-        className="w-full overflow-hidden rounded-t-2xl border border-gray-800 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.45)]"
-        style={{ maxHeight }}
-        data-testid={sheetTestId}
+      <ToolPanelShell
+        title={title}
+        onClose={onClose}
+        closeLabel={closeLabel}
+        variant="mobile-sheet"
+        maxHeight={maxHeight}
+        bodyMaxHeight={getToolPanelBodyMaxHeight(maxHeight)}
+        bodyClassName={bodyClassName}
+        shellTestId={sheetTestId}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gray-400">{title}</p>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-              aria-label={closeLabel}
-              title={closeLabel}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className={`${bodyClassName} overflow-y-auto`} style={{ maxHeight: bodyMaxHeight }}>
-          {children}
-        </div>
-      </div>
+        {children}
+      </ToolPanelShell>
     </div>
   </>
 );
@@ -669,7 +653,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <p className={toolLabelClass}>Selected Block</p>
           <p className="text-[11px] text-gray-400 break-words">{selectedRewrite?.label}</p>
           {selectedRewrite && (
-            <div className="max-h-[28vh] overflow-y-auto overscroll-contain rounded-lg border border-gray-800 bg-gray-950/65 px-2.5 py-2">
+            <div className="rounded-lg border border-gray-800 bg-gray-950/65 px-2.5 py-2">
               <p className="text-xs text-gray-200 whitespace-pre-wrap break-words">
                 {selectedRewrite.displayText}
               </p>
@@ -771,9 +755,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const mobileStandardToolSheetMaxHeight = currentTool === 'generate'
     ? MOBILE_GENERATE_SHEET_MAX_HEIGHT
     : MOBILE_TOOL_SHEET_MAX_HEIGHT;
-  const mobileStandardToolSheetBodyMaxHeight = currentTool === 'generate'
-    ? MOBILE_GENERATE_SHEET_BODY_MAX_HEIGHT
-    : MOBILE_TOOL_SHEET_BODY_MAX_HEIGHT;
   const mobileStandardToolSheetTestId = isMobileStandardToolSheetVisible && currentTool
     ? `mobile-tool-sheet-${currentTool}`
     : undefined;
@@ -929,7 +910,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <MobileBottomSheet
           title="Tools"
           maxHeight={MOBILE_MENU_SHEET_MAX_HEIGHT}
-          bodyMaxHeight={MOBILE_MENU_SHEET_BODY_MAX_HEIGHT}
           bodyClassName="p-3"
           onBackdropClick={() => setToolsSheet('collapsed')}
           sheetTestId="mobile-tools-menu-sheet"
@@ -959,7 +939,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <MobileBottomSheet
           title={TOOL_LABELS[currentTool]}
           maxHeight={mobileStandardToolSheetMaxHeight}
-          bodyMaxHeight={mobileStandardToolSheetBodyMaxHeight}
           bodyClassName="px-4 py-3"
           onBackdropClick={handleMobileToolPanelClose}
           onClose={handleMobileToolPanelClose}
@@ -989,7 +968,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <MobileBottomSheet
           title="EXPORT"
           maxHeight={MOBILE_EXPORT_SHEET_MAX_HEIGHT}
-          bodyMaxHeight={MOBILE_EXPORT_SHEET_BODY_MAX_HEIGHT}
           bodyClassName="px-4 py-2"
           onBackdropClick={handleMobileToolPanelClose}
           onClose={handleMobileToolPanelClose}

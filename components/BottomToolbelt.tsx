@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, FileDown, X, Sparkles, PlusCircle, RefreshCw, Play, Mic } from 'lucide-react';
 import { Button } from './Button';
+import {
+  ToolPanelPreset,
+  ToolPanelShell,
+  getToolPanelBodyMaxHeight,
+  getToolPanelMaxHeight
+} from './ToolPanelShell';
 
 export type ToolKey = 'generate' | 'insert' | 'rewrite' | 'voices' | 'playback' | 'export';
 
@@ -79,7 +85,14 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
   const hasActivePanel = Boolean(activeTool);
-  const panelHeightClass = activeTool === 'insert'
+  const desktopPanelPreset: ToolPanelPreset = activeTool === 'export'
+    ? 'compact'
+    : activeTool === 'generate'
+      ? 'medium'
+      : 'default';
+  const desktopPanelMaxHeight = getToolPanelMaxHeight('desktop-panel', desktopPanelPreset);
+  const desktopPanelBodyMaxHeight = getToolPanelBodyMaxHeight(desktopPanelMaxHeight);
+  const narrowViewportPanelHeightClass = activeTool === 'insert'
     ? 'h-[52vh] max-h-[334px] sm:h-[320px] sm:max-h-none lg:h-[300px]'
     : activeTool === 'generate'
       ? 'h-[48vh] max-h-[292px] sm:h-[300px] sm:max-h-none lg:h-[286px]'
@@ -91,10 +104,19 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
     : activeTool === 'insert'
       ? 'px-4 py-2'
       : 'px-4 py-3';
+  const panelLayoutClass = mobileExpanded && hasActivePanel
+    ? 'flex-1 min-h-0'
+    : isNarrowViewport
+      ? narrowViewportPanelHeightClass
+      : 'h-auto';
+  const panelMaxHeight = mobileExpanded || isNarrowViewport ? '100%' : desktopPanelMaxHeight;
+  const panelBodyMaxHeight = mobileExpanded || isNarrowViewport
+    ? getToolPanelBodyMaxHeight('100%')
+    : desktopPanelBodyMaxHeight;
 
   const panelBodyContent = hasExportPanel
     ? (
-      <div className="h-full min-h-0 flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Export Options</p>
           <p className="text-[10px] text-gray-500">Current draft only</p>
@@ -138,8 +160,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               : activePlaceholder;
   const panelBodyNode = typeof panelBodyContent === 'string'
     ? <p className="text-sm text-gray-300">{panelBodyContent}</p>
-    : <div className="min-h-full">{panelBodyContent}</div>;
-  const panelLayoutClass = mobileExpanded && hasActivePanel ? 'flex-1 min-h-0' : panelHeightClass;
+    : <div>{panelBodyContent}</div>;
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -238,24 +259,19 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
     <div className={`w-full ${edgeToEdge ? 'px-0' : 'px-3 max-[640px]:px-2'} ${mobileExpanded ? 'flex-1 min-h-0 pb-1' : 'shrink-0 pb-2'} ${className}`}>
       <div className={`${edgeToEdge ? 'w-full' : 'mx-auto w-full max-w-6xl'} flex flex-col ${mobileExpanded ? 'h-full min-h-0' : ''}`}>
         {hasActivePanel && (
-          <div className={`rounded-2xl border border-gray-800 bg-gray-950 shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex ${panelLayoutClass} flex-col overflow-hidden`}>
-            <div className="flex items-center justify-between gap-4 border-b border-gray-800 px-4 py-2.5 shrink-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{activeLabel}</p>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={onCloseTool}
-                  ref={panelCloseButtonRef}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-                  aria-label="Close tool panel"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className={`${panelBodyPaddingClass} flex-1 min-h-0 overflow-y-auto overscroll-contain`}>
+          <div className={`flex ${panelLayoutClass} flex-col`}>
+            <ToolPanelShell
+              title={activeLabel || ''}
+              onClose={onCloseTool}
+              closeButtonRef={panelCloseButtonRef}
+              closeLabel="Close tool panel"
+              variant="desktop-panel"
+              maxHeight={panelMaxHeight}
+              bodyMaxHeight={panelBodyMaxHeight}
+              bodyClassName={panelBodyPaddingClass}
+            >
               {panelBodyNode}
-            </div>
+            </ToolPanelShell>
           </div>
         )}
         {showSelector && (
@@ -279,7 +295,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
                 Tools
               </button>
             ) : (
-              <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1 text-gray-400 sm:max-h-none sm:overflow-visible sm:pr-0 lg:flex-nowrap">
+              <div className="flex flex-wrap gap-2 pr-1 text-gray-400 sm:pr-0 lg:flex-nowrap">
                 {TOOL_ORDER.map((tool, index) => renderToolButton(tool, 'inline', index))}
               </div>
             )}

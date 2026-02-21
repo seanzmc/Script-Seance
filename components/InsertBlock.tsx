@@ -215,6 +215,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
+    // ToolPanelShell owns scrolling; keep tool roots overflow-free unless absolutely required.
     <div className="flex flex-col gap-2">
       <div
         className={`grid gap-2 ${

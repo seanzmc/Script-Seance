@@ -1288,7 +1288,8 @@ export default function App() {
   const isTtsPreviewEnabled = voiceCatalogState === 'ready' && availableVoices.length > 0;
 
   const voicesContent = context ? (
-    <div className="h-full min-h-0 flex flex-col gap-2">
+    // ToolPanelShell owns scrolling; keep tool roots overflow-free unless absolutely required.
+    <div className="flex flex-col gap-2">
       {voiceCatalogState === 'loading' && (
         <p className="text-[10px] text-gray-500">Loading available voices...</p>
       )}

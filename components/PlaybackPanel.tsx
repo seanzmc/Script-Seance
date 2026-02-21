@@ -222,7 +222,8 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   const toggleTrackClass = 'ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors';
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-2">
+    // ToolPanelShell owns scrolling; keep tool roots overflow-free unless absolutely required.
+    <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
           Transport

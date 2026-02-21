@@ -28,7 +28,8 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
   isPreviewEnabled = true
 }) => {
   return (
-    <div className="h-full min-h-0 flex flex-col gap-1.5">
+    // ToolPanelShell owns scrolling; keep tool roots overflow-free unless absolutely required.
+    <div className="flex flex-col gap-1.5">
       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">VOICES</p>
       <p className="text-[10px] text-gray-500">
         Assign voices and preview reads. Defaults are auto-assigned.

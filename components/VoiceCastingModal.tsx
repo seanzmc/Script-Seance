@@ -186,10 +186,10 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
   };
 
   const containerClassName = embedded
-    ? 'h-full min-h-0 flex flex-col'
+    ? 'w-full'
     : 'fixed inset-0 z-[60] flex items-center justify-center p-4';
   const contentClassName = embedded
-    ? 'relative bg-gray-900 h-full w-full flex flex-col overflow-hidden'
+    ? 'relative w-full rounded-xl border border-gray-800 bg-gray-900 flex flex-col overflow-hidden'
     : 'relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200';
 
   return (
@@ -283,9 +283,9 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
           </div>
         </div>
 
-        <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'p-2' : 'p-4'} bg-black/20`}>
+        <div className={`${embedded ? 'p-2' : 'flex-1 min-h-0 overflow-y-auto p-4'} bg-black/20`}>
           {filteredVoices.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-500 space-y-2">
+            <div className="min-h-[140px] flex flex-col items-center justify-center text-gray-500 space-y-2">
               <Mic className="w-12 h-12 opacity-20" />
               <p>No voices match your filters.</p>
             </div>
