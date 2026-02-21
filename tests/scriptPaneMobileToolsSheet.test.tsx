@@ -325,4 +325,25 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     });
     expect(onStop).toHaveBeenCalledTimes(1);
   });
+
+  it('390x844: export opens as compact bottom sheet and closes cleanly', async () => {
+    render(<ScriptPane {...createProps()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mobile-export-sheet')).toBeTruthy();
+    });
+    expect(screen.getByText('Export options')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /export script \(\.txt\)/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /export pdf/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close export panel' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('mobile-export-sheet')).toBeNull();
+    });
+  });
 });

@@ -7,7 +7,7 @@ import { SetupForm, SetupFormState } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
 import { TitleEditModal } from './TitleEditModal';
-import { AlertCircle, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
+import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
 export interface InsertTarget {
   sceneId: string;
@@ -83,6 +83,12 @@ const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_PLAYBACK_SHEET_COLLAPSED_PX = 88;
 const MOBILE_PLAYBACK_SHEET_EXPANDED_PX = 200;
 const MOBILE_PLAYBACK_SHEET_EXPANDED_MAX = `min(${MOBILE_PLAYBACK_SHEET_EXPANDED_PX}px, 34vh)`;
+const MOBILE_EXPORT_SHEET_ESTIMATED_PX = 152;
+const MOBILE_EXPORT_SHEET_ESTIMATED_HEIGHT = `${MOBILE_EXPORT_SHEET_ESTIMATED_PX}px`;
+const MOBILE_EXPORT_SHEET_MAX_HEIGHT = 'min(208px, 40vh)';
+const MOBILE_EXPORT_SHEET_BODY_MAX_HEIGHT = 'calc(min(208px, 40vh) - 48px)';
+const MOBILE_MENU_SHEET_MAX_HEIGHT = '50vh';
+const MOBILE_MENU_SHEET_BODY_MAX_HEIGHT = 'calc(50vh - 48px)';
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -92,6 +98,64 @@ const TOOL_LABELS: Record<ToolKey, string> = {
   playback: 'Playback',
   export: 'Export'
 };
+
+interface MobileBottomSheetProps {
+  title: string;
+  maxHeight: string;
+  bodyMaxHeight: string;
+  bodyClassName?: string;
+  onClose?: () => void;
+  onBackdropClick?: () => void;
+  closeLabel?: string;
+  sheetTestId?: string;
+  children: React.ReactNode;
+}
+
+const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
+  title,
+  maxHeight,
+  bodyMaxHeight,
+  bodyClassName = 'p-3',
+  onClose,
+  onBackdropClick,
+  closeLabel = 'Close',
+  sheetTestId,
+  children
+}) => (
+  <>
+    <div
+      className="fixed inset-x-0 top-0 z-[75] bg-black/45 backdrop-blur-[1px]"
+      style={{ bottom: MOBILE_TOOLS_DOCK_BOTTOM }}
+      onClick={onBackdropClick}
+      aria-hidden="true"
+    />
+    <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76]`}>
+      <div
+        className="w-full overflow-hidden rounded-t-2xl border border-gray-800 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.45)]"
+        style={{ maxHeight }}
+        data-testid={sheetTestId}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gray-400">{title}</p>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+              aria-label={closeLabel}
+              title={closeLabel}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className={`${bodyClassName} overflow-y-auto`} style={{ maxHeight: bodyMaxHeight }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  </>
+);
 
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
@@ -389,17 +453,23 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const isToolSheetOpen = mobileSheetEnabled
     && toolsSheet === 'tool'
     && Boolean(currentTool)
-    && currentTool !== 'playback';
+    && currentTool !== 'playback'
+    && currentTool !== 'export';
   const isMobilePlaybackMiniVisible = mobileSheetEnabled
     && currentTool === 'playback'
     && toolsSheet === 'collapsed'
     && Boolean(playbackProps);
+  const isMobileExportSheetVisible = mobileSheetEnabled
+    && currentTool === 'export'
+    && toolsSheet === 'tool';
   const isMobileRewriteSelectMode = mobileSheetEnabled && currentTool === 'rewrite' && rewriteMode === 'select';
   const activeToolLabel = currentTool ? TOOL_LABELS[currentTool] : null;
   const mobileDockLabel = isMenuSheetOpen
     ? 'Choose a tool'
     : isToolSheetOpen
       ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
+      : isMobileExportSheetVisible
+        ? 'Export open'
       : currentTool === 'playback'
         ? isPlaybackExpanded ? 'Playback details open' : 'Playback mini-player open'
         : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
@@ -694,8 +764,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const playbackTargetHeight = isMobilePlaybackMiniVisible
     ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_MAX : `${MOBILE_PLAYBACK_SHEET_COLLAPSED_PX}px`)
     : '0px';
+  const mobileOverlayHeight = isMobilePlaybackMiniVisible
+    ? playbackTargetHeight
+    : isMobileExportSheetVisible
+      ? MOBILE_EXPORT_SHEET_ESTIMATED_HEIGHT
+      : '0px';
   const mobileBottomPadding = mobileSheetEnabled
-    ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${playbackTargetHeight})`
+    ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobileOverlayHeight})`
     : undefined;
   const handleTogglePlaybackExpanded = () => setIsPlaybackExpanded(prev => !prev);
 
@@ -829,42 +904,33 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         />
       )}
       {isMenuSheetOpen && (
-        <>
-          <div
-            className="fixed inset-x-0 top-0 z-[75] bg-black/45 backdrop-blur-[1px]"
-            style={{ bottom: MOBILE_TOOLS_DOCK_BOTTOM }}
-            onClick={() => setToolsSheet('collapsed')}
-            aria-hidden="true"
-          />
-          <div className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[76]`}>
-            <div className="w-full rounded-t-2xl border border-gray-800 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.45)] max-h-[50vh] overflow-hidden">
-              <div className="border-b border-gray-800 px-4 py-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gray-400">Tools</p>
-              </div>
-              <div className="max-h-[calc(50vh-48px)] overflow-y-auto p-3">
-                <div className="grid grid-cols-1 gap-2">
-                  {TOOL_ORDER.map((tool) => {
-                    const isActive = currentTool === tool;
-                    return (
-                      <button
-                        key={tool}
-                        type="button"
-                        onClick={() => handleSelectToolFromMenu(tool)}
-                        className={`min-h-[44px] rounded-xl border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                          isActive
-                            ? 'border-indigo-400 bg-indigo-500 text-white'
-                            : 'border-gray-700 bg-gray-900/55 text-gray-200 hover:bg-gray-800'
-                        }`}
-                      >
-                        {TOOL_LABELS[tool]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+        <MobileBottomSheet
+          title="Tools"
+          maxHeight={MOBILE_MENU_SHEET_MAX_HEIGHT}
+          bodyMaxHeight={MOBILE_MENU_SHEET_BODY_MAX_HEIGHT}
+          bodyClassName="p-3"
+          onBackdropClick={() => setToolsSheet('collapsed')}
+        >
+          <div className="grid grid-cols-1 gap-2">
+            {TOOL_ORDER.map((tool) => {
+              const isActive = currentTool === tool;
+              return (
+                <button
+                  key={tool}
+                  type="button"
+                  onClick={() => handleSelectToolFromMenu(tool)}
+                  className={`min-h-[44px] rounded-xl border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                    isActive
+                      ? 'border-indigo-400 bg-indigo-500 text-white'
+                      : 'border-gray-700 bg-gray-900/55 text-gray-200 hover:bg-gray-800'
+                  }`}
+                >
+                  {TOOL_LABELS[tool]}
+                </button>
+              );
+            })}
           </div>
-        </>
+        </MobileBottomSheet>
       )}
       {isToolSheetOpen && currentTool && (
         <div
@@ -907,6 +973,51 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             onClose={handlePlaybackMiniClose}
           />
         </div>
+      )}
+      {isMobileExportSheetVisible && (
+        <MobileBottomSheet
+          title="EXPORT"
+          maxHeight={MOBILE_EXPORT_SHEET_MAX_HEIGHT}
+          bodyMaxHeight={MOBILE_EXPORT_SHEET_BODY_MAX_HEIGHT}
+          bodyClassName="px-4 py-2"
+          onBackdropClick={handleMobileToolPanelClose}
+          onClose={handleMobileToolPanelClose}
+          closeLabel="Close export panel"
+          sheetTestId="mobile-export-sheet"
+        >
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Export options</p>
+              <p className="text-[10px] text-gray-500">Current draft only</p>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onExportTxt}
+                disabled={!canExport}
+                className="w-full text-xs"
+                title="Export script as a .txt file"
+              >
+                <Download className="w-3 h-3 mr-2" />
+                Export Script (.txt)
+              </Button>
+              {onExportPdf && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onExportPdf}
+                  disabled={!canExport}
+                  className="w-full text-xs"
+                  title="Export script as a PDF via print dialog"
+                >
+                  <FileDown className="w-3 h-3 mr-2" />
+                  Export PDF
+                </Button>
+              )}
+            </div>
+          </div>
+        </MobileBottomSheet>
       )}
       {mobileSheetEnabled && (
         <div className="fixed inset-x-0 bottom-0 z-[74] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
