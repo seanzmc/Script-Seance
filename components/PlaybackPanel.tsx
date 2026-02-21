@@ -540,8 +540,8 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
         </div>
       </div>
       {isExpanded && (
-        <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-2">
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+        <div className="mt-1 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-1">
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={onRefreshAudio}

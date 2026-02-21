@@ -81,7 +81,8 @@ const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset
 const MOBILE_TOOLS_DOCK_BOTTOM = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_PLAYBACK_SHEET_COLLAPSED_PX = 88;
-const MOBILE_PLAYBACK_SHEET_EXPANDED_PX = 296;
+const MOBILE_PLAYBACK_SHEET_EXPANDED_PX = 200;
+const MOBILE_PLAYBACK_SHEET_EXPANDED_MAX = `min(${MOBILE_PLAYBACK_SHEET_EXPANDED_PX}px, 34vh)`;
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -691,11 +692,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [currentTool, isNarrowViewport, toolsSheet]);
 
   const playbackTargetHeight = isMobilePlaybackMiniVisible
-    ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_PX : MOBILE_PLAYBACK_SHEET_COLLAPSED_PX)
-    : 0;
-  const mobilePlaybackPaddingPx = playbackTargetHeight;
+    ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_MAX : `${MOBILE_PLAYBACK_SHEET_COLLAPSED_PX}px`)
+    : '0px';
   const mobileBottomPadding = mobileSheetEnabled
-    ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobilePlaybackPaddingPx}px)`
+    ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${playbackTargetHeight})`
     : undefined;
   const handleTogglePlaybackExpanded = () => setIsPlaybackExpanded(prev => !prev);
 
@@ -896,7 +896,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <div
           className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5 transition-[height] duration-200 ease-out`}
           style={{
-            height: `${Math.max(playbackTargetHeight, MOBILE_PLAYBACK_SHEET_COLLAPSED_PX)}px`
+            height: playbackTargetHeight
           }}
           data-testid="playback-mini-player"
         >
