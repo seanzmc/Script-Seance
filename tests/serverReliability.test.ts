@@ -136,7 +136,7 @@ describe('server reliability', () => {
     }
   });
 
-  it('returns legacy voice catalog for listVoices when inworld is not configured', async () => {
+  it('returns an empty voice catalog for listVoices when inworld is not configured', async () => {
     const req = {
       body: {
         kind: 'listVoices',
@@ -166,7 +166,7 @@ describe('server reliability', () => {
 
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body?.data?.voices)).toBe(true);
-    expect(res.body.data.voices.some((voice: { id: string }) => voice.id === 'Zephyr')).toBe(true);
+    expect(res.body.data.voices).toEqual([]);
   });
 
   it('returns a configuration error for generateSpeech when TTS provider is not configured', async () => {
@@ -175,7 +175,7 @@ describe('server reliability', () => {
         kind: 'generateSpeech',
         context: {
           text: 'Hello world',
-          voiceName: 'Zephyr'
+          voiceName: 'inworld-voice-1'
         }
       }
     } as any;

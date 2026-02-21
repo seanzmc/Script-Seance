@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global console, process */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -47,12 +48,6 @@ const tsxComponentFiles = [
   ...walkFiles(path.join(rootDir, 'components')).filter((f) => /\.tsx$/i.test(f)),
   path.join(rootDir, 'App.tsx'),
 ].filter((f, idx, arr) => exists(f) && arr.indexOf(f) === idx);
-
-const parseSource = (filePath) => {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const source = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  return { content, source };
-};
 
 const sourceByFile = new Map(allCodeFiles.map((file) => {
   const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;

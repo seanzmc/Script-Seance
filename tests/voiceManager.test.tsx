@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('VoiceManager', () => {
-  it('includes legacy assigned voice even when missing from dynamic catalog', () => {
+  it('includes orphaned assigned voice even when missing from dynamic catalog', () => {
     const availableVoices: TtsVoice[] = [
       {
         id: 'inworld-voice-1',
@@ -21,7 +21,7 @@ describe('VoiceManager', () => {
     ];
     const voiceConfigs: VoiceConfig[] = [
       { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 },
-      { name: 'Hero', voiceId: 'legacy-voice-42', speed: 1, pitch: 0 }
+      { name: 'Hero', voiceId: 'orphaned-voice-42', speed: 1, pitch: 0 }
     ];
 
     render(
@@ -42,7 +42,7 @@ describe('VoiceManager', () => {
     const heroSelector = voiceSelectors[1];
     const options = within(heroSelector).getAllByRole('option').map((option) => option.textContent);
 
-    expect(options).toContain('legacy-voice-42');
+    expect(options).toContain('orphaned-voice-42');
     expect(options).toContain('Inworld Voice 1');
   });
 

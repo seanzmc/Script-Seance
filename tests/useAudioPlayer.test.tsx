@@ -72,7 +72,7 @@ describe('useAudioPlayer', () => {
       { id: 'block-2', type: BlockType.DIALOGUE, text: 'World', character: 'B' }
     ];
     const voiceConfigs: VoiceConfig[] = [
-      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
     ];
     const onError = vi.fn();
     const onSkip = vi.fn();
@@ -106,12 +106,12 @@ describe('useAudioPlayer', () => {
       { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
     ];
     const initialVoices: VoiceConfig[] = [
-      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 },
-      { name: 'A', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
     ];
     const updatedVoices: VoiceConfig[] = [
-      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 },
-      { name: 'A', voiceId: 'Aoede', speed: 1, pitch: 0 }
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'inworld-voice-2', speed: 1, pitch: 0 }
     ];
     const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
     const { rerender } = render(<Harness ref={ref} voiceConfigs={initialVoices} />);
@@ -132,7 +132,7 @@ describe('useAudioPlayer', () => {
       lastEngine.emit('audio', {
         blockId: 'block-1',
         audioBuffer: new ArrayBuffer(8),
-        voiceId: 'Zephyr',
+        voiceId: 'inworld-voice-1',
         speed: 1,
         pitch: 0,
         expressive: false

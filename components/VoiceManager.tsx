@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { VoiceConfig, TtsVoice, LEGACY_VOICE_IDS, DEFAULT_NARRATOR_VOICE_ID } from '../types';
+import { VoiceConfig, TtsVoice } from '../types';
+import { DEFAULT_VOICE_CONFIG, resolveDefaultNarratorVoiceId } from '../shared/voiceDefaults.js';
 import { Volume2, Loader, Square, List, ChevronDown } from 'lucide-react';
 
 export interface VoiceManagerProps {
@@ -29,7 +30,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
 }) => {
   const availableVoiceIds = availableVoices.map((voice) => voice.id);
   const availableVoiceIdSet = new Set(availableVoiceIds);
-  const fallbackVoiceIds = availableVoiceIds.length > 0 ? availableVoiceIds : LEGACY_VOICE_IDS;
+  const narratorDefaultVoiceId = resolveDefaultNarratorVoiceId(availableVoices);
 
   const [activeChar, setActiveChar] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
@@ -54,9 +55,8 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   const getConfig = (char: string): VoiceConfig => {
     return voiceConfigs.find(c => c.name === char) || {
       name: char,
-      voiceId: fallbackVoiceIds[0] || DEFAULT_NARRATOR_VOICE_ID,
-      speed: 1,
-      pitch: 0
+      voiceId: narratorDefaultVoiceId,
+      ...DEFAULT_VOICE_CONFIG
     };
   };
 
@@ -71,9 +71,9 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
 
   const renderRow = (char: string, options?: { variant?: 'narrator' | 'cast'; index?: number }) => {
     const config = getConfig(char);
-    const voiceOptions = config.voiceId && !fallbackVoiceIds.includes(config.voiceId)
-      ? [config.voiceId, ...fallbackVoiceIds]
-      : fallbackVoiceIds;
+    const voiceOptions = config.voiceId && !availableVoiceIds.includes(config.voiceId)
+      ? [config.voiceId, ...availableVoiceIds]
+      : availableVoiceIds;
     const hasDynamicCatalog = availableVoices.length > 0;
     const isActive = activeChar === char;
     const isThisLoading = isActive && isLoading;

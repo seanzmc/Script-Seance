@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Play, Check, Mic, User, Pause, Info, ChevronLeft } from 'lucide-react';
-import { VoiceConfig, TtsVoice, LEGACY_VOICE_IDS } from '../types';
+import { VoiceConfig, TtsVoice } from '../types';
 
 export interface VoiceCastingModalProps {
   isOpen: boolean;
@@ -30,21 +30,7 @@ interface VoiceData {
   isCustom: boolean;
 }
 
-const AVAILABLE_VOICES_DATA: VoiceData[] = [
-  { id: 'Aoede', name: 'Aoede', gender: 'Feminine', category: 'Calm', description: 'Smooth, confident, and professional. The "Narrator" type.', labels: ['calm'], tags: ['calm'], source: 'legacy', isCustom: false },
-  { id: 'Callirrhoe', name: 'Callirrhoe', gender: 'Feminine', category: 'Warm', description: 'Gentle, warm, and slightly breathy. The "Friend".', labels: ['warm'], tags: ['warm'], source: 'legacy', isCustom: false },
-  { id: 'Kore', name: 'Kore', gender: 'Feminine', category: 'Firm', description: 'Firm, clear, and direct. Good for reporters or pragmatic characters.', labels: ['firm'], tags: ['firm'], source: 'legacy', isCustom: false },
-  { id: 'Sulafat', name: 'Sulafat', gender: 'Feminine', category: 'Warm', description: 'Warm, motherly, and assuring. A "Guide" figure.', labels: ['warm'], tags: ['warm'], source: 'legacy', isCustom: false },
-  { id: 'Zephyr', name: 'Zephyr', gender: 'Feminine', category: 'High Energy', description: 'Breezy, cheerful, and fast. The "Sidekick".', labels: ['high-energy'], tags: ['high-energy'], source: 'legacy', isCustom: false },
-  { id: 'Charon', name: 'Charon', gender: 'Masculine', category: 'Deep', description: 'Deep, resonant, and serious. The "Villain" or "Movie Trailer" voice.', labels: ['deep'], tags: ['deep'], source: 'legacy', isCustom: false },
-  { id: 'Fenrir', name: 'Fenrir', gender: 'Masculine', category: 'High Energy', description: 'Excitable, fast, and intense. The "Action Hero".', labels: ['high-energy'], tags: ['high-energy'], source: 'legacy', isCustom: false },
-  { id: 'Puck', name: 'Puck', gender: 'Masculine', category: 'High Energy', description: 'Playful, mischievous, and higher-pitch. The "Trickster".', labels: ['high-energy'], tags: ['high-energy'], source: 'legacy', isCustom: false },
-  { id: 'Rasalgethi', name: 'Rasalgethi', gender: 'Masculine', category: 'Textured', description: 'Gravelly, informative, and older. The "Veteran".', labels: ['textured'], tags: ['textured'], source: 'legacy', isCustom: false },
-  { id: 'Umbriel', name: 'Umbriel', gender: 'Masculine', category: 'Calm', description: 'Smooth, easy-going, and low-stress. The "Cool Guy".', labels: ['calm'], tags: ['calm'], source: 'legacy', isCustom: false }
-];
-
 const FILTERS = ['All', 'Masculine', 'Feminine', 'High Energy', 'Calm', 'Deep'];
-const LEGACY_VOICE_MAP = new Map(AVAILABLE_VOICES_DATA.map((voice) => [voice.id, voice]));
 const PLACEHOLDER_META = new Set(['unknown', 'general']);
 const formatTagLabel = (value: string) =>
   value
@@ -79,17 +65,16 @@ const sanitizeMetaList = (values?: string[]) => {
 };
 
 const toVoiceData = (voice: TtsVoice): VoiceData => {
-  const legacy = LEGACY_VOICE_MAP.get(voice.id);
-  const labels = sanitizeMetaList(voice.labels.length > 0 ? voice.labels : (legacy?.labels || []));
+  const labels = sanitizeMetaList(voice.labels);
   const tags = sanitizeMetaList(voice.tags && voice.tags.length > 0 ? voice.tags : labels);
-  const gender = sanitizeMetaValue(voice.gender || legacy?.gender);
-  const category = sanitizeMetaValue(voice.category || legacy?.category || (voice.isCustom ? 'Custom' : ''));
+  const gender = sanitizeMetaValue(voice.gender);
+  const category = sanitizeMetaValue(voice.category || (voice.isCustom ? 'Custom' : ''));
   return {
     id: voice.id,
-    name: voice.displayName || legacy?.name || voice.id,
+    name: voice.displayName || voice.id,
     gender,
     category,
-    description: voice.description || legacy?.description || 'Inworld voice.',
+    description: voice.description || 'Inworld voice.',
     labels,
     tags,
     source: voice.source,
@@ -146,36 +131,23 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
 
   const mergedVoices = useMemo(() => {
     const dynamic = availableVoices.map(toVoiceData);
-    if (dynamic.length > 0) {
-      const withCurrent = dynamic.some((voice) => voice.id === currentVoiceId)
-        ? dynamic
-        : (currentVoiceId && LEGACY_VOICE_MAP.has(currentVoiceId))
-          ? [toVoiceData({
-            id: currentVoiceId,
-            displayName: LEGACY_VOICE_MAP.get(currentVoiceId)?.name || currentVoiceId,
-            source: 'legacy',
-            labels: LEGACY_VOICE_MAP.get(currentVoiceId)?.labels || [],
-            tags: LEGACY_VOICE_MAP.get(currentVoiceId)?.labels || [],
-            isCustom: false
-          }), ...dynamic]
-          : dynamic;
-      return withCurrent;
+    if (dynamic.some((voice) => voice.id === currentVoiceId)) {
+      return dynamic;
     }
-    const fallback = AVAILABLE_VOICES_DATA.filter((voice) => LEGACY_VOICE_IDS.includes(voice.id));
-    if (currentVoiceId && !fallback.some((voice) => voice.id === currentVoiceId)) {
+    if (currentVoiceId) {
       return [{
         id: currentVoiceId,
         name: currentVoiceId,
         gender: 'Unknown',
-        category: 'Legacy',
-        description: 'Voice assigned from a previous catalog.',
+        category: 'Unavailable',
+        description: 'Voice assigned in draft but missing from active provider catalog.',
         labels: [],
         tags: [],
-        source: 'legacy',
+        source: 'assigned-unavailable',
         isCustom: false
-      }, ...fallback];
+      }, ...dynamic];
     }
-    return fallback;
+    return dynamic;
   }, [availableVoices, currentVoiceId]);
 
   const filteredVoices = useMemo(() => {

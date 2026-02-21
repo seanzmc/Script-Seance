@@ -58,7 +58,7 @@ describe('ScriptEngine', () => {
       { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
     ];
     const voiceConfigs: VoiceConfig[] = [
-      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
     ];
 
     await engine.start(blocks, voiceConfigs);
@@ -94,7 +94,7 @@ describe('ScriptEngine', () => {
       { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
     ];
     const voiceConfigs: VoiceConfig[] = [
-      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
     ];
 
     await engine.start(blocks, voiceConfigs);

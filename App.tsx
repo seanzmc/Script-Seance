@@ -21,8 +21,6 @@ import {
   SceneLengthOption,
   StoryContext,
   VoiceConfig,
-  LEGACY_VOICE_IDS,
-  DEFAULT_NARRATOR_VOICE_ID,
   TtsVoice,
   VoiceCatalogState,
   ScriptBlock,
@@ -31,6 +29,10 @@ import {
   INSERT_TOP_ID,
   INSERT_BOTTOM_ID
 } from './types';
+import {
+  DEFAULT_VOICE_CONFIG,
+  resolveDefaultNarratorVoiceId
+} from './shared/voiceDefaults.js';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { RotateCcw } from 'lucide-react';
 
@@ -134,17 +136,7 @@ const normalizeSceneCharacters = (scene: Scene, characters: string[]) => ({
   ))
 });
 
-const getVoiceIdList = (voices: TtsVoice[]) =>
-  voices.length > 0 ? voices.map((voice) => voice.id) : LEGACY_VOICE_IDS;
-
-const getDefaultNarratorVoiceId = (voices: TtsVoice[]) => {
-  if (voices.length === 0) return DEFAULT_NARRATOR_VOICE_ID;
-  const preferred = voices.find((voice) =>
-    voice.labels.some((label) => ['narrator', 'calm', 'neutral', 'professional'].includes(label.toLowerCase()))
-  );
-  if (preferred) return preferred.id;
-  return voices[0].id;
-};
+const getVoiceIdList = (voices: TtsVoice[]) => voices.map((voice) => voice.id);
 
 const buildFallbackTitle = (premise: string, genre: string) => {
   const words = premise
@@ -499,7 +491,7 @@ export default function App() {
   useEffect(() => {
     if (!context?.characters) return;
     const voiceIds = getVoiceIdList(availableVoices);
-    const narratorVoiceId = getDefaultNarratorVoiceId(availableVoices);
+    const narratorVoiceId = resolveDefaultNarratorVoiceId(availableVoices);
 
     setVoiceConfigs((prev) => {
       const next = [...prev];
@@ -510,16 +502,15 @@ export default function App() {
         next.push({
           name: 'Narrator',
           voiceId: narratorVoiceId,
-          speed: playbackSpeed,
-          pitch: 0,
-          expressive: false
+          ...DEFAULT_VOICE_CONFIG
         });
       }
 
       context.characters.forEach((char, idx) => {
         if (!hasVoiceConfig(char)) {
-          const voice = voiceIds[idx % voiceIds.length] || narratorVoiceId;
-          next.push({ name: char, voiceId: voice, speed: playbackSpeed, pitch: 0, expressive: false });
+          const hasVoiceOptions = voiceIds.length > 0;
+          const voice = hasVoiceOptions ? voiceIds[idx % voiceIds.length] : narratorVoiceId;
+          next.push({ name: char, voiceId: voice, ...DEFAULT_VOICE_CONFIG });
         }
       });
 
@@ -1099,7 +1090,7 @@ export default function App() {
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
-    const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
+    const defaultVoiceId = voiceIds[0] || resolveDefaultNarratorVoiceId(availableVoices);
     let shouldClearGeneratedAudio = false;
     setVoiceConfigs(prev => {
       const normalized = normalizeCharacterName(char);
@@ -1124,9 +1115,7 @@ export default function App() {
       return [...prev, { 
         name: char, 
         voiceId: defaultVoiceId,
-        speed: playbackSpeed, 
-        pitch: 0,
-        expressive: false,
+        ...DEFAULT_VOICE_CONFIG,
         ...updates 
       } as VoiceConfig];
     });
@@ -1295,8 +1284,8 @@ export default function App() {
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
   const voiceIds = getVoiceIdList(availableVoices);
-  const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
-  const isTtsPreviewEnabled = voiceCatalogState === 'ready' && availableVoices.some((voice) => voice.source !== 'legacy');
+  const defaultVoiceId = voiceIds[0] || resolveDefaultNarratorVoiceId(availableVoices);
+  const isTtsPreviewEnabled = voiceCatalogState === 'ready' && availableVoices.length > 0;
 
   const voicesContent = context ? (
     <div className="h-full min-h-0 flex flex-col gap-2">
@@ -1304,7 +1293,7 @@ export default function App() {
         <p className="text-[10px] text-gray-500">Loading available voices...</p>
       )}
       {voiceCatalogState === 'error' && (
-        <p className="text-[10px] text-amber-300">Voice catalog unavailable. Using fallback voices.</p>
+        <p className="text-[10px] text-amber-300">Voice catalog unavailable. No provider voices loaded.</p>
       )}
       {voiceCatalogState === 'ready' && !isTtsPreviewEnabled && (
         <p className="text-[10px] text-amber-300">TTS provider not configured. Preview is disabled.</p>

@@ -1,6 +1,7 @@
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
 import { createGenerateSpeechRequest } from './ai';
 import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from './audioCache';
+import { DEFAULT_VOICE_CONFIG } from '../shared/voiceDefaults.js';
 
 // Global Content-Addressable Cache (persists across plays)
 // Key: voiceId:text | Value: ArrayBuffer (Raw PCM)
@@ -8,6 +9,14 @@ const AudioCache = new LruAudioCache(AUDIO_CACHE_MAX_ENTRIES, AUDIO_CACHE_MAX_BY
 const AUDIO_CACHE_SCHEMA_VERSION = 'v2';
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+const resolveNarratorFallbackVoiceId = (voiceConfigs: VoiceConfig[]) => {
+  const narrator = voiceConfigs.find((config) => normalizeCharacterName(config.name) === 'narrator');
+  if (typeof narrator?.voiceId === 'string' && narrator.voiceId.trim().length > 0) {
+    return narrator.voiceId;
+  }
+  const firstConfiguredVoice = voiceConfigs.find((config) => typeof config.voiceId === 'string' && config.voiceId.trim().length > 0);
+  return firstConfiguredVoice?.voiceId || '';
+};
 
 interface QueueItem {
   block: ScriptBlock;
@@ -133,6 +142,7 @@ export class ScriptEngine {
     );
 
     // 2. Hydrate: Assign Voice Configs upfront (Consistency)
+    const narratorFallbackVoiceId = resolveNarratorFallbackVoiceId(voiceConfigs);
     this.queue = playableBlocks.map(block => {
       let config: VoiceConfig | undefined;
       
@@ -148,10 +158,10 @@ export class ScriptEngine {
 
       return {
         block,
-        voiceId: config?.voiceId || 'Zephyr',
-        speed: config?.speed || 1,
-        pitch: config?.pitch || 0,
-        expressive: config?.expressive || false
+        voiceId: config?.voiceId || narratorFallbackVoiceId,
+        speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
+        pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
+        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
       };
     });
     this.blockRetryCounts.clear();

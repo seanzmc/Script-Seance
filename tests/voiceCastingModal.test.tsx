@@ -9,7 +9,7 @@ describe('VoiceCastingModal', () => {
     const onBack = vi.fn();
     const onClose = vi.fn();
     const voiceConfigs: VoiceConfig[] = [
-      { name: 'Narrator', voiceId: 'Zephyr', speed: 1, pitch: 0 }
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
     ];
 
     render(
@@ -19,7 +19,7 @@ describe('VoiceCastingModal', () => {
         onClose={onClose}
         onBack={onBack}
         characterName="Narrator"
-        currentVoiceId="Zephyr"
+        currentVoiceId="inworld-voice-1"
         availableVoices={[]}
         voiceConfigs={voiceConfigs}
         onSelect={vi.fn()}
@@ -81,5 +81,29 @@ describe('VoiceCastingModal', () => {
     expect(scoped.getAllByText('High Energy')).toHaveLength(1);
     expect(scoped.getAllByText('Calm')).toHaveLength(1);
     expect(scoped.getByText('Mystery')).toBeTruthy();
+  });
+
+  it('shows synthetic assigned voice when current voice is missing from provider catalog', () => {
+    render(
+      <VoiceCastingModal
+        isOpen={true}
+        embedded
+        onClose={vi.fn()}
+        onBack={vi.fn()}
+        characterName="Narrator"
+        currentVoiceId="orphaned-voice-42"
+        availableVoices={[]}
+        voiceConfigs={[{ name: 'Narrator', voiceId: 'orphaned-voice-42', speed: 1, pitch: 0 }]}
+        onSelect={vi.fn()}
+        onPreview={vi.fn()}
+      />
+    );
+
+    const orphanCard = screen.getByText('orphaned-voice-42').closest('.group');
+    if (!orphanCard) {
+      throw new Error('Orphaned voice card not found');
+    }
+    const scoped = within(orphanCard as HTMLElement);
+    expect(scoped.getByText('Voice assigned in draft but missing from active provider catalog.')).toBeTruthy();
   });
 });

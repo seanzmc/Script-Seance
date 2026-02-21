@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
 import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
+import { DEFAULT_VOICE_CONFIG } from '../shared/voiceDefaults.js';
 
 type BlockAudioStatus = 'notGenerated' | 'generating' | 'ready' | 'error';
 
@@ -93,6 +94,16 @@ export const useAudioPlayer = (
     const normalized = normalizeCharacterName(charName);
     return voiceConfigsRef.current.find(c => normalizeCharacterName(c.name) === normalized)
       || voiceConfigsRef.current.find(c => normalizeCharacterName(c.name) === 'narrator');
+  }, []);
+  const getFallbackVoiceId = useCallback(() => {
+    const narrator = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
+    if (typeof narrator?.voiceId === 'string' && narrator.voiceId.trim().length > 0) {
+      return narrator.voiceId;
+    }
+    const firstConfiguredVoice = voiceConfigsRef.current.find(
+      (config) => typeof config.voiceId === 'string' && config.voiceId.trim().length > 0
+    );
+    return firstConfiguredVoice?.voiceId || '';
   }, []);
 
   const updateBufferProgress = useCallback((nextTotal?: number) => {
@@ -348,12 +359,12 @@ export const useAudioPlayer = (
       .filter((block) => PLAYABLE_BLOCKS.includes(block.type))
       .map((block) => {
         const config = getVoiceConfigForBlock(block);
-        const voiceId = config?.voiceId || 'Zephyr';
+        const voiceId = config?.voiceId || getFallbackVoiceId();
         const expressive = config?.expressive ? 'expr' : 'plain';
         return `${block.id}:${voiceId}:${expressive}`;
       })
       .join('|');
-  }, [getVoiceConfigForBlock]);
+  }, [getFallbackVoiceId, getVoiceConfigForBlock]);
 
   const playScript = (blocks: ScriptBlock[], options?: { forceRegenerate?: boolean }) => {
     const playableBlocks = getPlayableBlocks(blocks);
@@ -474,8 +485,9 @@ export const useAudioPlayer = (
 
     try {
       const config = getVoiceConfigForBlock(block);
-      const buffer = await engineRef.current?.generateSingle(block.text, config?.voiceId || 'Zephyr', {
-        expressive: config?.expressive || false
+      const voiceId = config?.voiceId || getFallbackVoiceId();
+      const buffer = await engineRef.current?.generateSingle(block.text, voiceId, {
+        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
       });
       if (!buffer) {
         setBlockStatuses(prev => ({ ...prev, [block.id]: 'error' }));
@@ -484,10 +496,10 @@ export const useAudioPlayer = (
       audioDataMap.current.set(block.id, {
         blockId: block.id,
         audioBuffer: buffer,
-        voiceId: config?.voiceId || 'Zephyr',
-        speed: config?.speed ?? 1,
-        pitch: config?.pitch ?? 0,
-        expressive: config?.expressive ?? false
+        voiceId,
+        speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
+        pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
+        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
       });
       setBlockStatuses(prev => ({ ...prev, [block.id]: 'ready' }));
       updateBufferProgress();
@@ -502,7 +514,7 @@ export const useAudioPlayer = (
       setBlockStatuses(prev => ({ ...prev, [block.id]: 'error' }));
       onError?.(error, 'Audio generation failed.');
     }
-  }, [getVoiceConfigForBlock, isPaused, onError, playNext, updateBufferProgress]);
+  }, [getFallbackVoiceId, getVoiceConfigForBlock, isPaused, onError, playNext, updateBufferProgress]);
 
   const skipCurrentBlock = useCallback(() => {
     const block = queueRef.current[currentIndexRef.current];
@@ -545,8 +557,8 @@ export const useAudioPlayer = (
       
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
-      source.playbackRate.value = config.speed || 1;
-      source.detune.value = (config.pitch || 0) * 100;
+      source.playbackRate.value = config.speed ?? DEFAULT_VOICE_CONFIG.speed;
+      source.detune.value = (config.pitch ?? DEFAULT_VOICE_CONFIG.pitch) * 100;
 
       const gainNode = ctx.createGain();
       gainNode.gain.value = 0.92;

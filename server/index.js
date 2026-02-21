@@ -12,7 +12,6 @@ import {
 import { generateTextByKind, getPromptSizeEstimate } from './llm/textGeneration.js';
 import { isTextGenerationKind } from './llm/types.js';
 import {
-  LEGACY_TTS_VOICES,
   applyExpressiveText,
   extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
@@ -553,18 +552,18 @@ const generateSpeechByProvider = async (text, voiceName, expressive = false) => 
 
 const listVoicesByProvider = async () => {
   if (!hasInworldTtsCredentials()) {
-    return [...LEGACY_TTS_VOICES];
+    return [];
   }
   try {
     return await listInworldVoices();
   } catch (error) {
-    console.warn('[tts] voice catalog fallback to legacy voices', {
+    console.warn('[tts] voice catalog unavailable', {
       status: error?.status,
       code: error?.code,
       name: error?.name,
       message: error?.message
     });
-    return [...LEGACY_TTS_VOICES];
+    return [];
   }
 };
 

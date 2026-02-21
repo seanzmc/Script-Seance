@@ -191,7 +191,6 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
     atEnd,
     statusHeadline,
     statusDetail,
-    activeBlockNumber,
     errorCount
   } = useMemo(
     () =>

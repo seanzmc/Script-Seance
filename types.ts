@@ -45,27 +45,10 @@ export interface VoiceConfig {
 export const INSERT_TOP_ID = '__insert-top__';
 export const INSERT_BOTTOM_ID = '__insert-bottom__';
 
-export const LEGACY_VOICE_IDS = [
-  'Aoede',
-  'Callirrhoe',
-  'Kore',
-  'Sulafat',
-  'Zephyr',
-  'Charon',
-  'Fenrir',
-  'Puck',
-  'Rasalgethi',
-  'Umbriel'
-];
-
-export const AVAILABLE_VOICES = LEGACY_VOICE_IDS;
-
-export const DEFAULT_NARRATOR_VOICE_ID = 'Zephyr';
-
 export interface TtsVoice {
   id: string;
   displayName: string;
-  source: 'inworld-premade' | 'inworld-custom' | 'legacy';
+  source: 'inworld-premade' | 'inworld-custom';
   language?: string;
   labels: string[];
   tags?: string[];

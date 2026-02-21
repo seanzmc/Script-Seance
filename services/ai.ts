@@ -32,7 +32,7 @@ export type CancellableRequest<T> = {
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_SCENE_TIMEOUT_MS = 95000;
-const DEFAULT_VOICE_NAME = 'Zephyr';
+const DEFAULT_VOICE_NAME = '';
 const TTS_MAX_ATTEMPTS = 5;
 const TTS_BASE_DELAY_MS = 1000;
 const TTS_MAX_DELAY_MS = 10000;
