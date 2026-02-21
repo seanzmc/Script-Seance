@@ -389,14 +389,8 @@ export const generateScriptElement = async (
   styleContext: string,
   options?: RequestOptions
 ): Promise<string> => {
-  const data = await requestAi<{ text: string }>('generateScriptElement', {
-    type,
-    character,
-    instruction,
-    styleContext
-  }, options);
-
-  return data.text?.trim() || '';
+  const request = createGenerateScriptElementRequest(type, character, instruction, styleContext, options);
+  return request.promise;
 };
 
 export const regenerateScriptBlock = async (
@@ -420,11 +414,8 @@ export const generateSurpriseSetup = async (
   targetGenre?: string,
   options?: RequestOptions
 ): Promise<{ genre: string; premise: string; characters: string[] }> => {
-  return requestAi<{ genre: string; premise: string; characters: string[] }>(
-    'generateSurpriseSetup',
-    { targetGenre },
-    options
-  );
+  const request = createGenerateSurpriseSetupRequest(targetGenre, options);
+  return request.promise;
 };
 
 // --- TTS Generation ---
@@ -600,5 +591,40 @@ export const createRegenerateScriptBlockRequest = (
   return {
     cancel: request.cancel,
     promise: request.promise.then((data) => data.text?.trim() || block.text)
+  };
+};
+
+export const createGenerateScriptElementRequest = (
+  type: BlockType,
+  character: string | undefined,
+  instruction: string,
+  styleContext: string,
+  options?: RequestOptions
+): CancellableRequest<string> => {
+  const request = createAiRequest<{ text: string }>('generateScriptElement', {
+    type,
+    character,
+    instruction,
+    styleContext
+  }, options);
+
+  return {
+    cancel: request.cancel,
+    promise: request.promise.then((data) => data.text?.trim() || '')
+  };
+};
+
+export const createGenerateSurpriseSetupRequest = (
+  targetGenre?: string,
+  options?: RequestOptions
+): CancellableRequest<{ genre: string; premise: string; characters: string[] }> => {
+  const request = createAiRequest<{ genre: string; premise: string; characters: string[] }>(
+    'generateSurpriseSetup',
+    { targetGenre },
+    options
+  );
+  return {
+    cancel: request.cancel,
+    promise: request.promise
   };
 };

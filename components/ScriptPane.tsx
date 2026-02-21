@@ -45,6 +45,13 @@ export interface ScriptPaneProps {
   insertCompleteToken: number;
   onSelectInsertTarget: (target: InsertTarget) => void;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
+  onInsertSurprise?: (params: {
+    elementType: BlockType;
+    selectedChar: string;
+    instruction: string;
+    promptContext: string;
+    onCommit: (generatedText: string) => void;
+  }) => Promise<void>;
   onInsertError: (error: unknown) => void;
   onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
   onToggleLock: (sceneId: string, blockId: string) => void;
@@ -62,7 +69,8 @@ export interface ScriptPaneProps {
   isSetupOpen: boolean;
   onCloseSetup: () => void;
   setupState: SetupFormState;
-  onSetupChange: (next: Partial<SetupFormState>) => void;
+  onSetupChange: (next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => void;
+  onSetupSurprise?: (params: { mode: 'manual' | 'auto'; targetGenre: string }) => Promise<boolean>;
   onStartSetup: () => void;
   setupAutoSurprise: boolean;
   styleContext?: string;
@@ -170,6 +178,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertCompleteToken,
   onSelectInsertTarget,
   onChangeSpeaker,
+  onInsertSurprise,
   onInsertError,
   onRegenerate,
   onToggleLock,
@@ -188,6 +197,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onCloseSetup,
   setupState,
   onSetupChange,
+  onSetupSurprise,
   onStartSetup,
   setupAutoSurprise,
   styleContext,
@@ -503,6 +513,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <SetupForm
             value={setupState}
             onChange={onSetupChange}
+            onRequestSurprise={onSetupSurprise}
             onStart={onStartSetup}
             isLoading={isGenerating}
             onError={onSetupError}
@@ -720,6 +731,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       genre={context.genre}
       onAddBlock={onAddBlock}
       onStartInsertMode={onStartInsertMode}
+      onRequestSurprise={onInsertSurprise}
       insertModeActive={isInsertModeView}
       insertCompleteToken={insertCompleteToken}
       onError={onInsertError}

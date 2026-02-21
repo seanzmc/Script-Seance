@@ -11,8 +11,9 @@ import {
   createGenerateSceneRequest,
   createSuggestPlotTwistRequest,
   createRegenerateScriptBlockRequest,
+  createGenerateScriptElementRequest,
+  createGenerateSurpriseSetupRequest,
   CancellableRequest,
-  generateScriptElement,
   listVoices
 } from './services/ai';
 import { getSession, login } from './services/auth';
@@ -34,6 +35,15 @@ import {
   resolveDefaultNarratorVoiceId
 } from './shared/voiceDefaults.js';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
+import {
+  GenerationOrchestrator,
+  scopeKeys,
+  doesInsertAnchorResolve,
+  captureInsertAnchorSnapshot,
+  isRewriteFresh,
+  isSetupAutoSurpriseFresh,
+  isTitleSuggestionFresh
+} from './services/orchestration';
 import { RotateCcw } from 'lucide-react';
 
 interface ToastState {
@@ -217,7 +227,16 @@ export default function App() {
   const [suggestedTitle, setSuggestedTitle] = useState<string | null>(null);
   const [isSuggestingTitle, setIsSuggestingTitle] = useState(false);
   const [suggestedTitleDismissed, setSuggestedTitleDismissed] = useState(false);
-  const activeAiRequestRef = useRef<CancellableRequest<unknown> | null>(null);
+  const orchestratorRef = useRef(new GenerationOrchestrator());
+  const scriptIdRef = useRef(crypto.randomUUID());
+  const setupSessionIdRef = useRef(crypto.randomUUID());
+  const setupManualEditRevisionRef = useRef(0);
+  const promptContextRevisionRef = useRef(0);
+  const promptContextFingerprintRef = useRef('');
+  const contextRef = useRef<StoryContext | null>(null);
+  const userInstructionRef = useRef('');
+  const activeGenerationScopeRef = useRef<string | null>(null);
+  const manualTitleRevisionRef = useRef(0);
   const titleSuggestionTokenRef = useRef(0);
   const hasManualTitleRef = useRef(false);
 
@@ -264,6 +283,55 @@ export default function App() {
     ].filter(Boolean);
     return parts.join(' ');
   }, [setupState.genre, setupState.length, setupState.style]);
+
+  useEffect(() => {
+    contextRef.current = context;
+  }, [context]);
+
+  useEffect(() => {
+    userInstructionRef.current = userInstruction;
+  }, [userInstruction]);
+
+  const promptContextFingerprint = useMemo(() => {
+    if (context) {
+      return JSON.stringify({
+        mode: 'context',
+        title: context.title,
+        genre: context.genre,
+        premise: context.premise,
+        characters: context.characters,
+        style: context.style ?? '',
+        targetLength: context.targetLength ?? '',
+        scenes: context.scenes.map((scene) => ({
+          id: scene.id,
+          heading: scene.heading,
+          summary: scene.summary,
+          blocks: scene.blocks.map((block) => ({
+            id: block.id,
+            type: block.type,
+            text: block.text,
+            character: block.character ?? ''
+          }))
+        }))
+      });
+    }
+    return JSON.stringify({
+      mode: 'setup',
+      genre: setupState.genre,
+      premise: setupState.premise,
+      characters: setupState.characters,
+      style: setupState.style,
+      length: setupState.length
+    });
+  }, [context, setupState]);
+
+  useEffect(() => {
+    if (promptContextFingerprintRef.current === promptContextFingerprint) {
+      return;
+    }
+    promptContextFingerprintRef.current = promptContextFingerprint;
+    promptContextRevisionRef.current += 1;
+  }, [promptContextFingerprint]);
 
   const applyUndoAction = useCallback((current: StoryContext, action: UndoAction) => {
     if (action.type === 'scene') {
@@ -352,6 +420,8 @@ export default function App() {
 
   const openManualSetup = () => {
     setSetupAutoSurprise(false);
+    setupSessionIdRef.current = crypto.randomUUID();
+    setupManualEditRevisionRef.current = 0;
     setIsSetupOpen(true);
   };
 
@@ -360,7 +430,10 @@ export default function App() {
     setSetupAutoSurprise(false);
   };
 
-  const updateSetupState = useCallback((next: Partial<SetupFormState>) => {
+  const updateSetupState = useCallback((next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => {
+    if ((meta?.source ?? 'user') === 'user') {
+      setupManualEditRevisionRef.current += 1;
+    }
     setSetupState(prev => ({ ...prev, ...next }));
   }, []);
   const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
@@ -416,27 +489,29 @@ export default function App() {
     setToast({ message: `Audio failed for ${label}${detail}` });
   }, []);
 
-  const startAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
-    if (activeAiRequestRef.current) {
-      activeAiRequestRef.current.cancel();
+  const executeCancellableWithSignal = useCallback(<T,>(
+    signal: AbortSignal,
+    createRequest: () => CancellableRequest<T>
+  ): Promise<T> => {
+    const request = createRequest();
+    if (signal.aborted) {
+      request.cancel();
+    } else {
+      const onAbort = () => request.cancel();
+      signal.addEventListener('abort', onAbort, { once: true });
+      return request.promise.finally(() => {
+        signal.removeEventListener('abort', onAbort);
+      });
     }
-    activeAiRequestRef.current = request as CancellableRequest<unknown>;
-    setIsGenerating(true);
-    setError(null);
-  }, []);
-
-  const finishAiRequest = useCallback(<T,>(request: CancellableRequest<T>) => {
-    if (activeAiRequestRef.current === request) {
-      activeAiRequestRef.current = null;
-      setIsGenerating(false);
-    }
+    return request.promise;
   }, []);
 
   const cancelAiRequest = useCallback(() => {
-    if (activeAiRequestRef.current) {
-      activeAiRequestRef.current.cancel();
-      activeAiRequestRef.current = null;
+    const scopeKey = activeGenerationScopeRef.current;
+    if (scopeKey) {
+      orchestratorRef.current.cancelScope(scopeKey);
     }
+    activeGenerationScopeRef.current = null;
     setIsGenerating(false);
     setError(null);
   }, []);
@@ -722,6 +797,11 @@ export default function App() {
     setUserInstruction('');
     setVoiceConfigs([]);
     setSetupState(DEFAULT_SETUP_STATE);
+    setupSessionIdRef.current = crypto.randomUUID();
+    setupManualEditRevisionRef.current = 0;
+    scriptIdRef.current = crypto.randomUUID();
+    manualTitleRevisionRef.current = 0;
+    activeGenerationScopeRef.current = null;
     setInsertTarget(null);
     setInsertModeActive(false);
     setPendingInsertBlock(null);
@@ -742,33 +822,52 @@ export default function App() {
     titleSuggestionTokenRef.current = token;
     setIsSuggestingTitle(true);
     try {
+      const startedPromptContextRevision = promptContextRevisionRef.current;
+      const startedManualTitleRevision = manualTitleRevisionRef.current;
       const contextText = buildTitleContext(setup);
       const instruction = [
         'Create a concise, evocative screenplay title (2-6 words).',
         'Return only the title text, no quotes.',
         'Avoid scene headings like INT./EXT.'
       ].join(' ');
-      const rawTitle = await generateScriptElement(BlockType.ACTION, undefined, instruction, contextText);
-      if (titleSuggestionTokenRef.current !== token) return;
-      const cleanedTitle = sanitizeSuggestedTitle(rawTitle);
-      const finalTitle = cleanedTitle || buildFallbackTitle(setup.premise, setup.genre);
-      if (!finalTitle || finalTitle === DEFAULT_TITLE) return;
-      setSuggestedTitle(finalTitle);
-      setSuggestedTitleDismissed(false);
-      if (!hasManualTitleRef.current) {
-        setContext(prev => {
-          if (!prev || !isUntitledTitle(prev.title)) return prev;
-          return { ...prev, title: finalTitle };
-        });
+      const outcome = await orchestratorRef.current.run<string>({
+        opType: 'titleSuggestion',
+        scopeKey: scopeKeys.titleSuggestion(scriptIdRef.current),
+        execute: (signal) => executeCancellableWithSignal(
+          signal,
+          () => createGenerateScriptElementRequest(BlockType.ACTION, undefined, instruction, contextText)
+        ),
+        isFresh: () => isTitleSuggestionFresh({
+          startedPromptContextRevision,
+          currentPromptContextRevision: promptContextRevisionRef.current,
+          startedManualTitleRevision,
+          currentManualTitleRevision: manualTitleRevisionRef.current
+        }),
+        commit: (rawTitle) => {
+          const cleanedTitle = sanitizeSuggestedTitle(rawTitle);
+          const finalTitle = cleanedTitle || buildFallbackTitle(setup.premise, setup.genre);
+          if (!finalTitle || finalTitle === DEFAULT_TITLE) return;
+          setSuggestedTitle(finalTitle);
+          setSuggestedTitleDismissed(false);
+          if (!hasManualTitleRef.current) {
+            setContext(prev => {
+              if (!prev || !isUntitledTitle(prev.title)) return prev;
+              return { ...prev, title: finalTitle };
+            });
+          }
+        }
+      });
+      if (outcome.kind === 'failed') {
+        handleAiError(outcome.error, 'Failed to suggest title.');
       }
     } catch (err) {
-      console.error('Title suggestion failed', err);
+      handleAiError(err, 'Failed to suggest title.');
     } finally {
       if (titleSuggestionTokenRef.current === token) {
         setIsSuggestingTitle(false);
       }
     }
-  }, []);
+  }, [executeCancellableWithSignal, handleAiError]);
 
   // Handlers
   const handleStart = async () => {
@@ -780,11 +879,12 @@ export default function App() {
       setError('Add at least one character before generating a script.');
       return;
     }
-    let request: CancellableRequest<Scene> | null = null;
     try {
       closeSetup();
       resetUndoRedo();
       resetTitleSuggestionState();
+      scriptIdRef.current = crypto.randomUUID();
+      manualTitleRevisionRef.current = 0;
       void requestTitleSuggestion(setupState);
       const instruction = 'Write the opening scene setting the tone.';
       const initialContext: StoryContext = { 
@@ -796,73 +896,126 @@ export default function App() {
         style: setupState.style.trim() || undefined,
         targetLength: normalizeTargetLength(setupState.length)
       };
-      request = createGenerateSceneRequest(
-        initialContext,
-        instruction,
-        true
-      );
-      startAiRequest(request);
-      const firstScene = await request.promise;
-      const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
-      const initialLastBlockId = normalizedFirstScene.blocks[normalizedFirstScene.blocks.length - 1]?.id;
-      setContext({
-        ...initialContext,
-        scenes: [normalizedFirstScene]
+      const startedPromptContextRevision = promptContextRevisionRef.current;
+      const scopeKey = scopeKeys.generateOpeningScene(scriptIdRef.current);
+      activeGenerationScopeRef.current = scopeKey;
+      setIsGenerating(true);
+      setError(null);
+
+      const outcome = await orchestratorRef.current.run<Scene>({
+        opType: 'generateOpeningScene',
+        scopeKey,
+        execute: (signal) => executeCancellableWithSignal(
+          signal,
+          () => createGenerateSceneRequest(initialContext, instruction, true)
+        ),
+        isFresh: () =>
+          promptContextRevisionRef.current === startedPromptContextRevision &&
+          !contextRef.current,
+        commit: (firstScene) => {
+          const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
+          const initialLastBlockId = normalizedFirstScene.blocks[normalizedFirstScene.blocks.length - 1]?.id;
+          setContext({
+            ...initialContext,
+            scenes: [normalizedFirstScene]
+          });
+          setInsertScrollTargetId(initialLastBlockId ?? 'bottom');
+          setInsertScrollToken(token => token + 1);
+        }
       });
-      setInsertScrollTargetId(initialLastBlockId ?? 'bottom');
-      setInsertScrollToken(token => token + 1);
+
+      if (outcome.kind === 'failed') {
+        handleAiError(outcome.error, "Failed to generate story");
+      }
     } catch (err: unknown) {
       handleAiError(err, "Failed to generate story");
     } finally {
-      if (request) {
-        finishAiRequest(request);
+      if (activeGenerationScopeRef.current === scopeKeys.generateOpeningScene(scriptIdRef.current)) {
+        activeGenerationScopeRef.current = null;
       }
+      setIsGenerating(false);
     }
   };
 
   const handleGenerateNext = async () => {
     if (!context || isGenerating) return;
-    let request: CancellableRequest<Scene> | null = null;
     try {
       clearRedo();
       const prompt = userInstruction || "Continue the story logically.";
-      request = createGenerateSceneRequest(context, prompt, false);
-      startAiRequest(request);
-      const nextScene = await request.promise;
-      const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
-      const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
-      setContext(prev => {
-        if (!prev) return null;
-        const updatedScenes = [...prev.scenes, normalizedScene];
-        return { ...prev, scenes: updatedScenes };
+      const startedPromptContextRevision = promptContextRevisionRef.current;
+      const scopeKey = scopeKeys.generateNextScene(scriptIdRef.current);
+      activeGenerationScopeRef.current = scopeKey;
+      setIsGenerating(true);
+      setError(null);
+
+      const outcome = await orchestratorRef.current.run<Scene>({
+        opType: 'generateNextScene',
+        scopeKey,
+        execute: (signal) => executeCancellableWithSignal(
+          signal,
+          () => createGenerateSceneRequest(context, prompt, false)
+        ),
+        isFresh: () => promptContextRevisionRef.current === startedPromptContextRevision,
+        commit: (nextScene) => {
+          const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
+          const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
+          setContext(prev => {
+            if (!prev) return null;
+            const updatedScenes = [...prev.scenes, normalizedScene];
+            return { ...prev, scenes: updatedScenes };
+          });
+          setInsertScrollTargetId(lastBlockId ?? 'bottom');
+          setInsertScrollToken(token => token + 1);
+          setUserInstruction('');
+        }
       });
-      setInsertScrollTargetId(lastBlockId ?? 'bottom');
-      setInsertScrollToken(token => token + 1);
-      setUserInstruction('');
+      if (outcome.kind === 'failed') {
+        handleAiError(outcome.error, 'Failed to generate scene.');
+      }
     } catch (err: unknown) {
       handleAiError(err, 'Failed to generate scene.');
     } finally {
-      if (request) {
-        finishAiRequest(request);
+      if (activeGenerationScopeRef.current === scopeKeys.generateNextScene(scriptIdRef.current)) {
+        activeGenerationScopeRef.current = null;
       }
+      setIsGenerating(false);
     }
   };
 
   const handleTwist = async () => {
     if (!context || isGenerating) return;
-    let request: CancellableRequest<string> | null = null;
     try {
-      request = createSuggestPlotTwistRequest(context.genre);
-      startAiRequest(request);
-      const twist = await request.promise;
-      setUserInstruction(`PLOT TWIST: ${twist}`);
+      const startedPromptContextRevision = promptContextRevisionRef.current;
+      const startedUserInstruction = userInstructionRef.current;
+      const scopeKey = scopeKeys.suggestPlotTwist(scriptIdRef.current);
+      activeGenerationScopeRef.current = scopeKey;
+      setIsGenerating(true);
+      setError(null);
+
+      const outcome = await orchestratorRef.current.run<string>({
+        opType: 'suggestPlotTwist',
+        scopeKey,
+        execute: (signal) => executeCancellableWithSignal(
+          signal,
+          () => createSuggestPlotTwistRequest(context.genre)
+        ),
+        isFresh: () =>
+          promptContextRevisionRef.current === startedPromptContextRevision &&
+          userInstructionRef.current === startedUserInstruction,
+        commit: (twist) => {
+          setUserInstruction(`PLOT TWIST: ${twist}`);
+        }
+      });
+      if (outcome.kind === 'failed') {
+        handleAiError(outcome.error, 'Failed to generate plot twist.');
+      }
     } catch (err: unknown) {
-      console.error(err);
       handleAiError(err, 'Failed to generate plot twist.');
     } finally {
-      if (request) {
-        finishAiRequest(request);
+      if (activeGenerationScopeRef.current === scopeKeys.suggestPlotTwist(scriptIdRef.current)) {
+        activeGenerationScopeRef.current = null;
       }
+      setIsGenerating(false);
     }
   };
 
@@ -1039,6 +1192,88 @@ export default function App() {
     });
   }, [clearRedo]);
 
+  const handleInsertSurprise = useCallback(async (params: {
+    elementType: BlockType;
+    selectedChar: string;
+    instruction: string;
+    promptContext: string;
+    onCommit: (generatedText: string) => void;
+  }) => {
+    const startedPromptContextRevision = promptContextRevisionRef.current;
+    const anchorSnapshot = captureInsertAnchorSnapshot(contextRef.current, insertTarget);
+    const scopeKey = scopeKeys.insertSurpriseText(scriptIdRef.current, anchorSnapshot.anchorIdOrIndex);
+
+    const outcome = await orchestratorRef.current.run<string>({
+      opType: 'insertSurpriseText',
+      scopeKey,
+      execute: (signal) => executeCancellableWithSignal(
+        signal,
+        () => createGenerateScriptElementRequest(
+          params.elementType,
+          params.selectedChar,
+          params.instruction,
+          params.promptContext
+        )
+      ),
+      isFresh: () =>
+        promptContextRevisionRef.current === startedPromptContextRevision &&
+        doesInsertAnchorResolve(anchorSnapshot, contextRef.current),
+      commit: (generatedText) => {
+        params.onCommit(generatedText);
+      }
+    });
+
+    if (outcome.kind === 'failed') {
+      handleAiError(outcome.error, 'Failed to generate block.');
+    }
+  }, [executeCancellableWithSignal, handleAiError, insertTarget]);
+
+  const handleSetupSurprise = useCallback(async (params: {
+    mode: 'manual' | 'auto';
+    targetGenre: string;
+  }) => {
+    const startedSetupSessionId = setupSessionIdRef.current;
+    const startedSetupManualEditRevision = setupManualEditRevisionRef.current;
+    const opType = params.mode === 'auto' ? 'setupAutoSurprise' : 'setupSurprise';
+    const scopeKey = params.mode === 'auto'
+      ? scopeKeys.setupAutoSurprise(startedSetupSessionId)
+      : scopeKeys.setupSurprise(startedSetupSessionId);
+
+    const outcome = await orchestratorRef.current.run<{ genre: string; premise: string; characters: string[] }>({
+      opType,
+      scopeKey,
+      trigger: params.mode === 'auto' ? 'system' : 'user',
+      execute: (signal) => executeCancellableWithSignal(
+        signal,
+        () => createGenerateSurpriseSetupRequest(params.targetGenre)
+      ),
+      isFresh: () => {
+        if (params.mode === 'auto') {
+          return isSetupAutoSurpriseFresh({
+            startedSetupSessionId,
+            currentSetupSessionId: setupSessionIdRef.current,
+            startedSetupManualEditRevision,
+            currentSetupManualEditRevision: setupManualEditRevisionRef.current
+          });
+        }
+        return setupSessionIdRef.current === startedSetupSessionId;
+      },
+      commit: (data) => {
+        updateSetupState({
+          genre: data.genre,
+          premise: data.premise,
+          characters: data.characters
+        }, { source: 'system' });
+      }
+    });
+
+    if (outcome.kind === 'failed') {
+      handleAiError(outcome.error, 'Failed to generate a surprise setup.');
+      return false;
+    }
+    return outcome.kind === 'committed';
+  }, [executeCancellableWithSignal, handleAiError, updateSetupState]);
+
   const resetTitleSuggestionState = useCallback(() => {
     titleSuggestionTokenRef.current += 1;
     hasManualTitleRef.current = false;
@@ -1056,36 +1291,31 @@ export default function App() {
     if (!block || block.locked) return;
 
     const originalText = block.text;
-
-    let request: CancellableRequest<string> | null = null;
+    const startedBlockRevision = block.blockRevision;
+    const startedPromptContextRevision = promptContextRevisionRef.current;
+    const scopeKey = scopeKeys.rewriteBlock(scriptIdRef.current, blockId);
     try {
-      request = createRegenerateScriptBlockRequest(block, context.genre, context.premise, rewriteGuidance);
-      startAiRequest(request);
-      const newText = await request.promise;
-      
-      // Update state
-      clearRedo();
-      setContext(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          scenes: prev.scenes.map(s => s.id === sceneId ? {
-            ...s,
-            blocks: s.blocks.map((b) => (
-              b.id === blockId
-                ? { ...b, text: newText, blockRevision: b.blockRevision + 1 }
-                : b
-            ))
-          } : s)
-        };
-      });
-      setInsertScrollTargetId(blockId);
-      setInsertScrollToken(token => token + 1);
+      activeGenerationScopeRef.current = scopeKey;
+      setIsGenerating(true);
+      setError(null);
 
-      // Show toast with undo
-      setToast({
-        message: 'Block regenerated',
-        onUndo: () => {
+      const outcome = await orchestratorRef.current.run<string>({
+        opType: 'rewriteBlock',
+        scopeKey,
+        execute: (signal) => executeCancellableWithSignal(
+          signal,
+          () => createRegenerateScriptBlockRequest(block, context.genre, context.premise, rewriteGuidance)
+        ),
+        isFresh: () => isRewriteFresh({
+          context: contextRef.current,
+          sceneId,
+          blockId,
+          startedBlockRevision,
+          startedPromptContextRevision,
+          currentPromptContextRevision: promptContextRevisionRef.current
+        }),
+        commit: (newText) => {
+          clearRedo();
           setContext(prev => {
             if (!prev) return null;
             return {
@@ -1094,25 +1324,48 @@ export default function App() {
                 ...s,
                 blocks: s.blocks.map((b) => (
                   b.id === blockId
-                    ? { ...b, text: originalText, blockRevision: b.blockRevision + 1 }
+                    ? { ...b, text: newText, blockRevision: b.blockRevision + 1 }
                     : b
                 ))
               } : s)
             };
           });
-          setToast(null);
+          setInsertScrollTargetId(blockId);
+          setInsertScrollToken(token => token + 1);
+          setToast({
+            message: 'Block regenerated',
+            onUndo: () => {
+              setContext(prev => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  scenes: prev.scenes.map(s => s.id === sceneId ? {
+                    ...s,
+                    blocks: s.blocks.map((b) => (
+                      b.id === blockId
+                        ? { ...b, text: originalText, blockRevision: b.blockRevision + 1 }
+                        : b
+                    ))
+                  } : s)
+                };
+              });
+              setToast(null);
+            }
+          });
         }
       });
-
-    } catch (err: unknown) {
-      console.error(err);
-      handleAiError(err, "Failed to regenerate block.");
-    } finally {
-      if (request) {
-        finishAiRequest(request);
+      if (outcome.kind === 'failed') {
+        handleAiError(outcome.error, 'Failed to regenerate block.');
       }
+    } catch (err: unknown) {
+      handleAiError(err, 'Failed to regenerate block.');
+    } finally {
+      if (activeGenerationScopeRef.current === scopeKey) {
+        activeGenerationScopeRef.current = null;
+      }
+      setIsGenerating(false);
     }
-  }, [clearRedo, context, finishAiRequest, handleAiError, isGenerating, startAiRequest]);
+  }, [clearRedo, context, executeCancellableWithSignal, handleAiError, isGenerating]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
@@ -1161,6 +1414,7 @@ export default function App() {
   const applyTitle = useCallback((newTitle: string, source: 'auto' | 'user') => {
     setContext(prev => prev ? { ...prev, title: newTitle } : null);
     if (source === 'user') {
+      manualTitleRevisionRef.current += 1;
       hasManualTitleRef.current = true;
     }
   }, []);
@@ -1432,6 +1686,7 @@ export default function App() {
         insertCompleteToken={insertCompleteToken}
         onSelectInsertTarget={handleSelectInsertTarget}
         onChangeSpeaker={handleChangeSpeaker}
+        onInsertSurprise={handleInsertSurprise}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
         onRegenerate={handleRegenerateBlock}
         onToggleLock={handleToggleLock}
@@ -1450,6 +1705,7 @@ export default function App() {
         onCloseSetup={closeSetup}
         setupState={setupState}
         onSetupChange={updateSetupState}
+        onSetupSurprise={handleSetupSurprise}
         onStartSetup={handleStart}
         setupAutoSurprise={setupAutoSurprise}
         styleContext={scriptStyleContext}

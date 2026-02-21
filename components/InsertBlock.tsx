@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
 import { Button } from './Button';
-import { generateScriptElement } from '../services/ai';
 
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
@@ -93,6 +92,13 @@ export interface InsertBlockProps {
   genre: string;
   onAddBlock: (block: ScriptBlock) => void;
   onStartInsertMode: (block: ScriptBlock) => void;
+  onRequestSurprise?: (params: {
+    elementType: BlockType;
+    selectedChar: string;
+    instruction: string;
+    promptContext: string;
+    onCommit: (generatedText: string) => void;
+  }) => Promise<void>;
   insertModeActive: boolean;
   insertCompleteToken: number;
   onError?: (error: unknown) => void;
@@ -113,6 +119,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   genre, 
   onAddBlock,
   onStartInsertMode,
+  onRequestSurprise,
   insertModeActive,
   insertCompleteToken,
   onError,
@@ -192,21 +199,25 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   const handleSurpriseMe = async () => {
-    if (disabled || isGenerating) return;
+    if (disabled || isGenerating || !onRequestSurprise) return;
     setIsGenerating(true);
-    const instruction = buildSurpriseInstruction(elementType, content, selectedChar);
+    const requestType = elementType;
+    const requestCharacter = selectedChar;
+    const instruction = buildSurpriseInstruction(requestType, content, requestCharacter);
 
     try {
       const promptContext = styleContext?.trim() ? styleContext : genre;
-      const generatedText = await generateScriptElement(
-        elementType,
-        selectedChar,
+      await onRequestSurprise({
+        elementType: requestType,
+        selectedChar: requestCharacter,
         instruction,
-        promptContext
-      );
-      const sanitized = sanitizeGeneratedText(elementType, generatedText, selectedChar);
-      if (!sanitized) return;
-      setContent(sanitized);
+        promptContext,
+        onCommit: (generatedText) => {
+          const sanitized = sanitizeGeneratedText(requestType, generatedText, requestCharacter);
+          if (!sanitized) return;
+          setContent(sanitized);
+        }
+      });
     } catch (e) {
       console.error("Generation failed", e);
       onError?.(e);
@@ -252,7 +263,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         )}
         <Button
           onClick={handleSurpriseMe}
-          disabled={disabled || isGenerating}
+          disabled={disabled || isGenerating || !onRequestSurprise}
           size="sm"
           variant="secondary"
           loading={isGenerating}

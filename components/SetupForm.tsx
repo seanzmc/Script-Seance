@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { Users, Plus, Trash2, Shuffle, ChevronDown } from "lucide-react";
-import { generateSurpriseSetup } from "../services/ai";
 
 export type SetupFormState = {
   genre: string;
@@ -14,7 +13,8 @@ export type SetupFormState = {
 
 export interface SetupFormProps {
   value: SetupFormState;
-  onChange: (next: Partial<SetupFormState>) => void;
+  onChange: (next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => void;
+  onRequestSurprise?: (params: { mode: 'manual' | 'auto'; targetGenre: string }) => Promise<boolean>;
   onStart?: () => void;
   isLoading: boolean;
   onError?: (error: unknown, fallbackMessage: string) => boolean;
@@ -39,6 +39,7 @@ const STYLE_SUGGESTIONS = ["Dry humor", "Cinematic", "Fast-paced", "Lyrical", "U
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
   onChange,
+  onRequestSurprise,
   onStart,
   isLoading,
   onError,
@@ -66,9 +67,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
   }, [characters, focusIndex]);
 
-  const updateValue = useCallback((next: Partial<SetupFormState>) => {
+  const updateValue = useCallback((next: Partial<SetupFormState>, source: 'user' | 'system' = 'user') => {
     if (isLocked) return;
-    onChange(next);
+    onChange(next, { source });
   }, [isLocked, onChange]);
 
   const handleCharacterChange = (index: number, charValue: string) => {
@@ -100,7 +101,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     return true;
   }, [characters, premise]);
 
-  const handleSurpriseMe = useCallback(async () => {
+  const handleSurpriseMe = useCallback(async (mode: 'manual' | 'auto') => {
     if (isLocked) return;
     if (!checkSafety()) return;
 
@@ -108,12 +109,20 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     const targetGenre = genre;
 
     try {
-      const data = await generateSurpriseSetup(targetGenre);
-      updateValue({
-        genre: data.genre,
-        premise: data.premise,
-        characters: data.characters,
-      });
+      let committed = false;
+      if (onRequestSurprise) {
+        committed = await onRequestSurprise({ mode, targetGenre });
+      } else {
+        updateValue({
+          premise: `A gripping ${targetGenre} story with unexpected twists.`,
+          characters: ["Protagonist", "Antagonist", "The Catalyst"],
+        }, 'system');
+        committed = true;
+      }
+
+      if (!committed) {
+        return;
+      }
 
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
@@ -126,14 +135,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       updateValue({
         premise: `A gripping ${targetGenre} story with unexpected twists.`,
         characters: ["Protagonist", "Antagonist", "The Catalyst"],
-      });
+      }, 'system');
 
       setJustSurprised(true);
       setTimeout(() => setJustSurprised(false), 1500);
     } finally {
       setIsSurprising(false);
     }
-  }, [checkSafety, genre, isLocked, onError, updateValue]);
+  }, [checkSafety, genre, isLocked, onError, onRequestSurprise, updateValue]);
 
   const handlePillClick = (idea: string) => {
     if (isLocked) return;
@@ -156,7 +165,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
     if (autoSurpriseRef.current || isSurprising || isLocked) return;
     autoSurpriseRef.current = true;
-    void handleSurpriseMe();
+    void handleSurpriseMe('auto');
   }, [autoSurprise, handleSurpriseMe, isLocked, isSurprising]);
 
   const trimmedPremise = premise.trim();
@@ -241,7 +250,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               </div>
               <Button
                 variant="secondary"
-                onClick={handleSurpriseMe}
+                onClick={() => void handleSurpriseMe('manual')}
                 className="!bg-white/[0.03] hover:!bg-indigo-500/15 !border-white/20 hover:!border-indigo-400/60 !text-slate-200 transition-colors text-[11px] py-1.5 h-auto group"
                 type="button"
                 loading={isSurprising}
