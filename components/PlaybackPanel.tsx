@@ -47,11 +47,6 @@ export interface PlaybackMiniPlayerProps extends PlaybackPanelProps {
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onClose: () => void;
-  collapsedContentRef?: React.RefObject<HTMLDivElement | null>;
-  detailsWrapperRef?: React.RefObject<HTMLDivElement | null>;
-  detailsContentRef?: React.RefObject<HTMLDivElement | null>;
-  detailsViewportHeight?: number;
-  detailsShouldScroll?: boolean;
 }
 
 type PlaybackState = 'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error';
@@ -429,12 +424,7 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
   onToggleAutoScroll,
   isExpanded,
   onToggleExpanded,
-  onClose,
-  collapsedContentRef,
-  detailsWrapperRef,
-  detailsContentRef,
-  detailsViewportHeight,
-  detailsShouldScroll = false
+  onClose
 }) => {
   const {
     currentStatus,
@@ -476,7 +466,7 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-t-2xl border border-gray-800 border-b-0 bg-gray-950/95 px-3 py-2 shadow-[0_-18px_38px_rgba(0,0,0,0.45)] backdrop-blur">
-      <div ref={collapsedContentRef} className="shrink-0">
+      <div className="shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <button
@@ -550,17 +540,8 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
         </div>
       </div>
       {isExpanded && (
-        <div
-          ref={detailsWrapperRef}
-          className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-2"
-        >
-          <div
-            ref={detailsContentRef}
-            className={`min-h-0 flex-1 space-y-2 pr-0.5 ${
-              detailsShouldScroll ? 'overflow-y-auto overscroll-contain' : 'overflow-y-hidden'
-            }`}
-            style={detailsViewportHeight !== undefined ? { height: 'var(--playback-details-height)' } : undefined}
-          >
+        <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={onRefreshAudio}

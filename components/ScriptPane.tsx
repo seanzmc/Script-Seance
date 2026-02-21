@@ -80,10 +80,8 @@ const MOBILE_FOCUS_QUERY = '(max-width: 900px)';
 const MOBILE_TOOLS_DOCK_OFFSET_CLASS = 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))]';
 const MOBILE_TOOLS_DOCK_BOTTOM = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
-const MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX = 88;
-const MOBILE_PLAYBACK_MAX_VIEWPORT_RATIO = 0.6;
-const MOBILE_PLAYBACK_MIN_SCRIPT_MARGIN_PX = 96;
-const MOBILE_PLAYBACK_SCROLL_EPSILON_PX = 8;
+const MOBILE_PLAYBACK_SHEET_COLLAPSED_PX = 88;
+const MOBILE_PLAYBACK_SHEET_EXPANDED_PX = 296;
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
@@ -162,21 +160,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
-  const [playbackCollapsedHeight, setPlaybackCollapsedHeight] = useState(MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX);
-  const [playbackDetailsChromeHeight, setPlaybackDetailsChromeHeight] = useState(0);
-  const [playbackDetailsNaturalHeight, setPlaybackDetailsNaturalHeight] = useState(0);
-  const [playbackSheetHeight, setPlaybackSheetHeight] = useState(0);
-  const [playbackViewportHeight, setPlaybackViewportHeight] = useState(() => (
-    typeof window !== 'undefined' ? window.innerHeight : 0
-  ));
-  const [playbackTopInset, setPlaybackTopInset] = useState(() => (
-    typeof window !== 'undefined' && window.visualViewport ? window.visualViewport.offsetTop : 0
-  ));
   const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
-  const playbackSheetRef = useRef<HTMLDivElement>(null);
-  const playbackCollapsedContentRef = useRef<HTMLDivElement>(null);
-  const playbackDetailsWrapperRef = useRef<HTMLDivElement>(null);
-  const playbackDetailsRef = useRef<HTMLDivElement>(null);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
@@ -694,27 +678,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const measureViewport = () => {
-      setPlaybackViewportHeight(window.innerHeight);
-      setPlaybackTopInset(window.visualViewport?.offsetTop ?? 0);
-    };
-    measureViewport();
-    window.addEventListener('resize', measureViewport);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', measureViewport);
-      window.visualViewport.addEventListener('scroll', measureViewport);
-    }
-    return () => {
-      window.removeEventListener('resize', measureViewport);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', measureViewport);
-        window.visualViewport.removeEventListener('scroll', measureViewport);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     if (currentTool !== 'playback') {
       setIsPlaybackExpanded(false);
     }
@@ -727,215 +690,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     }
   }, [currentTool, isNarrowViewport, toolsSheet]);
 
-  useEffect(() => {
-    if (!isMobilePlaybackMiniVisible) {
-      setPlaybackSheetHeight(0);
-      return;
-    }
-    const node = playbackSheetRef.current;
-    if (!node) return;
-    const measure = () => {
-      const height = Math.ceil(node.getBoundingClientRect().height || node.offsetHeight);
-      setPlaybackSheetHeight(height);
-    };
-    const rafId = window.requestAnimationFrame(measure);
-    if (typeof ResizeObserver === 'function') {
-      const resizeObserver = new ResizeObserver(() => {
-        measure();
-      });
-      resizeObserver.observe(node);
-      return () => {
-        window.cancelAnimationFrame(rafId);
-        resizeObserver.disconnect();
-      };
-    }
-    window.addEventListener('resize', measure);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measure);
-    };
-  }, [isMobilePlaybackMiniVisible]);
-
-  useEffect(() => {
-    if (!isMobilePlaybackMiniVisible) return;
-    const collapsedNode = playbackCollapsedContentRef.current;
-    const sheetNode = playbackSheetRef.current;
-    if (!collapsedNode || !sheetNode) return;
-    const measureCollapsed = () => {
-      const contentHeight = Math.ceil(collapsedNode.getBoundingClientRect().height);
-      const style = window.getComputedStyle(sheetNode);
-      const parsePx = (value: string) => Number.parseFloat(value) || 0;
-      const shellChromeHeight = Math.ceil(
-        parsePx(style.paddingTop)
-        + parsePx(style.paddingBottom)
-        + parsePx(style.borderTopWidth)
-        + parsePx(style.borderBottomWidth)
-      );
-      setPlaybackCollapsedHeight(Math.max(
-        contentHeight + shellChromeHeight,
-        MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX
-      ));
-    };
-    const rafId = window.requestAnimationFrame(measureCollapsed);
-    if (typeof ResizeObserver === 'function') {
-      const resizeObserver = new ResizeObserver(() => {
-        measureCollapsed();
-      });
-      resizeObserver.observe(collapsedNode);
-      resizeObserver.observe(sheetNode);
-      return () => {
-        window.cancelAnimationFrame(rafId);
-        resizeObserver.disconnect();
-      };
-    }
-    window.addEventListener('resize', measureCollapsed);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measureCollapsed);
-    };
-  }, [isMobilePlaybackMiniVisible, playbackViewportHeight]);
-
-  useEffect(() => {
-    if (!isMobilePlaybackMiniVisible || !isPlaybackExpanded) {
-      setPlaybackDetailsChromeHeight(0);
-      return;
-    }
-    const wrapperNode = playbackDetailsWrapperRef.current;
-    if (!wrapperNode) return;
-    const measureChrome = () => {
-      const style = window.getComputedStyle(wrapperNode);
-      const parsePx = (value: string) => Number.parseFloat(value) || 0;
-      const chromeHeight = Math.ceil(
-        parsePx(style.marginTop)
-        + parsePx(style.marginBottom)
-        + parsePx(style.paddingTop)
-        + parsePx(style.paddingBottom)
-        + parsePx(style.borderTopWidth)
-        + parsePx(style.borderBottomWidth)
-      );
-      setPlaybackDetailsChromeHeight(chromeHeight);
-    };
-    const rafId = window.requestAnimationFrame(measureChrome);
-    if (typeof ResizeObserver === 'function') {
-      const resizeObserver = new ResizeObserver(() => {
-        measureChrome();
-      });
-      resizeObserver.observe(wrapperNode);
-      return () => {
-        window.cancelAnimationFrame(rafId);
-        resizeObserver.disconnect();
-      };
-    }
-    window.addEventListener('resize', measureChrome);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measureChrome);
-    };
-  }, [isMobilePlaybackMiniVisible, isPlaybackExpanded, playbackViewportHeight]);
-
-  useEffect(() => {
-    if (!isMobilePlaybackMiniVisible || !isPlaybackExpanded) {
-      setPlaybackDetailsNaturalHeight(0);
-      return;
-    }
-    const detailsNode = playbackDetailsRef.current;
-    if (!detailsNode) return;
-    const measureDetails = () => {
-      const previousInlineHeight = detailsNode.style.height;
-      detailsNode.style.height = 'auto';
-      const naturalHeight = Math.ceil(Math.max(
-        detailsNode.scrollHeight,
-        detailsNode.getBoundingClientRect().height
-      ));
-      detailsNode.style.height = previousInlineHeight;
-      setPlaybackDetailsNaturalHeight(naturalHeight);
-    };
-    const rafId = window.requestAnimationFrame(measureDetails);
-    if (typeof ResizeObserver === 'function') {
-      const resizeObserver = new ResizeObserver(() => {
-        measureDetails();
-      });
-      resizeObserver.observe(detailsNode);
-      return () => {
-        window.cancelAnimationFrame(rafId);
-        resizeObserver.disconnect();
-      };
-    }
-    window.addEventListener('resize', measureDetails);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measureDetails);
-    };
-  }, [isMobilePlaybackMiniVisible, isPlaybackExpanded, playbackViewportHeight]);
-
-  const effectiveViewportHeight = playbackViewportHeight || (typeof window !== 'undefined' ? window.innerHeight : 0);
-  const playbackMaxHeight = Math.max(
-    playbackCollapsedHeight,
-    Math.min(
-      effectiveViewportHeight * MOBILE_PLAYBACK_MAX_VIEWPORT_RATIO,
-      effectiveViewportHeight - playbackTopInset - MOBILE_PLAYBACK_MIN_SCRIPT_MARGIN_PX
-    )
-  );
-  const playbackAvailableDetailsHeight = Math.max(
-    0,
-    playbackMaxHeight - playbackCollapsedHeight - playbackDetailsChromeHeight
-  );
-  const playbackDetailsFitsWithoutScroll = playbackDetailsNaturalHeight <= (
-    playbackAvailableDetailsHeight + MOBILE_PLAYBACK_SCROLL_EPSILON_PX
-  );
-  const playbackDetailsViewportHeight = Math.max(
-    0,
-    playbackDetailsFitsWithoutScroll
-      ? playbackDetailsNaturalHeight
-      : playbackAvailableDetailsHeight
-  );
-  const playbackExpandedHeight = playbackCollapsedHeight + playbackDetailsChromeHeight + playbackDetailsViewportHeight;
-  const finalDetailsHeight = isPlaybackExpanded ? playbackDetailsViewportHeight : 0;
-  const finalDetailsShouldScroll = isPlaybackExpanded && !playbackDetailsFitsWithoutScroll;
-  const finalSheetHeight = isPlaybackExpanded
-    ? playbackExpandedHeight
-    : playbackCollapsedHeight;
   const playbackTargetHeight = isMobilePlaybackMiniVisible
-    ? finalSheetHeight
+    ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_PX : MOBILE_PLAYBACK_SHEET_COLLAPSED_PX)
     : 0;
-  const mobilePlaybackPaddingPx = isMobilePlaybackMiniVisible
-    ? playbackSheetHeight || playbackTargetHeight || MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX
-    : 0;
+  const mobilePlaybackPaddingPx = playbackTargetHeight;
   const mobileBottomPadding = mobileSheetEnabled
     ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobilePlaybackPaddingPx}px)`
     : undefined;
-  const handleTogglePlaybackExpanded = () => {
-    setIsPlaybackExpanded((prev) => {
-      const next = !prev;
-      if (!next) {
-        setPlaybackDetailsNaturalHeight(0);
-        setPlaybackDetailsChromeHeight(0);
-        setPlaybackSheetHeight(Math.max(playbackCollapsedHeight, MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX));
-      }
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    const isDev = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : true;
-    if (!isDev || !isMobilePlaybackMiniVisible) return;
-    console.debug('[playback-sheet]', {
-      expanded: isPlaybackExpanded,
-      collapsedHeight: playbackCollapsedHeight,
-      naturalDetailsHeight: playbackDetailsNaturalHeight,
-      availableDetailsHeight: playbackAvailableDetailsHeight,
-      finalDetailsHeight: finalDetailsHeight,
-      finalSheetHeight: playbackTargetHeight
-    });
-  }, [
-    isMobilePlaybackMiniVisible,
-    isPlaybackExpanded,
-    playbackCollapsedHeight,
-    playbackDetailsNaturalHeight,
-    playbackAvailableDetailsHeight,
-    finalDetailsHeight,
-    playbackTargetHeight
-  ]);
+  const handleTogglePlaybackExpanded = () => setIsPlaybackExpanded(prev => !prev);
 
   return (
     <section
@@ -1132,12 +894,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       )}
       {isMobilePlaybackMiniVisible && playbackProps && (
         <div
-          ref={playbackSheetRef}
           className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5 transition-[height] duration-200 ease-out`}
           style={{
-            ['--playback-sheet-height' as const]: `${Math.max(playbackTargetHeight, MOBILE_PLAYBACK_SHEET_FALLBACK_COLLAPSED_PX)}px`,
-            ['--playback-details-height' as const]: `${Math.max(finalDetailsHeight, 0)}px`,
-            height: 'var(--playback-sheet-height)'
+            height: `${Math.max(playbackTargetHeight, MOBILE_PLAYBACK_SHEET_COLLAPSED_PX)}px`
           }}
           data-testid="playback-mini-player"
         >
@@ -1146,11 +905,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             isExpanded={isPlaybackExpanded}
             onToggleExpanded={handleTogglePlaybackExpanded}
             onClose={handlePlaybackMiniClose}
-            collapsedContentRef={playbackCollapsedContentRef}
-            detailsWrapperRef={playbackDetailsWrapperRef}
-            detailsContentRef={playbackDetailsRef}
-            detailsViewportHeight={finalDetailsHeight}
-            detailsShouldScroll={finalDetailsShouldScroll}
           />
         </div>
       )}
