@@ -240,13 +240,16 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(screen.queryByText('View Tools')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    expect(screen.getByTestId('mobile-tools-menu-sheet')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Generate' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
     await waitFor(() => {
+      expect(screen.getByTestId('mobile-tool-sheet-generate')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
     });
+    expect(screen.getByRole('button', { name: /generate next/i })).toBeTruthy();
   });
 
   it('390x844: insert pick mode collapses tools and restores tool panel after completion token', async () => {
@@ -256,6 +259,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
 
     await waitFor(() => {
+      expect(screen.getByTestId('mobile-tool-sheet-insert')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
     });
 
@@ -266,6 +270,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
 
     rerender(<ScriptPane {...createProps({ insertModeActive: false, insertCompleteToken: 1 })} />);
     await waitFor(() => {
+      expect(screen.getByTestId('mobile-tool-sheet-insert')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
     });
   });
@@ -285,6 +290,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     fireEvent.click(blockButton);
 
     await waitFor(() => {
+      expect(screen.getByTestId('mobile-tool-sheet-rewrite')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
     });
   });
@@ -299,6 +305,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
     });
+    expect(screen.queryByTestId('mobile-tool-sheet-playback')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand playback details' }));
@@ -338,6 +345,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(screen.getByText('Export options')).toBeTruthy();
     expect(screen.getByRole('button', { name: /export script \(\.txt\)/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /export pdf/i })).toBeTruthy();
+    expect(screen.queryByTestId('mobile-tool-sheet-export')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Close export panel' }));

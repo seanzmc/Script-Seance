@@ -87,6 +87,10 @@ const MOBILE_EXPORT_SHEET_ESTIMATED_PX = 152;
 const MOBILE_EXPORT_SHEET_ESTIMATED_HEIGHT = `${MOBILE_EXPORT_SHEET_ESTIMATED_PX}px`;
 const MOBILE_EXPORT_SHEET_MAX_HEIGHT = 'min(208px, 40vh)';
 const MOBILE_EXPORT_SHEET_BODY_MAX_HEIGHT = 'calc(min(208px, 40vh) - 48px)';
+const MOBILE_GENERATE_SHEET_MAX_HEIGHT = '60vh';
+const MOBILE_GENERATE_SHEET_BODY_MAX_HEIGHT = 'calc(60vh - 48px)';
+const MOBILE_TOOL_SHEET_MAX_HEIGHT = '70vh';
+const MOBILE_TOOL_SHEET_BODY_MAX_HEIGHT = 'calc(70vh - 48px)';
 const MOBILE_MENU_SHEET_MAX_HEIGHT = '50vh';
 const MOBILE_MENU_SHEET_BODY_MAX_HEIGHT = 'calc(50vh - 48px)';
 const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
@@ -302,7 +306,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     </div>
   );
   const generateContent = context ? (
-    <div className="h-full min-h-0 flex flex-col gap-2">
+    <div className="space-y-2">
       <div className={toolSectionClass}>
         <div className="flex items-center justify-between gap-2">
           <h3 className={toolLabelClass}>Prompt</h3>
@@ -450,7 +454,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
   const mobileSheetEnabled = isNarrowViewport && Boolean(context);
   const isMenuSheetOpen = mobileSheetEnabled && toolsSheet === 'menu';
-  const isToolSheetOpen = mobileSheetEnabled
+  const isMobileStandardToolSheetVisible = mobileSheetEnabled
     && toolsSheet === 'tool'
     && Boolean(currentTool)
     && currentTool !== 'playback'
@@ -466,7 +470,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const activeToolLabel = currentTool ? TOOL_LABELS[currentTool] : null;
   const mobileDockLabel = isMenuSheetOpen
     ? 'Choose a tool'
-    : isToolSheetOpen
+    : isMobileStandardToolSheetVisible
       ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
       : isMobileExportSheetVisible
         ? 'Export open'
@@ -654,18 +658,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [currentTool, isNarrowViewport, rewriteMode, rewriteOptions, rewriteTarget]);
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
-    <div className="h-full min-h-0 flex flex-col gap-2">
-      <div className={`${toolSectionClass} flex-1 min-h-0 flex flex-col`}>
-        <p className="text-[10px] text-gray-500 shrink-0">
+    <div className="space-y-2">
+      <div className={toolSectionClass}>
+        <p className="text-[10px] text-gray-500">
           {isNarrowViewport
             ? 'Selected block appears below. Use Change selection to pick another block.'
             : 'Click a block in the script to target rewrite.'}
         </p>
-        <div className="px-0.5 py-0.5 space-y-1 shrink-0">
+        <div className="px-0.5 py-0.5 space-y-1">
           <p className={toolLabelClass}>Selected Block</p>
           <p className="text-[11px] text-gray-400 break-words">{selectedRewrite?.label}</p>
           {selectedRewrite && (
-            <div className="max-h-[34vh] overflow-y-auto overscroll-contain rounded-lg border border-gray-800 bg-gray-950/65 px-2.5 py-2">
+            <div className="max-h-[28vh] overflow-y-auto overscroll-contain rounded-lg border border-gray-800 bg-gray-950/65 px-2.5 py-2">
               <p className="text-xs text-gray-200 whitespace-pre-wrap break-words">
                 {selectedRewrite.displayText}
               </p>
@@ -678,7 +682,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <p className="text-[10px] text-amber-300">This block is locked and cannot be regenerated.</p>
           )}
         </div>
-        <div className="space-y-1 flex-1 min-h-0">
+        <div className="space-y-1">
           <label className={toolLabelClass}>
             Guidance (optional)
           </label>
@@ -690,7 +694,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             className={`${toolInputClass} h-[104px] resize-none`}
           />
         </div>
-        <div className="flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <p className="text-[10px] text-gray-500">{rewriteGuidance.length}/220 chars</p>
             {isNarrowViewport && (
@@ -764,6 +768,24 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const playbackTargetHeight = isMobilePlaybackMiniVisible
     ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_MAX : `${MOBILE_PLAYBACK_SHEET_COLLAPSED_PX}px`)
     : '0px';
+  const mobileStandardToolSheetMaxHeight = currentTool === 'generate'
+    ? MOBILE_GENERATE_SHEET_MAX_HEIGHT
+    : MOBILE_TOOL_SHEET_MAX_HEIGHT;
+  const mobileStandardToolSheetBodyMaxHeight = currentTool === 'generate'
+    ? MOBILE_GENERATE_SHEET_BODY_MAX_HEIGHT
+    : MOBILE_TOOL_SHEET_BODY_MAX_HEIGHT;
+  const mobileStandardToolSheetTestId = isMobileStandardToolSheetVisible && currentTool
+    ? `mobile-tool-sheet-${currentTool}`
+    : undefined;
+  const mobileStandardToolSheetContent = currentTool === 'generate'
+    ? generateContent
+    : currentTool === 'insert'
+      ? insertContent
+      : currentTool === 'rewrite'
+        ? rewriteContent
+        : currentTool === 'voices'
+          ? (voicesContent ?? <p className="text-[11px] text-gray-500">Voices panel unavailable.</p>)
+          : null;
   const mobileOverlayHeight = isMobilePlaybackMiniVisible
     ? playbackTargetHeight
     : isMobileExportSheetVisible
@@ -860,7 +882,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       )}
 
-      <div className={`${context && isToolSheetOpen ? 'hidden' : 'flex-1 min-h-0 min-w-0 overflow-hidden'}`}>
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {context ? (
           <div className={contentWrapperClassName}>
             {isMobileRewriteSelectMode && (
@@ -910,6 +932,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           bodyMaxHeight={MOBILE_MENU_SHEET_BODY_MAX_HEIGHT}
           bodyClassName="p-3"
           onBackdropClick={() => setToolsSheet('collapsed')}
+          sheetTestId="mobile-tools-menu-sheet"
         >
           <div className="grid grid-cols-1 gap-2">
             {TOOL_ORDER.map((tool) => {
@@ -932,31 +955,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </div>
         </MobileBottomSheet>
       )}
-      {isToolSheetOpen && currentTool && (
-        <div
-          className="fixed inset-x-0 top-0 z-[76]"
-          style={{ bottom: MOBILE_TOOLS_DOCK_BOTTOM }}
+      {isMobileStandardToolSheetVisible && currentTool && (
+        <MobileBottomSheet
+          title={TOOL_LABELS[currentTool]}
+          maxHeight={mobileStandardToolSheetMaxHeight}
+          bodyMaxHeight={mobileStandardToolSheetBodyMaxHeight}
+          bodyClassName="px-4 py-3"
+          onBackdropClick={handleMobileToolPanelClose}
+          onClose={handleMobileToolPanelClose}
+          closeLabel="Close tool panel"
+          sheetTestId={mobileStandardToolSheetTestId}
         >
-          <div className="h-full w-full">
-            <BottomToolbelt
-              activeTool={currentTool}
-              onSelectTool={handleDesktopToolSelect}
-              onCloseTool={handleMobileToolPanelClose}
-              showSelector={false}
-              edgeToEdge
-              mobileExpanded
-              className="h-full px-0 pb-0"
-              onExportTxt={onExportTxt}
-              onExportPdf={onExportPdf}
-              exportDisabled={!canExport}
-              generateContent={generateContent}
-              rewriteContent={rewriteContent}
-              playbackContent={playbackContent}
-              voicesContent={voicesContent}
-              insertContent={insertContent}
-            />
-          </div>
-        </div>
+          {mobileStandardToolSheetContent}
+        </MobileBottomSheet>
       )}
       {isMobilePlaybackMiniVisible && playbackProps && (
         <div

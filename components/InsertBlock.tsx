@@ -215,7 +215,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   };
 
   return (
-    <div className="min-h-full flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <div
         className={`grid gap-2 ${
           elementType === BlockType.DIALOGUE
