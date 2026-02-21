@@ -10,6 +10,11 @@ import {
 } from './promptBuilders.js';
 import { getTextModels } from './llmClient.js';
 import { isTextGenerationKind } from './types.js';
+import {
+  runWithAbortableTimeout,
+  runWithRetry,
+  isRetryableUpstreamError
+} from '../upstreamControl.js';
 
 const OPENAI_PROMPT_CACHE_PREFIX = 'script-seance:text-gen';
 const DEFAULT_OPENAI_PROMPT_CACHE_RETENTION = process.env.OPENAI_PROMPT_CACHE_RETENTION || '24h';
@@ -17,6 +22,10 @@ const MAX_RAW_RESPONSE_LOG_CHARS = 2000;
 const parsePositiveInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+const parseNonNegativeInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 const OPENAI_SCENE_MAX_OUTPUT_TOKENS = parsePositiveInt(process.env.OPENAI_SCENE_MAX_OUTPUT_TOKENS, 2200);
 const OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT = parsePositiveInt(
@@ -45,6 +54,11 @@ const OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS = parsePositiveInt(
   process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS,
   3
 );
+const DEFAULT_UPSTREAM_TIMEOUT_MS = parsePositiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 30000);
+const DEFAULT_UPSTREAM_RETRY_MAX_RETRIES = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_RETRIES, 2);
+const DEFAULT_UPSTREAM_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_BASE_DELAY_MS, 250);
+const DEFAULT_UPSTREAM_RETRY_MAX_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_DELAY_MS, 4000);
+const DEFAULT_UPSTREAM_RETRY_JITTER_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_JITTER_MS, 150);
 
 const buildSceneJsonSchema = (lengthProfile) => ({
   type: 'object',
@@ -280,6 +294,39 @@ const normalizeSceneThoughtCompletion = (data) => {
   };
 };
 
+const resolveRetryPolicy = (upstreamContext = {}) => {
+  const overrides = upstreamContext.retryPolicy ?? {};
+  return {
+    maxRetries: overrides.maxRetries ?? DEFAULT_UPSTREAM_RETRY_MAX_RETRIES,
+    baseDelayMs: overrides.baseDelayMs ?? DEFAULT_UPSTREAM_RETRY_BASE_DELAY_MS,
+    maxDelayMs: overrides.maxDelayMs ?? DEFAULT_UPSTREAM_RETRY_MAX_DELAY_MS,
+    jitterMs: overrides.jitterMs ?? DEFAULT_UPSTREAM_RETRY_JITTER_MS,
+    isRetryableError: overrides.isRetryableError ?? isRetryableUpstreamError,
+    signal: upstreamContext.signal ?? overrides.signal
+  };
+};
+
+const runWithUpstreamPolicy = async ({
+  operationName,
+  timeoutMs,
+  upstreamContext,
+  execute
+}) => {
+  const resolvedTimeoutMs = timeoutMs ?? upstreamContext?.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
+  const retryPolicy = resolveRetryPolicy(upstreamContext);
+  return await runWithRetry(
+    async ({ signal }) => runWithAbortableTimeout(
+      (timeoutSignal) => execute(timeoutSignal),
+      {
+        timeoutMs: resolvedTimeoutMs,
+        signal,
+        operationName
+      }
+    ),
+    retryPolicy
+  );
+};
+
 const requestOpenAiText = async ({
   openai,
   kind,
@@ -293,14 +340,15 @@ const requestOpenAiText = async ({
   cacheRetention,
   jsonSchemaFormat,
   retryOnMaxOutputTokens = false,
-  withTimeout,
+  upstreamContext,
   timeoutMs
 }) => {
+  const resolvedTimeoutMs = timeoutMs ?? upstreamContext?.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
   console.info('[text-gen] request', {
     kind,
     provider: 'openai',
     model,
-    timeoutMs
+    timeoutMs: resolvedTimeoutMs
   });
   const reasoningEffort = getReasoningEffortForModel(model);
   const shouldApplySampling = shouldApplySamplingControls(model, reasoningEffort);
@@ -348,7 +396,12 @@ const requestOpenAiText = async ({
 
     let response;
     try {
-      response = await withTimeout(openai.responses.create(requestPayload), timeoutMs);
+      response = await runWithUpstreamPolicy({
+        operationName: 'openai.responses.create',
+        timeoutMs: resolvedTimeoutMs,
+        upstreamContext,
+        execute: (timeoutSignal) => openai.responses.create(requestPayload, { signal: timeoutSignal })
+      });
     } catch (error) {
       if (error && typeof error === 'object' && error.code === 'UPSTREAM_TIMEOUT') {
         error.details = {
@@ -356,7 +409,7 @@ const requestOpenAiText = async ({
           kind,
           provider: 'openai',
           model,
-          timeoutMs,
+          timeoutMs: resolvedTimeoutMs,
           attempt: attempt + 1,
           maxOutputTokens: outputTokenLimit
         };
@@ -450,23 +503,30 @@ const requestGeminiText = async ({
   model,
   contents,
   config,
-  withTimeout,
+  upstreamContext,
   timeoutMs
 }) => {
+  const resolvedTimeoutMs = timeoutMs ?? upstreamContext?.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
   console.info('[text-gen] request', {
     kind,
     provider: 'gemini',
     model,
-    timeoutMs
+    timeoutMs: resolvedTimeoutMs
   });
   const startedAt = Date.now();
   let response;
   try {
-    response = await withTimeout(geminiAi.models.generateContent({
-      model,
-      contents,
-      ...(config ? { config } : {})
-    }), timeoutMs);
+    response = await runWithUpstreamPolicy({
+      operationName: 'gemini.models.generateContent',
+      timeoutMs: resolvedTimeoutMs,
+      upstreamContext,
+      execute: (timeoutSignal) => geminiAi.models.generateContent({
+        model,
+        contents,
+        ...(config ? { config } : {}),
+        abortSignal: timeoutSignal
+      })
+    });
   } catch (error) {
     if (error && typeof error === 'object' && error.code === 'UPSTREAM_TIMEOUT') {
       error.details = {
@@ -474,7 +534,7 @@ const requestGeminiText = async ({
         kind,
         provider: 'gemini',
         model,
-        timeoutMs
+        timeoutMs: resolvedTimeoutMs
       };
       console.warn('[text-gen] timeout', error.details);
     }
@@ -546,8 +606,8 @@ export const generateTextByKind = async ({
   provider,
   openai,
   geminiAi,
-  withTimeout,
-  timeoutMs
+  upstreamContext,
+  timeoutMs = undefined
 }) => {
   if (!isTextGenerationKind(kind)) {
     throw new Error(`Unsupported text generation kind: ${kind}`);
@@ -593,7 +653,7 @@ export const generateTextByKind = async ({
             schema: buildSceneJsonSchema(lengthProfile)
           },
           retryOnMaxOutputTokens: true,
-          withTimeout,
+          upstreamContext,
           timeoutMs
         })
       : await requestGeminiText({
@@ -625,7 +685,7 @@ export const generateTextByKind = async ({
               required: ['heading', 'summary', 'blocks']
             }
           },
-          withTimeout,
+          upstreamContext,
           timeoutMs
         });
 
@@ -666,7 +726,7 @@ export const generateTextByKind = async ({
           topP: 0.98,
           cacheKey: buildPromptCacheKey(kind, undefined, models.openai),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-          withTimeout,
+          upstreamContext,
           timeoutMs
         })
       : await requestGeminiText({
@@ -674,7 +734,7 @@ export const generateTextByKind = async ({
           kind,
           model: models.gemini,
           contents: prompt,
-          withTimeout,
+          upstreamContext,
           timeoutMs
         });
 
@@ -697,7 +757,7 @@ export const generateTextByKind = async ({
           topP: 0.92,
           cacheKey: buildPromptCacheKey(kind, type, models.openai),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-          withTimeout,
+          upstreamContext,
           timeoutMs
         })
       : await requestGeminiText({
@@ -710,7 +770,7 @@ export const generateTextByKind = async ({
             maxOutputTokens: 100,
             temperature: 0.7
           },
-          withTimeout,
+          upstreamContext,
           timeoutMs
         });
 
@@ -739,7 +799,7 @@ export const generateTextByKind = async ({
           topP: 0.95,
           cacheKey: buildPromptCacheKey(kind, block.type, models.openai),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-          withTimeout,
+          upstreamContext,
           timeoutMs
         })
       : await requestGeminiText({
@@ -751,7 +811,7 @@ export const generateTextByKind = async ({
             maxOutputTokens: 150,
             temperature: 0.8
           },
-          withTimeout,
+          upstreamContext,
           timeoutMs
         });
 
@@ -779,7 +839,7 @@ export const generateTextByKind = async ({
           description: 'Structured surprise setup response.',
           schema: SURPRISE_SETUP_JSON_SCHEMA
         },
-        withTimeout,
+        upstreamContext,
         timeoutMs
       })
     : await requestGeminiText({
@@ -799,7 +859,7 @@ export const generateTextByKind = async ({
             required: ['genre', 'premise', 'characters']
           }
         },
-        withTimeout,
+        upstreamContext,
         timeoutMs
       });
 

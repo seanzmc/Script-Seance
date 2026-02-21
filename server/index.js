@@ -21,6 +21,13 @@ import {
   dedupeVoices,
   isInworldVoiceFetchErrorRecoverable
 } from './ttsProviders.js';
+import {
+  createRequestAbortedError,
+  runWithAbortableTimeout,
+  runWithRetry,
+  isAbortError,
+  isRetryableUpstreamError
+} from './upstreamControl.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -43,6 +50,10 @@ const AI_UPSTREAM_TIMEOUT_MS_SCENE = parsePositiveInt(
   process.env.AI_UPSTREAM_TIMEOUT_MS_SCENE,
   Math.max(AI_UPSTREAM_TIMEOUT_MS, 90000)
 );
+const AI_UPSTREAM_RETRY_MAX_RETRIES = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_RETRIES, 2);
+const AI_UPSTREAM_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_BASE_DELAY_MS, 250);
+const AI_UPSTREAM_RETRY_MAX_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_DELAY_MS, 4000);
+const AI_UPSTREAM_RETRY_JITTER_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_JITTER_MS, 150);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const RATE_LIMIT_MINUTE_MS = 60 * 1000;
 const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
@@ -111,6 +122,11 @@ if (IS_PROD) {
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseNonNegativeInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -225,6 +241,81 @@ const createUpstreamError = (message, status, code, details) => {
   return error;
 };
 
+const createRetryPolicy = (signal, overrides = undefined) => ({
+  maxRetries: overrides?.maxRetries ?? AI_UPSTREAM_RETRY_MAX_RETRIES,
+  baseDelayMs: overrides?.baseDelayMs ?? AI_UPSTREAM_RETRY_BASE_DELAY_MS,
+  maxDelayMs: overrides?.maxDelayMs ?? AI_UPSTREAM_RETRY_MAX_DELAY_MS,
+  jitterMs: overrides?.jitterMs ?? AI_UPSTREAM_RETRY_JITTER_MS,
+  isRetryableError: overrides?.isRetryableError ?? isRetryableUpstreamError,
+  signal: signal ?? overrides?.signal
+});
+
+const removeListener = (target, eventName, listener) => {
+  if (!target || typeof listener !== 'function') return;
+  if (typeof target.off === 'function') {
+    target.off(eventName, listener);
+  } else if (typeof target.removeListener === 'function') {
+    target.removeListener(eventName, listener);
+  }
+};
+
+const attachRequestAbortSignal = (req) => {
+  const controller = new AbortController();
+  const abortWith = (reason) => {
+    if (!controller.signal.aborted) {
+      controller.abort(reason);
+    }
+  };
+  const onAborted = () => abortWith(createRequestAbortedError('Client canceled request.'));
+  const onClose = () => abortWith(createRequestAbortedError('Client connection closed.'));
+
+  if (req && typeof req.on === 'function') {
+    req.on('aborted', onAborted);
+    req.on('close', onClose);
+  }
+  if (req?.socket && typeof req.socket.on === 'function') {
+    req.socket.on('close', onClose);
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      removeListener(req, 'aborted', onAborted);
+      removeListener(req, 'close', onClose);
+      removeListener(req?.socket, 'close', onClose);
+    }
+  };
+};
+
+const waitForPromiseOrAbort = async (promise, signal) => {
+  if (!signal) {
+    return promise;
+  }
+  if (signal.aborted) {
+    throw signal.reason ?? createRequestAbortedError();
+  }
+  return await new Promise((resolve, reject) => {
+    const onAbort = () => {
+      cleanup();
+      reject(signal.reason ?? createRequestAbortedError());
+    };
+    const cleanup = () => {
+      signal.removeEventListener('abort', onAbort);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      }
+    );
+  });
+};
+
 const parseJsonSafe = (text) => {
   if (!text || typeof text !== 'string') return null;
   try {
@@ -308,27 +399,44 @@ const parseInworldExpirationTime = (value) => {
   return null;
 };
 
-const fetchInworldJwtToken = async () => {
-  const response = await withTimeout(fetch(`${INWORLD_API_BASE}/auth/v1/tokens/token:generate`, {
-    method: 'POST',
-    headers: createInworldJwtRequestHeaders(),
-    body: JSON.stringify({
-      key: INWORLD_API_KEY,
-      resources: [getInworldWorkspaceResource()]
-    })
-  }), AI_UPSTREAM_TIMEOUT_MS);
+const fetchInworldJwtToken = async (executionContext = {}) => {
+  const timeoutMs = executionContext.timeoutMs ?? AI_UPSTREAM_TIMEOUT_MS;
+  const retryPolicy = createRetryPolicy(executionContext.signal, executionContext.retryPolicy);
+  const bodyText = await runWithRetry(
+    async ({ signal }) => runWithAbortableTimeout(
+      async (timeoutSignal) => {
+        const response = await fetch(`${INWORLD_API_BASE}/auth/v1/tokens/token:generate`, {
+          method: 'POST',
+          headers: createInworldJwtRequestHeaders(),
+          body: JSON.stringify({
+            key: INWORLD_API_KEY,
+            resources: [getInworldWorkspaceResource()]
+          }),
+          signal: timeoutSignal
+        });
+        const text = await response.text();
+        const payload = parseJsonSafe(text);
+        if (!response.ok) {
+          const message = payload?.error?.message || payload?.message || `Inworld token generation failed (${response.status})`;
+          throw createUpstreamError(
+            message,
+            response.status,
+            mapUpstreamStatusToErrorCode(response.status),
+            payload?.error?.details || payload?.details
+          );
+        }
+        return text;
+      },
+      {
+        timeoutMs,
+        signal,
+        operationName: 'inworld.jwt.generate'
+      }
+    ),
+    retryPolicy
+  );
 
-  const text = await response.text();
-  const payload = parseJsonSafe(text);
-  if (!response.ok) {
-    const message = payload?.error?.message || payload?.message || `Inworld token generation failed (${response.status})`;
-    throw createUpstreamError(
-      message,
-      response.status,
-      mapUpstreamStatusToErrorCode(response.status),
-      payload?.error?.details || payload?.details
-    );
-  }
+  const payload = parseJsonSafe(bodyText);
 
   const token = typeof payload?.token === 'string' ? payload.token.trim() : '';
   if (!token) {
@@ -341,7 +449,7 @@ const fetchInworldJwtToken = async () => {
   return { token, expiresAt };
 };
 
-const getInworldJwtToken = async () => {
+const getInworldJwtToken = async (executionContext = {}) => {
   const now = Date.now();
   if (
     inworldJwtCache.token &&
@@ -351,11 +459,11 @@ const getInworldJwtToken = async () => {
   }
 
   if (inworldJwtCache.pending) {
-    return inworldJwtCache.pending;
+    return waitForPromiseOrAbort(inworldJwtCache.pending, executionContext.signal);
   }
 
   inworldJwtCache.pending = (async () => {
-    const nextToken = await fetchInworldJwtToken();
+    const nextToken = await fetchInworldJwtToken(executionContext);
     inworldJwtCache.token = nextToken.token;
     inworldJwtCache.expiresAt = nextToken.expiresAt;
     return nextToken.token;
@@ -363,11 +471,11 @@ const getInworldJwtToken = async () => {
     inworldJwtCache.pending = null;
   });
 
-  return inworldJwtCache.pending;
+  return waitForPromiseOrAbort(inworldJwtCache.pending, executionContext.signal);
 };
 
-const createInworldHeaders = async () => ({
-  Authorization: `Bearer ${await getInworldJwtToken()}`,
+const createInworldHeaders = async (executionContext = {}) => ({
+  Authorization: `Bearer ${await getInworldJwtToken(executionContext)}`,
   'Content-Type': 'application/json',
   Accept: 'application/json, text/event-stream'
 });
@@ -379,24 +487,39 @@ const normalizeVoicePayloads = (voices, source, isCustom) =>
       .filter(Boolean)
   );
 
-const fetchInworldVoiceList = async (endpoint, source, isCustom) => {
-  const headers = await createInworldHeaders();
-  const response = await withTimeout(fetch(`${INWORLD_API_BASE}${endpoint}`, {
-    method: 'GET',
-    headers
-  }), AI_UPSTREAM_TIMEOUT_MS);
-  if (!response.ok) {
-    const body = await response.text();
-    const payload = parseJsonSafe(body);
-    const message = payload?.error?.message || payload?.message || `Inworld voice list failed (${response.status})`;
-    throw createUpstreamError(
-      message,
-      response.status,
-      mapUpstreamStatusToErrorCode(response.status),
-      payload?.error?.details || payload?.details
-    );
-  }
-  const bodyText = await response.text();
+const fetchInworldVoiceList = async (endpoint, source, isCustom, executionContext = {}) => {
+  const headers = await createInworldHeaders(executionContext);
+  const timeoutMs = executionContext.timeoutMs ?? AI_UPSTREAM_TIMEOUT_MS;
+  const retryPolicy = createRetryPolicy(executionContext.signal, executionContext.retryPolicy);
+  const bodyText = await runWithRetry(
+    async ({ signal }) => runWithAbortableTimeout(
+      async (timeoutSignal) => {
+        const response = await fetch(`${INWORLD_API_BASE}${endpoint}`, {
+          method: 'GET',
+          headers,
+          signal: timeoutSignal
+        });
+        const text = await response.text();
+        if (!response.ok) {
+          const payload = parseJsonSafe(text);
+          const message = payload?.error?.message || payload?.message || `Inworld voice list failed (${response.status})`;
+          throw createUpstreamError(
+            message,
+            response.status,
+            mapUpstreamStatusToErrorCode(response.status),
+            payload?.error?.details || payload?.details
+          );
+        }
+        return text;
+      },
+      {
+        timeoutMs,
+        signal,
+        operationName: `inworld.voices:${endpoint}`
+      }
+    ),
+    retryPolicy
+  );
   if (!bodyText || bodyText.trim().length === 0) {
     return [];
   }
@@ -407,7 +530,7 @@ const fetchInworldVoiceList = async (endpoint, source, isCustom) => {
   return normalizeVoicePayloads(parseInworldVoiceList(payload), source, isCustom);
 };
 
-const listInworldVoices = async () => {
+const listInworldVoices = async (executionContext = {}) => {
   const now = Date.now();
   if (voiceCatalogCache.expiresAt > now && voiceCatalogCache.voices.length > 0) {
     return voiceCatalogCache.voices;
@@ -426,9 +549,12 @@ const listInworldVoices = async () => {
   let premadeVoices = [];
   for (const endpoint of premadeEndpoints) {
     try {
-      premadeVoices = await fetchInworldVoiceList(endpoint, 'inworld-premade', false);
+      premadeVoices = await fetchInworldVoiceList(endpoint, 'inworld-premade', false, executionContext);
       if (premadeVoices.length > 0) break;
     } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
       if (!isInworldVoiceFetchErrorRecoverable(error?.status)) {
         throw error;
       }
@@ -438,11 +564,14 @@ const listInworldVoices = async () => {
   let customVoices = [];
   for (const endpoint of customEndpoints) {
     try {
-      customVoices = await fetchInworldVoiceList(endpoint, 'inworld-custom', true);
+      customVoices = await fetchInworldVoiceList(endpoint, 'inworld-custom', true, executionContext);
       if (customVoices.length > 0) {
         break;
       }
     } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
       const status = error?.status;
       const silentlyRecoverable = [400, 401, 403, 404, 405, 422].includes(status);
       if (!silentlyRecoverable && !isInworldVoiceFetchErrorRecoverable(status)) {
@@ -465,7 +594,7 @@ const listInworldVoices = async () => {
   return merged;
 };
 
-const generateSpeechWithInworld = async (text, voiceName, expressive = false) => {
+const generateSpeechWithInworld = async (text, voiceName, expressive = false, executionContext = {}) => {
   const preparedText = applyExpressiveText(text, expressive);
   const resolvedVoiceId = typeof voiceName === 'string' ? voiceName.trim() : '';
   if (!resolvedVoiceId) {
@@ -481,25 +610,40 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
     }
   };
 
-  const headers = await createInworldHeaders();
+  const headers = await createInworldHeaders(executionContext);
   const requestInworld = async (endpoint, parseAsStream = false) => {
-    const response = await withTimeout(fetch(`${INWORLD_API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    }), AI_UPSTREAM_TIMEOUT_MS);
-
-    const bodyText = await response.text();
-    if (!response.ok) {
-      const parsedError = parseJsonSafe(bodyText);
-      const message = parsedError?.error?.message || parsedError?.message || `Inworld TTS request failed (${response.status})`;
-      throw createUpstreamError(
-        message,
-        response.status,
-        mapUpstreamStatusToErrorCode(response.status),
-        parsedError?.error?.details || parsedError?.details
-      );
-    }
+    const timeoutMs = executionContext.timeoutMs ?? AI_UPSTREAM_TIMEOUT_MS;
+    const retryPolicy = createRetryPolicy(executionContext.signal, executionContext.retryPolicy);
+    const bodyText = await runWithRetry(
+      async ({ signal }) => runWithAbortableTimeout(
+        async (timeoutSignal) => {
+          const response = await fetch(`${INWORLD_API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+            signal: timeoutSignal
+          });
+          const text = await response.text();
+          if (!response.ok) {
+            const parsedError = parseJsonSafe(text);
+            const message = parsedError?.error?.message || parsedError?.message || `Inworld TTS request failed (${response.status})`;
+            throw createUpstreamError(
+              message,
+              response.status,
+              mapUpstreamStatusToErrorCode(response.status),
+              parsedError?.error?.details || parsedError?.details
+            );
+          }
+          return text;
+        },
+        {
+          timeoutMs,
+          signal,
+          operationName: `inworld.tts:${endpoint}`
+        }
+      ),
+      retryPolicy
+    );
 
     if (parseAsStream) {
       const syntheticStream = new ReadableStream({
@@ -538,25 +682,28 @@ const generateSpeechWithInworld = async (text, voiceName, expressive = false) =>
   throw createUpstreamError('No audio data returned from Inworld.', 502, 'UPSTREAM_ERROR');
 };
 
-const generateSpeechByProvider = async (text, voiceName, expressive = false) => {
+const generateSpeechByProvider = async (text, voiceName, expressive = false, executionContext = {}) => {
   if (!hasInworldTtsCredentials()) {
     throw createUpstreamError('TTS provider not configured.', 500, 'CONFIG_ERROR');
   }
   const startedAt = Date.now();
-  const result = await generateSpeechWithInworld(text, voiceName, expressive);
+  const result = await generateSpeechWithInworld(text, voiceName, expressive, executionContext);
   return {
     ...result,
     latencyMs: Date.now() - startedAt
   };
 };
 
-const listVoicesByProvider = async () => {
+const listVoicesByProvider = async (executionContext = {}) => {
   if (!hasInworldTtsCredentials()) {
     return [];
   }
   try {
-    return await listInworldVoices();
+    return await listInworldVoices(executionContext);
   } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
     console.warn('[tts] voice catalog unavailable', {
       status: error?.status,
       code: error?.code,
@@ -635,29 +782,6 @@ const ensurePromptSize = (res, size) => {
     return false;
   }
   return true;
-};
-
-const withTimeout = async (promise, timeoutMs) => {
-  if (!timeoutMs || timeoutMs <= 0) {
-    return promise;
-  }
-
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      const error = new Error('Upstream request timed out.');
-      error.code = 'UPSTREAM_TIMEOUT';
-      reject(error);
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
 };
 
 const checkRateLimit = (key) => {
@@ -859,197 +983,210 @@ const handleAiGenerate = async (req, res) => {
     return sendError(res, 400, 'Invalid request payload.', 'INVALID_REQUEST');
   }
 
+  const requestContext = attachRequestAbortSignal(req);
   try {
-    let data;
+    try {
+      let data;
+      const baseExecutionContext = {
+        signal: requestContext.signal,
+        timeoutMs: AI_UPSTREAM_TIMEOUT_MS,
+        retryPolicy: createRetryPolicy(requestContext.signal)
+      };
 
-    if (isTextGenerationKind(kind)) {
-      if (kind === 'generateScene') {
-        const { storyContext, userInstruction, isFirstScene } = context;
-        if (!isObject(storyContext) || !isNonEmptyString(userInstruction, 2000) || typeof isFirstScene !== 'boolean') {
-          return sendError(res, 400, 'Invalid generateScene context.', 'INVALID_REQUEST');
+      if (isTextGenerationKind(kind)) {
+        if (kind === 'generateScene') {
+          const { storyContext, userInstruction, isFirstScene } = context;
+          if (!isObject(storyContext) || !isNonEmptyString(userInstruction, 2000) || typeof isFirstScene !== 'boolean') {
+            return sendError(res, 400, 'Invalid generateScene context.', 'INVALID_REQUEST');
+          }
+
+          const { genre, premise, characters, style, targetLength } = storyContext;
+          if (!isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000) || !Array.isArray(characters)) {
+            return sendError(res, 400, 'Invalid story context.', 'INVALID_REQUEST');
+          }
+
+          if (characters.some((c) => !isNonEmptyString(c, 120))) {
+            return sendError(res, 400, 'Invalid character list.', 'INVALID_REQUEST');
+          }
+          if (
+            style !== undefined &&
+            style !== null &&
+            !isNonEmptyString(style, 400)
+          ) {
+            return sendError(res, 400, 'Invalid story style.', 'INVALID_REQUEST');
+          }
+          if (
+            targetLength !== undefined &&
+            targetLength !== null &&
+            (typeof targetLength !== 'string' || !VALID_SCENE_LENGTHS.has(targetLength))
+          ) {
+            return sendError(res, 400, 'Invalid target length.', 'INVALID_REQUEST');
+          }
+        } else if (kind === 'suggestPlotTwist') {
+          const { genre } = context;
+          if (!isNonEmptyString(genre, 120)) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
+          }
+        } else if (kind === 'generateScriptElement') {
+          const { type, character, instruction, styleContext } = context;
+          if (
+            !isNonEmptyString(type, 24) ||
+            !VALID_BLOCK_TYPES.has(type) ||
+            !isNonEmptyString(instruction, 2000) ||
+            !isNonEmptyString(styleContext, 4000)
+          ) {
+            return sendError(res, 400, 'Invalid generateScriptElement context.', 'INVALID_REQUEST');
+          }
+
+          const hasCharacter = character !== undefined && character !== null;
+          if (
+            (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
+            (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
+          ) {
+            return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+          }
+        } else if (kind === 'regenerateScriptBlock') {
+          const { block, genre, premise, rewriteGuidance } = context;
+          if (!isObject(block) || !isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000)) {
+            return sendError(res, 400, 'Invalid regenerateScriptBlock context.', 'INVALID_REQUEST');
+          }
+          if (
+            rewriteGuidance !== undefined &&
+            rewriteGuidance !== null &&
+            !isNonEmptyString(rewriteGuidance, 1200)
+          ) {
+            return sendError(res, 400, 'Invalid rewrite guidance.', 'INVALID_REQUEST');
+          }
+
+          const { type, text, character } = block;
+          if (
+            !isNonEmptyString(type, 24) ||
+            !VALID_BLOCK_TYPES.has(type) ||
+            !isNonEmptyString(text, 2000)
+          ) {
+            return sendError(res, 400, 'Invalid block data.', 'INVALID_REQUEST');
+          }
+
+          const hasCharacter = character !== undefined && character !== null;
+          if (
+            (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
+            (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
+          ) {
+            return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+          }
+        } else if (kind === 'generateSurpriseSetup') {
+          const { targetGenre } = context;
+          if (targetGenre !== undefined && targetGenre !== null && !isNonEmptyString(targetGenre, 120)) {
+            return sendError(res, 400, 'Invalid generateSurpriseSetup context.', 'INVALID_REQUEST');
+          }
         }
 
-        const { genre, premise, characters, style, targetLength } = storyContext;
-        if (!isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000) || !Array.isArray(characters)) {
-          return sendError(res, 400, 'Invalid story context.', 'INVALID_REQUEST');
+        const promptSize = getPromptSizeEstimate({ kind, context, genres: GENRES });
+        if (!ensurePromptSize(res, promptSize)) {
+          return;
         }
 
-        if (characters.some((c) => !isNonEmptyString(c, 120))) {
-          return sendError(res, 400, 'Invalid character list.', 'INVALID_REQUEST');
+        const textProvider = getTextProvider();
+        const textTimeoutMs = kind === 'generateScene'
+          ? AI_UPSTREAM_TIMEOUT_MS_SCENE
+          : AI_UPSTREAM_TIMEOUT_MS;
+        const generationResult = await generateTextByKind({
+          kind,
+          context,
+          genres: GENRES,
+          provider: textProvider,
+          openai: textProvider === 'openai' ? getOpenAIClient() : null,
+          geminiAi: textProvider === 'gemini' ? getGeminiClient() : null,
+          upstreamContext: {
+            ...baseExecutionContext,
+            timeoutMs: textTimeoutMs,
+            retryPolicy: createRetryPolicy(requestContext.signal)
+          }
+        });
+        data = generationResult.data;
+        rawAiResponse = generationResult.meta?.rawAiResponse;
+        parsedAiKeys = generationResult.meta?.parsedAiKeys;
+      } else if (kind === 'generateSpeech') {
+        const { text, voiceName, expressive } = context;
+        if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
+          return sendError(res, 400, 'Invalid generateSpeech context.', 'INVALID_REQUEST');
         }
-        if (
-          style !== undefined &&
-          style !== null &&
-          !isNonEmptyString(style, 400)
-        ) {
-          return sendError(res, 400, 'Invalid story style.', 'INVALID_REQUEST');
+        if (!ensurePromptSize(res, text.length)) {
+          return;
         }
-        if (
-          targetLength !== undefined &&
-          targetLength !== null &&
-          (typeof targetLength !== 'string' || !VALID_SCENE_LENGTHS.has(targetLength))
-        ) {
-          return sendError(res, 400, 'Invalid target length.', 'INVALID_REQUEST');
-        }
-      } else if (kind === 'suggestPlotTwist') {
-        const { genre } = context;
-        if (!isNonEmptyString(genre, 120)) {
-          return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
-        }
-      } else if (kind === 'generateScriptElement') {
-        const { type, character, instruction, styleContext } = context;
-        if (
-          !isNonEmptyString(type, 24) ||
-          !VALID_BLOCK_TYPES.has(type) ||
-          !isNonEmptyString(instruction, 2000) ||
-          !isNonEmptyString(styleContext, 4000)
-        ) {
-          return sendError(res, 400, 'Invalid generateScriptElement context.', 'INVALID_REQUEST');
-        }
-
-        const hasCharacter = character !== undefined && character !== null;
-        if (
-          (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
-          (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
-        ) {
-          return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
-        }
-      } else if (kind === 'regenerateScriptBlock') {
-        const { block, genre, premise, rewriteGuidance } = context;
-        if (!isObject(block) || !isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000)) {
-          return sendError(res, 400, 'Invalid regenerateScriptBlock context.', 'INVALID_REQUEST');
-        }
-        if (
-          rewriteGuidance !== undefined &&
-          rewriteGuidance !== null &&
-          !isNonEmptyString(rewriteGuidance, 1200)
-        ) {
-          return sendError(res, 400, 'Invalid rewrite guidance.', 'INVALID_REQUEST');
-        }
-
-        const { type, text, character } = block;
-        if (
-          !isNonEmptyString(type, 24) ||
-          !VALID_BLOCK_TYPES.has(type) ||
-          !isNonEmptyString(text, 2000)
-        ) {
-          return sendError(res, 400, 'Invalid block data.', 'INVALID_REQUEST');
-        }
-
-        const hasCharacter = character !== undefined && character !== null;
-        if (
-          (type === 'dialogue' && !isNonEmptyString(character, 120)) ||
-          (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
-        ) {
-          return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
-        }
-      } else if (kind === 'generateSurpriseSetup') {
-        const { targetGenre } = context;
-        if (targetGenre !== undefined && targetGenre !== null && !isNonEmptyString(targetGenre, 120)) {
-          return sendError(res, 400, 'Invalid generateSurpriseSetup context.', 'INVALID_REQUEST');
-        }
+        const result = await generateSpeechByProvider(text, voiceName, Boolean(expressive), baseExecutionContext);
+        data = { audioBase64: result.audioBase64 };
+        console.info('[tts] generated', {
+          provider: result.provider,
+          voiceName,
+          latencyMs: result.latencyMs
+        });
+      } else if (kind === 'listVoices') {
+        const voices = await listVoicesByProvider(baseExecutionContext);
+        data = { voices };
+      } else {
+        return sendError(res, 400, 'Unknown request kind.', 'INVALID_REQUEST');
       }
 
-      const promptSize = getPromptSizeEstimate({ kind, context, genres: GENRES });
-      if (!ensurePromptSize(res, promptSize)) {
-        return;
+      const validation = validateAiResponse(kind, data);
+      if (!validation.ok) {
+        createAiValidationError(kind, validation.reason);
       }
 
-      const textProvider = getTextProvider();
-      const textTimeoutMs = kind === 'generateScene'
-        ? AI_UPSTREAM_TIMEOUT_MS_SCENE
-        : AI_UPSTREAM_TIMEOUT_MS;
-      const generationResult = await generateTextByKind({
-        kind,
-        context,
-        genres: GENRES,
-        provider: textProvider,
-        openai: textProvider === 'openai' ? getOpenAIClient() : null,
-        geminiAi: textProvider === 'gemini' ? getGeminiClient() : null,
-        withTimeout,
-        timeoutMs: textTimeoutMs
-      });
-      data = generationResult.data;
-      rawAiResponse = generationResult.meta?.rawAiResponse;
-      parsedAiKeys = generationResult.meta?.parsedAiKeys;
-    } else if (kind === 'generateSpeech') {
-      const { text, voiceName, expressive } = context;
-      if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
-        return sendError(res, 400, 'Invalid generateSpeech context.', 'INVALID_REQUEST');
+      return res.json({ data });
+    } catch (error) {
+      const message = error?.message || '';
+      const normalizedMessage = message.toLowerCase();
+      const isRateLimit =
+        error?.status === 429 ||
+        normalizedMessage.includes('429') ||
+        normalizedMessage.includes('resource_exhausted') ||
+        normalizedMessage.includes('rate limit');
+      const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
+      const isInvalidAi = error?.code === 'INVALID_AI_RESPONSE';
+      const isConfigError = error?.code === 'CONFIG_ERROR';
+
+      if (!IS_PROD && isInvalidAi && kind === 'generateScene') {
+        const rawFromError = error?.details?.rawResponse;
+        const rawSnippet = typeof rawAiResponse === 'string'
+          ? rawAiResponse.slice(0, 2000)
+          : typeof rawFromError === 'string'
+          ? rawFromError.slice(0, 2000)
+          : null;
+        console.warn('[ai/generate] Invalid AI response', {
+          requestId,
+          kind,
+          reason: error?.details?.reason,
+          parsedKeys: parsedAiKeys || null,
+          rawResponse: rawSnippet
+        });
       }
-      if (!ensurePromptSize(res, text.length)) {
-        return;
-      }
-      const result = await generateSpeechByProvider(text, voiceName, Boolean(expressive));
-      data = { audioBase64: result.audioBase64 };
-      console.info('[tts] generated', {
-        provider: result.provider,
-        voiceName,
-        latencyMs: result.latencyMs
-      });
-    } else if (kind === 'listVoices') {
-      const voices = await listVoicesByProvider();
-      data = { voices };
-    } else {
-      return sendError(res, 400, 'Unknown request kind.', 'INVALID_REQUEST');
+
+      console.error('[ai/generate] Failed', error);
+      return sendError(
+        res,
+        isConfigError ? 500 : isTimeout ? 504 : isRateLimit ? 429 : 502,
+        isTimeout
+          ? 'AI request timed out.'
+          : isConfigError
+          ? error?.message || 'Server configuration error.'
+          : isInvalidAi
+          ? 'AI response did not match expected format.'
+          : 'AI request failed.',
+        isConfigError
+          ? 'CONFIG_ERROR'
+          : isTimeout
+          ? 'UPSTREAM_TIMEOUT'
+          : isRateLimit
+          ? 'RATE_LIMITED'
+          : isInvalidAi
+          ? 'INVALID_AI_RESPONSE'
+          : 'UPSTREAM_ERROR',
+        isInvalidAi ? error?.details : undefined
+      );
     }
-
-    const validation = validateAiResponse(kind, data);
-    if (!validation.ok) {
-      createAiValidationError(kind, validation.reason);
-    }
-
-    return res.json({ data });
-  } catch (error) {
-    const message = error?.message || '';
-    const normalizedMessage = message.toLowerCase();
-    const isRateLimit =
-      error?.status === 429 ||
-      normalizedMessage.includes('429') ||
-      normalizedMessage.includes('resource_exhausted') ||
-      normalizedMessage.includes('rate limit');
-    const isTimeout = error?.code === 'UPSTREAM_TIMEOUT' || message.includes('timed out');
-    const isInvalidAi = error?.code === 'INVALID_AI_RESPONSE';
-    const isConfigError = error?.code === 'CONFIG_ERROR';
-
-    if (!IS_PROD && isInvalidAi && kind === 'generateScene') {
-      const rawFromError = error?.details?.rawResponse;
-      const rawSnippet = typeof rawAiResponse === 'string'
-        ? rawAiResponse.slice(0, 2000)
-        : typeof rawFromError === 'string'
-        ? rawFromError.slice(0, 2000)
-        : null;
-      console.warn('[ai/generate] Invalid AI response', {
-        requestId,
-        kind,
-        reason: error?.details?.reason,
-        parsedKeys: parsedAiKeys || null,
-        rawResponse: rawSnippet
-      });
-    }
-
-    console.error('[ai/generate] Failed', error);
-    return sendError(
-      res,
-      isConfigError ? 500 : isTimeout ? 504 : isRateLimit ? 429 : 502,
-      isTimeout
-        ? 'AI request timed out.'
-        : isConfigError
-        ? error?.message || 'Server configuration error.'
-        : isInvalidAi
-        ? 'AI response did not match expected format.'
-        : 'AI request failed.',
-      isConfigError
-        ? 'CONFIG_ERROR'
-        : isTimeout
-        ? 'UPSTREAM_TIMEOUT'
-        : isRateLimit
-        ? 'RATE_LIMITED'
-        : isInvalidAi
-        ? 'INVALID_AI_RESPONSE'
-        : 'UPSTREAM_ERROR',
-      isInvalidAi ? error?.details : undefined
-    );
+  } finally {
+    requestContext.cleanup();
   }
 };
 

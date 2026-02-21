@@ -161,5 +161,11 @@ describe('OpenAI text generation smoke', () => {
     expect(String(surpriseData?.genre || '').trim().length).toBeGreaterThan(0);
     expect(String(surpriseData?.premise || '').trim().length).toBeGreaterThan(0);
     expect(Array.isArray(surpriseData?.characters)).toBe(true);
+
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(5);
+    for (const call of mockResponsesCreate.mock.calls) {
+      const options = call[1] as { signal?: AbortSignal } | undefined;
+      expect(options?.signal).toBeInstanceOf(AbortSignal);
+    }
   });
 });

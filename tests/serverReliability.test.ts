@@ -44,6 +44,86 @@ beforeEach(() => {
 });
 
 describe('server reliability', () => {
+  it('maps upstream timeout errors to 504 UPSTREAM_TIMEOUT', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const timeoutError = new Error('Upstream request timed out.');
+      (timeoutError as Error & { code?: string }).code = 'UPSTREAM_TIMEOUT';
+      mockGenerateContent.mockRejectedValue(timeoutError);
+
+      const req = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: { genre: 'Noir' }
+        }
+      } as any;
+      const res = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(req, res);
+      expect(res.statusCode).toBe(504);
+      expect(res.body?.error?.code).toBe('UPSTREAM_TIMEOUT');
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('preserves cancel mapping contract as generic upstream error', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const canceledError = new Error('Client canceled request.');
+      const typedError = canceledError as Error & { code?: string; status?: number };
+      typedError.code = 'REQUEST_ABORTED';
+      typedError.status = 499;
+      mockGenerateContent.mockRejectedValue(typedError);
+
+      const req = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: { genre: 'Noir' }
+        }
+      } as any;
+      const res = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(req, res);
+      expect(res.statusCode).toBe(502);
+      expect(res.body?.error?.code).toBe('UPSTREAM_ERROR');
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('returns 429 when upstream error message indicates a rate limit in mixed case', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
