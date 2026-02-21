@@ -39,6 +39,8 @@ const flushPromises = () => new Promise<void>((resolve) => queueMicrotask(resolv
 
 describe('ScriptEngine', () => {
   beforeEach(() => {
+    const cacheResetEngine = new ScriptEngine();
+    cacheResetEngine.clearAudioCache();
     pendingRequests.length = 0;
     createGenerateSpeechRequest.mockClear();
   });
@@ -55,7 +57,7 @@ describe('ScriptEngine', () => {
     engine.on('audio', onAudio);
 
     const blocks: ScriptBlock[] = [
-      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }
     ];
     const voiceConfigs: VoiceConfig[] = [
       { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
@@ -71,7 +73,7 @@ describe('ScriptEngine', () => {
     expect(onError).not.toHaveBeenCalled();
 
     await engine.start(
-      [{ id: 'block-2', type: BlockType.DIALOGUE, text: 'World', character: 'B' }],
+      [{ id: 'block-2', type: BlockType.DIALOGUE, text: 'World', blockRevision: 1, character: 'B' }],
       voiceConfigs
     );
     expect(pendingRequests).toHaveLength(2);
@@ -91,7 +93,7 @@ describe('ScriptEngine', () => {
     engine.on('error', onError);
 
     const blocks: ScriptBlock[] = [
-      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }
     ];
     const voiceConfigs: VoiceConfig[] = [
       { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
@@ -112,5 +114,77 @@ describe('ScriptEngine', () => {
 
     expect(pendingRequests).toHaveLength(1);
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('reuses cached audio when blockRevision is unchanged', async () => {
+    const engine = new ScriptEngine();
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello there', blockRevision: 1, character: 'A' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
+    ];
+
+    await engine.start(blocks, voiceConfigs);
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(1);
+    pendingRequests[0].resolve(new ArrayBuffer(4));
+    await flushPromises();
+
+    await engine.start(blocks, voiceConfigs);
+    await flushPromises();
+
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reuse cached audio when blockRevision changes', async () => {
+    const engine = new ScriptEngine();
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
+    ];
+
+    await engine.start(
+      [{ id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello there', blockRevision: 1, character: 'A' }],
+      voiceConfigs
+    );
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(1);
+    pendingRequests[0].resolve(new ArrayBuffer(4));
+    await flushPromises();
+
+    await engine.start(
+      [{ id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello there', blockRevision: 2, character: 'A' }],
+      voiceConfigs
+    );
+
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(2);
+    pendingRequests[1].resolve(new ArrayBuffer(4));
+    await flushPromises();
+  });
+
+  it('reuses preview cache for whitespace-equivalent text', async () => {
+    const engine = new ScriptEngine();
+
+    const firstPromise = engine.generateSingle('Line one\n   line two', 'inworld-voice-1');
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(1);
+    pendingRequests[0].resolve(new ArrayBuffer(8));
+    await firstPromise;
+
+    const secondPromise = engine.generateSingle('Line one line two', 'inworld-voice-1');
+    await secondPromise;
+
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reuse preview cache for case-different text', async () => {
+    const engine = new ScriptEngine();
+
+    const firstPromise = engine.generateSingle('Case Sensitive Line', 'inworld-voice-1');
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(1);
+    pendingRequests[0].resolve(new ArrayBuffer(8));
+    await firstPromise;
+
+    const secondPromise = engine.generateSingle('case sensitive line', 'inworld-voice-1');
+    expect(createGenerateSpeechRequest).toHaveBeenCalledTimes(2);
+    pendingRequests[1].resolve(new ArrayBuffer(8));
+    await secondPromise;
   });
 });

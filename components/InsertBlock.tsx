@@ -164,6 +164,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     id: crypto.randomUUID(),
     type: elementType,
     text: trimmedContent,
+    blockRevision: 1,
     character: elementType === BlockType.DIALOGUE ? resolveCharacterName(selectedChar, characters) : undefined
   });
 

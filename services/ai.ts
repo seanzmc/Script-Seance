@@ -368,7 +368,8 @@ export const generateScene = async (
     summary: data.summary,
     blocks: data.blocks.map((block) => ({
       ...block,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
+      blockRevision: 1
     }))
   };
 };
@@ -566,7 +567,8 @@ export const createGenerateSceneRequest = (
       summary: data.summary,
       blocks: data.blocks.map((block) => ({
         ...block,
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
+        blockRevision: 1
       }))
     }))
   };

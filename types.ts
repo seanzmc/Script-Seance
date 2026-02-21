@@ -10,6 +10,7 @@ export interface ScriptBlock {
   id: string;
   type: BlockType;
   text: string;
+  blockRevision: number;
   character?: string;
   parenthetical?: string;
   locked?: boolean;

@@ -17,9 +17,9 @@ describe('buildScriptTextExport', () => {
         heading: 'INT. APARTMENT - NIGHT',
         summary: 'A tense exchange',
         blocks: [
-          { id: 'b1', type: BlockType.ACTION, text: 'Rain hammers the window.' },
-          { id: 'b2', type: BlockType.DIALOGUE, character: 'Alex', text: 'We are out of time.' },
-          { id: 'b3', type: BlockType.HEADING, text: 'INT. SHOULD NOT DUPLICATE - DAY' }
+          { id: 'b1', type: BlockType.ACTION, text: 'Rain hammers the window.', blockRevision: 1 },
+          { id: 'b2', type: BlockType.DIALOGUE, character: 'Alex', text: 'We are out of time.', blockRevision: 1 },
+          { id: 'b3', type: BlockType.HEADING, text: 'INT. SHOULD NOT DUPLICATE - DAY', blockRevision: 1 }
         ]
       }
     ];

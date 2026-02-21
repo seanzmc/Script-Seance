@@ -1,12 +1,16 @@
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
 import { createGenerateSpeechRequest } from './ai';
 import { LruAudioCache, AUDIO_CACHE_MAX_BYTES, AUDIO_CACHE_MAX_ENTRIES } from './audioCache';
+import { buildTtsBlockCacheKey, buildTtsPreviewCacheKey } from './ttsCacheKeys';
 import { DEFAULT_VOICE_CONFIG } from '../shared/voiceDefaults.js';
 
 // Global Content-Addressable Cache (persists across plays)
 // Key: voiceId:text | Value: ArrayBuffer (Raw PCM)
 const AudioCache = new LruAudioCache(AUDIO_CACHE_MAX_ENTRIES, AUDIO_CACHE_MAX_BYTES);
-const AUDIO_CACHE_SCHEMA_VERSION = 'v2';
+const TTS_PROVIDER = 'inworld';
+const TTS_MODEL_ID = 'inworld-tts-1.5-max';
+const TTS_AUDIO_ENCODING = 'LINEAR16';
+const TTS_SAMPLE_RATE_HZ = 24000;
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 const resolveNarratorFallbackVoiceId = (voiceConfigs: VoiceConfig[]) => {
@@ -178,7 +182,13 @@ export class ScriptEngine {
     options?: { expressive?: boolean }
   ): Promise<ArrayBuffer> {
      const requestId = `preview:${Date.now()}:${Math.random().toString(16).slice(2)}`;
-     return this.fetchAudio(text, voiceId, requestId, 0, options?.expressive || false);
+     return this.fetchAudio({
+       text,
+       voiceId,
+       requestId,
+       expressive: options?.expressive || false,
+       cacheTarget: { kind: 'preview' }
+     });
   }
 
   // --- Core Processing Loop ---
@@ -211,11 +221,17 @@ export class ScriptEngine {
     try {
       // Check cache or fetch
       const buffer = await this.fetchAudio(
-        item.block.text,
-        item.voiceId,
-        item.block.id,
-        0,
-        item.expressive
+        {
+          text: item.block.text,
+          voiceId: item.voiceId,
+          requestId: item.block.id,
+          expressive: item.expressive,
+          cacheTarget: {
+            kind: 'block',
+            blockId: item.block.id,
+            blockRevision: item.block.blockRevision
+          }
+        }
       );
       this.blockRetryCounts.delete(item.block.id);
 
@@ -258,17 +274,38 @@ export class ScriptEngine {
 
   // --- AI Integration & Caching ---
 
-  private async fetchAudio(
-    text: string,
-    voiceId: string,
-    requestId: string,
-    retryCount = 0,
-    expressive = false
-  ): Promise<ArrayBuffer> {
+  private async fetchAudio(params: {
+    text: string;
+    voiceId: string;
+    requestId: string;
+    retryCount?: number;
+    expressive: boolean;
+    cacheTarget:
+      | { kind: 'block'; blockId: string; blockRevision: number }
+      | { kind: 'preview' };
+  }): Promise<ArrayBuffer> {
+    const { text, voiceId, requestId, expressive, cacheTarget } = params;
+    const retryCount = params.retryCount ?? 0;
     const safeText = text.trim();
-    // Cache Key: VoiceID + Text. 
-    // Speed/Pitch are applied client-side (AudioContext), so they don't affect the raw API request.
-    const cacheKey = `${AUDIO_CACHE_SCHEMA_VERSION}:${voiceId}:${expressive ? 'expr' : 'plain'}:${safeText}`;
+    const keyContext = {
+      provider: TTS_PROVIDER,
+      modelId: TTS_MODEL_ID,
+      audioEncoding: TTS_AUDIO_ENCODING,
+      sampleRateHz: TTS_SAMPLE_RATE_HZ,
+      voiceId,
+      expressive
+    };
+    const cacheKey =
+      cacheTarget.kind === 'block'
+        ? buildTtsBlockCacheKey({
+            ...keyContext,
+            blockId: cacheTarget.blockId,
+            blockRevision: cacheTarget.blockRevision
+          })
+        : buildTtsPreviewCacheKey({
+            ...keyContext,
+            text: safeText
+          });
 
     const cached = AudioCache.get(cacheKey);
     if (cached !== undefined) {
@@ -341,7 +378,14 @@ export class ScriptEngine {
             throw createRequestAbortedError();
          }
 
-         return this.fetchAudio(text, voiceId, requestId, retryCount + 1, expressive);
+         return this.fetchAudio({
+           text,
+           voiceId,
+           requestId,
+           retryCount: retryCount + 1,
+           expressive,
+           cacheTarget
+         });
        }
        
        throw error;

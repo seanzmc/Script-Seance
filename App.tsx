@@ -127,13 +127,23 @@ const resolveCharacterName = (value: string | null | undefined, characters: stri
   return match ?? value;
 };
 
+const ensureBlockRevision = (block: ScriptBlock): ScriptBlock => {
+  const rawRevision = (block as ScriptBlock & { blockRevision?: number }).blockRevision;
+  const blockRevision =
+    typeof rawRevision === 'number' && Number.isFinite(rawRevision) && rawRevision > 0
+      ? Math.floor(rawRevision)
+      : 1;
+  return { ...block, blockRevision };
+};
+
 const normalizeSceneCharacters = (scene: Scene, characters: string[]) => ({
   ...scene,
-  blocks: scene.blocks.map(block => (
-    block.character
+  blocks: scene.blocks.map((rawBlock) => {
+    const block = ensureBlockRevision(rawBlock);
+    return block.character
       ? { ...block, character: resolveCharacterName(block.character, characters) }
-      : block
-  ))
+      : block;
+  })
 });
 
 const getVoiceIdList = (voices: TtsVoice[]) => voices.map((voice) => voice.id);
@@ -1015,7 +1025,15 @@ export default function App() {
         ...prev,
         scenes: prev.scenes.map(scene => scene.id === sceneId ? {
           ...scene,
-          blocks: scene.blocks.map(block => block.id === blockId ? { ...block, character: resolvedCharacter } : block)
+          blocks: scene.blocks.map((block) => {
+            if (block.id !== blockId) {
+              return block;
+            }
+            if (block.character === resolvedCharacter) {
+              return block;
+            }
+            return { ...block, character: resolvedCharacter, blockRevision: block.blockRevision + 1 };
+          })
         } : scene)
       };
     });
@@ -1053,7 +1071,11 @@ export default function App() {
           ...prev,
           scenes: prev.scenes.map(s => s.id === sceneId ? {
             ...s,
-            blocks: s.blocks.map(b => b.id === blockId ? { ...b, text: newText } : b)
+            blocks: s.blocks.map((b) => (
+              b.id === blockId
+                ? { ...b, text: newText, blockRevision: b.blockRevision + 1 }
+                : b
+            ))
           } : s)
         };
       });
@@ -1070,7 +1092,11 @@ export default function App() {
               ...prev,
               scenes: prev.scenes.map(s => s.id === sceneId ? {
                 ...s,
-                blocks: s.blocks.map(b => b.id === blockId ? { ...b, text: originalText } : b)
+                blocks: s.blocks.map((b) => (
+                  b.id === blockId
+                    ? { ...b, text: originalText, blockRevision: b.blockRevision + 1 }
+                    : b
+                ))
               } : s)
             };
           });

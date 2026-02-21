@@ -103,13 +103,15 @@ const contextFixture: StoryContext = {
         {
           id: 'b1',
           type: BlockType.ACTION,
-          text: 'Alex studies the evidence board under flickering light.'
+          text: 'Alex studies the evidence board under flickering light.',
+          blockRevision: 1
         },
         {
           id: 'b2',
           type: BlockType.DIALOGUE,
           character: 'Alex',
-          text: 'Something here does not add up.'
+          text: 'Something here does not add up.',
+          blockRevision: 1
         }
       ]
     }

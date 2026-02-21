@@ -361,7 +361,7 @@ export const useAudioPlayer = (
         const config = getVoiceConfigForBlock(block);
         const voiceId = config?.voiceId || getFallbackVoiceId();
         const expressive = config?.expressive ? 'expr' : 'plain';
-        return `${block.id}:${voiceId}:${expressive}`;
+        return `${block.id}:${block.blockRevision}:${voiceId}:${expressive}`;
       })
       .join('|');
   }, [getFallbackVoiceId, getVoiceConfigForBlock]);

@@ -68,8 +68,8 @@ describe('useAudioPlayer', () => {
 
   it('pauses on the current block when audio generation fails', async () => {
     const blocks: ScriptBlock[] = [
-      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' },
-      { id: 'block-2', type: BlockType.DIALOGUE, text: 'World', character: 'B' }
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' },
+      { id: 'block-2', type: BlockType.DIALOGUE, text: 'World', blockRevision: 1, character: 'B' }
     ];
     const voiceConfigs: VoiceConfig[] = [
       { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
@@ -103,7 +103,7 @@ describe('useAudioPlayer', () => {
 
   it('clears reusable generated blocks when a character voice changes', async () => {
     const blocks: ScriptBlock[] = [
-      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', character: 'A' }
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }
     ];
     const initialVoices: VoiceConfig[] = [
       { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 },
