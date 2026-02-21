@@ -20,7 +20,7 @@ export const scopeKeys = {
   ttsPlaybackPrefetch: (scriptId: string) =>
     `script:${asPart(scriptId)}:tts:playback`,
   ttsPlaybackRefresh: (scriptId: string) =>
-    `script:${asPart(scriptId)}:tts:playback:refresh`,
+    `script:${asPart(scriptId)}:tts:playback`,
   ttsPreview: (scriptId: string, voiceIdOrCharacterId: string) =>
     `script:${asPart(scriptId)}:tts:preview:${asPart(voiceIdOrCharacterId)}`,
   ttsBlockRetry: (scriptId: string, blockId: string) =>

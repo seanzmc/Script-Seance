@@ -237,6 +237,8 @@ export default function App() {
   const userInstructionRef = useRef('');
   const activeGenerationScopeRef = useRef<string | null>(null);
   const manualTitleRevisionRef = useRef(0);
+  const voiceContextRevisionRef = useRef(0);
+  const voiceContextFingerprintRef = useRef('');
   const titleSuggestionTokenRef = useRef(0);
   const hasManualTitleRef = useRef(false);
 
@@ -284,6 +286,11 @@ export default function App() {
     return parts.join(' ');
   }, [setupState.genre, setupState.length, setupState.style]);
 
+  const allBlocks = useMemo(
+    () => (context ? context.scenes.flatMap(scene => scene.blocks) : []),
+    [context]
+  );
+
   useEffect(() => {
     contextRef.current = context;
   }, [context]);
@@ -291,6 +298,23 @@ export default function App() {
   useEffect(() => {
     userInstructionRef.current = userInstruction;
   }, [userInstruction]);
+
+  const voiceContextFingerprint = useMemo(() => {
+    const entries = voiceConfigs
+      .map((config) => (
+        `${normalizeCharacterName(config.name)}:${config.voiceId}:${config.expressive ? '1' : '0'}`
+      ))
+      .sort();
+    return entries.join('|');
+  }, [voiceConfigs]);
+
+  useEffect(() => {
+    if (voiceContextFingerprintRef.current === voiceContextFingerprint) {
+      return;
+    }
+    voiceContextFingerprintRef.current = voiceContextFingerprint;
+    voiceContextRevisionRef.current += 1;
+  }, [voiceContextFingerprint]);
 
   const promptContextFingerprint = useMemo(() => {
     if (context) {
@@ -555,7 +579,11 @@ export default function App() {
     goToPrevious,
     retryCurrentBlock,
     skipCurrentBlock
-  } = useAudioPlayer(voiceConfigs, handleAiError, handleAudioSkip);
+  } = useAudioPlayer(voiceConfigs, handleAiError, handleAudioSkip, {
+    scriptId: scriptIdRef.current,
+    voiceContextRevision: voiceContextRevisionRef.current,
+    blocks: allBlocks
+  });
 
   // Clear preview state when playback ends
   useEffect(() => {
@@ -1525,7 +1553,7 @@ export default function App() {
       pitch: currentConfig?.pitch ?? 0,
       expressive: currentConfig?.expressive ?? false
     };
-    await playPreview(text, config);
+    await playPreview(text, config, { scopeId: castingCharacter });
   };
 
   const handleOpenCasting = (character: string) => {
@@ -1555,11 +1583,6 @@ export default function App() {
       ? resolveCharacterName(currentBlock.character || 'Narrator', context?.characters ?? [])
       : 'Narrator'
     : 'None';
-
-  const allBlocks = useMemo(
-    () => (context ? context.scenes.flatMap(scene => scene.blocks) : []),
-    [context]
-  );
 
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
@@ -1609,7 +1632,7 @@ export default function App() {
           voiceConfigs={voiceConfigs}
           onUpdateConfig={updateVoiceConfig}
           onOpenCasting={handleOpenCasting}
-          onPreview={(config) => playPreview(getPreviewText(config.name), config)}
+          onPreview={(config) => playPreview(getPreviewText(config.name), config, { scopeId: config.name })}
           onStop={stop}
           isAudioPlaying={isPreviewPlaying}
           isLoading={isLoadingAudio && !isPlaying}

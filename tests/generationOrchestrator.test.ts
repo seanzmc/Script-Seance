@@ -132,4 +132,43 @@ describe('GenerationOrchestrator', () => {
     expect(outcome.kind).toBe('aborted');
     expect(commit).not.toHaveBeenCalled();
   });
+
+  it('ttsPreview latest-wins within preview scope', async () => {
+    const orchestrator = new GenerationOrchestrator();
+    const firstExecution = deferred<ArrayBuffer>();
+    let firstSignal: AbortSignal | null = null;
+    const firstCommit = vi.fn();
+
+    const firstRun = orchestrator.run({
+      opType: 'ttsPreview',
+      scopeKey: 'script:s1:tts:preview:voice-1',
+      execute: async (signal) => {
+        firstSignal = signal;
+        return firstExecution.promise;
+      },
+      isFresh: () => true,
+      commit: firstCommit
+    });
+
+    await Promise.resolve();
+
+    const secondCommit = vi.fn();
+    const secondRun = orchestrator.run({
+      opType: 'ttsPreview',
+      scopeKey: 'script:s1:tts:preview:voice-1',
+      execute: async () => new ArrayBuffer(8),
+      isFresh: () => true,
+      commit: secondCommit
+    });
+
+    expect(firstSignal?.aborted).toBe(true);
+    const secondOutcome = await secondRun;
+    expect(secondOutcome.kind).toBe('committed');
+    expect(secondCommit).toHaveBeenCalledTimes(1);
+
+    firstExecution.resolve(new ArrayBuffer(8));
+    const firstOutcome = await firstRun;
+    expect(firstOutcome.kind).toBe('aborted');
+    expect(firstCommit).not.toHaveBeenCalled();
+  });
 });

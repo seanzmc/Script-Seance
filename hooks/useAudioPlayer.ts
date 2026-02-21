@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ScriptBlock, VoiceConfig, BlockType } from '../types';
 import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
 import { DEFAULT_VOICE_CONFIG } from '../shared/voiceDefaults.js';
+import { GenerationOrchestrator, scopeKeys } from '../services/orchestration';
 
 type BlockAudioStatus = 'notGenerated' | 'generating' | 'ready' | 'error';
 
@@ -9,10 +10,30 @@ const PLAYABLE_BLOCKS = [BlockType.DIALOGUE, BlockType.ACTION, BlockType.TRANSIT
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
+export type AudioOrchestrationContext = {
+  scriptId?: string;
+  voiceContextRevision?: number;
+  blocks?: ScriptBlock[];
+};
+
+type PlaybackGate = {
+  playbackRunId: number;
+  voiceContextRevision: number;
+  blockRevisions: Map<string, number>;
+  receiptOpId: string;
+};
+
+const createAbortError = () => {
+  const error = new Error('Request canceled.') as Error & { code?: string };
+  error.code = 'REQUEST_ABORTED';
+  return error;
+};
+
 export const useAudioPlayer = (
   voiceConfigs: VoiceConfig[],
   onError?: (error: unknown, fallbackMessage: string) => void,
-  onSkip?: (block: ScriptBlock, error: unknown) => void
+  onSkip?: (block: ScriptBlock, error: unknown) => void,
+  orchestrationContext?: AudioOrchestrationContext
 ) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
@@ -27,40 +48,63 @@ export const useAudioPlayer = (
   // --- Refs (State that doesn't trigger re-renders or is needed in callbacks) ---
   const engineRef = useRef<ScriptEngine | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  
-  const queueRef = useRef<ScriptBlock[]>([]);       // Playable blocks only
-  const currentIndexRef = useRef(0);                // Pointer to current block in queue
-  const audioDataMap = useRef<Map<string, AudioChunk>>(new Map()); // Buffer for arrived audio chunks
+
+  const queueRef = useRef<ScriptBlock[]>([]);
+  const currentIndexRef = useRef(0);
+  const audioDataMap = useRef<Map<string, AudioChunk>>(new Map());
   const skippedBlockIdsRef = useRef<Set<string>>(new Set());
   const totalCountRef = useRef(0);
   const bufferedAudioSignatureRef = useRef<string | null>(null);
-  
+
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const activeBlockIdRef = useRef<string | null>(null);
   const pendingBlockIdRef = useRef<string | null>(null);
-  const isPlayingRef = useRef(false); // Sync ref for callbacks
+  const isPlayingRef = useRef(false);
   const playbackRunIdRef = useRef(0);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreOnEndedRef = useRef(false);
   const blockStatusesRef = useRef<Record<string, BlockAudioStatus>>({});
+
+  const orchestratorRef = useRef(new GenerationOrchestrator());
+  const scriptIdRef = useRef(orchestrationContext?.scriptId || 'local-script');
+  const voiceContextRevisionRef = useRef(orchestrationContext?.voiceContextRevision ?? 0);
+  const blockRevisionByIdRef = useRef<Map<string, number>>(new Map());
+  const activePlaybackGateRef = useRef<PlaybackGate | null>(null);
+  const activePreviewScopeRef = useRef<string | null>(null);
+  const activeRetryScopeRef = useRef<string | null>(null);
+
   const debug = useCallback((...args: unknown[]) => {
     if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
       console.debug('[playback]', ...args);
     }
   }, []);
 
-  // Store latest configs in ref for real-time access during playback loop
   const voiceConfigsRef = useRef(voiceConfigs);
   useEffect(() => {
     voiceConfigsRef.current = voiceConfigs;
   }, [voiceConfigs]);
 
-  // Initialize Engine Singleton for this hook instance
+  useEffect(() => {
+    scriptIdRef.current = orchestrationContext?.scriptId || 'local-script';
+  }, [orchestrationContext?.scriptId]);
+
+  useEffect(() => {
+    voiceContextRevisionRef.current = orchestrationContext?.voiceContextRevision ?? 0;
+  }, [orchestrationContext?.voiceContextRevision]);
+
+  const currentBlockRevisionMap = useMemo(() => {
+    const nextMap = new Map<string, number>();
+    orchestrationContext?.blocks?.forEach((block) => {
+      nextMap.set(block.id, block.blockRevision);
+    });
+    return nextMap;
+  }, [orchestrationContext?.blocks]);
+  blockRevisionByIdRef.current = currentBlockRevisionMap;
+
   if (!engineRef.current) {
     engineRef.current = new ScriptEngine();
   }
 
-  // Keep Sync Ref
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -69,7 +113,6 @@ export const useAudioPlayer = (
     blockStatusesRef.current = blockStatuses;
   }, [blockStatuses]);
 
-  // Audio Context Singleton Lazy Loader
   const getContext = useCallback(() => {
     if (!audioContextRef.current) {
       const Ctx =
@@ -84,7 +127,15 @@ export const useAudioPlayer = (
   }, []);
 
   const getPlayableBlocks = (blocks: ScriptBlock[]) =>
-    blocks.filter(b => PLAYABLE_BLOCKS.includes(b.type));
+    blocks.filter((block) => PLAYABLE_BLOCKS.includes(block.type));
+
+  const getCurrentBlockRevision = useCallback((blockId: string) => {
+    const fromContext = blockRevisionByIdRef.current.get(blockId);
+    if (typeof fromContext === 'number') {
+      return fromContext;
+    }
+    return queueRef.current.find((block) => block.id === blockId)?.blockRevision;
+  }, []);
 
   const getVoiceConfigForBlock = useCallback((block: ScriptBlock) => {
     let charName = block.character;
@@ -92,17 +143,18 @@ export const useAudioPlayer = (
       charName = 'Narrator';
     }
     const normalized = normalizeCharacterName(charName);
-    return voiceConfigsRef.current.find(c => normalizeCharacterName(c.name) === normalized)
-      || voiceConfigsRef.current.find(c => normalizeCharacterName(c.name) === 'narrator');
+    return voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === normalized)
+      || voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
   }, []);
+
   const getFallbackVoiceId = useCallback(() => {
     const narrator = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
     if (typeof narrator?.voiceId === 'string' && narrator.voiceId.trim().length > 0) {
       return narrator.voiceId;
     }
-    const firstConfiguredVoice = voiceConfigsRef.current.find(
-      (config) => typeof config.voiceId === 'string' && config.voiceId.trim().length > 0
-    );
+    const firstConfiguredVoice = voiceConfigsRef.current.find((config) => (
+      typeof config.voiceId === 'string' && config.voiceId.trim().length > 0
+    ));
     return firstConfiguredVoice?.voiceId || '';
   }, []);
 
@@ -121,8 +173,6 @@ export const useAudioPlayer = (
     updateBufferProgress(0);
     setBlockStatuses({});
   }, [updateBufferProgress]);
-
-  // --- Playback Logic ---
 
   const clearStartTimeout = useCallback(() => {
     if (startTimeoutRef.current) {
@@ -150,6 +200,10 @@ export const useAudioPlayer = (
     pendingBlockIdRef.current = null;
   }, []);
 
+  const getPlaybackScopeKey = useCallback(() => (
+    scopeKeys.ttsPlaybackPrefetch(scriptIdRef.current)
+  ), []);
+
   const stop = useCallback((options?: { clearBuffer?: boolean }) => {
     const clearBuffer = options?.clearBuffer ?? false;
     clearStartTimeout();
@@ -162,11 +216,20 @@ export const useAudioPlayer = (
     setCurrentBlockId(null);
     setCurrentBlockIndex(-1);
     setIsLoadingAudio(false);
-    
-    // Stop Audio Source
+
     haltActiveSource();
-    
-    // Stop Engine & Reset Pointers
+
+    orchestratorRef.current.cancelScope(getPlaybackScopeKey());
+    if (activePreviewScopeRef.current) {
+      orchestratorRef.current.cancelScope(activePreviewScopeRef.current);
+      activePreviewScopeRef.current = null;
+    }
+    if (activeRetryScopeRef.current) {
+      orchestratorRef.current.cancelScope(activeRetryScopeRef.current);
+      activeRetryScopeRef.current = null;
+    }
+
+    activePlaybackGateRef.current = null;
     engineRef.current?.stop();
     queueRef.current = [];
     currentIndexRef.current = 0;
@@ -175,7 +238,7 @@ export const useAudioPlayer = (
     if (clearBuffer) {
       resetBuffer();
     }
-  }, [clearStartTimeout, debug, haltActiveSource, resetBuffer]);
+  }, [clearStartTimeout, debug, getPlaybackScopeKey, haltActiveSource, resetBuffer]);
 
   useEffect(() => {
     return () => {
@@ -194,7 +257,6 @@ export const useAudioPlayer = (
     const idx = currentIndexRef.current;
     const script = queueRef.current;
 
-    // End of script?
     if (idx >= script.length) {
       stop();
       return;
@@ -224,11 +286,9 @@ export const useAudioPlayer = (
       return;
     }
 
-    // CHECK BUFFER: Do we have the audio for this block yet?
     const chunk = audioDataMap.current.get(block.id);
 
     if (chunk) {
-      // YES: Audio is ready. Play immediately.
       setIsLoadingAudio(false);
       setCurrentBlockId(block.id);
       pendingBlockIdRef.current = block.id;
@@ -240,20 +300,17 @@ export const useAudioPlayer = (
         pendingBlockIdRef.current = null;
         return;
       }
-      
+
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
-      
-      // Look up live client-side modifiers (Speed/Pitch)
-      // This allows sliders to affect ongoing playback without restarting
-      const config = getVoiceConfigForBlock(block);
 
-      const speed = config?.speed ?? chunk.speed; // Fallback to chunk's speed if config missing (unlikely)
+      const config = getVoiceConfigForBlock(block);
+      const speed = config?.speed ?? chunk.speed;
       const pitch = config?.pitch ?? chunk.pitch;
 
       source.playbackRate.value = speed;
       source.detune.value = pitch * 100;
-      
+
       const gainNode = ctx.createGain();
       gainNode.gain.value = 0.92;
       source.connect(gainNode);
@@ -262,7 +319,7 @@ export const useAudioPlayer = (
       activeBlockIdRef.current = block.id;
       ignoreOnEndedRef.current = false;
       debug('start block', idx, block.id);
-      
+
       source.onended = () => {
         if (ignoreOnEndedRef.current || !isPlayingRef.current || runId !== playbackRunIdRef.current) {
           activeSourceRef.current = null;
@@ -274,42 +331,63 @@ export const useAudioPlayer = (
         activeBlockIdRef.current = null;
         pendingBlockIdRef.current = null;
         debug('end block', idx, block.id);
-        // Advance pointer and loop
         currentIndexRef.current++;
         playNext(runId);
       };
-      
+
       source.start();
       pendingBlockIdRef.current = null;
-
     } else {
-      // NO: Audio is still generating.
-      // Show loading and wait. The 'audio' event listener will re-trigger playNext() when it arrives.
       setIsLoadingAudio(true);
-      setCurrentBlockId(block.id); // Visually focus the block so user knows where we are
+      setCurrentBlockId(block.id);
       pendingBlockIdRef.current = null;
     }
   }, [debug, getContext, getVoiceConfigForBlock, stop]);
 
-  // --- Event Bindings ---
+  const isPlaybackChunkFresh = useCallback((chunk: AudioChunk) => {
+    const gate = activePlaybackGateRef.current;
+    if (!gate) {
+      return false;
+    }
+
+    if (chunk.playbackRunId !== undefined && chunk.playbackRunId !== gate.playbackRunId) {
+      return false;
+    }
+    if (playbackRunIdRef.current !== gate.playbackRunId) {
+      return false;
+    }
+    if (voiceContextRevisionRef.current !== gate.voiceContextRevision) {
+      return false;
+    }
+
+    const startedRevision = gate.blockRevisions.get(chunk.blockId);
+    if (typeof startedRevision !== 'number') {
+      return false;
+    }
+
+    const currentRevision = getCurrentBlockRevision(chunk.blockId);
+    return currentRevision === startedRevision;
+  }, [getCurrentBlockRevision]);
 
   useEffect(() => {
     const engine = engineRef.current!;
 
     const onAudio = (chunk: AudioChunk) => {
-      // 1. Store the chunk in buffer
+      if (!isPlaybackChunkFresh(chunk)) {
+        return;
+      }
+
       audioDataMap.current.set(chunk.blockId, chunk);
-      setBlockStatuses(prev => ({ ...prev, [chunk.blockId]: 'ready' }));
+      setBlockStatuses((prev) => ({ ...prev, [chunk.blockId]: 'ready' }));
       updateBufferProgress();
-      
-      // 2. If we are currently stalled waiting for THIS specific block, resume playback
+
       if (isPlayingRef.current) {
         const currentBlock = queueRef.current[currentIndexRef.current];
         if (
-          currentBlock &&
-          currentBlock.id === chunk.blockId &&
-          !activeSourceRef.current &&
-          pendingBlockIdRef.current !== chunk.blockId
+          currentBlock
+          && currentBlock.id === chunk.blockId
+          && !activeSourceRef.current
+          && pendingBlockIdRef.current !== chunk.blockId
         ) {
           playNext(playbackRunIdRef.current);
         }
@@ -322,8 +400,8 @@ export const useAudioPlayer = (
       const skipped = (payload as { skipped?: boolean }).skipped;
       if (skipped && blockId) {
         if (blockStatusesRef.current[blockId] !== 'error') {
-          setBlockStatuses(prev => ({ ...prev, [blockId]: 'error' }));
-          const skippedBlock = queueRef.current.find(block => block.id === blockId);
+          setBlockStatuses((prev) => ({ ...prev, [blockId]: 'error' }));
+          const skippedBlock = queueRef.current.find((block) => block.id === blockId);
           if (skippedBlock) {
             onSkip?.(skippedBlock, payload.error);
           }
@@ -344,15 +422,13 @@ export const useAudioPlayer = (
       onError?.(payload.error, 'Audio generation failed.');
     };
     engine.on('error', onEngineError);
-    
+
     return () => {
       engine.off('audio', onAudio);
       engine.off('error', onEngineError);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onError, onSkip]); 
-
-  // --- Public Methods ---
+  }, [onError, onSkip, isPlaybackChunkFresh]);
 
   const getAudioGenerationSignature = useCallback((blocks: ScriptBlock[]) => {
     return blocks
@@ -366,14 +442,86 @@ export const useAudioPlayer = (
       .join('|');
   }, [getFallbackVoiceId, getVoiceConfigForBlock]);
 
+  const startPlaybackGeneration = useCallback((blocks: ScriptBlock[], playbackRunId: number, forceRegenerate: boolean) => {
+    const engine = engineRef.current;
+    if (!engine) {
+      return;
+    }
+
+    const scopeKey = getPlaybackScopeKey();
+    const startedVoiceContextRevision = voiceContextRevisionRef.current;
+    const playable = getPlayableBlocks(blocks);
+    const blockRevisions = new Map(playable.map((block) => [block.id, block.blockRevision]));
+
+    void orchestratorRef.current.run<void>({
+      opType: forceRegenerate ? 'ttsPlaybackRefresh' : 'ttsPlaybackPrefetch',
+      scopeKey,
+      metadata: {
+        playbackRunId,
+        voiceContextRevision: startedVoiceContextRevision,
+        blockRevisionSnapshot: Object.fromEntries(blockRevisions)
+      },
+      execute: (signal, receipt) => new Promise<void>((resolve, reject) => {
+        const onAbort = () => {
+          cleanup();
+          engine.stop();
+          reject(createAbortError());
+        };
+        const onComplete = () => {
+          cleanup();
+          resolve();
+        };
+        const cleanup = () => {
+          signal.removeEventListener('abort', onAbort);
+          engine.off('complete', onComplete);
+        };
+
+        activePlaybackGateRef.current = {
+          playbackRunId,
+          voiceContextRevision: startedVoiceContextRevision,
+          blockRevisions,
+          receiptOpId: receipt.opId
+        };
+
+        signal.addEventListener('abort', onAbort, { once: true });
+        engine.on('complete', onComplete);
+        void engine.start(blocks, voiceConfigsRef.current, {
+          clearCache: forceRegenerate,
+          playbackRunId
+        });
+      }),
+      isFresh: () => {
+        if (playbackRunIdRef.current !== playbackRunId) {
+          return false;
+        }
+        if (voiceContextRevisionRef.current !== startedVoiceContextRevision) {
+          return false;
+        }
+        for (const [blockId, startedRevision] of blockRevisions) {
+          if (getCurrentBlockRevision(blockId) !== startedRevision) {
+            return false;
+          }
+        }
+        return true;
+      },
+      commit: () => {
+        // Playback commits progressively via gated `audio` chunks.
+      }
+    }).then((outcome) => {
+      if (outcome.kind === 'failed') {
+        onError?.(outcome.error, 'Audio generation failed.');
+      }
+    });
+  }, [getCurrentBlockRevision, getPlaybackScopeKey, onError]);
+
   const playScript = (blocks: ScriptBlock[], options?: { forceRegenerate?: boolean }) => {
     const playableBlocks = getPlayableBlocks(blocks);
     const audioSignature = getAudioGenerationSignature(blocks);
     const canReuseBuffer =
-      !options?.forceRegenerate &&
-      audioSignature.length > 0 &&
-      audioSignature === bufferedAudioSignatureRef.current &&
-      audioDataMap.current.size > 0;
+      !options?.forceRegenerate
+      && audioSignature.length > 0
+      && audioSignature === bufferedAudioSignatureRef.current
+      && audioDataMap.current.size > 0;
 
     stop({ clearBuffer: !canReuseBuffer });
     queueRef.current = playableBlocks;
@@ -384,7 +532,7 @@ export const useAudioPlayer = (
     updateBufferProgress(playableBlocks.length);
     setBlockStatuses(() => {
       const nextStatuses: Record<string, BlockAudioStatus> = {};
-      playableBlocks.forEach(block => {
+      playableBlocks.forEach((block) => {
         if (canReuseBuffer && audioDataMap.current.has(block.id)) {
           nextStatuses[block.id] = 'ready';
         } else if (canReuseBuffer && skippedBlockIdsRef.current.has(block.id)) {
@@ -400,14 +548,14 @@ export const useAudioPlayer = (
       return;
     }
 
-    // Tiny delay to ensure stop cleanup finishes
+    const nextRunId = playbackRunIdRef.current + 1;
     startTimeoutRef.current = setTimeout(() => {
       startTimeoutRef.current = null;
-      playbackRunIdRef.current += 1;
+      playbackRunIdRef.current = nextRunId;
       setIsPlaying(true);
       isPlayingRef.current = true;
-      engineRef.current?.start(blocks, voiceConfigs);
-      playNext(playbackRunIdRef.current);
+      startPlaybackGeneration(blocks, nextRunId, Boolean(options?.forceRegenerate));
+      playNext(nextRunId);
     }, 10);
   };
 
@@ -479,48 +627,81 @@ export const useAudioPlayer = (
   const retryCurrentBlock = useCallback(async () => {
     const block = queueRef.current[currentIndexRef.current];
     if (!block) return;
-    setBlockStatuses(prev => ({ ...prev, [block.id]: 'generating' }));
+
+    const config = getVoiceConfigForBlock(block);
+    const voiceId = config?.voiceId || getFallbackVoiceId();
+    const startedVoiceContextRevision = voiceContextRevisionRef.current;
+    const startedBlockRevision = getCurrentBlockRevision(block.id) ?? block.blockRevision;
+    const scopeKey = scopeKeys.ttsBlockRetry(scriptIdRef.current, block.id);
+
+    setBlockStatuses((prev) => ({ ...prev, [block.id]: 'generating' }));
     skippedBlockIdsRef.current.delete(block.id);
     updateBufferProgress();
 
-    try {
-      const config = getVoiceConfigForBlock(block);
-      const voiceId = config?.voiceId || getFallbackVoiceId();
-      const buffer = await engineRef.current?.generateSingle(block.text, voiceId, {
-        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
-      });
-      if (!buffer) {
-        setBlockStatuses(prev => ({ ...prev, [block.id]: 'error' }));
-        return;
+    activeRetryScopeRef.current = scopeKey;
+    const outcome = await orchestratorRef.current.run<AudioChunk>({
+      opType: 'ttsBlockRetry',
+      scopeKey,
+      metadata: {
+        playbackRunId: playbackRunIdRef.current,
+        voiceContextRevision: startedVoiceContextRevision,
+        blockRevision: startedBlockRevision
+      },
+      execute: async (signal) => {
+        const buffer = await engineRef.current?.generateSingle(block.text, voiceId, {
+          expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive,
+          signal,
+          requestId: `retry:${block.id}:${Date.now()}`
+        });
+        if (!buffer) {
+          throw new Error('No audio data returned.');
+        }
+        return {
+          blockId: block.id,
+          audioBuffer: buffer,
+          voiceId,
+          speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
+          pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
+          expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
+        };
+      },
+      isFresh: () => (
+        voiceContextRevisionRef.current === startedVoiceContextRevision
+        && (getCurrentBlockRevision(block.id) ?? block.blockRevision) === startedBlockRevision
+      ),
+      commit: (chunk) => {
+        audioDataMap.current.set(block.id, chunk);
+        setBlockStatuses((prev) => ({ ...prev, [block.id]: 'ready' }));
+        updateBufferProgress();
+        if (isPaused) {
+          return;
+        }
+        if (isPlayingRef.current) {
+          playNext(playbackRunIdRef.current);
+        }
       }
-      audioDataMap.current.set(block.id, {
-        blockId: block.id,
-        audioBuffer: buffer,
-        voiceId,
-        speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
-        pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
-        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
-      });
-      setBlockStatuses(prev => ({ ...prev, [block.id]: 'ready' }));
-      updateBufferProgress();
-      if (isPaused) {
-        return;
-      }
-      if (isPlayingRef.current) {
-        playNext(playbackRunIdRef.current);
-      }
-    } catch (error: unknown) {
-      console.error(error);
-      setBlockStatuses(prev => ({ ...prev, [block.id]: 'error' }));
-      onError?.(error, 'Audio generation failed.');
+    });
+
+    if (activeRetryScopeRef.current === scopeKey) {
+      activeRetryScopeRef.current = null;
     }
-  }, [getFallbackVoiceId, getVoiceConfigForBlock, isPaused, onError, playNext, updateBufferProgress]);
+
+    if (outcome.kind === 'failed') {
+      setBlockStatuses((prev) => ({ ...prev, [block.id]: 'error' }));
+      onError?.(outcome.error, 'Audio generation failed.');
+      return;
+    }
+
+    if (outcome.kind === 'aborted' || outcome.kind === 'dropped') {
+      setBlockStatuses((prev) => ({ ...prev, [block.id]: 'notGenerated' }));
+    }
+  }, [getCurrentBlockRevision, getFallbackVoiceId, getVoiceConfigForBlock, isPaused, onError, playNext, updateBufferProgress]);
 
   const skipCurrentBlock = useCallback(() => {
     const block = queueRef.current[currentIndexRef.current];
     if (!block) return;
     skippedBlockIdsRef.current.add(block.id);
-    setBlockStatuses(prev => ({ ...prev, [block.id]: 'error' }));
+    setBlockStatuses((prev) => ({ ...prev, [block.id]: 'error' }));
     updateBufferProgress();
 
     if (isPlayingRef.current) {
@@ -537,47 +718,77 @@ export const useAudioPlayer = (
     }
   }, [haltActiveSource, isPaused, playNext, updateBufferProgress]);
 
-  const playPreview = async (text: string, config: VoiceConfig) => {
+  const playPreview = async (
+    text: string,
+    config: VoiceConfig,
+    options?: { scopeId?: string }
+  ) => {
     stop({ clearBuffer: false });
     setIsLoadingAudio(true);
-    // Note: isPreviewPlaying remains false during loading phase
-    
-    try {
-      // Use engine for preview to benefit from caching
-      const buffer = await engineRef.current?.generateSingle(text, config.voiceId, {
-        expressive: config.expressive || false
-      });
-      if (!buffer) {
-         setIsLoadingAudio(false);
-         return;
-      }
 
-      const ctx = getContext();
-      const audioBuffer = await decodePCM(buffer, ctx);
-      
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.playbackRate.value = config.speed ?? DEFAULT_VOICE_CONFIG.speed;
-      source.detune.value = (config.pitch ?? DEFAULT_VOICE_CONFIG.pitch) * 100;
+    const startedVoiceContextRevision = voiceContextRevisionRef.current;
+    const scopeIdentity = options?.scopeId || config.voiceId;
+    const scopeKey = scopeKeys.ttsPreview(scriptIdRef.current, scopeIdentity);
+    activePreviewScopeRef.current = scopeKey;
 
-      const gainNode = ctx.createGain();
-      gainNode.gain.value = 0.92;
-      source.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      activeSourceRef.current = source;
-      
-      source.onended = () => {
+    const outcome = await orchestratorRef.current.run<ArrayBuffer>({
+      opType: 'ttsPreview',
+      scopeKey,
+      metadata: {
+        voiceContextRevision: startedVoiceContextRevision,
+        scopeIdentity
+      },
+      execute: async (signal) => {
+        const buffer = await engineRef.current?.generateSingle(text, config.voiceId, {
+          expressive: config.expressive || false,
+          signal,
+          requestId: `preview:${scopeIdentity}:${Date.now()}`
+        });
+        if (!buffer) {
+          throw new Error('No audio data returned.');
+        }
+        return buffer;
+      },
+      isFresh: () => voiceContextRevisionRef.current === startedVoiceContextRevision,
+      commit: async (buffer) => {
+        const ctx = getContext();
+        const audioBuffer = await decodePCM(buffer, ctx);
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.playbackRate.value = config.speed ?? DEFAULT_VOICE_CONFIG.speed;
+        source.detune.value = (config.pitch ?? DEFAULT_VOICE_CONFIG.pitch) * 100;
+
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 0.92;
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        activeSourceRef.current = source;
+
+        source.onended = () => {
+          setIsLoadingAudio(false);
+          setIsPreviewPlaying(false);
+          activeSourceRef.current = null;
+        };
+
         setIsLoadingAudio(false);
-        setIsPreviewPlaying(false);
-        activeSourceRef.current = null;
-      };
-      
+        setIsPreviewPlaying(true);
+        source.start();
+      }
+    });
+
+    if (activePreviewScopeRef.current === scopeKey) {
+      activePreviewScopeRef.current = null;
+    }
+
+    if (outcome.kind === 'failed') {
+      onError?.(outcome.error, 'Preview audio failed.');
       setIsLoadingAudio(false);
-      setIsPreviewPlaying(true);
-      source.start();
-    } catch (error: unknown) {
-      console.error(error);
-      onError?.(error, 'Preview audio failed.');
+      setIsPreviewPlaying(false);
+      return;
+    }
+
+    if (outcome.kind === 'aborted' || outcome.kind === 'dropped') {
       setIsLoadingAudio(false);
       setIsPreviewPlaying(false);
     }
@@ -628,9 +839,9 @@ const decodePCM = async (buffer: ArrayBuffer, ctx: AudioContext): Promise<AudioB
   const sampleRate = 24000;
   const dataInt16 = new Int16Array(copy, 0, safeByteLength / 2);
   const frameCount = dataInt16.length / numChannels;
-  
+
   const audioBuffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-  
+
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = audioBuffer.getChannelData(channel);
     for (let i = 0; i < frameCount; i++) {

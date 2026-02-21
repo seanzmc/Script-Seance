@@ -13,7 +13,7 @@ describe('scopeKeys', () => {
     expect(scopeKeys.setupSurprise('setup-1')).toBe('setup:setup-1:surprise');
     expect(scopeKeys.setupAutoSurprise('setup-1')).toBe('setup:setup-1:auto-surprise');
     expect(scopeKeys.ttsPlaybackPrefetch('s1')).toBe('script:s1:tts:playback');
-    expect(scopeKeys.ttsPlaybackRefresh('s1')).toBe('script:s1:tts:playback:refresh');
+    expect(scopeKeys.ttsPlaybackRefresh('s1')).toBe('script:s1:tts:playback');
     expect(scopeKeys.ttsPreview('s1', 'voice-1')).toBe('script:s1:tts:preview:voice-1');
     expect(scopeKeys.ttsBlockRetry('s1', 'b1')).toBe('script:s1:block:b1:tts-retry');
   });

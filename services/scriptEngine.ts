@@ -28,6 +28,7 @@ interface QueueItem {
   speed: number;
   pitch: number;
   expressive: boolean;
+  playbackRunId?: number;
 }
 
 export interface AudioChunk {
@@ -37,6 +38,7 @@ export interface AudioChunk {
   speed: number;
   pitch: number;
   expressive: boolean;
+  playbackRunId?: number;
 }
 
 export type EventHandler = (data: unknown) => void;
@@ -135,7 +137,7 @@ export class ScriptEngine {
   public async start(
     blocks: ScriptBlock[],
     voiceConfigs: VoiceConfig[],
-    options?: { clearCache?: boolean }
+    options?: { clearCache?: boolean; playbackRunId?: number }
   ) {
     this.stop({ clearCache: options?.clearCache });
     this.isRunning = true;
@@ -165,7 +167,8 @@ export class ScriptEngine {
         voiceId: config?.voiceId || narratorFallbackVoiceId,
         speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
         pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
-        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
+        expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive,
+        playbackRunId: options?.playbackRunId
       };
     });
     this.blockRetryCounts.clear();
@@ -179,15 +182,16 @@ export class ScriptEngine {
   public async generateSingle(
     text: string,
     voiceId: string,
-    options?: { expressive?: boolean }
+    options?: { expressive?: boolean; signal?: AbortSignal; requestId?: string }
   ): Promise<ArrayBuffer> {
-     const requestId = `preview:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+     const requestId = options?.requestId ?? `preview:${Date.now()}:${Math.random().toString(16).slice(2)}`;
      return this.fetchAudio({
        text,
        voiceId,
        requestId,
        expressive: options?.expressive || false,
-       cacheTarget: { kind: 'preview' }
+       cacheTarget: { kind: 'preview' },
+       signal: options?.signal
      });
   }
 
@@ -243,7 +247,8 @@ export class ScriptEngine {
           voiceId: item.voiceId,
           speed: item.speed,
           pitch: item.pitch,
-          expressive: item.expressive
+          expressive: item.expressive,
+          playbackRunId: item.playbackRunId
         } as AudioChunk);
       }
     } catch (error: unknown) {
@@ -280,11 +285,12 @@ export class ScriptEngine {
     requestId: string;
     retryCount?: number;
     expressive: boolean;
+    signal?: AbortSignal;
     cacheTarget:
       | { kind: 'block'; blockId: string; blockRevision: number }
       | { kind: 'preview' };
   }): Promise<ArrayBuffer> {
-    const { text, voiceId, requestId, expressive, cacheTarget } = params;
+    const { text, voiceId, requestId, expressive, cacheTarget, signal } = params;
     const retryCount = params.retryCount ?? 0;
     const safeText = text.trim();
     const keyContext = {
@@ -314,6 +320,14 @@ export class ScriptEngine {
 
     const request = createGenerateSpeechRequest(safeText, voiceId, undefined, { expressive });
     this.inflightCancels.set(requestId, request.cancel);
+    const abortRequest = () => request.cancel();
+    if (signal) {
+      if (signal.aborted) {
+        request.cancel();
+      } else {
+        signal.addEventListener('abort', abortRequest, { once: true });
+      }
+    }
 
     try {
       const buffer = await request.promise;
@@ -384,12 +398,16 @@ export class ScriptEngine {
            requestId,
            retryCount: retryCount + 1,
            expressive,
+           signal,
            cacheTarget
          });
        }
        
        throw error;
     } finally {
+      if (signal) {
+        signal.removeEventListener('abort', abortRequest);
+      }
       this.inflightCancels.delete(requestId);
     }
   }
