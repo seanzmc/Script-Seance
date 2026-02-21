@@ -1296,6 +1296,7 @@ export default function App() {
   const totalBufferedBlocks = totalBufferedCount;
   const voiceIds = getVoiceIdList(availableVoices);
   const defaultVoiceId = voiceIds[0] || DEFAULT_NARRATOR_VOICE_ID;
+  const isTtsPreviewEnabled = voiceCatalogState === 'ready' && availableVoices.some((voice) => voice.source !== 'legacy');
 
   const voicesContent = context ? (
     <div className="h-full min-h-0 flex flex-col gap-2">
@@ -1304,6 +1305,9 @@ export default function App() {
       )}
       {voiceCatalogState === 'error' && (
         <p className="text-[10px] text-amber-300">Voice catalog unavailable. Using fallback voices.</p>
+      )}
+      {voiceCatalogState === 'ready' && !isTtsPreviewEnabled && (
+        <p className="text-[10px] text-amber-300">TTS provider not configured. Preview is disabled.</p>
       )}
       {voicesView === 'casting' && castingCharacter ? (
         <VoiceCastingModal
@@ -1326,6 +1330,7 @@ export default function App() {
           onPreview={handleModalPreview}
           isPreviewing={isPreviewPlaying || isLoadingAudio}
           previewVoiceId={previewVoiceId}
+          isPreviewEnabled={isTtsPreviewEnabled}
         />
       ) : (
         <VoicesPanel
@@ -1338,6 +1343,7 @@ export default function App() {
           onStop={stop}
           isAudioPlaying={isPreviewPlaying}
           isLoading={isLoadingAudio && !isPlaying}
+          isPreviewEnabled={isTtsPreviewEnabled}
         />
       )}
     </div>

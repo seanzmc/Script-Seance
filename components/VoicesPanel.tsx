@@ -12,6 +12,7 @@ export interface VoicesPanelProps {
   onStop: () => void;
   isAudioPlaying: boolean;
   isLoading: boolean;
+  isPreviewEnabled?: boolean;
 }
 
 export const VoicesPanel: React.FC<VoicesPanelProps> = ({
@@ -23,7 +24,8 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
   onPreview,
   onStop,
   isAudioPlaying,
-  isLoading
+  isLoading,
+  isPreviewEnabled = true
 }) => {
   return (
     <div className="h-full min-h-0 flex flex-col gap-1.5">
@@ -41,6 +43,7 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
         onStop={onStop}
         isAudioPlaying={isAudioPlaying}
         isLoading={isLoading}
+        isPreviewEnabled={isPreviewEnabled}
       />
     </div>
   );

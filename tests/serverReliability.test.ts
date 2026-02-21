@@ -23,7 +23,6 @@ beforeAll(async () => {
   process.env.ADMIN_PASSWORD = 'test-password';
   process.env.GEMINI_API_KEY = 'test-key';
   process.env.TEXT_LLM_PROVIDER = 'gemini';
-  process.env.TTS_PROVIDER = 'gemini';
   process.env.INWORLD_API_KEY = '';
   process.env.INWORLD_API_SECRET = '';
   process.env.INWORLD_WORKSPACE_ID = '';
@@ -170,24 +169,7 @@ describe('server reliability', () => {
     expect(res.body.data.voices.some((voice: { id: string }) => voice.id === 'Zephyr')).toBe(true);
   });
 
-  it('keeps generateSpeech response contract for backwards compatibility', async () => {
-    const base64Audio = 'QUJD'; // "ABC"
-    mockGenerateContent.mockResolvedValue({
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                inlineData: {
-                  data: base64Audio
-                }
-              }
-            ]
-          }
-        }
-      ]
-    });
-
+  it('returns a configuration error for generateSpeech when TTS provider is not configured', async () => {
     const req = {
       body: {
         kind: 'generateSpeech',
@@ -218,8 +200,9 @@ describe('server reliability', () => {
 
     await handleAiGenerate(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body?.data?.audioBase64).toBe(base64Audio);
+    expect(res.statusCode).toBe(500);
+    expect(res.body?.error?.code).toBe('CONFIG_ERROR');
+    expect(res.body?.error?.message).toBe('TTS provider not configured.');
   });
 
   it('prunes expired sessions and stale rate buckets', () => {

@@ -13,6 +13,7 @@ export interface VoiceCastingModalProps {
   onPreview: (voiceId: string) => void;
   isPreviewing?: boolean;
   previewVoiceId?: string | null;
+  isPreviewEnabled?: boolean;
   embedded?: boolean;
   onBack?: () => void;
 }
@@ -52,6 +53,14 @@ const formatTagLabel = (value: string) =>
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ');
+const normalizeTagToken = (value?: string) =>
+  typeof value === 'string'
+    ? value
+      .toLowerCase()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    : '';
 const sanitizeMetaValue = (value?: string) => {
   const normalized = value?.trim();
   if (!normalized) return '';
@@ -87,6 +96,26 @@ const toVoiceData = (voice: TtsVoice): VoiceData => {
     isCustom: voice.isCustom
   };
 };
+const getExtraTraitTags = (voice: VoiceData) => {
+  const canonicalTags = new Set(
+    [voice.gender, voice.category]
+      .map((value) => normalizeTagToken(value))
+      .filter(Boolean)
+  );
+  const seen = new Set<string>();
+  const extras: string[] = [];
+
+  voice.tags.forEach((tag) => {
+    const normalized = normalizeTagToken(tag);
+    if (!normalized || canonicalTags.has(normalized) || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    extras.push(formatTagLabel(normalized));
+  });
+
+  return extras;
+};
 
 export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
   isOpen,
@@ -99,6 +128,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
   onPreview,
   isPreviewing,
   previewVoiceId,
+  isPreviewEnabled = true,
   embedded = false,
   onBack
 }) => {
@@ -168,6 +198,10 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
     
     return result;
   }, [activeFilter, showAvailableOnly, assignedMap, mergedVoices]);
+  const availableVoiceIds = useMemo(
+    () => new Set(availableVoices.map((voice) => voice.id)),
+    [availableVoices]
+  );
 
   if (!isOpen) return null;
 
@@ -290,6 +324,11 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                 const isPlaying = isPreviewing && previewVoiceId === voice.id;
                 const assignments = assignedMap[voice.id] || [];
                 const isAssignedElsewhere = assignments.length > 0;
+                const extraTraits = getExtraTraitTags(voice);
+                const canPreviewVoice = isPreviewEnabled && availableVoiceIds.has(voice.id);
+                const previewTitle = canPreviewVoice
+                  ? (isPlaying ? 'Stop preview' : 'Preview')
+                  : 'TTS provider not configured';
 
                 return (
                   <div
@@ -347,16 +386,16 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                       {voice.description}
                     </p>
 
-                    {voice.tags.length > 0 && (
+                    {extraTraits.length > 0 && (
                       <div className="mb-2 flex flex-wrap gap-1">
-                        {voice.tags.slice(0, 4).map((tag) => (
+                        {extraTraits.slice(0, 4).map((tag) => (
                           <span
                             key={`${voice.id}-${tag}`}
                             className={`px-1.5 py-0 rounded text-[10px] ${
                               isSelected ? 'bg-indigo-500/25 text-indigo-200' : 'bg-gray-700/80 text-gray-300'
                             }`}
                           >
-                            {formatTagLabel(tag)}
+                            {tag}
                           </span>
                         ))}
                       </div>
@@ -376,16 +415,20 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     <div className="flex items-center justify-between gap-2">
                       <button
                         onClick={(e) => {
+                          if (!canPreviewVoice) return;
                           e.stopPropagation();
                           onPreview(voice.id);
                         }}
-                        aria-label={isPlaying ? 'Stop preview' : 'Preview'}
+                        aria-label={previewTitle}
+                        disabled={!canPreviewVoice}
                         className={`h-9 px-2.5 rounded-md text-[11px] font-semibold transition-all inline-flex items-center gap-1.5 ${
-                          isPlaying 
+                          !canPreviewVoice
+                            ? 'bg-gray-800/60 text-gray-500 cursor-not-allowed'
+                            : isPlaying 
                             ? 'bg-indigo-500 text-white shadow-inner' 
                             : 'bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white'
                         }`}
-                        title={isPlaying ? 'Stop preview' : 'Preview'}
+                        title={previewTitle}
                       >
                         {isPlaying ? (
                           <Pause className="w-3.5 h-3.5 fill-current" />

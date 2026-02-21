@@ -12,6 +12,7 @@ export interface VoiceManagerProps {
   onStop: () => void;
   isAudioPlaying: boolean;
   isLoading: boolean;
+  isPreviewEnabled?: boolean;
 }
 
 export const VoiceManager: React.FC<VoiceManagerProps> = ({
@@ -23,9 +24,11 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
   onPreview,
   onStop,
   isAudioPlaying,
-  isLoading
+  isLoading,
+  isPreviewEnabled = true
 }) => {
   const availableVoiceIds = availableVoices.map((voice) => voice.id);
+  const availableVoiceIdSet = new Set(availableVoiceIds);
   const fallbackVoiceIds = availableVoiceIds.length > 0 ? availableVoiceIds : LEGACY_VOICE_IDS;
 
   const [activeChar, setActiveChar] = useState<string | null>(null);
@@ -75,6 +78,8 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
     const isActive = activeChar === char;
     const isThisLoading = isActive && isLoading;
     const isThisPlaying = isActive && isAudioPlaying;
+    const isVoicePreviewAvailable = isPreviewEnabled && availableVoiceIdSet.has(config.voiceId);
+    const previewDisabled = !isVoicePreviewAvailable && !isThisLoading && !isThisPlaying;
     const isExpanded = expandedChars[char];
     const advancedControlsId = `voice-advanced-${char.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
     const isNarrator = options?.variant === 'narrator';
@@ -136,12 +141,15 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
             </button>
             <button
               onClick={() => handlePreview(char, config)}
+              disabled={previewDisabled}
               className={`px-2.5 py-1.5 rounded-md border text-[11px] font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
-                (isThisLoading || isThisPlaying)
+                previewDisabled
+                  ? 'bg-gray-800/60 border-gray-700 text-gray-500 cursor-not-allowed'
+                  : (isThisLoading || isThisPlaying)
                   ? 'bg-red-600/85 border-red-500 text-white'
                   : 'bg-gray-800/80 border-gray-700 text-gray-300 hover:text-white hover:border-indigo-500/70 hover:bg-indigo-600/70'
               }`}
-              title={isThisPlaying ? 'Stop preview' : 'Preview voice'}
+              title={previewDisabled ? 'TTS provider not configured' : (isThisPlaying ? 'Stop preview' : 'Preview voice')}
             >
               {isThisLoading ? (
                 <Loader className="w-3.5 h-3.5 animate-spin" />
@@ -189,15 +197,6 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
                   className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                 />
               </div>
-              <label className="col-span-2 flex items-center justify-between rounded-md border border-gray-700 bg-gray-900/60 px-2 py-1.5 text-[10px] uppercase tracking-widest text-gray-400">
-                <span>Expressive TTS</span>
-                <input
-                  type="checkbox"
-                  checked={config.expressive || false}
-                  onChange={(e) => onUpdateConfig(char, { expressive: e.target.checked })}
-                  className="h-3.5 w-3.5 accent-indigo-500"
-                />
-              </label>
             </div>
           )}
         </div>

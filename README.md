@@ -21,7 +21,7 @@ UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
 - Vite 6
 - Express 5 API server
 - OpenAI SDK (`openai`)
-- Google GenAI SDK (`@google/genai`) for Gemini TTS fallback
+- Google GenAI SDK (`@google/genai`) for optional Gemini text generation
 - Vitest + Testing Library
 
 ## Environment Variables
@@ -58,7 +58,6 @@ AI_MAX_PROMPT_CHARS=8000
 AI_UPSTREAM_TIMEOUT_MS=30000
 AI_UPSTREAM_TIMEOUT_MS_SCENE=90000
 TRUST_PROXY=0
-TTS_PROVIDER=dual
 TTS_INWORLD_MODEL=inworld-tts-1.5-max
 INWORLD_API_BASE=https://api.inworld.ai
 INWORLD_ENGINE_HOST=api-engine.inworld.ai
@@ -68,8 +67,8 @@ INWORLD_JWT_REFRESH_BUFFER_MS=60000
 ```
 
 `OPENAI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.  
-For Inworld TTS migration paths, set `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
-`GEMINI_API_KEY` is optional unless you use Gemini text fallback (`TEXT_LLM_PROVIDER=gemini`) or Gemini TTS.
+For Inworld TTS, set `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
+`GEMINI_API_KEY` is optional unless you use Gemini text fallback (`TEXT_LLM_PROVIDER=gemini`).
 
 ## Local Development
 

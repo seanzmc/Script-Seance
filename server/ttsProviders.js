@@ -112,7 +112,6 @@ const LEGACY_TTS_VOICES = [
 ];
 
 const LEGACY_VOICE_IDS = new Set(LEGACY_TTS_VOICES.map((voice) => voice.id));
-const TTS_PROVIDER_SET = new Set(['gemini', 'inworld', 'dual']);
 const AUDIO_FIELD_KEYS = ['audioBase64', 'audio_base64', 'audioContent', 'audio_content', 'audio'];
 const DISALLOWED_INWORLD_TAGS = new Set(['unknown', 'general']);
 const CURATED_INWORLD_VOICES = [
@@ -196,11 +195,6 @@ const isEnglishLanguageCode = (value) => {
 };
 const pruneInworldTags = (tags) =>
   mergeUniqueLabels(tags).filter((tag) => !DISALLOWED_INWORLD_TAGS.has(tag));
-
-const normalizeTtsProvider = (value, fallback = 'dual') => {
-  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  return TTS_PROVIDER_SET.has(normalized) ? normalized : fallback;
-};
 
 const mergeUniqueLabels = (labels) => {
   const next = new Set();
@@ -589,7 +583,6 @@ const isInworldVoiceFetchErrorRecoverable = (status) =>
 export {
   LEGACY_TTS_VOICES,
   LEGACY_VOICE_IDS,
-  normalizeTtsProvider,
   applyExpressiveText,
   extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
