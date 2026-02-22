@@ -21,8 +21,18 @@ const getErrorName = (error: unknown): string | undefined => {
   return undefined;
 };
 
+const getErrorCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const code = (error as Record<string, unknown>).code;
+  return typeof code === 'string' ? code : undefined;
+};
+
 export type RequestOptions = {
   timeoutMs?: number;
+  opType?: string;
+  scopeKey?: string;
 };
 
 export type CancellableRequest<T> = {
@@ -37,6 +47,21 @@ const TTS_MAX_ATTEMPTS = 5;
 const TTS_BASE_DELAY_MS = 1000;
 const TTS_MAX_DELAY_MS = 10000;
 const TTS_JITTER_MS = 250;
+
+type DebugWindow = Window & {
+  __SS_DEBUG_AI_ABORTS__?: boolean;
+};
+
+const isAbortDebugEnabled = () =>
+  typeof window !== 'undefined' &&
+  Boolean((window as DebugWindow).__SS_DEBUG_AI_ABORTS__);
+
+const debugAbortLog = (event: string, details: Record<string, unknown>) => {
+  if (!isAbortDebugEnabled()) {
+    return;
+  }
+  console.info(`[ai:${event}]`, details);
+};
 
 type GenerateSpeechContext = {
   text: string;
@@ -255,6 +280,11 @@ const createAiRequest = <T>(
 
   const cancel = () => {
     if (!controller.signal.aborted) {
+      debugAbortLog('cancel', {
+        kind,
+        opType: options.opType,
+        scopeKey: options.scopeKey
+      });
       abortReason = 'cancel';
       controller.abort();
     }
@@ -316,7 +346,19 @@ const createAiRequest = <T>(
   })();
 
   const wrappedPromise = promise.catch((error: unknown) => {
-    if (getErrorName(error) === 'AbortError') {
+    const errorName = getErrorName(error);
+    const errorCode = getErrorCode(error);
+    if (errorName === 'AbortError' || errorCode === 'REQUEST_ABORTED') {
+      debugAbortLog('fetch-reject', {
+        kind,
+        opType: options.opType,
+        scopeKey: options.scopeKey,
+        errorName,
+        errorCode,
+        abortReason
+      });
+    }
+    if (errorName === 'AbortError') {
       const message =
         abortReason === 'timeout' ? 'Request timed out.' : 'Request canceled.';
       const abortError = new Error(message) as Error & { code?: string };

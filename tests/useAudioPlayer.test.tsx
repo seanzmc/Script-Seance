@@ -53,7 +53,7 @@ class MockAudioContext {
   createGain() {
     return { gain: { value: 1 }, connect: () => undefined } as unknown as GainNode;
   }
-  createBuffer(_numChannels: number, frameCount: number, _sampleRate: number) {
+  createBuffer(_numChannels: number, frameCount: number) {
     return {
       getChannelData: () => new Float32Array(frameCount)
     } as unknown as AudioBuffer;
@@ -65,7 +65,6 @@ vi.mock('../services/scriptEngine', () => {
     private listeners = new Map<string, Set<(data: unknown) => void>>();
 
     constructor() {
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
       lastEngine = this as unknown as EngineLike;
     }
 

@@ -26,6 +26,21 @@ const isAbortError = (error: unknown) => {
 
 const createOpId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+type DebugWindow = Window & {
+  __SS_DEBUG_AI_ABORTS__?: boolean;
+};
+
+const isAbortDebugEnabled = () =>
+  typeof window !== 'undefined' &&
+  Boolean((window as DebugWindow).__SS_DEBUG_AI_ABORTS__);
+
+const debugAbortLog = (event: string, details: Record<string, unknown>) => {
+  if (!isAbortDebugEnabled()) {
+    return;
+  }
+  console.info(`[orchestrator:${event}]`, details);
+};
+
 export class GenerationOrchestrator {
   private activeByScope = new Map<string, ActiveOp>();
 
@@ -41,14 +56,22 @@ export class GenerationOrchestrator {
   }
 
   public async run<T>(options: RunOptions<T>): Promise<Outcome<T>> {
+    const nextOpId = createOpId();
     const previous = this.activeByScope.get(options.scopeKey);
     if (previous) {
+      debugAbortLog('abort-prior', {
+        scopeKey: options.scopeKey,
+        priorOpId: previous.opId,
+        priorOpType: previous.receipt.opType,
+        newOpId: nextOpId,
+        newOpType: options.opType
+      });
       previous.receipt.status = 'aborted';
       previous.receipt.abortController.abort('superseded');
     }
 
     const receipt: Receipt = {
-      opId: createOpId(),
+      opId: nextOpId,
       opType: options.opType,
       scopeKey: options.scopeKey,
       startedAt: Date.now(),

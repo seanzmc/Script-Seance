@@ -858,12 +858,19 @@ export default function App() {
         'Return only the title text, no quotes.',
         'Avoid scene headings like INT./EXT.'
       ].join(' ');
+      const scopeKey = scopeKeys.titleSuggestion(scriptIdRef.current);
       const outcome = await orchestratorRef.current.run<string>({
         opType: 'titleSuggestion',
-        scopeKey: scopeKeys.titleSuggestion(scriptIdRef.current),
+        scopeKey,
         execute: (signal) => executeCancellableWithSignal(
           signal,
-          () => createGenerateScriptElementRequest(BlockType.ACTION, undefined, instruction, contextText)
+          () => createGenerateScriptElementRequest(
+            BlockType.ACTION,
+            undefined,
+            instruction,
+            contextText,
+            { opType: 'titleSuggestion', scopeKey }
+          )
         ),
         isFresh: () => isTitleSuggestionFresh({
           startedPromptContextRevision,
@@ -935,7 +942,12 @@ export default function App() {
         scopeKey,
         execute: (signal) => executeCancellableWithSignal(
           signal,
-          () => createGenerateSceneRequest(initialContext, instruction, true)
+          () => createGenerateSceneRequest(
+            initialContext,
+            instruction,
+            true,
+            { opType: 'generateOpeningScene', scopeKey }
+          )
         ),
         isFresh: () =>
           promptContextRevisionRef.current === startedPromptContextRevision &&
@@ -981,7 +993,12 @@ export default function App() {
         scopeKey,
         execute: (signal) => executeCancellableWithSignal(
           signal,
-          () => createGenerateSceneRequest(context, prompt, false)
+          () => createGenerateSceneRequest(
+            context,
+            prompt,
+            false,
+            { opType: 'generateNextScene', scopeKey }
+          )
         ),
         isFresh: () => promptContextRevisionRef.current === startedPromptContextRevision,
         commit: (nextScene) => {
@@ -1025,7 +1042,10 @@ export default function App() {
         scopeKey,
         execute: (signal) => executeCancellableWithSignal(
           signal,
-          () => createSuggestPlotTwistRequest(context.genre)
+          () => createSuggestPlotTwistRequest(
+            context.genre,
+            { opType: 'suggestPlotTwist', scopeKey }
+          )
         ),
         isFresh: () =>
           promptContextRevisionRef.current === startedPromptContextRevision &&
@@ -1240,7 +1260,8 @@ export default function App() {
           params.elementType,
           params.selectedChar,
           params.instruction,
-          params.promptContext
+          params.promptContext,
+          { opType: 'insertSurpriseText', scopeKey }
         )
       ),
       isFresh: () =>
@@ -1273,7 +1294,10 @@ export default function App() {
       trigger: params.mode === 'auto' ? 'system' : 'user',
       execute: (signal) => executeCancellableWithSignal(
         signal,
-        () => createGenerateSurpriseSetupRequest(params.targetGenre)
+        () => createGenerateSurpriseSetupRequest(
+          params.targetGenre,
+          { opType, scopeKey }
+        )
       ),
       isFresh: () => {
         if (params.mode === 'auto') {
@@ -1332,7 +1356,13 @@ export default function App() {
         scopeKey,
         execute: (signal) => executeCancellableWithSignal(
           signal,
-          () => createRegenerateScriptBlockRequest(block, context.genre, context.premise, rewriteGuidance)
+          () => createRegenerateScriptBlockRequest(
+            block,
+            context.genre,
+            context.premise,
+            rewriteGuidance,
+            { opType: 'rewriteBlock', scopeKey }
+          )
         ),
         isFresh: () => isRewriteFresh({
           context: contextRef.current,

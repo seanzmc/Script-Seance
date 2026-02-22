@@ -259,7 +259,7 @@ const removeListener = (target, eventName, listener) => {
   }
 };
 
-const attachRequestAbortSignal = (req) => {
+const attachRequestAbortSignal = (req, res) => {
   const controller = new AbortController();
   const abortWith = (reason) => {
     if (!controller.signal.aborted) {
@@ -267,22 +267,24 @@ const attachRequestAbortSignal = (req) => {
     }
   };
   const onAborted = () => abortWith(createRequestAbortedError('Client canceled request.'));
-  const onClose = () => abortWith(createRequestAbortedError('Client connection closed.'));
+  const onResponseClose = () => {
+    if (!res?.writableEnded) {
+      abortWith(createRequestAbortedError('Client connection closed.'));
+    }
+  };
 
   if (req && typeof req.on === 'function') {
     req.on('aborted', onAborted);
-    req.on('close', onClose);
   }
-  if (req?.socket && typeof req.socket.on === 'function') {
-    req.socket.on('close', onClose);
+  if (res && typeof res.on === 'function') {
+    res.on('close', onResponseClose);
   }
 
   return {
     signal: controller.signal,
     cleanup: () => {
       removeListener(req, 'aborted', onAborted);
-      removeListener(req, 'close', onClose);
-      removeListener(req?.socket, 'close', onClose);
+      removeListener(res, 'close', onResponseClose);
     }
   };
 };
@@ -983,7 +985,7 @@ const handleAiGenerate = async (req, res) => {
     return sendError(res, 400, 'Invalid request payload.', 'INVALID_REQUEST');
   }
 
-  const requestContext = attachRequestAbortSignal(req);
+  const requestContext = attachRequestAbortSignal(req, res);
   try {
     try {
       let data;
@@ -1137,6 +1139,7 @@ const handleAiGenerate = async (req, res) => {
     } catch (error) {
       const message = error?.message || '';
       const normalizedMessage = message.toLowerCase();
+      const isRequestAborted = isAbortError(error);
       const isRateLimit =
         error?.status === 429 ||
         normalizedMessage.includes('429') ||
@@ -1160,6 +1163,22 @@ const handleAiGenerate = async (req, res) => {
           parsedKeys: parsedAiKeys || null,
           rawResponse: rawSnippet
         });
+      }
+
+      if (isRequestAborted) {
+        if (!IS_PROD) {
+          console.info('[ai/generate] Aborted', {
+            requestId,
+            kind,
+            code: error?.code,
+            status: error?.status,
+            message
+          });
+        }
+        if (!res.writableEnded && !res.destroyed) {
+          return sendError(res, 499, 'Request canceled.', 'REQUEST_ABORTED');
+        }
+        return;
       }
 
       console.error('[ai/generate] Failed', error);

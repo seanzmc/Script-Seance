@@ -83,7 +83,8 @@ describe('server reliability', () => {
     }
   });
 
-  it('preserves cancel mapping contract as generic upstream error', async () => {
+  it('returns request-aborted mapping for canceled upstream execution', async () => {
+    const consoleInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const canceledError = new Error('Client canceled request.');
@@ -117,9 +118,10 @@ describe('server reliability', () => {
       } as any;
 
       await handleAiGenerate(req, res);
-      expect(res.statusCode).toBe(502);
-      expect(res.body?.error?.code).toBe('UPSTREAM_ERROR');
+      expect(res.statusCode).toBe(499);
+      expect(res.body?.error?.code).toBe('REQUEST_ABORTED');
     } finally {
+      consoleInfo.mockRestore();
       consoleError.mockRestore();
     }
   });
