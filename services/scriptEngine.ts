@@ -29,6 +29,7 @@ interface QueueItem {
   pitch: number;
   expressive: boolean;
   playbackRunId?: number;
+  voiceContextRevision?: number;
 }
 
 export interface AudioChunk {
@@ -39,6 +40,8 @@ export interface AudioChunk {
   pitch: number;
   expressive: boolean;
   playbackRunId?: number;
+  blockRevision?: number;
+  voiceContextRevision?: number;
 }
 
 export type EventHandler = (data: unknown) => void;
@@ -137,7 +140,7 @@ export class ScriptEngine {
   public async start(
     blocks: ScriptBlock[],
     voiceConfigs: VoiceConfig[],
-    options?: { clearCache?: boolean; playbackRunId?: number }
+    options?: { clearCache?: boolean; playbackRunId?: number; voiceContextRevision?: number }
   ) {
     this.stop({ clearCache: options?.clearCache });
     this.isRunning = true;
@@ -168,7 +171,8 @@ export class ScriptEngine {
         speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
         pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
         expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive,
-        playbackRunId: options?.playbackRunId
+        playbackRunId: options?.playbackRunId,
+        voiceContextRevision: options?.voiceContextRevision
       };
     });
     this.blockRetryCounts.clear();
@@ -248,7 +252,9 @@ export class ScriptEngine {
           speed: item.speed,
           pitch: item.pitch,
           expressive: item.expressive,
-          playbackRunId: item.playbackRunId
+          playbackRunId: item.playbackRunId,
+          blockRevision: item.block.blockRevision,
+          voiceContextRevision: item.voiceContextRevision
         } as AudioChunk);
       }
     } catch (error: unknown) {

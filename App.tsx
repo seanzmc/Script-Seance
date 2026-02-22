@@ -130,6 +130,15 @@ const sanitizeSuggestedTitle = (rawTitle: string) => {
 const normalizeCharacterName = (value: string) =>
   value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
+const getVoiceContextFingerprint = (configs: VoiceConfig[]) => (
+  configs
+    .map((config) => (
+      `${normalizeCharacterName(config.name)}:${config.voiceId}:${config.expressive ? '1' : '0'}`
+    ))
+    .sort()
+    .join('|')
+);
+
 const resolveCharacterName = (value: string | null | undefined, characters: string[]) => {
   if (!value) return value ?? undefined;
   const normalized = normalizeCharacterName(value);
@@ -232,13 +241,11 @@ export default function App() {
   const setupSessionIdRef = useRef(crypto.randomUUID());
   const setupManualEditRevisionRef = useRef(0);
   const promptContextRevisionRef = useRef(0);
-  const promptContextFingerprintRef = useRef('');
   const contextRef = useRef<StoryContext | null>(null);
   const userInstructionRef = useRef('');
   const activeGenerationScopeRef = useRef<string | null>(null);
   const manualTitleRevisionRef = useRef(0);
   const voiceContextRevisionRef = useRef(0);
-  const voiceContextFingerprintRef = useRef('');
   const titleSuggestionTokenRef = useRef(0);
   const hasManualTitleRef = useRef(false);
 
@@ -255,6 +262,8 @@ export default function App() {
   const [redoCount, setRedoCount] = useState(0);
   const undoStackRef = useRef<UndoAction[]>([]);
   const redoStackRef = useRef<UndoAction[]>([]);
+  const setupStateRef = useRef<SetupFormState>(DEFAULT_SETUP_STATE);
+  const voiceConfigsRef = useRef<VoiceConfig[]>([]);
 
   // Playback Settings
   const [showHighlights, setShowHighlights] = useState(true);
@@ -296,66 +305,77 @@ export default function App() {
   }, [context]);
 
   useEffect(() => {
-    userInstructionRef.current = userInstruction;
-  }, [userInstruction]);
+    setupStateRef.current = setupState;
+  }, [setupState]);
 
-  const voiceContextFingerprint = useMemo(() => {
-    const entries = voiceConfigs
-      .map((config) => (
-        `${normalizeCharacterName(config.name)}:${config.voiceId}:${config.expressive ? '1' : '0'}`
-      ))
-      .sort();
-    return entries.join('|');
+  useEffect(() => {
+    voiceConfigsRef.current = voiceConfigs;
   }, [voiceConfigs]);
 
   useEffect(() => {
-    if (voiceContextFingerprintRef.current === voiceContextFingerprint) {
-      return;
-    }
-    voiceContextFingerprintRef.current = voiceContextFingerprint;
-    voiceContextRevisionRef.current += 1;
-  }, [voiceContextFingerprint]);
+    userInstructionRef.current = userInstruction;
+  }, [userInstruction]);
 
-  const promptContextFingerprint = useMemo(() => {
-    if (context) {
-      return JSON.stringify({
-        mode: 'context',
-        title: context.title,
-        genre: context.genre,
-        premise: context.premise,
-        characters: context.characters,
-        style: context.style ?? '',
-        targetLength: context.targetLength ?? '',
-        scenes: context.scenes.map((scene) => ({
-          id: scene.id,
-          heading: scene.heading,
-          summary: scene.summary,
-          blocks: scene.blocks.map((block) => ({
-            id: block.id,
-            type: block.type,
-            text: block.text,
-            character: block.character ?? ''
-          }))
-        }))
-      });
+  const applyContextMutation = useCallback((
+    mutation: StoryContext | null | ((previous: StoryContext | null) => StoryContext | null),
+    options?: { bumpPromptRevision?: boolean }
+  ) => {
+    const previous = contextRef.current;
+    const next = typeof mutation === 'function'
+      ? (mutation as (previous: StoryContext | null) => StoryContext | null)(previous)
+      : mutation;
+    if (next === previous) {
+      return false;
     }
-    return JSON.stringify({
-      mode: 'setup',
-      genre: setupState.genre,
-      premise: setupState.premise,
-      characters: setupState.characters,
-      style: setupState.style,
-      length: setupState.length
-    });
-  }, [context, setupState]);
+    contextRef.current = next;
+    if (options?.bumpPromptRevision ?? true) {
+      promptContextRevisionRef.current += 1;
+    }
+    setContext(next);
+    return true;
+  }, []);
 
-  useEffect(() => {
-    if (promptContextFingerprintRef.current === promptContextFingerprint) {
-      return;
+  const applySetupStateMutation = useCallback((
+    mutation: SetupFormState | ((previous: SetupFormState) => SetupFormState),
+    options?: { source?: 'user' | 'system'; bumpPromptRevision?: boolean }
+  ) => {
+    const previous = setupStateRef.current;
+    const next = typeof mutation === 'function'
+      ? (mutation as (previous: SetupFormState) => SetupFormState)(previous)
+      : mutation;
+    if (next === previous) {
+      return false;
     }
-    promptContextFingerprintRef.current = promptContextFingerprint;
-    promptContextRevisionRef.current += 1;
-  }, [promptContextFingerprint]);
+    setupStateRef.current = next;
+    if (options?.bumpPromptRevision ?? true) {
+      promptContextRevisionRef.current += 1;
+    }
+    if ((options?.source ?? 'user') === 'user') {
+      setupManualEditRevisionRef.current += 1;
+    }
+    setSetupState(next);
+    return true;
+  }, []);
+
+  const applyVoiceConfigMutation = useCallback((
+    mutation: VoiceConfig[] | ((previous: VoiceConfig[]) => VoiceConfig[])
+  ) => {
+    const previous = voiceConfigsRef.current;
+    const next = typeof mutation === 'function'
+      ? (mutation as (previous: VoiceConfig[]) => VoiceConfig[])(previous)
+      : mutation;
+    if (next === previous) {
+      return false;
+    }
+    voiceConfigsRef.current = next;
+    const previousFingerprint = getVoiceContextFingerprint(previous);
+    const nextFingerprint = getVoiceContextFingerprint(next);
+    if (previousFingerprint !== nextFingerprint) {
+      voiceContextRevisionRef.current += 1;
+    }
+    setVoiceConfigs(next);
+    return true;
+  }, []);
 
   const applyUndoAction = useCallback((current: StoryContext, action: UndoAction) => {
     if (action.type === 'scene') {
@@ -455,11 +475,8 @@ export default function App() {
   };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => {
-    if ((meta?.source ?? 'user') === 'user') {
-      setupManualEditRevisionRef.current += 1;
-    }
-    setSetupState(prev => ({ ...prev, ...next }));
-  }, []);
+    applySetupStateMutation((prev) => ({ ...prev, ...next }), { source: meta?.source ?? 'user' });
+  }, [applySetupStateMutation]);
   const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     if (!insertModeActive) return;
     setInsertTarget(target);
@@ -606,7 +623,7 @@ export default function App() {
     const voiceIds = getVoiceIdList(availableVoices);
     const narratorVoiceId = resolveDefaultNarratorVoiceId(availableVoices);
 
-    setVoiceConfigs((prev) => {
+    applyVoiceConfigMutation((prev) => {
       const next = [...prev];
       const hasVoiceConfig = (name: string) =>
         next.some(config => normalizeCharacterName(config.name) === normalizeCharacterName(name));
@@ -629,20 +646,23 @@ export default function App() {
 
       return next;
     });
-  }, [availableVoices, context?.characters, playbackSpeed]);
+  }, [applyVoiceConfigMutation, availableVoices, context?.characters, playbackSpeed]);
 
   useEffect(() => {
     if (context) {
-      setSetupState(prev => ({
+      applySetupStateMutation((prev) => ({
         ...prev,
         genre: context.genre,
         premise: context.premise,
         characters: context.characters,
         style: typeof context.style === 'string' ? context.style : prev.style,
         length: normalizeTargetLength(context.targetLength)
-      }));
+      }), {
+        source: 'system',
+        bumpPromptRevision: false
+      });
     }
-  }, [context]);
+  }, [applySetupStateMutation, context]);
 
   useEffect(() => {
     setInsertTarget(null);
@@ -722,7 +742,7 @@ export default function App() {
           ...parsed.context,
           scenes: parsed.context.scenes.map(scene => normalizeSceneCharacters(scene, parsed.context.characters))
         };
-        setContext(hydratedContext);
+        applyContextMutation(hydratedContext);
         if (typeof parsed.userInstruction === 'string') {
           setUserInstruction(parsed.userInstruction);
         }
@@ -734,7 +754,7 @@ export default function App() {
     } finally {
       didHydrateDraftRef.current = true;
     }
-  }, []);
+  }, [applyContextMutation]);
 
   useEffect(() => {
     if (!context || !didHydrateDraftRef.current || typeof window === 'undefined') return;
@@ -790,8 +810,8 @@ export default function App() {
     if (!context || !suggestedTitle || suggestedTitleDismissed) return;
     if (hasManualTitleRef.current) return;
     if (!isUntitledTitle(context.title)) return;
-    setContext(prev => prev ? { ...prev, title: suggestedTitle } : prev);
-  }, [context, suggestedTitle, suggestedTitleDismissed]);
+    applyContextMutation((prev) => prev ? { ...prev, title: suggestedTitle } : prev);
+  }, [applyContextMutation, context, suggestedTitle, suggestedTitleDismissed]);
 
   const handleLogin = async (password: string) => {
     setIsAuthLoading(true);
@@ -821,10 +841,10 @@ export default function App() {
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
     resetUndoRedo();
-    setContext(null);
+    applyContextMutation(null);
     setUserInstruction('');
-    setVoiceConfigs([]);
-    setSetupState(DEFAULT_SETUP_STATE);
+    applyVoiceConfigMutation([]);
+    applySetupStateMutation(DEFAULT_SETUP_STATE, { source: 'system' });
     setupSessionIdRef.current = crypto.randomUUID();
     setupManualEditRevisionRef.current = 0;
     scriptIdRef.current = crypto.randomUUID();
@@ -885,7 +905,7 @@ export default function App() {
           setSuggestedTitle(finalTitle);
           setSuggestedTitleDismissed(false);
           if (!hasManualTitleRef.current) {
-            setContext(prev => {
+            applyContextMutation((prev) => {
               if (!prev || !isUntitledTitle(prev.title)) return prev;
               return { ...prev, title: finalTitle };
             });
@@ -902,7 +922,7 @@ export default function App() {
         setIsSuggestingTitle(false);
       }
     }
-  }, [executeCancellableWithSignal, handleAiError]);
+  }, [applyContextMutation, executeCancellableWithSignal, handleAiError]);
 
   // Handlers
   const handleStart = async () => {
@@ -955,7 +975,7 @@ export default function App() {
         commit: (firstScene) => {
           const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
           const initialLastBlockId = normalizedFirstScene.blocks[normalizedFirstScene.blocks.length - 1]?.id;
-          setContext({
+          applyContextMutation({
             ...initialContext,
             scenes: [normalizedFirstScene]
           });
@@ -1004,7 +1024,7 @@ export default function App() {
         commit: (nextScene) => {
           const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
           const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
-          setContext(prev => {
+          applyContextMutation((prev) => {
             if (!prev) return null;
             const updatedScenes = [...prev.scenes, normalizedScene];
             return { ...prev, scenes: updatedScenes };
@@ -1073,7 +1093,7 @@ export default function App() {
     setInsertScrollTargetId(block.id);
     setInsertScrollToken(token => token + 1);
     
-    setContext(prev => {
+    applyContextMutation((prev) => {
       if (!prev) return null;
       const newScenes = [...prev.scenes];
       const normalizedBlock = block.character
@@ -1120,7 +1140,7 @@ export default function App() {
 
   const handleInsertAfter = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
     clearRedo();
-    setContext(prev => {
+    applyContextMutation((prev) => {
       if (!prev) return null;
       const sceneIndex = prev.scenes.findIndex(scene => scene.id === target.sceneId);
       if (sceneIndex === -1) return prev;
@@ -1156,7 +1176,7 @@ export default function App() {
       return { ...prev, scenes: newScenes };
     });
     setInsertTarget(null);
-  }, [clearRedo, pushUndoAction]);
+  }, [applyContextMutation, clearRedo, pushUndoAction]);
 
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
@@ -1170,7 +1190,7 @@ export default function App() {
 
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
-    setContext(prev => {
+    applyContextMutation((prev) => {
       if (!prev || prev.scenes.length === 0) return prev;
       const lastAction = popUndoAction();
       if (!lastAction) return prev;
@@ -1185,7 +1205,7 @@ export default function App() {
   };
 
   const handleRedo = () => {
-    setContext(prev => {
+    applyContextMutation((prev) => {
       const action = popRedoAction();
       if (!action) return prev;
       if (!prev) {
@@ -1204,7 +1224,7 @@ export default function App() {
 
   const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
     clearRedo();
-    setContext(prev => {
+    applyContextMutation((prev) => {
       if (!prev) return null;
       const newScenes = prev.scenes.map(scene => {
         if (scene.id !== sceneId) return scene;
@@ -1215,11 +1235,11 @@ export default function App() {
       });
       return { ...prev, scenes: newScenes };
     });
-  }, [clearRedo]);
+  }, [applyContextMutation, clearRedo]);
 
   const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
     clearRedo();
-    setContext(prev => {
+    applyContextMutation((prev) => {
       if (!prev) return null;
       const resolvedCharacter = resolveCharacterName(character, prev.characters);
       return {
@@ -1238,7 +1258,7 @@ export default function App() {
         } : scene)
       };
     });
-  }, [clearRedo]);
+  }, [applyContextMutation, clearRedo]);
 
   const handleInsertSurprise = useCallback(async (params: {
     elementType: BlockType;
@@ -1374,7 +1394,7 @@ export default function App() {
         }),
         commit: (newText) => {
           clearRedo();
-          setContext(prev => {
+          applyContextMutation((prev) => {
             if (!prev) return null;
             return {
               ...prev,
@@ -1393,7 +1413,7 @@ export default function App() {
           setToast({
             message: 'Block regenerated',
             onUndo: () => {
-              setContext(prev => {
+              applyContextMutation((prev) => {
                 if (!prev) return null;
                 return {
                   ...prev,
@@ -1423,13 +1443,13 @@ export default function App() {
       }
       setIsGenerating(false);
     }
-  }, [clearRedo, context, executeCancellableWithSignal, handleAiError, isGenerating]);
+  }, [applyContextMutation, clearRedo, context, executeCancellableWithSignal, handleAiError, isGenerating]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
     const defaultVoiceId = voiceIds[0] || resolveDefaultNarratorVoiceId(availableVoices);
     let shouldClearGeneratedAudio = false;
-    setVoiceConfigs(prev => {
+    applyVoiceConfigMutation((prev) => {
       const normalized = normalizeCharacterName(char);
       const existingIdx = prev.findIndex(c => normalizeCharacterName(c.name) === normalized);
       if (existingIdx >= 0) {
@@ -1466,16 +1486,16 @@ export default function App() {
 
   const handleGlobalSpeedChange = (speed: number) => {
     setPlaybackSpeed(speed);
-    setVoiceConfigs(prev => prev.map(config => ({ ...config, speed })));
+    applyVoiceConfigMutation((prev) => prev.map(config => ({ ...config, speed })));
   };
 
   const applyTitle = useCallback((newTitle: string, source: 'auto' | 'user') => {
-    setContext(prev => prev ? { ...prev, title: newTitle } : null);
+    applyContextMutation((prev) => prev ? { ...prev, title: newTitle } : null);
     if (source === 'user') {
       manualTitleRevisionRef.current += 1;
       hasManualTitleRef.current = true;
     }
-  }, []);
+  }, [applyContextMutation]);
 
   const handleTitleChange = (newTitle: string) => {
     applyTitle(newTitle, 'user');

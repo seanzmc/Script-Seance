@@ -26,7 +26,7 @@ export const isRewriteFresh = (params: {
   if (!block) {
     return false;
   }
-  return block.blockRevision === params.startedBlockRevision;
+  return block.blockRevision === params.startedBlockRevision && !block.locked;
 };
 
 export const isSetupAutoSurpriseFresh = (params: {

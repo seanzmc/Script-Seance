@@ -352,6 +352,97 @@ describe('useAudioPlayer', () => {
     expect(ref.current.blockStatuses['block-1']).toBe('generating');
   });
 
+  it('discards stale buffered audio when blockRevision changes before playback reaches that block', async () => {
+    const originalStart = MockAudioBufferSourceNode.prototype.start;
+    MockAudioBufferSourceNode.prototype.start = function startWithoutAutoEnd() {};
+    try {
+      const initialBlocks: ScriptBlock[] = [
+        { id: 'block-1', type: BlockType.DIALOGUE, text: 'Line one', blockRevision: 1, character: 'A' },
+        { id: 'block-2', type: BlockType.DIALOGUE, text: 'Line two', blockRevision: 1, character: 'A' }
+      ];
+      const revisedBlocks: ScriptBlock[] = [
+        { id: 'block-1', type: BlockType.DIALOGUE, text: 'Line one', blockRevision: 1, character: 'A' },
+        { id: 'block-2', type: BlockType.DIALOGUE, text: 'Line two', blockRevision: 2, character: 'A' }
+      ];
+      const voiceConfigs: VoiceConfig[] = [
+        { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 },
+        { name: 'A', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
+      ];
+      const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+      const { rerender } = render(
+        <Harness
+          ref={ref}
+          voiceConfigs={voiceConfigs}
+          blocks={initialBlocks}
+          scriptId="script-1"
+          voiceContextRevision={1}
+        />
+      );
+
+      await act(async () => {
+        ref.current.playScript(initialBlocks);
+        vi.runAllTimers();
+      });
+
+      const firstRunId = getEngine().start.mock.calls[0]?.[2]?.playbackRunId as number;
+      await act(async () => {
+        getEngine().emit('audio', {
+          blockId: 'block-1',
+          audioBuffer: new ArrayBuffer(8),
+          voiceId: 'inworld-voice-1',
+          speed: 1,
+          pitch: 0,
+          expressive: false,
+          playbackRunId: firstRunId,
+          blockRevision: 1,
+          voiceContextRevision: 1
+        });
+      });
+
+      await act(async () => {
+        getEngine().emit('audio', {
+          blockId: 'block-2',
+          audioBuffer: new ArrayBuffer(8),
+          voiceId: 'inworld-voice-1',
+          speed: 1,
+          pitch: 0,
+          expressive: false,
+          playbackRunId: firstRunId,
+          blockRevision: 1,
+          voiceContextRevision: 1
+        });
+      });
+
+      await act(async () => {
+        rerender(
+          <Harness
+            ref={ref}
+            voiceConfigs={voiceConfigs}
+            blocks={revisedBlocks}
+            scriptId="script-1"
+            voiceContextRevision={1}
+          />
+        );
+      });
+
+      getEngine().generateSingle.mockResolvedValueOnce(new ArrayBuffer(16));
+      await act(async () => {
+        ref.current.goToNext();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(getEngine().generateSingle).toHaveBeenCalledTimes(1);
+      expect(getEngine().generateSingle).toHaveBeenCalledWith(
+        'Line two',
+        'inworld-voice-1',
+        expect.objectContaining({ requestId: expect.stringContaining('playback-regenerate:block-2') })
+      );
+    } finally {
+      MockAudioBufferSourceNode.prototype.start = originalStart;
+    }
+  });
+
   it('drops retry result when blockRevision changes before resolve', async () => {
     const initialBlocks: ScriptBlock[] = [
       { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }

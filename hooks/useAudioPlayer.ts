@@ -251,6 +251,20 @@ export const useAudioPlayer = (
     };
   }, [stop]);
 
+  const isBufferedChunkFreshForPlayback = useCallback((chunk: AudioChunk, block: ScriptBlock) => {
+    const currentRevision = getCurrentBlockRevision(block.id) ?? block.blockRevision;
+    if (typeof chunk.blockRevision === 'number' && chunk.blockRevision !== currentRevision) {
+      return false;
+    }
+    if (
+      typeof chunk.voiceContextRevision === 'number'
+      && chunk.voiceContextRevision !== voiceContextRevisionRef.current
+    ) {
+      return false;
+    }
+    return true;
+  }, [getCurrentBlockRevision]);
+
   const playNext = useCallback(async (runId: number) => {
     if (!isPlayingRef.current || runId !== playbackRunIdRef.current) return;
 
@@ -289,6 +303,69 @@ export const useAudioPlayer = (
     const chunk = audioDataMap.current.get(block.id);
 
     if (chunk) {
+      if (!isBufferedChunkFreshForPlayback(chunk, block)) {
+        audioDataMap.current.delete(block.id);
+        setBlockStatuses((prev) => ({ ...prev, [block.id]: 'generating' }));
+        updateBufferProgress();
+        setIsLoadingAudio(true);
+        setCurrentBlockId(block.id);
+        pendingBlockIdRef.current = null;
+
+        const config = getVoiceConfigForBlock(block);
+        const voiceId = config?.voiceId || getFallbackVoiceId();
+        const startedVoiceContextRevision = voiceContextRevisionRef.current;
+        const startedBlockRevision = getCurrentBlockRevision(block.id) ?? block.blockRevision;
+
+        void (async () => {
+          try {
+            const regeneratedBuffer = await engineRef.current?.generateSingle(block.text, voiceId, {
+              expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive,
+              requestId: `playback-regenerate:${block.id}:${Date.now()}`
+            });
+            if (!regeneratedBuffer) {
+              throw new Error('No audio data returned.');
+            }
+            if (!isPlayingRef.current || runId !== playbackRunIdRef.current) {
+              return;
+            }
+            if (voiceContextRevisionRef.current !== startedVoiceContextRevision) {
+              return;
+            }
+            if ((getCurrentBlockRevision(block.id) ?? block.blockRevision) !== startedBlockRevision) {
+              return;
+            }
+            const regeneratedChunk: AudioChunk = {
+              blockId: block.id,
+              audioBuffer: regeneratedBuffer,
+              voiceId,
+              speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
+              pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
+              expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive,
+              playbackRunId: runId,
+              blockRevision: startedBlockRevision,
+              voiceContextRevision: startedVoiceContextRevision
+            };
+            audioDataMap.current.set(block.id, regeneratedChunk);
+            setBlockStatuses((prev) => ({ ...prev, [block.id]: 'ready' }));
+            updateBufferProgress();
+
+            const currentBlock = queueRef.current[currentIndexRef.current];
+            if (
+              currentBlock
+              && currentBlock.id === block.id
+              && !activeSourceRef.current
+              && pendingBlockIdRef.current !== block.id
+            ) {
+              void playNext(runId);
+            }
+          } catch (error) {
+            setBlockStatuses((prev) => ({ ...prev, [block.id]: 'error' }));
+            onError?.(error, 'Audio generation failed.');
+          }
+        })();
+        return;
+      }
+
       setIsLoadingAudio(false);
       setCurrentBlockId(block.id);
       pendingBlockIdRef.current = block.id;
@@ -342,7 +419,17 @@ export const useAudioPlayer = (
       setCurrentBlockId(block.id);
       pendingBlockIdRef.current = null;
     }
-  }, [debug, getContext, getVoiceConfigForBlock, stop]);
+  }, [
+    debug,
+    getContext,
+    getCurrentBlockRevision,
+    getFallbackVoiceId,
+    getVoiceConfigForBlock,
+    isBufferedChunkFreshForPlayback,
+    onError,
+    stop,
+    updateBufferProgress
+  ]);
 
   const isPlaybackChunkFresh = useCallback((chunk: AudioChunk) => {
     const gate = activePlaybackGateRef.current;
@@ -373,11 +460,18 @@ export const useAudioPlayer = (
     const engine = engineRef.current!;
 
     const onAudio = (chunk: AudioChunk) => {
-      if (!isPlaybackChunkFresh(chunk)) {
+      const gate = activePlaybackGateRef.current;
+      const normalizedChunk: AudioChunk = {
+        ...chunk,
+        blockRevision: chunk.blockRevision ?? gate?.blockRevisions.get(chunk.blockId),
+        voiceContextRevision: chunk.voiceContextRevision ?? gate?.voiceContextRevision
+      };
+
+      if (!isPlaybackChunkFresh(normalizedChunk)) {
         return;
       }
 
-      audioDataMap.current.set(chunk.blockId, chunk);
+      audioDataMap.current.set(chunk.blockId, normalizedChunk);
       setBlockStatuses((prev) => ({ ...prev, [chunk.blockId]: 'ready' }));
       updateBufferProgress();
 
@@ -385,9 +479,9 @@ export const useAudioPlayer = (
         const currentBlock = queueRef.current[currentIndexRef.current];
         if (
           currentBlock
-          && currentBlock.id === chunk.blockId
+          && currentBlock.id === normalizedChunk.blockId
           && !activeSourceRef.current
-          && pendingBlockIdRef.current !== chunk.blockId
+          && pendingBlockIdRef.current !== normalizedChunk.blockId
         ) {
           playNext(playbackRunIdRef.current);
         }
@@ -487,7 +581,8 @@ export const useAudioPlayer = (
         engine.on('complete', onComplete);
         void engine.start(blocks, voiceConfigsRef.current, {
           clearCache: forceRegenerate,
-          playbackRunId
+          playbackRunId,
+          voiceContextRevision: startedVoiceContextRevision
         });
       }),
       isFresh: () => {
@@ -662,7 +757,9 @@ export const useAudioPlayer = (
           voiceId,
           speed: config?.speed ?? DEFAULT_VOICE_CONFIG.speed,
           pitch: config?.pitch ?? DEFAULT_VOICE_CONFIG.pitch,
-          expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive
+          expressive: config?.expressive ?? DEFAULT_VOICE_CONFIG.expressive,
+          blockRevision: startedBlockRevision,
+          voiceContextRevision: startedVoiceContextRevision
         };
       },
       isFresh: () => (

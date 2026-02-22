@@ -50,6 +50,29 @@ describe('LLM orchestration receipt gating', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it('drops generate-next when prompt revision changes in the same tick as resolve', async () => {
+    const orchestrator = new GenerationOrchestrator();
+    const execution = deferred<string>();
+    const commit = vi.fn();
+    const startedPromptContextRevision = 7;
+    let currentPromptContextRevision = 7;
+
+    const run = orchestrator.run<string>({
+      opType: 'generateNextScene',
+      scopeKey: 'script:s1:scene:next',
+      execute: async () => execution.promise,
+      isFresh: () => currentPromptContextRevision === startedPromptContextRevision,
+      commit
+    });
+
+    currentPromptContextRevision = 8;
+    execution.resolve('Scene content');
+
+    const outcome = await run;
+    expect(outcome.kind).toBe('dropped');
+    expect(commit).not.toHaveBeenCalled();
+  });
+
   it('drops rewrite when target block revision changes before resolve', async () => {
     const orchestrator = new GenerationOrchestrator();
     const execution = deferred<string>();
@@ -94,6 +117,61 @@ describe('LLM orchestration receipt gating', () => {
         blocks: [{
           ...context.scenes[0].blocks[0],
           blockRevision: 2
+        }]
+      }]
+    };
+    execution.resolve('Updated line');
+
+    const outcome = await run;
+    expect(outcome.kind).toBe('dropped');
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('drops rewrite when target block is locked before resolve', async () => {
+    const orchestrator = new GenerationOrchestrator();
+    const execution = deferred<string>();
+    const commit = vi.fn();
+    let context: StoryContext = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A tense conspiracy.',
+      characters: ['Alex'],
+      scenes: [{
+        id: 'scene-1',
+        heading: 'INT. OFFICE - NIGHT',
+        summary: 'Initial scene',
+        blocks: [{
+          id: 'block-1',
+          type: BlockType.ACTION,
+          text: 'Alex studies the evidence.',
+          blockRevision: 1,
+          locked: false
+        }]
+      }]
+    };
+
+    const run = orchestrator.run<string>({
+      opType: 'rewriteBlock',
+      scopeKey: 'script:s1:block:block-1:rewrite',
+      execute: async () => execution.promise,
+      isFresh: () => isRewriteFresh({
+        context,
+        sceneId: 'scene-1',
+        blockId: 'block-1',
+        startedBlockRevision: 1,
+        startedPromptContextRevision: 10,
+        currentPromptContextRevision: 10
+      }),
+      commit
+    });
+
+    context = {
+      ...context,
+      scenes: [{
+        ...context.scenes[0],
+        blocks: [{
+          ...context.scenes[0].blocks[0],
+          locked: true
         }]
       }]
     };
