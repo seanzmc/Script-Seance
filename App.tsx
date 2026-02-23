@@ -8,12 +8,11 @@ import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
 import { PrivacyModal } from './components/PrivacyModal';
 import {
-  createGenerateSceneRequest,
-  createSuggestPlotTwistRequest,
-  createRegenerateScriptBlockRequest,
-  createGenerateScriptElementRequest,
-  createGenerateSurpriseSetupRequest,
-  CancellableRequest,
+  executeGenerateScene,
+  executeSuggestPlotTwist,
+  executeRewriteBlock,
+  executeGenerateScriptElement,
+  executeGenerateSurpriseSetup,
   listVoices
 } from './services/ai';
 import { getSession, login } from './services/auth';
@@ -530,23 +529,6 @@ export default function App() {
     setToast({ message: `Audio failed for ${label}${detail}` });
   }, []);
 
-  const executeCancellableWithSignal = useCallback(<T,>(
-    signal: AbortSignal,
-    createRequest: () => CancellableRequest<T>
-  ): Promise<T> => {
-    const request = createRequest();
-    if (signal.aborted) {
-      request.cancel();
-    } else {
-      const onAbort = () => request.cancel();
-      signal.addEventListener('abort', onAbort, { once: true });
-      return request.promise.finally(() => {
-        signal.removeEventListener('abort', onAbort);
-      });
-    }
-    return request.promise;
-  }, []);
-
   const cancelAiRequest = useCallback(() => {
     const scopeKey = activeGenerationScopeRef.current;
     if (scopeKey) {
@@ -882,15 +864,12 @@ export default function App() {
       const outcome = await orchestratorRef.current.run<string>({
         opType: 'titleSuggestion',
         scopeKey,
-        execute: (signal) => executeCancellableWithSignal(
-          signal,
-          () => createGenerateScriptElementRequest(
-            BlockType.ACTION,
-            undefined,
-            instruction,
-            contextText,
-            { opType: 'titleSuggestion', scopeKey }
-          )
+        execute: (signal) => executeGenerateScriptElement(
+          BlockType.ACTION,
+          undefined,
+          instruction,
+          contextText,
+          { signal, opType: 'titleSuggestion', scopeKey }
         ),
         isFresh: () => isTitleSuggestionFresh({
           startedPromptContextRevision,
@@ -922,7 +901,7 @@ export default function App() {
         setIsSuggestingTitle(false);
       }
     }
-  }, [applyContextMutation, executeCancellableWithSignal, handleAiError]);
+  }, [applyContextMutation, handleAiError]);
 
   // Handlers
   const handleStart = async () => {
@@ -960,14 +939,11 @@ export default function App() {
       const outcome = await orchestratorRef.current.run<Scene>({
         opType: 'generateOpeningScene',
         scopeKey,
-        execute: (signal) => executeCancellableWithSignal(
-          signal,
-          () => createGenerateSceneRequest(
-            initialContext,
-            instruction,
-            true,
-            { opType: 'generateOpeningScene', scopeKey }
-          )
+        execute: (signal) => executeGenerateScene(
+          initialContext,
+          instruction,
+          true,
+          { signal, opType: 'generateOpeningScene', scopeKey }
         ),
         isFresh: () =>
           promptContextRevisionRef.current === startedPromptContextRevision &&
@@ -1011,14 +987,11 @@ export default function App() {
       const outcome = await orchestratorRef.current.run<Scene>({
         opType: 'generateNextScene',
         scopeKey,
-        execute: (signal) => executeCancellableWithSignal(
-          signal,
-          () => createGenerateSceneRequest(
-            context,
-            prompt,
-            false,
-            { opType: 'generateNextScene', scopeKey }
-          )
+        execute: (signal) => executeGenerateScene(
+          context,
+          prompt,
+          false,
+          { signal, opType: 'generateNextScene', scopeKey }
         ),
         isFresh: () => promptContextRevisionRef.current === startedPromptContextRevision,
         commit: (nextScene) => {
@@ -1060,12 +1033,9 @@ export default function App() {
       const outcome = await orchestratorRef.current.run<string>({
         opType: 'suggestPlotTwist',
         scopeKey,
-        execute: (signal) => executeCancellableWithSignal(
-          signal,
-          () => createSuggestPlotTwistRequest(
-            context.genre,
-            { opType: 'suggestPlotTwist', scopeKey }
-          )
+        execute: (signal) => executeSuggestPlotTwist(
+          context.genre,
+          { signal, opType: 'suggestPlotTwist', scopeKey }
         ),
         isFresh: () =>
           promptContextRevisionRef.current === startedPromptContextRevision &&
@@ -1274,15 +1244,12 @@ export default function App() {
     const outcome = await orchestratorRef.current.run<string>({
       opType: 'insertSurpriseText',
       scopeKey,
-      execute: (signal) => executeCancellableWithSignal(
-        signal,
-        () => createGenerateScriptElementRequest(
-          params.elementType,
-          params.selectedChar,
-          params.instruction,
-          params.promptContext,
-          { opType: 'insertSurpriseText', scopeKey }
-        )
+      execute: (signal) => executeGenerateScriptElement(
+        params.elementType,
+        params.selectedChar,
+        params.instruction,
+        params.promptContext,
+        { signal, opType: 'insertSurpriseText', scopeKey }
       ),
       isFresh: () =>
         promptContextRevisionRef.current === startedPromptContextRevision &&
@@ -1295,7 +1262,7 @@ export default function App() {
     if (outcome.kind === 'failed') {
       handleAiError(outcome.error, 'Failed to generate block.');
     }
-  }, [executeCancellableWithSignal, handleAiError, insertTarget]);
+  }, [handleAiError, insertTarget]);
 
   const handleSetupSurprise = useCallback(async (params: {
     mode: 'manual' | 'auto';
@@ -1312,12 +1279,9 @@ export default function App() {
       opType,
       scopeKey,
       trigger: params.mode === 'auto' ? 'system' : 'user',
-      execute: (signal) => executeCancellableWithSignal(
-        signal,
-        () => createGenerateSurpriseSetupRequest(
-          params.targetGenre,
-          { opType, scopeKey }
-        )
+      execute: (signal) => executeGenerateSurpriseSetup(
+        params.targetGenre,
+        { signal, opType, scopeKey }
       ),
       isFresh: () => {
         if (params.mode === 'auto') {
@@ -1344,7 +1308,7 @@ export default function App() {
       return false;
     }
     return outcome.kind === 'committed';
-  }, [executeCancellableWithSignal, handleAiError, updateSetupState]);
+  }, [handleAiError, updateSetupState]);
 
   const resetTitleSuggestionState = useCallback(() => {
     titleSuggestionTokenRef.current += 1;
@@ -1374,15 +1338,12 @@ export default function App() {
       const outcome = await orchestratorRef.current.run<string>({
         opType: 'rewriteBlock',
         scopeKey,
-        execute: (signal) => executeCancellableWithSignal(
-          signal,
-          () => createRegenerateScriptBlockRequest(
-            block,
-            context.genre,
-            context.premise,
-            rewriteGuidance,
-            { opType: 'rewriteBlock', scopeKey }
-          )
+        execute: (signal) => executeRewriteBlock(
+          block,
+          context.genre,
+          context.premise,
+          rewriteGuidance,
+          { signal, opType: 'rewriteBlock', scopeKey }
         ),
         isFresh: () => isRewriteFresh({
           context: contextRef.current,
@@ -1443,7 +1404,7 @@ export default function App() {
       }
       setIsGenerating(false);
     }
-  }, [applyContextMutation, clearRedo, context, executeCancellableWithSignal, handleAiError, isGenerating]);
+  }, [applyContextMutation, clearRedo, context, handleAiError, isGenerating]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
