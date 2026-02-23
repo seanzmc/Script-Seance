@@ -1,6 +1,6 @@
 export const TTS_CACHE_SCHEMA_VERSION = 3;
 
-type TtsCacheCommonFields = {
+export type TtsCacheCommonFields = {
   provider: string;
   modelId: string;
   audioEncoding: string;
