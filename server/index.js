@@ -42,6 +42,7 @@ const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 const IS_PROD = process.env.NODE_ENV === 'production';
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 app.set('trust proxy', TRUST_PROXY ? 1 : false);
+const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000'];
 const AI_RPM = parsePositiveInt(process.env.AI_RPM, 30);
 const AI_RPD = parsePositiveInt(process.env.AI_RPD, 500);
 const MAX_PROMPT_CHARS = parsePositiveInt(process.env.AI_MAX_PROMPT_CHARS, 8000);
@@ -71,6 +72,7 @@ const INWORLD_MAX_ENGLISH_VOICES = parsePositiveInt(process.env.INWORLD_MAX_ENGL
 const VOICE_CATALOG_CACHE_TTL_MS = parsePositiveInt(process.env.VOICE_CATALOG_CACHE_TTL_MS, 5 * 60 * 1000);
 const INWORLD_JWT_REFRESH_BUFFER_MS = parsePositiveInt(process.env.INWORLD_JWT_REFRESH_BUFFER_MS, 60 * 1000);
 const INWORLD_TOKEN_METHOD = 'ai.inworld.engine.WorldEngine/GenerateToken';
+const ALLOWED_ORIGINS = new Set(parseAllowedOrigins(process.env.ALLOWED_ORIGINS));
 
 const GENRES = [
   'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
@@ -127,6 +129,27 @@ function parsePositiveInt(value, fallback) {
 function parseNonNegativeInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function normalizeOrigin(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed;
+  }
+}
+
+function parseAllowedOrigins(value) {
+  const source = typeof value === 'string' && value.trim().length > 0
+    ? value
+    : DEFAULT_ALLOWED_ORIGINS.join(',');
+  return source
+    .split(',')
+    .map((entry) => normalizeOrigin(entry))
+    .filter(Boolean);
 }
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -934,6 +957,46 @@ const rateLimitLogin = (req, res, next) => {
 };
 
 app.use(express.json({ limit: BODY_LIMIT }));
+
+const ORIGIN_GUARD_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const isProtectedApiPath = (pathName = '') => (
+  pathName === '/api/auth'
+  || pathName.startsWith('/api/auth/')
+  || pathName === '/api/ai'
+  || pathName.startsWith('/api/ai/')
+);
+
+const enforceAllowedOrigin = (req, res, next) => {
+  if (!ORIGIN_GUARD_METHODS.has(req.method)) {
+    return next();
+  }
+  if (!isProtectedApiPath(req.path)) {
+    return next();
+  }
+
+  const originHeader = req.headers.origin;
+  if (typeof originHeader !== 'string' || originHeader.trim().length === 0) {
+    if (IS_PROD) {
+      return sendError(res, 403, 'Origin header required.', 'ORIGIN_REQUIRED');
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[origin-guard] Missing Origin header for mutating request', {
+        method: req.method,
+        path: req.path
+      });
+    }
+    return next();
+  }
+
+  const normalizedOrigin = normalizeOrigin(originHeader);
+  if (!ALLOWED_ORIGINS.has(normalizedOrigin)) {
+    return sendError(res, 403, 'Origin not allowed.', 'ORIGIN_NOT_ALLOWED');
+  }
+
+  return next();
+};
+
+app.use(enforceAllowedOrigin);
 
 const handleLogin = (req, res) => {
   const password = req.body?.password;
