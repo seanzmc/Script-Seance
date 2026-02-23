@@ -29,6 +29,18 @@ const getErrorCode = (error: unknown): string | undefined => {
   return typeof code === 'string' ? code : undefined;
 };
 
+export const AI_KINDS = {
+  generateScene: 'generateScene',
+  suggestPlotTwist: 'suggestPlotTwist',
+  regenerateScriptBlock: 'regenerateScriptBlock',
+  generateScriptElement: 'generateScriptElement',
+  generateSurpriseSetup: 'generateSurpriseSetup',
+  generateSpeech: 'generateSpeech',
+  listVoices: 'listVoices'
+} as const;
+
+export type AiKind = typeof AI_KINDS[keyof typeof AI_KINDS];
+
 export type AiExecuteOptions = {
   signal?: AbortSignal;
 };
@@ -177,12 +189,12 @@ const decodeAudioBase64 = (value: string): ArrayBuffer => {
 };
 
 const createAiRequest = <T>(
-  kind: string,
+  kind: AiKind,
   context: unknown,
   options: RequestOptions = {}
 ): CancellableRequest<T> => {
   const controller = new AbortController();
-  const kindDefaultTimeout = kind === 'generateScene' ? DEFAULT_SCENE_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  const kindDefaultTimeout = kind === AI_KINDS.generateScene ? DEFAULT_SCENE_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
   const timeoutMs = options.timeoutMs ?? kindDefaultTimeout;
   let abortReason: 'cancel' | 'timeout' | null = null;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -311,7 +323,7 @@ const createAiRequest = <T>(
 };
 
 const requestAi = async <T>(
-  kind: string,
+  kind: AiKind,
   context: unknown,
   options?: RequestOptions
 ): Promise<T> => {
@@ -350,7 +362,7 @@ export const executeGenerateScene = async (
   options?: RequestOptions
 ): Promise<Scene> => {
   const request = createAiRequest<SceneGenerationData>(
-    'generateScene',
+    AI_KINDS.generateScene,
     { storyContext: context, userInstruction, isFirstScene },
     options
   );
@@ -362,7 +374,7 @@ export const executeSuggestPlotTwist = async (
   genre: string,
   options?: RequestOptions
 ): Promise<string> => {
-  const request = createAiRequest<{ text: string }>('suggestPlotTwist', { genre }, options);
+  const request = createAiRequest<{ text: string }>(AI_KINDS.suggestPlotTwist, { genre }, options);
   const data = await request.promise;
   return data.text || 'Suddenly, everything changes.';
 };
@@ -374,7 +386,7 @@ export const executeGenerateScriptElement = async (
   styleContext: string,
   options?: RequestOptions
 ): Promise<string> => {
-  const request = createAiRequest<{ text: string }>('generateScriptElement', {
+  const request = createAiRequest<{ text: string }>(AI_KINDS.generateScriptElement, {
     type,
     character,
     instruction,
@@ -392,7 +404,7 @@ export const executeRewriteBlock = async (
   options?: RequestOptions
 ): Promise<string> => {
   const request = createAiRequest<{ text: string }>(
-    'regenerateScriptBlock',
+    AI_KINDS.regenerateScriptBlock,
     { block, genre, premise, rewriteGuidance },
     options
   );
@@ -405,7 +417,7 @@ export const executeGenerateSurpriseSetup = async (
   options?: RequestOptions
 ): Promise<{ genre: string; premise: string; characters: string[] }> => {
   const request = createAiRequest<{ genre: string; premise: string; characters: string[] }>(
-    'generateSurpriseSetup',
+    AI_KINDS.generateSurpriseSetup,
     { targetGenre },
     options
   );
@@ -506,7 +518,7 @@ export const createGenerateSpeechRequest = (
       throw createAbortError();
     }
     const request = createAiRequest<{ audioBase64: string }>(
-      'generateSpeech',
+      AI_KINDS.generateSpeech,
       context,
       options
     );
@@ -526,123 +538,6 @@ export const createGenerateSpeechRequest = (
 };
 
 export const listVoices = async (options?: RequestOptions): Promise<TtsVoice[]> => {
-  const data = await requestAi<{ voices: TtsVoice[] }>('listVoices', {}, options);
+  const data = await requestAi<{ voices: TtsVoice[] }>(AI_KINDS.listVoices, {}, options);
   return Array.isArray(data.voices) ? data.voices : [];
-};
-
-/** @deprecated Use executeGenerateScene instead. */
-export const createGenerateSceneRequest = (
-  context: StoryContext,
-  userInstruction: string,
-  isFirstScene: boolean,
-  options?: RequestOptions
-): CancellableRequest<Scene> => {
-  const controller = new AbortController();
-  if (options?.signal) {
-    if (options.signal.aborted) {
-      controller.abort(options.signal.reason);
-    } else {
-      options.signal.addEventListener('abort', () => controller.abort(options.signal?.reason), { once: true });
-    }
-  }
-  return {
-    cancel: () => controller.abort(),
-    promise: executeGenerateScene(context, userInstruction, isFirstScene, {
-      ...options,
-      signal: controller.signal
-    })
-  };
-};
-
-/** @deprecated Use executeSuggestPlotTwist instead. */
-export const createSuggestPlotTwistRequest = (
-  genre: string,
-  options?: RequestOptions
-): CancellableRequest<string> => {
-  const controller = new AbortController();
-  if (options?.signal) {
-    if (options.signal.aborted) {
-      controller.abort(options.signal.reason);
-    } else {
-      options.signal.addEventListener('abort', () => controller.abort(options.signal?.reason), { once: true });
-    }
-  }
-  return {
-    cancel: () => controller.abort(),
-    promise: executeSuggestPlotTwist(genre, {
-      ...options,
-      signal: controller.signal
-    })
-  };
-};
-
-/** @deprecated Use executeRewriteBlock instead. */
-export const createRegenerateScriptBlockRequest = (
-  block: ScriptBlock,
-  genre: string,
-  premise: string,
-  rewriteGuidance?: string,
-  options?: RequestOptions
-): CancellableRequest<string> => {
-  const controller = new AbortController();
-  if (options?.signal) {
-    if (options.signal.aborted) {
-      controller.abort(options.signal.reason);
-    } else {
-      options.signal.addEventListener('abort', () => controller.abort(options.signal?.reason), { once: true });
-    }
-  }
-  return {
-    cancel: () => controller.abort(),
-    promise: executeRewriteBlock(block, genre, premise, rewriteGuidance, {
-      ...options,
-      signal: controller.signal
-    })
-  };
-};
-
-export const createGenerateScriptElementRequest = (
-  type: BlockType,
-  character: string | undefined,
-  instruction: string,
-  styleContext: string,
-  options?: RequestOptions
-): CancellableRequest<string> => {
-  const controller = new AbortController();
-  if (options?.signal) {
-    if (options.signal.aborted) {
-      controller.abort(options.signal.reason);
-    } else {
-      options.signal.addEventListener('abort', () => controller.abort(options.signal?.reason), { once: true });
-    }
-  }
-
-  return {
-    cancel: () => controller.abort(),
-    promise: executeGenerateScriptElement(type, character, instruction, styleContext, {
-      ...options,
-      signal: controller.signal
-    })
-  };
-};
-
-export const createGenerateSurpriseSetupRequest = (
-  targetGenre?: string,
-  options?: RequestOptions
-): CancellableRequest<{ genre: string; premise: string; characters: string[] }> => {
-  const controller = new AbortController();
-  if (options?.signal) {
-    if (options.signal.aborted) {
-      controller.abort(options.signal.reason);
-    } else {
-      options.signal.addEventListener('abort', () => controller.abort(options.signal?.reason), { once: true });
-    }
-  }
-  return {
-    cancel: () => controller.abort(),
-    promise: executeGenerateSurpriseSetup(targetGenre, {
-      ...options,
-      signal: controller.signal
-    })
-  };
 };

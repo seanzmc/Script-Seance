@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BlockType } from '../types';
-import { createGenerateSpeechRequest, createSuggestPlotTwistRequest, generateScriptElement } from '../services/ai';
+import { createGenerateSpeechRequest, executeSuggestPlotTwist, generateScriptElement } from '../services/ai';
 
 type MockResponse = {
   ok: boolean;
@@ -60,8 +60,8 @@ describe('AI API wrapper', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const request = createSuggestPlotTwistRequest('mystery', { timeoutMs: 10 });
-    const expectation = expect(request.promise).rejects.toMatchObject({
+    const promise = executeSuggestPlotTwist('mystery', { timeoutMs: 10 });
+    const expectation = expect(promise).rejects.toMatchObject({
       message: 'Request timed out.',
       code: 'REQUEST_TIMEOUT'
     });
