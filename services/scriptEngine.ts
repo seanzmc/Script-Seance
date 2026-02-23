@@ -46,53 +46,11 @@ export interface AudioChunk {
 
 export type EventHandler = (data: unknown) => void;
 
-const getErrorMeta = (error: unknown) => {
-  let message: string | undefined;
-  let status: number | undefined;
-  let code: string | number | undefined;
-  let details: Record<string, unknown> | undefined;
-
-  if (error instanceof Error) {
-    message = error.message;
-  }
-
-  if (typeof error === 'object' && error !== null) {
-    const record = error as Record<string, unknown>;
-    const recordMessage = record.message;
-    const recordStatus = record.status;
-    const recordCode = record.code;
-    const recordDetails = record.details;
-
-    if (typeof recordMessage === 'string') {
-      message = recordMessage;
-    }
-    if (typeof recordStatus === 'number') {
-      status = recordStatus;
-    }
-    if (typeof recordCode === 'string' || typeof recordCode === 'number') {
-      code = recordCode;
-    }
-    if (recordDetails && typeof recordDetails === 'object') {
-      details = recordDetails as Record<string, unknown>;
-    }
-  }
-
-  return { message, status, code, details };
-};
-
-const createRequestAbortedError = () => {
-  const abortError = new Error('Request canceled.') as Error & { code?: string };
-  abortError.code = 'REQUEST_ABORTED';
-  return abortError;
-};
-
 export class ScriptEngine {
   private queue: QueueItem[] = [];
   private activeRequests = 0;
   private concurrencyLimit = 1; // Reduced to 1 to avoid hitting strict rate limits (10 RPM)
   private isRunning = false;
-  private maxBlockRetries = 1;
-  private blockRetryCounts: Map<string, number> = new Map();
   private skippedBlocks: Set<string> = new Set();
   private inflightCancels: Map<string, () => void> = new Map();
   private listeners: Map<string, EventHandler[]> = new Map();
@@ -125,7 +83,6 @@ export class ScriptEngine {
   public stop(options?: { clearCache?: boolean }) {
     this.isRunning = false;
     this.queue = [];
-    this.blockRetryCounts.clear();
     this.skippedBlocks.clear();
     this.abortInflight();
     if (options?.clearCache) {
@@ -175,7 +132,6 @@ export class ScriptEngine {
         voiceContextRevision: options?.voiceContextRevision
       };
     });
-    this.blockRetryCounts.clear();
     this.skippedBlocks.clear();
 
     // 3. Start the sliding window
@@ -241,7 +197,6 @@ export class ScriptEngine {
           }
         }
       );
-      this.blockRetryCounts.delete(item.block.id);
 
       if (this.isRunning) {
         // Emit immediately for streaming playback
@@ -260,15 +215,6 @@ export class ScriptEngine {
     } catch (error: unknown) {
       if (!this.isRunning || isAbortError(error)) return;
       const blockId = item.block.id;
-      const retryCount = this.blockRetryCounts.get(blockId) ?? 0;
-
-      if (retryCount < this.maxBlockRetries) {
-        this.blockRetryCounts.set(blockId, retryCount + 1);
-        console.warn(`[ScriptEngine] Retry ${retryCount + 1}/${this.maxBlockRetries} for block ${blockId}`);
-        return this.fetchQueueItem(item);
-      }
-
-      this.blockRetryCounts.delete(blockId);
       if (!this.skippedBlocks.has(blockId)) {
         this.skippedBlocks.add(blockId);
         console.error("Failed to generate block", blockId, error);
@@ -276,7 +222,7 @@ export class ScriptEngine {
           error,
           blockId,
           skipped: true,
-          attempts: retryCount + 1
+          attempts: 1
         });
       }
       // We log but continue, effectively skipping the faulty block
@@ -289,7 +235,6 @@ export class ScriptEngine {
     text: string;
     voiceId: string;
     requestId: string;
-    retryCount?: number;
     expressive: boolean;
     signal?: AbortSignal;
     cacheTarget:
@@ -297,7 +242,6 @@ export class ScriptEngine {
       | { kind: 'preview' };
   }): Promise<ArrayBuffer> {
     const { text, voiceId, requestId, expressive, cacheTarget, signal } = params;
-    const retryCount = params.retryCount ?? 0;
     const safeText = text.trim();
     const keyContext = {
       provider: TTS_PROVIDER,
@@ -341,75 +285,6 @@ export class ScriptEngine {
       // Write to Cache
       AudioCache.set(cacheKey, buffer);
       return buffer;
-    } catch (error: unknown) {
-       if (isAbortError(error)) {
-         throw error;
-       }
-       // Handle Rate Limiting (429)
-       const { message, status, code, details } = getErrorMeta(error);
-       const isRateLimit =
-         message?.includes('429') ||
-         status === 429 ||
-         code === 429 ||
-         code === 'RATE_LIMITED' ||
-         message?.includes('RESOURCE_EXHAUSTED');
-       
-       if (isRateLimit && retryCount < 4) {
-         let delayMs = 3000 * Math.pow(2, retryCount); // Default: 3s, 6s, 12s, 24s
-         const retryAfterMsValue = (() => {
-           const retryAfterSeconds = details?.retryAfterSeconds;
-           if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
-             return Math.ceil(retryAfterSeconds * 1000);
-           }
-           if (typeof retryAfterSeconds === 'string') {
-             const parsedSeconds = Number.parseInt(retryAfterSeconds, 10);
-             if (Number.isFinite(parsedSeconds)) {
-               return Math.ceil(parsedSeconds * 1000);
-             }
-           }
-           const retryAfterMs = details?.retryAfterMs;
-           if (typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs)) {
-             return Math.ceil(retryAfterMs);
-           }
-           if (typeof retryAfterMs === 'string') {
-             const parsedMs = Number.parseInt(retryAfterMs, 10);
-             if (Number.isFinite(parsedMs)) {
-               return Math.ceil(parsedMs);
-             }
-           }
-           return null;
-         })();
-         if (retryAfterMsValue && retryAfterMsValue > 0) {
-           delayMs = retryAfterMsValue + 1000;
-         }
-         
-         // Extract specific retry delay if available from message "Please retry in X s."
-         const match = message?.match(/retry in ([\d.]+)s/);
-         if (match && match[1]) {
-            delayMs = Math.ceil(parseFloat(match[1]) * 1000) + 1000; // +1s buffer
-         }
- 
-         console.warn(`[ScriptEngine] Rate limit hit. Retrying in ${delayMs}ms... (Attempt ${retryCount + 1})`);
-         
-         await new Promise(resolve => setTimeout(resolve, delayMs));
-         
-         // If we are stopping, abort retries to prevent zombie requests.
-         if (!this.isRunning) {
-            throw createRequestAbortedError();
-         }
-
-         return this.fetchAudio({
-           text,
-           voiceId,
-           requestId,
-           retryCount: retryCount + 1,
-           expressive,
-           signal,
-           cacheTarget
-         });
-       }
-       
-       throw error;
     } finally {
       if (signal) {
         signal.removeEventListener('abort', abortRequest);
@@ -431,6 +306,16 @@ export class ScriptEngine {
 }
 
 const isAbortError = (error: unknown) => {
-  const { code, message } = getErrorMeta(error);
-  return code === 'REQUEST_ABORTED' || message === 'Request canceled.';
+  if (error instanceof DOMException) {
+    return error.name === 'AbortError';
+  }
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const record = error as Record<string, unknown>;
+  return (
+    record.name === 'AbortError' ||
+    record.code === 'ABORT_ERR' ||
+    record.code === 'REQUEST_ABORTED'
+  );
 };

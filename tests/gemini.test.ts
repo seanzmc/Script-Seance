@@ -84,4 +84,23 @@ describe('AI API wrapper', () => {
     const buffer = await request.promise;
     expect(Array.from(new Uint8Array(buffer))).toEqual([251, 255]);
   });
+
+  it('does not retry generateSpeech HTTP requests on 429', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createMockResponse(429, {
+        error: {
+          message: 'Too many requests',
+          code: 'RATE_LIMITED'
+        }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = createGenerateSpeechRequest('hello', 'Alex');
+    await expect(request.promise).rejects.toMatchObject({
+      status: 429,
+      code: 'RATE_LIMITED'
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

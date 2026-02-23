@@ -86,8 +86,7 @@ describe('ScriptEngine', () => {
     );
   });
 
-  it('does not retry after stop when rate-limited during backoff', async () => {
-    vi.useFakeTimers();
+  it('does not automatically retry block generation after a rate-limit error', async () => {
     const engine = new ScriptEngine();
     const onError = vi.fn();
     engine.on('error', onError);
@@ -108,12 +107,39 @@ describe('ScriptEngine', () => {
     pendingRequests[0].reject(rateLimitError);
     await flushPromises();
 
-    engine.stop();
-    await vi.runAllTimersAsync();
-    await flushPromises();
+    expect(pendingRequests).toHaveLength(1);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blockId: 'block-1',
+        skipped: true,
+        attempts: 1,
+        error: expect.objectContaining({ status: 429, code: 'RATE_LIMITED' })
+      })
+    );
+  });
+
+  it('surfaces preview 429 as RATE_LIMITED and not REQUEST_ABORTED', async () => {
+    const engine = new ScriptEngine();
+    const previewPromise = engine.generateSingle('Hello', 'inworld-voice-1');
+    expect(pendingRequests).toHaveLength(1);
+
+    const rateLimitError = new Error('Too many requests') as Error & { status?: number; code?: string };
+    rateLimitError.status = 429;
+    rateLimitError.code = 'RATE_LIMITED';
+    pendingRequests[0].reject(rateLimitError);
+
+    try {
+      await previewPromise;
+      throw new Error('Expected preview to reject');
+    } catch (error) {
+      expect(error).toMatchObject({
+        status: 429,
+        code: 'RATE_LIMITED'
+      });
+      expect((error as { code?: string }).code).not.toBe('REQUEST_ABORTED');
+    }
 
     expect(pendingRequests).toHaveLength(1);
-    expect(onError).not.toHaveBeenCalled();
   });
 
   it('reuses cached audio when blockRevision is unchanged', async () => {

@@ -510,4 +510,81 @@ describe('useAudioPlayer', () => {
 
     expect(ref.current.blockStatuses['block-1']).toBe('notGenerated');
   });
+
+  it('manual retry button still issues a fresh generation request', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Retry me', blockRevision: 1, character: 'A' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={blocks}
+        scriptId="script-1"
+        voiceContextRevision={1}
+      />
+    );
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    await act(async () => {
+      ref.current.pause();
+    });
+
+    getEngine().generateSingle.mockResolvedValueOnce(new ArrayBuffer(12));
+    await act(async () => {
+      await ref.current.retryCurrentBlock();
+    });
+
+    expect(getEngine().generateSingle).toHaveBeenCalledTimes(1);
+    expect(getEngine().generateSingle).toHaveBeenCalledWith(
+      'Retry me',
+      'inworld-voice-1',
+      expect.objectContaining({ requestId: expect.stringContaining('retry:block-1:') })
+    );
+  });
+
+  it('surfaces preview 429 as RATE_LIMITED and not REQUEST_ABORTED', async () => {
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
+    ];
+    const onError = vi.fn();
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={[]}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        onError={onError}
+      />
+    );
+
+    const rateLimitError = new Error('Too many requests') as Error & { code?: string; status?: number };
+    rateLimitError.code = 'RATE_LIMITED';
+    rateLimitError.status = 429;
+    getEngine().generateSingle.mockRejectedValueOnce(rateLimitError);
+
+    await act(async () => {
+      await ref.current.playPreview('Preview this', voiceConfigs[0], { scopeId: 'narrator-preview' });
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'RATE_LIMITED', status: 429 }),
+      'Preview audio failed.'
+    );
+    const surfacedError = onError.mock.calls[0]?.[0] as { code?: string };
+    expect(surfacedError.code).not.toBe('REQUEST_ABORTED');
+  });
 });

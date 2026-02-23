@@ -43,10 +43,6 @@ export type CancellableRequest<T> = {
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_SCENE_TIMEOUT_MS = 95000;
 const DEFAULT_VOICE_NAME = '';
-const TTS_MAX_ATTEMPTS = 5;
-const TTS_BASE_DELAY_MS = 1000;
-const TTS_MAX_DELAY_MS = 10000;
-const TTS_JITTER_MS = 250;
 
 type DebugWindow = Window & {
   __SS_DEBUG_AI_ABORTS__?: boolean;
@@ -80,8 +76,6 @@ type TtsQueueItem<T> = {
   reject: (error: unknown) => void;
   cancelled: boolean;
   inFlightCancel?: (() => void) | null;
-  delayTimeout?: ReturnType<typeof setTimeout> | null;
-  delayReject?: ((error: unknown) => void) | null;
 };
 
 const ttsQueue: Array<TtsQueueItem<unknown>> = [];
@@ -120,9 +114,7 @@ const enqueueTts = <T>(run: (item: TtsQueueItem<T>) => Promise<T>): CancellableR
       resolve,
       reject,
       cancelled: false,
-      inFlightCancel: null,
-      delayTimeout: null,
-      delayReject: null
+      inFlightCancel: null
     };
     ttsQueue.push(item as unknown as TtsQueueItem<unknown>);
     drainTtsQueue();
@@ -134,13 +126,6 @@ const enqueueTts = <T>(run: (item: TtsQueueItem<T>) => Promise<T>): CancellableR
     if (item.inFlightCancel) {
       item.inFlightCancel();
     }
-    if (item.delayTimeout) {
-      clearTimeout(item.delayTimeout);
-      item.delayTimeout = null;
-      const rejectDelay = item.delayReject;
-      item.delayReject = null;
-      rejectDelay?.(createAbortError());
-    }
     const index = ttsQueue.indexOf(item as unknown as TtsQueueItem<unknown>);
     if (index >= 0) {
       ttsQueue.splice(index, 1);
@@ -150,79 +135,6 @@ const enqueueTts = <T>(run: (item: TtsQueueItem<T>) => Promise<T>): CancellableR
 
   return { promise, cancel };
 };
-
-const isRateLimitError = (error: unknown) => {
-  if (!error || typeof error !== 'object') return false;
-  const record = error as { status?: number; code?: string | number; message?: string; details?: Record<string, unknown> };
-  if (record.status === 429 || record.code === 429 || record.code === 'RATE_LIMITED') {
-    return true;
-  }
-  const message = record.message?.toLowerCase() ?? '';
-  if (message.includes('resource_exhausted') || message.includes('rate limit') || message.includes('429')) {
-    return true;
-  }
-  const details = record.details as Record<string, unknown> | undefined;
-  if (!details) return false;
-  const reason = typeof details.reason === 'string' ? details.reason.toLowerCase() : '';
-  return reason.includes('resource_exhausted') || reason.includes('rate limit');
-};
-
-const getRetryDelayMs = (error: unknown) => {
-  if (!error || typeof error !== 'object') return null;
-  const record = error as { details?: Record<string, unknown> };
-  const details = record.details as Record<string, unknown> | undefined;
-  if (!details) return null;
-  const retryAfterSeconds = details.retryAfterSeconds;
-  if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
-    return Math.ceil(retryAfterSeconds * 1000);
-  }
-  const retryDelayMs = details.retryDelayMs;
-  if (typeof retryDelayMs === 'number' && Number.isFinite(retryDelayMs)) {
-    return Math.ceil(retryDelayMs);
-  }
-  const retryDelaySeconds = details.retryDelaySeconds;
-  if (typeof retryDelaySeconds === 'number' && Number.isFinite(retryDelaySeconds)) {
-    return Math.ceil(retryDelaySeconds * 1000);
-  }
-  const retryDelay = (details.retryDelay ?? (details.retryInfo as { retryDelay?: unknown } | undefined)?.retryDelay) as
-    | { seconds?: number; nanos?: number }
-    | number
-    | string
-    | undefined;
-  if (typeof retryDelay === 'number' && Number.isFinite(retryDelay)) {
-    return Math.ceil(retryDelay);
-  }
-  if (typeof retryDelay === 'string') {
-    const parsed = Number.parseInt(retryDelay, 10);
-    if (Number.isFinite(parsed)) {
-      return Math.ceil(parsed);
-    }
-  }
-  if (retryDelay && typeof retryDelay === 'object') {
-    const seconds = typeof retryDelay.seconds === 'number' ? retryDelay.seconds : 0;
-    const nanos = typeof retryDelay.nanos === 'number' ? retryDelay.nanos : 0;
-    const totalMs = seconds * 1000 + Math.ceil(nanos / 1e6);
-    if (Number.isFinite(totalMs) && totalMs > 0) {
-      return totalMs;
-    }
-  }
-  return null;
-};
-
-const waitWithCancel = (ms: number, item: TtsQueueItem<unknown>) =>
-  new Promise<void>((resolve, reject) => {
-    if (item.cancelled) {
-      reject(createAbortError());
-      return;
-    }
-    const timeout = setTimeout(() => {
-      item.delayTimeout = null;
-      item.delayReject = null;
-      resolve();
-    }, ms);
-    item.delayTimeout = timeout;
-    item.delayReject = reject;
-  });
 
 const normalizeBase64Audio = (value: string) => {
   const withoutDataUrl = value.replace(/^data:[^;]+;base64,/i, '');
@@ -507,66 +419,26 @@ export const createGenerateSpeechRequest = (
   const context = buildGenerateSpeechContext(text, voiceName, extraContext);
 
   return enqueueTts<ArrayBuffer>(async (item) => {
-    let attempt = 1;
-    let lastDelayMs = 0;
-
-    while (attempt <= TTS_MAX_ATTEMPTS) {
-      if (item.cancelled) {
-        throw createAbortError();
-      }
-
-      const request = createAiRequest<{ audioBase64: string }>(
-        'generateSpeech',
-        context,
-        options
-      );
-      item.inFlightCancel = request.cancel;
-
-      try {
-        const data = await request.promise;
-        item.inFlightCancel = null;
-        const base64Audio = data.audioBase64;
-        if (!base64Audio) {
-          throw new Error('No audio data returned');
-        }
-        return decodeAudioBase64(base64Audio);
-      } catch (error: unknown) {
-        item.inFlightCancel = null;
-        if (item.cancelled) {
-          throw createAbortError();
-        }
-        if (!isRateLimitError(error)) {
-          throw error;
-        }
-        if (attempt >= TTS_MAX_ATTEMPTS) {
-          const finalError = new Error(
-            `TTS rate limit exceeded after retries (attempts: ${attempt}, lastDelayMs: ${lastDelayMs})`
-          ) as Error & { code?: string; status?: number; details?: Record<string, unknown> };
-          const record = error as { code?: string | number; status?: number; details?: Record<string, unknown> };
-          finalError.code = record.code ? String(record.code) : 'RATE_LIMITED';
-          finalError.status = record.status ?? 429;
-          finalError.details = {
-            ...(record.details ?? {}),
-            attempts: attempt,
-            lastDelayMs
-          };
-          throw finalError;
-        }
-
-        const retryDelayMs = getRetryDelayMs(error);
-        const baseDelay = Math.min(
-          TTS_MAX_DELAY_MS,
-          TTS_BASE_DELAY_MS * Math.pow(2, attempt - 1)
-        );
-        const jitter = Math.floor(Math.random() * TTS_JITTER_MS);
-        const delayMs = Math.min(TTS_MAX_DELAY_MS, (retryDelayMs ?? baseDelay) + jitter);
-        lastDelayMs = delayMs;
-        await waitWithCancel(delayMs, item as unknown as TtsQueueItem<unknown>);
-        attempt += 1;
-      }
+    if (item.cancelled) {
+      throw createAbortError();
     }
+    const request = createAiRequest<{ audioBase64: string }>(
+      'generateSpeech',
+      context,
+      options
+    );
+    item.inFlightCancel = request.cancel;
 
-    throw new Error('TTS retry loop exhausted.');
+    try {
+      const data = await request.promise;
+      const base64Audio = data.audioBase64;
+      if (!base64Audio) {
+        throw new Error('No audio data returned');
+      }
+      return decodeAudioBase64(base64Audio);
+    } finally {
+      item.inFlightCancel = null;
+    }
   });
 };
 
