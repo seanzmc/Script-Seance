@@ -1,6 +1,19 @@
 export const SCRIPT_ELEMENT_SYSTEM_INSTRUCTION =
   'You are a screenwriting assistant. Output ONLY the raw script text requested. Do not add quotes, prefixes, or formatting.';
 
+const STYLE_BLOCK_MAX_CHARS = 500;
+const collapseWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
+
+export const formatStyleBlock = (style) => {
+  if (typeof style !== 'string') return '';
+  const normalized = collapseWhitespace(style);
+  if (!normalized) return '';
+  const capped = normalized.length > STYLE_BLOCK_MAX_CHARS
+    ? normalized.slice(0, STYLE_BLOCK_MAX_CHARS).trim()
+    : normalized;
+  return capped ? `Style Theme: ${capped}` : '';
+};
+
 const SCENE_LENGTH_PROFILES = {
   short: {
     label: 'Short',
@@ -69,7 +82,7 @@ export const buildGenerateScenePrompt = ({
     : '';
 
   const charactersList = Array.isArray(characters) ? characters.join(', ') : '';
-  const styleTheme = typeof style === 'string' ? style.trim() : '';
+  const styleTheme = formatStyleBlock(style);
   const lengthProfile = getSceneLengthProfile(targetLength, isFirstScene);
 
   const prompt = `
@@ -78,7 +91,7 @@ export const buildGenerateScenePrompt = ({
     Genre: ${genre}
     Premise: ${premise}
     Characters: ${charactersList}
-    Style Theme: ${styleTheme || 'Lean into a vivid, genre-faithful cinematic voice.'}
+    ${styleTheme || 'Style Theme: Lean into a vivid, genre-faithful cinematic voice.'}
     Target Length: ${lengthProfile.label}
 
     ${previousScenesSummary ? `Previous Story Context:\n${previousScenesSummary}` : ''}
@@ -130,55 +143,86 @@ export const buildGenerateScenePrompt = ({
   };
 };
 
-export const buildPlotTwistPrompt = (genre) =>
-  `Give me a short, shocking, single-sentence plot twist idea for a ${genre} story.`;
+export const buildPlotTwistPrompt = (genre, style) =>
+  [
+    'Give me a short, shocking, single-sentence plot twist idea.',
+    'Output only one sentence.',
+    `Genre: ${genre}.`,
+    formatStyleBlock(style)
+  ].filter(Boolean).join('\n');
 
 export const buildScriptElementPrompt = ({ type, character, instruction, styleContext }) => {
+  const styleBlock = formatStyleBlock(styleContext) || 'Style Theme: Match the established screenplay voice.';
   if (type === 'dialogue') {
-    return `Write a single line of dialogue for character "${character}". Context: ${styleContext}. Instruction: ${instruction}`;
+    return [
+      `Write a single line of dialogue for character "${character}".`,
+      styleBlock,
+      `Instruction: ${instruction}`
+    ].join('\n');
   }
   if (type === 'action') {
-    return `Write a concise screenplay action line. Context: ${styleContext}. Instruction: ${instruction}`;
+    return [
+      'Write a concise screenplay action line.',
+      styleBlock,
+      `Instruction: ${instruction}`
+    ].join('\n');
   }
   if (type === 'transition') {
-    return `Write a screenplay transition (e.g. CUT TO:). Context: ${styleContext}. Instruction: ${instruction}`;
+    return [
+      'Write a screenplay transition (e.g. CUT TO:).',
+      styleBlock,
+      `Instruction: ${instruction}`
+    ].join('\n');
   }
   if (type === 'heading') {
-    return `Write a scene heading (slugline) like INT. HOUSE - DAY. Context: ${styleContext}. Instruction: ${instruction}`;
+    return [
+      'Write a scene heading (slugline) like INT. HOUSE - DAY.',
+      styleBlock,
+      `Instruction: ${instruction}`
+    ].join('\n');
   }
   return '';
 };
 
-export const buildRegenerateBlockPrompt = ({ type, character, genre, premise, text, rewriteGuidance }) => {
+export const buildRegenerateBlockPrompt = ({ type, character, genre, premise, text, style, rewriteGuidance }) => {
   const guidanceText = typeof rewriteGuidance === 'string' ? rewriteGuidance.trim() : '';
+  const styleBlock = formatStyleBlock(style);
 
   if (type === 'dialogue') {
-    return `Rewrite this dialogue line for ${character} to be more impactful, witty, or dramatic, fitting the genre "${genre}". 
-    Premise: ${premise}.
-    Original line: "${text}".
-    ${guidanceText ? `Additional direction: ${guidanceText}.` : ''}
-    Output ONLY the new dialogue text.`;
+    return [
+      `Rewrite this dialogue line for ${character} to be more impactful, witty, or dramatic, fitting the genre "${genre}".`,
+      'Output ONLY the new dialogue text.',
+      `Premise: ${premise}.`,
+      styleBlock,
+      `Original line: "${text}".`,
+      guidanceText ? `Additional direction: ${guidanceText}.` : ''
+    ].filter(Boolean).join('\n');
   }
 
-  return `Rewrite this screenplay ${type} block to be more descriptive and engaging. 
-    Genre: ${genre}.
-    Premise: ${premise}.
-    Original text: "${text}".
-    ${guidanceText ? `Additional direction: ${guidanceText}.` : ''}
-    Output ONLY the new text.`;
+  return [
+    `Rewrite this screenplay ${type} block to be more descriptive and engaging.`,
+    'Output ONLY the new text.',
+    `Genre: ${genre}.`,
+    `Premise: ${premise}.`,
+    styleBlock,
+    `Original text: "${text}".`,
+    guidanceText ? `Additional direction: ${guidanceText}.` : ''
+  ].filter(Boolean).join('\n');
 };
 
-export const buildSurpriseSetupPrompt = ({ targetGenre, genres }) => {
+export const buildSurpriseSetupPrompt = ({ targetGenre, genres, style }) => {
   const genreInstruction = targetGenre
     ? `The genre MUST be "${targetGenre}".`
     : `Pick a genre from this list if suitable: ${genres.join(', ')}, otherwise choose a fitting one.`;
+  const styleBlock = formatStyleBlock(style);
 
-  return `
-    Generate a creative, unique, and interesting movie premise. 
-    ${genreInstruction}
-    Return a JSON object with: 
-    'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''}, 
-    'premise' (string, 1-2 sentences), 
-    'characters' (array of 3 character names with brief role description, e.g. "John (The Detective)").
-  `;
+  return [
+    'Generate a creative, unique, and interesting movie premise.',
+    genreInstruction,
+    styleBlock,
+    'Return a JSON object with:',
+    `'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''},`,
+    "'premise' (string, 1-2 sentences),",
+    "'characters' (array of 3 character names with brief role description, e.g. \"John (The Detective)\")."
+  ].filter(Boolean).join('\n');
 };

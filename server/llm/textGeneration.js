@@ -622,22 +622,35 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
   }
 
   if (kind === 'suggestPlotTwist') {
-    return buildPlotTwistPrompt(context.genre || '').length;
+    return buildPlotTwistPrompt(context.genre || '', context.style || '').length;
   }
 
   if (kind === 'generateScriptElement') {
-    return `${context.instruction || ''}\n${context.styleContext || ''}`.length;
+    return buildScriptElementPrompt({
+      type: context.type,
+      character: context.character,
+      instruction: context.instruction || '',
+      styleContext: context.styleContext || ''
+    }).length;
   }
 
   if (kind === 'regenerateScriptBlock') {
-    const guidanceText = typeof context.rewriteGuidance === 'string' ? context.rewriteGuidance.trim() : '';
-    return `${context.premise || ''}\n${context.block?.text || ''}\n${guidanceText}`.length;
+    return buildRegenerateBlockPrompt({
+      type: context.block?.type,
+      character: context.block?.character,
+      genre: context.genre || '',
+      premise: context.premise || '',
+      text: context.block?.text || '',
+      style: context.style || '',
+      rewriteGuidance: context.rewriteGuidance
+    }).length;
   }
 
   if (kind === 'generateSurpriseSetup') {
     return buildSurpriseSetupPrompt({
       targetGenre: context.targetGenre,
-      genres
+      genres,
+      style: context.style || ''
     }).length;
   }
 
@@ -781,7 +794,7 @@ export const generateTextByKind = async ({
   }
 
   if (kind === 'suggestPlotTwist') {
-    const prompt = buildPlotTwistPrompt(context.genre);
+    const prompt = buildPlotTwistPrompt(context.genre, context.style);
     emitKindPromptTrace({
       traceMeta,
       kind,
@@ -790,12 +803,13 @@ export const generateTextByKind = async ({
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 90,
-      styleSource: '',
+      styleSource: context.style || '',
       instructionPreview: {
         task: 'Give one shocking, single-sentence plot twist'
       },
       contextPreview: {
-        genre: context.genre
+        genre: context.genre,
+        style: context.style || ''
       }
     });
     const text = provider === 'openai'
@@ -880,13 +894,14 @@ export const generateTextByKind = async ({
   }
 
   if (kind === 'regenerateScriptBlock') {
-    const { block, genre, premise, rewriteGuidance } = context;
+    const { block, genre, premise, style, rewriteGuidance } = context;
     const prompt = buildRegenerateBlockPrompt({
       type: block.type,
       character: block.character,
       genre,
       premise,
       text: block.text,
+      style,
       rewriteGuidance
     });
     emitKindPromptTrace({
@@ -897,7 +912,7 @@ export const generateTextByKind = async ({
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 150,
-      styleSource: '',
+      styleSource: style || '',
       instructionPreview: {
         task: 'Rewrite the existing screenplay block',
         rewriteGuidance: rewriteGuidance || ''
@@ -905,6 +920,7 @@ export const generateTextByKind = async ({
       contextPreview: {
         genre,
         premise,
+        style: style || '',
         blockType: block.type,
         character: block.character || null,
         originalText: block.text
@@ -943,7 +959,8 @@ export const generateTextByKind = async ({
 
   const prompt = buildSurpriseSetupPrompt({
     targetGenre: context.targetGenre,
-    genres
+    genres,
+    style: context.style
   });
   emitKindPromptTrace({
     traceMeta,
@@ -953,13 +970,14 @@ export const generateTextByKind = async ({
     timeoutMs,
     upstreamContext,
     maxOutputTokens: 350,
-    styleSource: '',
+    styleSource: context.style || '',
     instructionPreview: {
       task: 'Generate a surprise setup JSON payload',
       targetGenreRequired: Boolean(context.targetGenre)
     },
     contextPreview: {
       targetGenre: context.targetGenre || null,
+      style: context.style || '',
       allowedGenres: genres
     }
   });

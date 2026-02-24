@@ -3,11 +3,12 @@ import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
-import { SetupForm, SetupFormState } from './SetupForm';
+import { SetupForm, SetupFormState, STYLE_PRESETS } from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
 import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from './ToolPanelShell';
 import { TitleEditModal } from './TitleEditModal';
+import { StyleEditModal } from './StyleEditModal';
 import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
 export interface InsertTarget {
@@ -66,6 +67,7 @@ export interface ScriptPaneProps {
   autoScroll: boolean;
   onOpenPrivacy: () => void;
   onOpenSetup: () => void;
+  onSaveStyle?: (style: string) => void;
   isSetupOpen: boolean;
   onCloseSetup: () => void;
   setupState: SetupFormState;
@@ -193,6 +195,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   autoScroll,
   onOpenPrivacy,
   onOpenSetup,
+  onSaveStyle,
   isSetupOpen,
   onCloseSetup,
   setupState,
@@ -220,6 +223,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ));
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+  const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
+  const [styleDraft, setStyleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
@@ -608,6 +613,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const handleCloseTitleModal = () => {
     setIsTitleModalOpen(false);
   };
+  const handleOpenStyleModal = () => {
+    setStyleDraft(context?.style ?? '');
+    setIsStyleModalOpen(true);
+  };
+  const handleCloseStyleModal = () => {
+    setIsStyleModalOpen(false);
+  };
+  const handleSaveStyle = () => {
+    onSaveStyle?.(styleDraft);
+    setIsStyleModalOpen(false);
+  };
   const handleSaveTitle = () => {
     const nextTitle = titleDraft.trim() || 'Untitled Screenplay';
     onTitleChange(nextTitle);
@@ -815,12 +831,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     </>
                   )}
                 </div>
-                {styleLabel && (
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Style</span>
-                    <span className="text-sm font-medium text-gray-200">{styleLabel}</span>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Style</span>
+                  <span className="text-sm font-medium text-gray-200">{styleLabel || 'No style set'}</span>
+                  {onSaveStyle && (
+                    <button
+                      type="button"
+                      onClick={handleOpenStyleModal}
+                      className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300"
+                      title="Edit style"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit style
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col items-center justify-center gap-1 text-center min-w-0">
                 <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Draft Title</span>
@@ -1057,6 +1082,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onSave={handleSaveTitle}
         onClose={handleCloseTitleModal}
         inputRef={titleInputRef}
+      />
+      <StyleEditModal
+        isOpen={isStyleModalOpen}
+        value={styleDraft}
+        presets={STYLE_PRESETS}
+        onChange={setStyleDraft}
+        onSave={handleSaveStyle}
+        onClose={handleCloseStyleModal}
       />
       {setupModal}
     </section>

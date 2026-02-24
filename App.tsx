@@ -1514,6 +1514,24 @@ export default function App() {
     applyTitle(newTitle, 'user');
   };
 
+  const handleSaveStyle = useCallback((nextStyle: string) => {
+    const normalizedStyle = nextStyle.trim() ? nextStyle.trim() : undefined;
+    const didMutateContext = applyContextMutation((prev) => {
+      if (!prev) return prev;
+      if (prev.style === normalizedStyle) {
+        return prev;
+      }
+      return { ...prev, style: normalizedStyle };
+    });
+    if (!didMutateContext) {
+      return;
+    }
+    applySetupStateMutation((prev) => ({ ...prev, style: normalizedStyle ?? '' }), {
+      source: 'system',
+      bumpPromptRevision: false
+    });
+  }, [applyContextMutation, applySetupStateMutation]);
+
   const handleUseSuggestedTitle = useCallback(() => {
     if (!suggestedTitle) return;
     applyTitle(suggestedTitle, 'user');
@@ -1787,6 +1805,7 @@ export default function App() {
         autoScroll={autoScroll}
         onOpenPrivacy={openPrivacy}
         onOpenSetup={openManualSetup}
+        onSaveStyle={handleSaveStyle}
         isSetupOpen={isSetupOpen}
         onCloseSetup={closeSetup}
         setupState={setupState}

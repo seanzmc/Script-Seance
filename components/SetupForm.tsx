@@ -34,7 +34,7 @@ const STARTER_IDEAS = [
 ];
 
 const LENGTH_OPTIONS = ["Short", "Medium", "Long"];
-const STYLE_PRESETS = [
+export const STYLE_PRESETS = [
   "Dry humor",
   "Dark humor",
   "Puns",
