@@ -83,56 +83,52 @@ describe('SetupForm submit validation', () => {
         style: ''
       });
       const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
-      const promptContextRevisionRef = React.useRef(0);
-      const contextRef = React.useRef<StoryContext | null>(context);
-      const setupStateRef = React.useRef<SetupFormState>(setupState);
-
-      React.useEffect(() => {
-        contextRef.current = context;
-      }, [context]);
-
-      React.useEffect(() => {
-        setupStateRef.current = setupState;
-      }, [setupState]);
+      const [promptContextRevision, setPromptContextRevision] = React.useState(0);
 
       const applyContextMutation = React.useCallback((
         mutation: StoryContext | null | ((previous: StoryContext | null) => StoryContext | null)
       ) => {
-        const previous = contextRef.current;
-        const next = typeof mutation === 'function'
-          ? (mutation as (previous: StoryContext | null) => StoryContext | null)(previous)
-          : mutation;
-        if (next === previous) {
-          return false;
+        let didMutate = false;
+        setContext((previous) => {
+          const next = typeof mutation === 'function'
+            ? (mutation as (previous: StoryContext | null) => StoryContext | null)(previous)
+            : mutation;
+          if (next === previous) {
+            return previous;
+          }
+          didMutate = true;
+          return next;
+        });
+        if (didMutate) {
+          setPromptContextRevision((previous) => previous + 1);
         }
-        contextRef.current = next;
-        promptContextRevisionRef.current += 1;
-        setContext(next);
-        return true;
+        return didMutate;
       }, []);
 
       const applySetupStateMutation = React.useCallback((
         mutation: SetupFormState | ((previous: SetupFormState) => SetupFormState),
         options?: { bumpPromptRevision?: boolean }
       ) => {
-        const previous = setupStateRef.current;
-        const next = typeof mutation === 'function'
-          ? (mutation as (previous: SetupFormState) => SetupFormState)(previous)
-          : mutation;
-        if (next === previous) {
-          return false;
+        let didMutate = false;
+        setSetupState((previous) => {
+          const next = typeof mutation === 'function'
+            ? (mutation as (previous: SetupFormState) => SetupFormState)(previous)
+            : mutation;
+          if (next === previous) {
+            return previous;
+          }
+          didMutate = true;
+          return next;
+        });
+        if (didMutate && (options?.bumpPromptRevision ?? true)) {
+          setPromptContextRevision((previous) => previous + 1);
         }
-        setupStateRef.current = next;
-        if (options?.bumpPromptRevision ?? true) {
-          promptContextRevisionRef.current += 1;
-        }
-        setSetupState(next);
-        return true;
+        return didMutate;
       }, []);
 
       const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
         const hasStyle = Object.prototype.hasOwnProperty.call(next, 'style');
-        if (hasStyle && contextRef.current) {
+        if (hasStyle && context) {
           const rawStyle = typeof next.style === 'string' ? next.style : '';
           const normalizedStyle = rawStyle.trim() ? rawStyle.trim() : undefined;
           const didMutateContext = applyContextMutation((prev) => {
@@ -148,12 +144,12 @@ describe('SetupForm submit validation', () => {
           return;
         }
         applySetupStateMutation((prev) => ({ ...prev, ...next }));
-      }, [applyContextMutation, applySetupStateMutation]);
+      }, [applyContextMutation, applySetupStateMutation, context]);
 
       return (
         <div>
           <p data-testid="context-style">{context?.style || ''}</p>
-          <p data-testid="prompt-revision">{String(promptContextRevisionRef.current)}</p>
+          <p data-testid="prompt-revision">{String(promptContextRevision)}</p>
           <SetupForm
             value={setupState}
             onChange={onSetupChange}

@@ -131,6 +131,7 @@ describe('AI API wrapper', () => {
       promptContextRevision: 17,
       styleFingerprint: 'abc123ff'
     });
+    expect((fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)?.['X-SS-Debug-Prompts']).toBe('1');
 
     fetchMock.mockClear();
     debugWindow.__SS_DEBUG_PROMPTS__ = false;
@@ -141,5 +142,6 @@ describe('AI API wrapper', () => {
 
     const requestWithoutTrace = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
     expect(requestWithoutTrace.promptTrace).toBeUndefined();
+    expect((fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)?.['X-SS-Debug-Prompts']).toBeUndefined();
   });
 });

@@ -17,7 +17,9 @@ import {
 } from '../upstreamControl.js';
 import {
   createStyleFingerprint,
-  emitPromptTrace
+  emitPromptTrace,
+  buildPromptPreviewText,
+  buildPromptPreviewValue
 } from './promptTrace.js';
 
 const OPENAI_PROMPT_CACHE_PREFIX = 'script-seance:text-gen';
@@ -378,6 +380,67 @@ const emitKindPromptTrace = ({
   });
 };
 
+const normalizeTokenUsage = (usage) => {
+  if (!usage || typeof usage !== 'object') {
+    return null;
+  }
+  const inputTokens = typeof usage.inputTokens === 'number' ? usage.inputTokens : null;
+  const outputTokens = typeof usage.outputTokens === 'number' ? usage.outputTokens : null;
+  const totalTokens = typeof usage.totalTokens === 'number' ? usage.totalTokens : null;
+  const cachedInputTokens = typeof usage.cachedInputTokens === 'number' ? usage.cachedInputTokens : null;
+  const cacheHitRatio = typeof usage.cacheHitRatio === 'number' ? usage.cacheHitRatio : null;
+  if (
+    inputTokens === null &&
+    outputTokens === null &&
+    totalTokens === null &&
+    cachedInputTokens === null &&
+    cacheHitRatio === null
+  ) {
+    return null;
+  }
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cachedInputTokens,
+    cacheHitRatio
+  };
+};
+
+const buildKindDebugMeta = ({
+  traceMeta,
+  kind,
+  provider,
+  model,
+  timeoutMs,
+  upstreamContext,
+  maxOutputTokens,
+  styleSource,
+  instructionPreview,
+  contextPreview,
+  promptPreview,
+  requestMetrics
+}) => ({
+  kind,
+  provider,
+  model,
+  max_output_tokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : null,
+  timeoutMs: resolveTimeoutForTrace(timeoutMs, upstreamContext),
+  promptContextRevision:
+    typeof traceMeta?.promptContextRevision === 'number' ? traceMeta.promptContextRevision : null,
+  styleFingerprint: resolveStyleFingerprintForTrace(traceMeta?.styleFingerprint, styleSource),
+  memoryBundle: {
+    sectionSizes: null
+  },
+  durationMs: typeof requestMetrics?.durationMs === 'number' ? requestMetrics.durationMs : null,
+  tokenUsage: normalizeTokenUsage(requestMetrics?.usage),
+  previews: {
+    instruction: buildPromptPreviewValue(instructionPreview),
+    context: buildPromptPreviewValue(contextPreview),
+    prompt: traceMeta?.enabled ? buildPromptPreviewText(promptPreview) : null
+  }
+});
+
 const requestOpenAiText = async ({
   openai,
   kind,
@@ -538,7 +601,18 @@ const requestOpenAiText = async ({
     if (!text || !text.trim()) {
       throw new Error('No response from AI');
     }
-    return text;
+    return {
+      text,
+      durationMs: latencyMs,
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens,
+        totalTokens,
+        cachedInputTokens,
+        cacheHitRatio
+      },
+      finalMaxOutputTokens: outputTokenLimit
+    };
   }
 };
 
@@ -598,7 +672,13 @@ const requestGeminiText = async ({
   if (!text || !text.trim()) {
     throw new Error('No response from AI');
   }
-  return text;
+  return {
+    text,
+    durationMs: latencyMs,
+    usage: null,
+    finalMaxOutputTokens:
+      typeof config?.maxOutputTokens === 'number' ? config.maxOutputTokens : null
+  };
 };
 
 export const getPromptSizeEstimate = ({ kind, context, genres }) => {
@@ -690,6 +770,17 @@ export const generateTextByKind = async ({
     const sceneModel = provider === 'openai'
       ? resolveSceneModel(models, lengthProfile, sceneMaxOutputTokens)
       : models.gemini;
+    const instructionPreview = {
+      task: isFirstScene ? 'Write opening scene' : 'Write next scene',
+      userInstruction
+    };
+    const contextPreview = {
+      genre: storyContext.genre,
+      premise: storyContext.premise,
+      characters: storyContext.characters,
+      targetLength: storyContext.targetLength || lengthProfile.label,
+      previousSceneSummaries: getSceneSummariesPreview(storyContext.scenes)
+    };
     emitKindPromptTrace({
       traceMeta,
       kind,
@@ -699,20 +790,11 @@ export const generateTextByKind = async ({
       upstreamContext,
       maxOutputTokens: sceneMaxOutputTokens,
       styleSource: storyContext.style,
-      instructionPreview: {
-        task: isFirstScene ? 'Write opening scene' : 'Write next scene',
-        userInstruction
-      },
-      contextPreview: {
-        genre: storyContext.genre,
-        premise: storyContext.premise,
-        characters: storyContext.characters,
-        targetLength: storyContext.targetLength || lengthProfile.label,
-        previousSceneSummaries: getSceneSummariesPreview(storyContext.scenes)
-      }
+      instructionPreview,
+      contextPreview
     });
 
-    const rawText = provider === 'openai'
+    const responsePayload = provider === 'openai'
       ? await requestOpenAiText({
           openai,
           kind,
@@ -768,6 +850,7 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
+    const rawText = responsePayload.text;
 
     const data = parseJsonObject(rawText, kind);
     const normalizedScene = normalizeSceneThoughtCompletion(data);
@@ -788,31 +871,50 @@ export const generateTextByKind = async ({
         rawAiResponse: rawText,
         parsedAiKeys: normalizedScene.data && typeof normalizedScene.data === 'object'
           ? Object.keys(normalizedScene.data)
-          : []
+          : [],
+        debug: buildKindDebugMeta({
+          traceMeta,
+          kind,
+          provider,
+          model: sceneModel,
+          timeoutMs,
+          upstreamContext,
+          maxOutputTokens: provider === 'openai'
+            ? responsePayload.finalMaxOutputTokens
+            : null,
+          styleSource: storyContext.style,
+          instructionPreview,
+          contextPreview,
+          promptPreview: prompt,
+          requestMetrics: responsePayload
+        })
       }
     };
   }
 
   if (kind === 'suggestPlotTwist') {
     const prompt = buildPlotTwistPrompt(context.genre, context.style);
+    const twistModel = provider === 'openai' ? models.openai : models.gemini;
+    const instructionPreview = {
+      task: 'Give one shocking, single-sentence plot twist'
+    };
+    const contextPreview = {
+      genre: context.genre,
+      style: context.style || ''
+    };
     emitKindPromptTrace({
       traceMeta,
       kind,
       provider,
-      model: provider === 'openai' ? models.openai : models.gemini,
+      model: twistModel,
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 90,
       styleSource: context.style || '',
-      instructionPreview: {
-        task: 'Give one shocking, single-sentence plot twist'
-      },
-      contextPreview: {
-        genre: context.genre,
-        style: context.style || ''
-      }
+      instructionPreview,
+      contextPreview
     });
-    const text = provider === 'openai'
+    const responsePayload = provider === 'openai'
       ? await requestOpenAiText({
           openai,
           kind,
@@ -834,34 +936,56 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
+    const text = responsePayload.text;
 
-    return { data: { text: text || 'Suddenly, everything changes.' } };
+    return {
+      data: { text: text || 'Suddenly, everything changes.' },
+      meta: {
+        debug: buildKindDebugMeta({
+          traceMeta,
+          kind,
+          provider,
+          model: twistModel,
+          timeoutMs,
+          upstreamContext,
+          maxOutputTokens: provider === 'openai' ? responsePayload.finalMaxOutputTokens : null,
+          styleSource: context.style || '',
+          instructionPreview,
+          contextPreview,
+          promptPreview: prompt,
+          requestMetrics: responsePayload
+        })
+      }
+    };
   }
 
   if (kind === 'generateScriptElement') {
     const { type, character, instruction, styleContext } = context;
     const prompt = buildScriptElementPrompt({ type, character, instruction, styleContext });
+    const scriptElementModel = provider === 'openai' ? models.openai : models.gemini;
+    const instructionPreview = {
+      task: 'Generate one script element block',
+      instruction
+    };
+    const contextPreview = {
+      type,
+      character,
+      styleContext
+    };
     emitKindPromptTrace({
       traceMeta,
       kind,
       provider,
-      model: provider === 'openai' ? models.openai : models.gemini,
+      model: scriptElementModel,
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 100,
       styleSource: styleContext,
-      instructionPreview: {
-        task: 'Generate one script element block',
-        instruction
-      },
-      contextPreview: {
-        type,
-        character,
-        styleContext
-      }
+      instructionPreview,
+      contextPreview
     });
 
-    const text = provider === 'openai'
+    const responsePayload = provider === 'openai'
       ? await requestOpenAiText({
           openai,
           kind,
@@ -889,8 +1013,29 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
+    const text = responsePayload.text;
 
-    return { data: { text: text.trim() } };
+    return {
+      data: { text: text.trim() },
+      meta: {
+        debug: buildKindDebugMeta({
+          traceMeta,
+          kind,
+          provider,
+          model: scriptElementModel,
+          timeoutMs,
+          upstreamContext,
+          maxOutputTokens: provider === 'openai'
+            ? responsePayload.finalMaxOutputTokens
+            : 100,
+          styleSource: styleContext,
+          instructionPreview,
+          contextPreview,
+          promptPreview: `${SCRIPT_ELEMENT_SYSTEM_INSTRUCTION}\n${prompt}`,
+          requestMetrics: responsePayload
+        })
+      }
+    };
   }
 
   if (kind === 'regenerateScriptBlock') {
@@ -904,30 +1049,33 @@ export const generateTextByKind = async ({
       style,
       rewriteGuidance
     });
+    const rewriteModel = provider === 'openai' ? models.openai : models.gemini;
+    const instructionPreview = {
+      task: 'Rewrite the existing screenplay block',
+      rewriteGuidance: rewriteGuidance || ''
+    };
+    const contextPreview = {
+      genre,
+      premise,
+      style: style || '',
+      blockType: block.type,
+      character: block.character || null,
+      originalText: block.text
+    };
     emitKindPromptTrace({
       traceMeta,
       kind,
       provider,
-      model: provider === 'openai' ? models.openai : models.gemini,
+      model: rewriteModel,
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 150,
       styleSource: style || '',
-      instructionPreview: {
-        task: 'Rewrite the existing screenplay block',
-        rewriteGuidance: rewriteGuidance || ''
-      },
-      contextPreview: {
-        genre,
-        premise,
-        style: style || '',
-        blockType: block.type,
-        character: block.character || null,
-        originalText: block.text
-      }
+      instructionPreview,
+      contextPreview
     });
 
-    const text = provider === 'openai'
+    const responsePayload = provider === 'openai'
       ? await requestOpenAiText({
           openai,
           kind,
@@ -953,8 +1101,29 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
+    const text = responsePayload.text;
 
-    return { data: { text: text.trim() || block.text } };
+    return {
+      data: { text: text.trim() || block.text },
+      meta: {
+        debug: buildKindDebugMeta({
+          traceMeta,
+          kind,
+          provider,
+          model: rewriteModel,
+          timeoutMs,
+          upstreamContext,
+          maxOutputTokens: provider === 'openai'
+            ? responsePayload.finalMaxOutputTokens
+            : 150,
+          styleSource: style || '',
+          instructionPreview,
+          contextPreview,
+          promptPreview: prompt,
+          requestMetrics: responsePayload
+        })
+      }
+    };
   }
 
   const prompt = buildSurpriseSetupPrompt({
@@ -962,27 +1131,30 @@ export const generateTextByKind = async ({
     genres,
     style: context.style
   });
+  const surpriseModel = provider === 'openai' ? models.openai : models.gemini;
+  const instructionPreview = {
+    task: 'Generate a surprise setup JSON payload',
+    targetGenreRequired: Boolean(context.targetGenre)
+  };
+  const contextPreview = {
+    targetGenre: context.targetGenre || null,
+    style: context.style || '',
+    allowedGenres: genres
+  };
   emitKindPromptTrace({
     traceMeta,
     kind,
     provider,
-    model: provider === 'openai' ? models.openai : models.gemini,
+    model: surpriseModel,
     timeoutMs,
     upstreamContext,
     maxOutputTokens: 350,
     styleSource: context.style || '',
-    instructionPreview: {
-      task: 'Generate a surprise setup JSON payload',
-      targetGenreRequired: Boolean(context.targetGenre)
-    },
-    contextPreview: {
-      targetGenre: context.targetGenre || null,
-      style: context.style || '',
-      allowedGenres: genres
-    }
+    instructionPreview,
+    contextPreview
   });
 
-  const rawText = provider === 'openai'
+  const responsePayload = provider === 'openai'
     ? await requestOpenAiText({
         openai,
         kind,
@@ -1021,8 +1193,27 @@ export const generateTextByKind = async ({
         upstreamContext,
         timeoutMs
       });
+  const rawText = responsePayload.text;
 
   return {
-    data: parseJsonObject(rawText, kind)
+    data: parseJsonObject(rawText, kind),
+    meta: {
+      debug: buildKindDebugMeta({
+        traceMeta,
+        kind,
+        provider,
+        model: surpriseModel,
+        timeoutMs,
+        upstreamContext,
+        maxOutputTokens: provider === 'openai'
+          ? responsePayload.finalMaxOutputTokens
+          : null,
+        styleSource: context.style || '',
+        instructionPreview,
+        contextPreview,
+        promptPreview: prompt,
+        requestMetrics: responsePayload
+      })
+    }
   };
 };

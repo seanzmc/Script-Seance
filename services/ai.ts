@@ -6,9 +6,45 @@ type ApiError = {
   details?: Record<string, unknown>;
 };
 
-type ApiResponse<T> =
-  | { data: T; error?: never }
-  | { data?: never; error: ApiError };
+export type PromptDebugTokenUsage = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  cachedInputTokens: number | null;
+  cacheHitRatio: number | null;
+} | null;
+
+export type PromptDebugTrace = {
+  requestId?: string;
+  kind: string;
+  provider: string;
+  model: string;
+  max_output_tokens: number | null;
+  timeoutMs: number | null;
+  promptContextRevision: number | null;
+  styleFingerprint: string;
+  memoryBundle?: {
+    sectionSizes: Record<string, number> | null;
+  };
+  durationMs: number | null;
+  tokenUsage: PromptDebugTokenUsage;
+  previews?: {
+    instruction?: unknown;
+    context?: unknown;
+    prompt?: unknown;
+  };
+};
+
+export const PROMPT_DEBUG_EVENT_NAME = 'ss:prompt-debug-trace';
+
+type ApiSuccessResponse<T> = { data: T; error?: never; debug?: PromptDebugTrace };
+type ApiFailureResponse = { data?: never; error: ApiError };
+type ApiResponse<T> = ApiSuccessResponse<T> | ApiFailureResponse;
+
+const isApiFailureResponse = <T>(payload: ApiResponse<T>): payload is ApiFailureResponse => (
+  typeof (payload as ApiFailureResponse).error === 'object' &&
+  (payload as ApiFailureResponse).error !== null
+);
 
 const getErrorName = (error: unknown): string | undefined => {
   if (error instanceof Error) {
@@ -82,6 +118,28 @@ const isPromptDebugEnabled = () =>
   typeof window !== 'undefined' &&
   Boolean((window as DebugWindow).__SS_DEBUG_PROMPTS__) &&
   (typeof process === 'undefined' || process.env.NODE_ENV !== 'production');
+
+const isPromptDebugTrace = (value: unknown): value is PromptDebugTrace => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const trace = value as Record<string, unknown>;
+  return (
+    typeof trace.kind === 'string' &&
+    typeof trace.provider === 'string' &&
+    typeof trace.model === 'string'
+  );
+};
+
+const emitPromptDebugTrace = (trace: unknown) => {
+  if (!isPromptDebugEnabled()) {
+    return;
+  }
+  if (!isPromptDebugTrace(trace)) {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent<PromptDebugTrace>(PROMPT_DEBUG_EVENT_NAME, { detail: trace }));
+};
 
 const buildPromptTracePayload = () => {
   if (!isPromptDebugEnabled()) {
@@ -268,7 +326,10 @@ const createAiRequest = <T>(
     const promptTrace = buildPromptTracePayload();
     const response = await fetch('/api/ai/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(promptTrace ? { 'X-SS-Debug-Prompts': '1' } : {})
+      },
       credentials: 'include',
       signal: controller.signal,
       body: JSON.stringify({
@@ -290,7 +351,7 @@ const createAiRequest = <T>(
       throw new Error('Invalid JSON response from server');
     }
 
-    if (!response.ok || payload.error) {
+    if (isApiFailureResponse(payload)) {
       const apiError = payload.error;
       const statusMessage =
         response.status === 401
@@ -321,7 +382,31 @@ const createAiRequest = <T>(
       throw error;
     }
 
-    return payload.data as T;
+    if (!response.ok) {
+      const statusMessage =
+        response.status === 401
+          ? 'Authentication required. Please log in to continue.'
+          : response.status === 429
+          ? 'Rate limit exceeded. Please wait and try again.'
+          : 'AI request failed';
+      const error = new Error(statusMessage) as Error & {
+        code?: string;
+        status?: number;
+        details?: Record<string, unknown>;
+      };
+      error.status = response.status;
+      const retryAfterHeader = response.headers?.get?.('Retry-After');
+      if (retryAfterHeader) {
+        const retryAfterSeconds = Number.parseInt(retryAfterHeader, 10);
+        if (Number.isFinite(retryAfterSeconds)) {
+          error.details = { ...(error.details ?? {}), retryAfterSeconds };
+        }
+      }
+      throw error;
+    }
+
+    emitPromptDebugTrace(payload.debug);
+    return payload.data;
   })();
 
   const wrappedPromise = promise.catch((error: unknown) => {
@@ -406,26 +491,17 @@ export const executeGenerateScene = async (
   return mapSceneGenerationData(data);
 };
 
-export function executeSuggestPlotTwist(
-  genre: string,
-  options?: RequestOptions
-): Promise<string>;
-export function executeSuggestPlotTwist(
-  genre: string,
-  style?: string,
-  options?: RequestOptions
-): Promise<string>;
-export async function executeSuggestPlotTwist(
+export const executeSuggestPlotTwist = async (
   genre: string,
   styleOrOptions?: string | RequestOptions,
   maybeOptions?: RequestOptions
-): Promise<string> {
+): Promise<string> => {
   const style = typeof styleOrOptions === 'string' ? styleOrOptions : undefined;
   const options = typeof styleOrOptions === 'string' ? maybeOptions : styleOrOptions;
   const request = createAiRequest<{ text: string }>(AI_KINDS.suggestPlotTwist, { genre, style }, options);
   const data = await request.promise;
   return data.text || 'Suddenly, everything changes.';
-}
+};
 
 export const executeGenerateScriptElement = async (
   type: BlockType,

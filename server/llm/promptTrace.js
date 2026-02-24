@@ -13,7 +13,7 @@ const REDACTION_PATTERNS = [
   { pattern: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: '[REDACTED_SSN]' }
 ];
 
-const parseBooleanFlag = (value) => {
+export const parseBooleanFlag = (value) => {
   if (typeof value === 'boolean') return value;
   if (typeof value !== 'string') return false;
   const normalized = value.trim().toLowerCase();
@@ -83,11 +83,20 @@ export const resolvePromptTraceMeta = (payloadTrace) => {
   };
 };
 
-export const isPromptTraceEnabled = (requestFlag = false) => {
+export const isPromptTraceServerEnabled = () => {
   if (IS_PROD) return false;
-  const envEnabled = parseBooleanFlag(process.env.SS_DEBUG_PROMPTS);
-  return envEnabled || Boolean(requestFlag);
+  return parseBooleanFlag(process.env.SS_DEBUG_PROMPTS);
 };
+
+export const isPromptTraceEnabled = (requestFlag = false) => {
+  return isPromptTraceServerEnabled() && Boolean(requestFlag);
+};
+
+export const buildPromptPreviewText = (value, maxChars = MAX_PREVIEW_CHARS) => (
+  toPreviewText(value, maxChars)
+);
+
+export const buildPromptPreviewValue = (value) => toPreviewValue(value);
 
 export const emitPromptTrace = ({
   enabled,

@@ -159,27 +159,26 @@ describe('script view style editor', () => {
           }
         ]
       });
-      const promptContextRevisionRef = React.useRef(0);
-      const contextRef = React.useRef(context);
-
-      React.useEffect(() => {
-        contextRef.current = context;
-      }, [context]);
+      const [promptContextRevision, setPromptContextRevision] = React.useState(0);
 
       const applyContextMutation = React.useCallback((
         mutation: StoryContext | null | ((previous: StoryContext | null) => StoryContext | null)
       ) => {
-        const previous = contextRef.current;
-        const next = typeof mutation === 'function'
-          ? (mutation as (previous: StoryContext | null) => StoryContext | null)(previous)
-          : mutation;
-        if (!next || next === previous) {
-          return false;
+        let didMutate = false;
+        setContext((previous) => {
+          const next = typeof mutation === 'function'
+            ? (mutation as (previous: StoryContext | null) => StoryContext | null)(previous)
+            : mutation;
+          if (!next || next === previous) {
+            return previous;
+          }
+          didMutate = true;
+          return next;
+        });
+        if (didMutate) {
+          setPromptContextRevision((previous) => previous + 1);
         }
-        contextRef.current = next;
-        promptContextRevisionRef.current += 1;
-        setContext(next);
-        return true;
+        return didMutate;
       }, []);
 
       const handleSaveStyle = React.useCallback((nextStyle: string) => {
@@ -192,14 +191,12 @@ describe('script view style editor', () => {
       }, [applyContextMutation]);
 
       const triggerTwist = () => {
-        const current = contextRef.current;
-        if (!current) return;
-        void executeSuggestPlotTwist(current.genre, current.style);
+        void executeSuggestPlotTwist(context.genre, context.style);
       };
 
       return (
         <div>
-          <p data-testid="prompt-context-revision">{String(promptContextRevisionRef.current)}</p>
+          <p data-testid="prompt-context-revision">{String(promptContextRevision)}</p>
           <button type="button" onClick={triggerTwist}>
             Trigger Twist Request
           </button>

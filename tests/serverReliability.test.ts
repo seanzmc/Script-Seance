@@ -44,6 +44,126 @@ beforeEach(() => {
 });
 
 describe('server reliability', () => {
+  it('sends prompt debug metadata only when both server and client debug flags are enabled', async () => {
+    const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
+    try {
+      delete process.env.SS_DEBUG_PROMPTS;
+      mockGenerateContent.mockResolvedValueOnce({ text: 'A twist appears.' });
+
+      const reqWithoutEnv = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: { genre: 'Noir' },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 7,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+      const resWithoutEnv = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(reqWithoutEnv, resWithoutEnv);
+      expect(resWithoutEnv.statusCode).toBe(200);
+      expect(resWithoutEnv.body?.debug).toBeUndefined();
+
+      process.env.SS_DEBUG_PROMPTS = '1';
+      mockGenerateContent.mockResolvedValueOnce({ text: 'Another twist appears.' });
+
+      const reqWithoutClientFlag = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: { genre: 'Noir' }
+        }
+      } as any;
+      const resWithoutClientFlag = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(reqWithoutClientFlag, resWithoutClientFlag);
+      expect(resWithoutClientFlag.statusCode).toBe(200);
+      expect(resWithoutClientFlag.body?.debug).toBeUndefined();
+
+      mockGenerateContent.mockResolvedValueOnce({ text: 'Final twist appears.' });
+
+      const reqWithBothFlags = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: { genre: 'Noir' },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 17,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+      const resWithBothFlags = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(reqWithBothFlags, resWithBothFlags);
+      expect(resWithBothFlags.statusCode).toBe(200);
+      expect(resWithBothFlags.body?.debug).toMatchObject({
+        kind: 'suggestPlotTwist',
+        provider: 'gemini',
+        promptContextRevision: 17,
+        styleFingerprint: 'abc123ff'
+      });
+      expect(typeof resWithBothFlags.body?.debug?.model).toBe('string');
+      expect(resWithBothFlags.body?.debug?.previews?.prompt).toEqual(expect.any(String));
+    } finally {
+      if (previousDebugEnv === undefined) {
+        delete process.env.SS_DEBUG_PROMPTS;
+      } else {
+        process.env.SS_DEBUG_PROMPTS = previousDebugEnv;
+      }
+    }
+  });
+
   it('maps upstream timeout errors to 504 UPSTREAM_TIMEOUT', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {

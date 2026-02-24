@@ -13,8 +13,9 @@ import { generateTextByKind, getPromptSizeEstimate } from './llm/textGeneration.
 import { isTextGenerationKind } from './llm/types.js';
 import {
   createStyleFingerprint,
+  buildPromptPreviewValue,
   emitPromptTrace,
-  isPromptTraceEnabled,
+  isPromptTraceServerEnabled,
   resolvePromptTraceMeta
 } from './llm/promptTrace.js';
 import {
@@ -1047,10 +1048,14 @@ const handleAiGenerate = async (req, res) => {
   const kind = payload.kind;
   const context = payload.context;
   const promptTraceRequest = resolvePromptTraceMeta(payload.promptTrace);
-  const promptTraceEnabled = isPromptTraceEnabled(promptTraceRequest.requestFlag);
+  const serverPromptDebugEnabled = isPromptTraceServerEnabled();
+  const clientPromptDebugEnabled = Boolean(promptTraceRequest.requestFlag);
+  const promptTraceEnabled = serverPromptDebugEnabled && clientPromptDebugEnabled;
+  const shouldIncludePromptDebug = promptTraceEnabled;
   const requestId = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
   let rawAiResponse;
   let parsedAiKeys;
+  let responseDebug = null;
 
   if (!isNonEmptyString(kind, 64) || !isObject(context)) {
     return sendError(res, 400, 'Invalid request payload.', 'INVALID_REQUEST');
@@ -1184,6 +1189,9 @@ const handleAiGenerate = async (req, res) => {
         data = generationResult.data;
         rawAiResponse = generationResult.meta?.rawAiResponse;
         parsedAiKeys = generationResult.meta?.parsedAiKeys;
+        if (shouldIncludePromptDebug) {
+          responseDebug = generationResult.meta?.debug ?? null;
+        }
       } else if (kind === 'generateSpeech') {
         const { text, voiceName, expressive } = context;
         if (!isNonEmptyString(text, 4000) || !isNonEmptyString(voiceName, 120)) {
@@ -1217,9 +1225,58 @@ const handleAiGenerate = async (req, res) => {
           voiceName,
           latencyMs: result.latencyMs
         });
+        if (shouldIncludePromptDebug) {
+          responseDebug = {
+            kind,
+            provider: 'inworld',
+            model: TTS_INWORLD_MODEL,
+            max_output_tokens: null,
+            timeoutMs: baseExecutionContext.timeoutMs,
+            promptContextRevision: promptTraceRequest.promptContextRevision,
+            styleFingerprint: promptTraceRequest.styleFingerprint || createStyleFingerprint(''),
+            memoryBundle: {
+              sectionSizes: null
+            },
+            durationMs: typeof result.latencyMs === 'number' ? result.latencyMs : null,
+            tokenUsage: null,
+            previews: {
+              instruction: buildPromptPreviewValue({
+                task: 'Synthesize speech audio from screenplay text'
+              }),
+              context: buildPromptPreviewValue({
+                voiceName,
+                expressive: Boolean(expressive)
+              }),
+              prompt: buildPromptPreviewValue(text)
+            }
+          };
+        }
       } else if (kind === 'listVoices') {
         const voices = await listVoicesByProvider(baseExecutionContext);
         data = { voices };
+        if (shouldIncludePromptDebug) {
+          responseDebug = {
+            kind,
+            provider: 'inworld',
+            model: TTS_INWORLD_MODEL,
+            max_output_tokens: null,
+            timeoutMs: baseExecutionContext.timeoutMs,
+            promptContextRevision: promptTraceRequest.promptContextRevision,
+            styleFingerprint: promptTraceRequest.styleFingerprint || createStyleFingerprint(''),
+            memoryBundle: {
+              sectionSizes: null
+            },
+            durationMs: null,
+            tokenUsage: null,
+            previews: {
+              instruction: buildPromptPreviewValue({
+                task: 'List TTS voices'
+              }),
+              context: buildPromptPreviewValue({}),
+              prompt: null
+            }
+          };
+        }
       } else {
         return sendError(res, 400, 'Unknown request kind.', 'INVALID_REQUEST');
       }
@@ -1229,7 +1286,13 @@ const handleAiGenerate = async (req, res) => {
         createAiValidationError(kind, validation.reason);
       }
 
-      return res.json({ data });
+      const debugPayload = shouldIncludePromptDebug && responseDebug
+        ? { requestId, ...responseDebug }
+        : null;
+      return res.json({
+        data,
+        ...(debugPayload ? { debug: debugPayload } : {})
+      });
     } catch (error) {
       const message = error?.message || '';
       const normalizedMessage = message.toLowerCase();

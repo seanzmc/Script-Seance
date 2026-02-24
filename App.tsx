@@ -3,6 +3,7 @@ import { SetupFormState } from './components/SetupForm';
 import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
 import { VoicesPanel } from './components/VoicesPanel';
+import { PromptInspector } from './components/PromptInspector';
 import type { PlaybackPanelProps } from './components/PlaybackPanel';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
@@ -13,8 +14,10 @@ import {
   executeRewriteBlock,
   executeGenerateScriptElement,
   executeGenerateSurpriseSetup,
-  listVoices
+  listVoices,
+  PROMPT_DEBUG_EVENT_NAME
 } from './services/ai';
+import type { PromptDebugTrace } from './services/ai';
 import { getSession, login } from './services/auth';
 import {
   Scene,
@@ -57,6 +60,7 @@ interface DraftPayload {
 }
 
 type DebugWindow = Window & {
+  __SS_DEBUG_PROMPTS__?: boolean;
   __SS_PROMPT_CONTEXT_REVISION__?: number;
   __SS_STYLE_FINGERPRINT__?: string;
 };
@@ -251,6 +255,8 @@ export default function App() {
   const [suggestedTitle, setSuggestedTitle] = useState<string | null>(null);
   const [isSuggestingTitle, setIsSuggestingTitle] = useState(false);
   const [suggestedTitleDismissed, setSuggestedTitleDismissed] = useState(false);
+  const [promptDebugTraces, setPromptDebugTraces] = useState<PromptDebugTrace[]>([]);
+  const [isPromptDebugEnabled, setIsPromptDebugEnabled] = useState(false);
   const orchestratorRef = useRef(new GenerationOrchestrator());
   const scriptIdRef = useRef(crypto.randomUUID());
   const setupSessionIdRef = useRef(crypto.randomUUID());
@@ -343,9 +349,23 @@ export default function App() {
     if (typeof window === 'undefined') return;
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') return;
     const debugWindow = window as DebugWindow;
+    setIsPromptDebugEnabled(Boolean(debugWindow.__SS_DEBUG_PROMPTS__));
     debugWindow.__SS_PROMPT_CONTEXT_REVISION__ = promptContextRevisionRef.current;
     debugWindow.__SS_STYLE_FINGERPRINT__ = promptStyleFingerprint;
   }, [context, promptStyleFingerprint, setupState]);
+
+  useEffect(() => {
+    if (!isPromptDebugEnabled || typeof window === 'undefined') return;
+    const handlePromptDebugTrace = (event: Event) => {
+      const detail = (event as CustomEvent<PromptDebugTrace>).detail;
+      if (!detail) return;
+      setPromptDebugTraces((previous) => [detail, ...previous].slice(0, 30));
+    };
+    window.addEventListener(PROMPT_DEBUG_EVENT_NAME, handlePromptDebugTrace as EventListener);
+    return () => {
+      window.removeEventListener(PROMPT_DEBUG_EVENT_NAME, handlePromptDebugTrace as EventListener);
+    };
+  }, [isPromptDebugEnabled]);
 
   const applyContextMutation = useCallback((
     mutation: StoryContext | null | ((previous: StoryContext | null) => StoryContext | null),
@@ -1823,6 +1843,13 @@ export default function App() {
         insertScrollTargetId={insertScrollTargetId}
         insertScrollToken={insertScrollToken}
       />
+
+      {isPromptDebugEnabled && (
+        <PromptInspector
+          traces={promptDebugTraces}
+          onClear={() => setPromptDebugTraces([])}
+        />
+      )}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5 fade-in z-50">
