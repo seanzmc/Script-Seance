@@ -406,14 +406,26 @@ export const executeGenerateScene = async (
   return mapSceneGenerationData(data);
 };
 
-export const executeSuggestPlotTwist = async (
+export function executeSuggestPlotTwist(
   genre: string,
   options?: RequestOptions
-): Promise<string> => {
-  const request = createAiRequest<{ text: string }>(AI_KINDS.suggestPlotTwist, { genre }, options);
+): Promise<string>;
+export function executeSuggestPlotTwist(
+  genre: string,
+  style?: string,
+  options?: RequestOptions
+): Promise<string>;
+export async function executeSuggestPlotTwist(
+  genre: string,
+  styleOrOptions?: string | RequestOptions,
+  maybeOptions?: RequestOptions
+): Promise<string> {
+  const style = typeof styleOrOptions === 'string' ? styleOrOptions : undefined;
+  const options = typeof styleOrOptions === 'string' ? maybeOptions : styleOrOptions;
+  const request = createAiRequest<{ text: string }>(AI_KINDS.suggestPlotTwist, { genre, style }, options);
   const data = await request.promise;
   return data.text || 'Suddenly, everything changes.';
-};
+}
 
 export const executeGenerateScriptElement = async (
   type: BlockType,
@@ -436,12 +448,13 @@ export const executeRewriteBlock = async (
   block: ScriptBlock,
   genre: string,
   premise: string,
+  style?: string,
   rewriteGuidance?: string,
   options?: RequestOptions
 ): Promise<string> => {
   const request = createAiRequest<{ text: string }>(
     AI_KINDS.regenerateScriptBlock,
-    { block, genre, premise, rewriteGuidance },
+    { block, genre, premise, style, rewriteGuidance },
     options
   );
   const data = await request.promise;
@@ -471,9 +484,10 @@ export const generateScene = async (
 
 export const suggestPlotTwist = async (
   genre: string,
+  style?: string,
   options?: RequestOptions
 ): Promise<string> => {
-  return executeSuggestPlotTwist(genre, options);
+  return executeSuggestPlotTwist(genre, style, options);
 };
 
 export const generateScriptElement = async (
@@ -490,10 +504,11 @@ export const regenerateScriptBlock = async (
   block: ScriptBlock,
   genre: string,
   premise: string,
+  style?: string,
   rewriteGuidance?: string,
   options?: RequestOptions
 ): Promise<string> => {
-  return executeRewriteBlock(block, genre, premise, rewriteGuidance, options);
+  return executeRewriteBlock(block, genre, premise, style, rewriteGuidance, options);
 };
 
 export const generateSurpriseSetup = async (

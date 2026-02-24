@@ -233,7 +233,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }`.trim();
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
-  const styleLabel = setupState.style.trim();
+  const styleLabel = context?.style?.trim() || '';
   const toolLabelClass = 'text-[10px] font-bold uppercase tracking-widest text-gray-400';
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner';

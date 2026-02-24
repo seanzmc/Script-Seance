@@ -34,7 +34,18 @@ const STARTER_IDEAS = [
 ];
 
 const LENGTH_OPTIONS = ["Short", "Medium", "Long"];
-const STYLE_SUGGESTIONS = ["Dry humor", "Cinematic", "Fast-paced", "Lyrical", "Unhinged"];
+const STYLE_PRESETS = [
+  "Dry humor",
+  "Dark humor",
+  "Puns",
+  "Unhinged",
+  "Infomercial",
+  "Transatlantic dialogue",
+  "All dialogue rhymes",
+  "Characters can't hear each other (constant misunderstandings)",
+  "Everyone speaks in Gen Z slang",
+  "Dead serious documentary tone"
+];
 
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
@@ -195,10 +206,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   useEffect(() => {
     if (showAdvanced) return;
-    if (style.trim() || (length && length !== "Medium")) {
+    if (length && length !== "Medium") {
       setShowAdvanced(true);
     }
-  }, [length, showAdvanced, style]);
+  }, [length, showAdvanced]);
 
   return (
     <div className="space-y-4">
@@ -279,6 +290,53 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2 rounded-2xl bg-indigo-500/[0.08] ring-1 ring-indigo-300/25 p-4 sm:p-5">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-[0.32em] text-indigo-100">
+                Style
+              </label>
+              <p className="text-[11px] text-indigo-100/75">
+                Pick a vibe, then tweak it. This sets the tone for future generations.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {STYLE_PRESETS.map((tag) => {
+                const isSelected = style.trim().toLowerCase() === tag.toLowerCase();
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => updateValue({ style: tag })}
+                    disabled={isLocked}
+                    className={`text-[10px] px-2.5 py-1.5 rounded-full ring-1 transition-colors ${
+                      isSelected
+                        ? "text-indigo-100 bg-indigo-500/35 ring-indigo-100/55"
+                        : "text-indigo-100/90 bg-indigo-500/15 ring-indigo-200/30 hover:bg-indigo-500/24 hover:ring-indigo-100/45"
+                    } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                    title={`Use style: ${tag}`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+            <textarea
+              rows={3}
+              value={style}
+              onChange={(e) => updateValue({ style: e.target.value })}
+              className={`w-full rounded-lg p-2.5 text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm resize-y min-h-[88px] ${
+                justSurprised
+                  ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
+                  : "bg-slate-900/80 ring-1 ring-white/15"
+              } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
+              placeholder="e.g., Witty noir with clipped banter and escalating absurdity."
+              disabled={isLocked}
+            />
+            {isStyleBlank && (
+              <p className="text-[10px] text-slate-300/80">Using defaults.</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-3">
@@ -373,76 +431,28 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </button>
             {showAdvanced && (
               <div className="px-4 pb-4 sm:px-5 sm:pb-5 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-2 rounded-xl bg-indigo-500/[0.08] ring-1 ring-indigo-300/25 p-3.5">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold uppercase tracking-[0.32em] text-indigo-100">
-                        Style (optional)
-                      </label>
-                      <p className="text-[11px] text-indigo-100/75">
-                        Add a mood, tone, or pacing hint to make the output feel distinct.
-                      </p>
-                    </div>
-                    <input
-                      value={style}
-                      onChange={(e) => updateValue({ style: e.target.value })}
-                      className={`w-full rounded-lg p-2.5 text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm ${
-                        justSurprised
-                          ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
-                          : "bg-slate-900/80 ring-1 ring-white/15"
-                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-                      placeholder="e.g., Witty noir with crisp dialogue"
-                      disabled={isLocked}
-                    />
-                    <div className="flex flex-wrap gap-1.5">
-                      {STYLE_SUGGESTIONS.map((tag) => {
-                        const isSelected = style.trim().toLowerCase() === tag.toLowerCase();
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => updateValue({ style: tag })}
-                            disabled={isLocked}
-                            className={`text-[10px] px-2 py-1 rounded-full ring-1 transition-colors ${
-                              isSelected
-                                ? "text-indigo-100 bg-indigo-500/28 ring-indigo-100/50"
-                                : "text-indigo-100/85 bg-indigo-500/16 ring-indigo-200/30 hover:bg-indigo-500/24 hover:ring-indigo-100/40"
-                            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                            title={`Use style: ${tag}`}
-                          >
-                            {tag}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {isStyleBlank && (
-                      <p className="text-[10px] text-slate-400">Using defaults.</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5 rounded-xl bg-slate-900/55 ring-1 ring-white/10 p-3.5">
-                    <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
-                      Target Length (optional)
-                    </label>
-                    <select
-                      value={length}
-                      onChange={(e) => updateValue({ length: e.target.value })}
-                      className={`w-full rounded-lg p-2.5 text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                        justSurprised
-                          ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
-                          : "bg-slate-900/80 ring-1 ring-white/15"
-                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-                      disabled={isLocked}
-                    >
-                      <option value="">Balanced (default)</option>
-                      {LENGTH_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-slate-400">{lengthHint}</p>
-                  </div>
+                <div className="space-y-1.5 rounded-xl bg-slate-900/55 ring-1 ring-white/10 p-3.5">
+                  <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
+                    Target Length (optional)
+                  </label>
+                  <select
+                    value={length}
+                    onChange={(e) => updateValue({ length: e.target.value })}
+                    className={`w-full rounded-lg p-2.5 text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                      justSurprised
+                        ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
+                        : "bg-slate-900/80 ring-1 ring-white/15"
+                    } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
+                    disabled={isLocked}
+                  >
+                    <option value="">Balanced (default)</option>
+                    {LENGTH_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400">{lengthHint}</p>
                 </div>
               </div>
             )}

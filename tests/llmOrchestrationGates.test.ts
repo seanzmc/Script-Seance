@@ -73,6 +73,56 @@ describe('LLM orchestration receipt gating', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it('drops generate-next when a style context mutation bumps prompt revision synchronously', async () => {
+    const orchestrator = new GenerationOrchestrator();
+    const execution = deferred<string>();
+    const commit = vi.fn();
+    let promptContextRevision = 11;
+    let context: StoryContext | null = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A tense conspiracy.',
+      characters: ['Alex'],
+      style: 'Cinematic',
+      scenes: []
+    };
+
+    const applyContextMutation = (
+      mutation: StoryContext | null | ((previous: StoryContext | null) => StoryContext | null)
+    ) => {
+      const previous = context;
+      const next = typeof mutation === 'function'
+        ? (mutation as (previous: StoryContext | null) => StoryContext | null)(previous)
+        : mutation;
+      if (next === previous) {
+        return false;
+      }
+      context = next;
+      promptContextRevision += 1;
+      return true;
+    };
+
+    const startedPromptContextRevision = promptContextRevision;
+    const run = orchestrator.run<string>({
+      opType: 'generateNextScene',
+      scopeKey: 'script:s1:scene:next',
+      execute: async () => execution.promise,
+      isFresh: () => promptContextRevision === startedPromptContextRevision,
+      commit
+    });
+
+    const didMutate = applyContextMutation((prev) => (
+      prev ? { ...prev, style: 'Dry humor' } : prev
+    ));
+    expect(didMutate).toBe(true);
+    expect(promptContextRevision).toBe(startedPromptContextRevision + 1);
+
+    execution.resolve('Scene content');
+    const outcome = await run;
+    expect(outcome.kind).toBe('dropped');
+    expect(commit).not.toHaveBeenCalled();
+  });
+
   it('drops rewrite when target block revision changes before resolve', async () => {
     const orchestrator = new GenerationOrchestrator();
     const execution = deferred<string>();

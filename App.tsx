@@ -300,21 +300,23 @@ export default function App() {
   const canRedo = redoCount > 0;
   const canUndo = undoCount > 0;
   const scriptStyleContext = useMemo(() => {
-    const style = setupState.style.trim();
-    const length = setupState.length.trim();
+    const genre = context ? context.genre : setupState.genre;
+    const style = context
+      ? (typeof context.style === 'string' ? context.style.trim() : '')
+      : setupState.style.trim();
+    const length = context
+      ? (typeof context.targetLength === 'string' ? context.targetLength.trim() : '')
+      : setupState.length.trim();
     const parts = [
-      setupState.genre ? `Genre: ${setupState.genre}.` : '',
+      genre ? `Genre: ${genre}.` : '',
       style ? `Style: ${style}.` : '',
       length ? `Length: ${length}.` : ''
     ].filter(Boolean);
     return parts.join(' ');
-  }, [setupState.genre, setupState.length, setupState.style]);
+  }, [context, setupState.genre, setupState.length, setupState.style]);
   const promptStyleFingerprint = useMemo(() => (
-    buildPromptStyleFingerprint([
-      scriptStyleContext,
-      context?.style || ''
-    ].join('|'))
-  ), [context?.style, scriptStyleContext]);
+    buildPromptStyleFingerprint(scriptStyleContext)
+  ), [scriptStyleContext]);
 
   const allBlocks = useMemo(
     () => (context ? context.scenes.flatMap(scene => scene.blocks) : []),
@@ -504,8 +506,26 @@ export default function App() {
   };
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => {
-    applySetupStateMutation((prev) => ({ ...prev, ...next }), { source: meta?.source ?? 'user' });
-  }, [applySetupStateMutation]);
+    const source = meta?.source ?? 'user';
+    const hasStyle = Object.prototype.hasOwnProperty.call(next, 'style');
+    if (hasStyle && contextRef.current) {
+      const rawStyle = typeof next.style === 'string' ? next.style : '';
+      const normalizedStyle = rawStyle.trim() ? rawStyle.trim() : undefined;
+      const didMutateContext = applyContextMutation((prev) => {
+        if (!prev) return prev;
+        if (prev.style === normalizedStyle) {
+          return prev;
+        }
+        return { ...prev, style: normalizedStyle };
+      });
+      applySetupStateMutation((prev) => ({ ...prev, ...next }), {
+        source,
+        bumpPromptRevision: !didMutateContext
+      });
+      return;
+    }
+    applySetupStateMutation((prev) => ({ ...prev, ...next }), { source });
+  }, [applyContextMutation, applySetupStateMutation]);
   const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     if (!insertModeActive) return;
     setInsertTarget(target);
@@ -667,7 +687,7 @@ export default function App() {
         genre: context.genre,
         premise: context.premise,
         characters: context.characters,
-        style: typeof context.style === 'string' ? context.style : prev.style,
+        style: typeof context.style === 'string' ? context.style : '',
         length: normalizeTargetLength(context.targetLength)
       }), {
         source: 'system',
@@ -1065,6 +1085,7 @@ export default function App() {
         scopeKey,
         execute: (signal) => executeSuggestPlotTwist(
           context.genre,
+          context.style,
           { signal, opType: 'suggestPlotTwist', scopeKey }
         ),
         isFresh: () =>
@@ -1372,6 +1393,7 @@ export default function App() {
           block,
           context.genre,
           context.premise,
+          context.style,
           rewriteGuidance,
           { signal, opType: 'rewriteBlock', scopeKey }
         ),
