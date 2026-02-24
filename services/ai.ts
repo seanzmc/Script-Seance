@@ -62,6 +62,9 @@ const DEFAULT_VOICE_NAME = '';
 
 type DebugWindow = Window & {
   __SS_DEBUG_AI_ABORTS__?: boolean;
+  __SS_DEBUG_PROMPTS__?: boolean;
+  __SS_PROMPT_CONTEXT_REVISION__?: number;
+  __SS_STYLE_FINGERPRINT__?: string;
 };
 
 const isAbortDebugEnabled = () =>
@@ -73,6 +76,34 @@ const debugAbortLog = (event: string, details: Record<string, unknown>) => {
     return;
   }
   console.info(`[ai:${event}]`, details);
+};
+
+const isPromptDebugEnabled = () =>
+  typeof window !== 'undefined' &&
+  Boolean((window as DebugWindow).__SS_DEBUG_PROMPTS__) &&
+  (typeof process === 'undefined' || process.env.NODE_ENV !== 'production');
+
+const buildPromptTracePayload = () => {
+  if (!isPromptDebugEnabled()) {
+    return null;
+  }
+  const promptContextRevisionRaw = (window as DebugWindow).__SS_PROMPT_CONTEXT_REVISION__;
+  const promptContextRevision = (
+    typeof promptContextRevisionRaw === 'number' &&
+    Number.isFinite(promptContextRevisionRaw) &&
+    promptContextRevisionRaw >= 0
+  )
+    ? Math.floor(promptContextRevisionRaw)
+    : null;
+  const styleFingerprintRaw = (window as DebugWindow).__SS_STYLE_FINGERPRINT__;
+  const styleFingerprint = typeof styleFingerprintRaw === 'string' && styleFingerprintRaw.trim()
+    ? styleFingerprintRaw.trim().toLowerCase().slice(0, 64)
+    : null;
+  return {
+    enabled: true,
+    promptContextRevision,
+    styleFingerprint
+  };
 };
 
 type GenerateSpeechContext = {
@@ -234,12 +265,17 @@ const createAiRequest = <T>(
   };
 
   const promise = (async () => {
+    const promptTrace = buildPromptTracePayload();
     const response = await fetch('/api/ai/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       signal: controller.signal,
-      body: JSON.stringify({ kind, context })
+      body: JSON.stringify({
+        kind,
+        context,
+        ...(promptTrace ? { promptTrace } : {})
+      })
     });
 
     const text = await response.text();

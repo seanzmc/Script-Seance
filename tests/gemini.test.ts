@@ -103,4 +103,43 @@ describe('AI API wrapper', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('includes prompt trace metadata only when prompt debug flag is enabled', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createMockResponse(200, {
+        data: {
+          text: 'Twist!'
+        }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const debugWindow = window as Window & {
+      __SS_DEBUG_PROMPTS__?: boolean;
+      __SS_PROMPT_CONTEXT_REVISION__?: number;
+      __SS_STYLE_FINGERPRINT__?: string;
+    };
+    debugWindow.__SS_DEBUG_PROMPTS__ = true;
+    debugWindow.__SS_PROMPT_CONTEXT_REVISION__ = 17;
+    debugWindow.__SS_STYLE_FINGERPRINT__ = 'abc123ff';
+
+    await executeSuggestPlotTwist('Noir');
+
+    const requestWithTrace = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
+    expect(requestWithTrace.promptTrace).toEqual({
+      enabled: true,
+      promptContextRevision: 17,
+      styleFingerprint: 'abc123ff'
+    });
+
+    fetchMock.mockClear();
+    debugWindow.__SS_DEBUG_PROMPTS__ = false;
+    delete debugWindow.__SS_PROMPT_CONTEXT_REVISION__;
+    delete debugWindow.__SS_STYLE_FINGERPRINT__;
+
+    await executeSuggestPlotTwist('Noir');
+
+    const requestWithoutTrace = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
+    expect(requestWithoutTrace.promptTrace).toBeUndefined();
+  });
 });

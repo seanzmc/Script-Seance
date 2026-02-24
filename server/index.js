@@ -12,6 +12,12 @@ import {
 import { generateTextByKind, getPromptSizeEstimate } from './llm/textGeneration.js';
 import { isTextGenerationKind } from './llm/types.js';
 import {
+  createStyleFingerprint,
+  emitPromptTrace,
+  isPromptTraceEnabled,
+  resolvePromptTraceMeta
+} from './llm/promptTrace.js';
+import {
   applyExpressiveText,
   extractAudioBase64FromPayload,
   collectAudioFromStreamBody,
@@ -1040,6 +1046,8 @@ const handleAiGenerate = async (req, res) => {
   const payload = req.body || {};
   const kind = payload.kind;
   const context = payload.context;
+  const promptTraceRequest = resolvePromptTraceMeta(payload.promptTrace);
+  const promptTraceEnabled = isPromptTraceEnabled(promptTraceRequest.requestFlag);
   const requestId = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
   let rawAiResponse;
   let parsedAiKeys;
@@ -1165,7 +1173,12 @@ const handleAiGenerate = async (req, res) => {
           upstreamContext: {
             ...baseExecutionContext,
             timeoutMs: textTimeoutMs,
-            retryPolicy: createRetryPolicy(requestContext.signal)
+            retryPolicy: createRetryPolicy(requestContext.signal),
+            promptTrace: {
+              enabled: promptTraceEnabled,
+              promptContextRevision: promptTraceRequest.promptContextRevision,
+              styleFingerprint: promptTraceRequest.styleFingerprint
+            }
           }
         });
         data = generationResult.data;
@@ -1179,6 +1192,24 @@ const handleAiGenerate = async (req, res) => {
         if (!ensurePromptSize(res, text.length)) {
           return;
         }
+        emitPromptTrace({
+          enabled: promptTraceEnabled,
+          kind,
+          provider: 'inworld',
+          model: TTS_INWORLD_MODEL,
+          timeoutMs: baseExecutionContext.timeoutMs,
+          maxOutputTokens: null,
+          promptContextRevision: promptTraceRequest.promptContextRevision,
+          styleFingerprint: promptTraceRequest.styleFingerprint || createStyleFingerprint(''),
+          instructionPreview: {
+            task: 'Synthesize speech audio from screenplay text'
+          },
+          contextPreview: {
+            voiceName,
+            expressive: Boolean(expressive),
+            text
+          }
+        });
         const result = await generateSpeechByProvider(text, voiceName, Boolean(expressive), baseExecutionContext);
         data = { audioBase64: result.audioBase64 };
         console.info('[tts] generated', {

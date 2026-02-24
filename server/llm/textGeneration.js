@@ -15,6 +15,10 @@ import {
   runWithRetry,
   isRetryableUpstreamError
 } from '../upstreamControl.js';
+import {
+  createStyleFingerprint,
+  emitPromptTrace
+} from './promptTrace.js';
 
 const OPENAI_PROMPT_CACHE_PREFIX = 'script-seance:text-gen';
 const DEFAULT_OPENAI_PROMPT_CACHE_RETENTION = process.env.OPENAI_PROMPT_CACHE_RETENTION || '24h';
@@ -327,6 +331,53 @@ const runWithUpstreamPolicy = async ({
   );
 };
 
+const resolveTimeoutForTrace = (timeoutMs, upstreamContext) => (
+  timeoutMs ?? upstreamContext?.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS
+);
+
+const resolveStyleFingerprintForTrace = (explicitStyleFingerprint, styleSource) => (
+  explicitStyleFingerprint || createStyleFingerprint(styleSource)
+);
+
+const getSceneSummariesPreview = (scenes) => (
+  Array.isArray(scenes)
+    ? scenes
+      .map((scene, index) => {
+        const summary = typeof scene?.summary === 'string' ? scene.summary.trim() : '';
+        return summary ? `Scene ${index + 1}: ${summary}` : null;
+      })
+      .filter(Boolean)
+      .slice(0, 6)
+    : []
+);
+
+const emitKindPromptTrace = ({
+  traceMeta,
+  kind,
+  provider,
+  model,
+  timeoutMs,
+  upstreamContext,
+  maxOutputTokens,
+  styleSource,
+  instructionPreview,
+  contextPreview
+}) => {
+  if (!traceMeta?.enabled) return;
+  emitPromptTrace({
+    enabled: true,
+    kind,
+    provider,
+    model,
+    timeoutMs: resolveTimeoutForTrace(timeoutMs, upstreamContext),
+    maxOutputTokens,
+    promptContextRevision: traceMeta.promptContextRevision,
+    styleFingerprint: resolveStyleFingerprintForTrace(traceMeta.styleFingerprint, styleSource),
+    instructionPreview,
+    contextPreview
+  });
+};
+
 const requestOpenAiText = async ({
   openai,
   kind,
@@ -608,6 +659,7 @@ export const generateTextByKind = async ({
   }
 
   const models = getTextModels(kind);
+  const traceMeta = upstreamContext?.promptTrace;
 
   if (kind === 'generateScene') {
     const { storyContext, userInstruction, isFirstScene } = context;
@@ -625,6 +677,27 @@ export const generateTextByKind = async ({
     const sceneModel = provider === 'openai'
       ? resolveSceneModel(models, lengthProfile, sceneMaxOutputTokens)
       : models.gemini;
+    emitKindPromptTrace({
+      traceMeta,
+      kind,
+      provider,
+      model: sceneModel,
+      timeoutMs,
+      upstreamContext,
+      maxOutputTokens: sceneMaxOutputTokens,
+      styleSource: storyContext.style,
+      instructionPreview: {
+        task: isFirstScene ? 'Write opening scene' : 'Write next scene',
+        userInstruction
+      },
+      contextPreview: {
+        genre: storyContext.genre,
+        premise: storyContext.premise,
+        characters: storyContext.characters,
+        targetLength: storyContext.targetLength || lengthProfile.label,
+        previousSceneSummaries: getSceneSummariesPreview(storyContext.scenes)
+      }
+    });
 
     const rawText = provider === 'openai'
       ? await requestOpenAiText({
@@ -709,6 +782,22 @@ export const generateTextByKind = async ({
 
   if (kind === 'suggestPlotTwist') {
     const prompt = buildPlotTwistPrompt(context.genre);
+    emitKindPromptTrace({
+      traceMeta,
+      kind,
+      provider,
+      model: provider === 'openai' ? models.openai : models.gemini,
+      timeoutMs,
+      upstreamContext,
+      maxOutputTokens: 90,
+      styleSource: '',
+      instructionPreview: {
+        task: 'Give one shocking, single-sentence plot twist'
+      },
+      contextPreview: {
+        genre: context.genre
+      }
+    });
     const text = provider === 'openai'
       ? await requestOpenAiText({
           openai,
@@ -738,6 +827,25 @@ export const generateTextByKind = async ({
   if (kind === 'generateScriptElement') {
     const { type, character, instruction, styleContext } = context;
     const prompt = buildScriptElementPrompt({ type, character, instruction, styleContext });
+    emitKindPromptTrace({
+      traceMeta,
+      kind,
+      provider,
+      model: provider === 'openai' ? models.openai : models.gemini,
+      timeoutMs,
+      upstreamContext,
+      maxOutputTokens: 100,
+      styleSource: styleContext,
+      instructionPreview: {
+        task: 'Generate one script element block',
+        instruction
+      },
+      contextPreview: {
+        type,
+        character,
+        styleContext
+      }
+    });
 
     const text = provider === 'openai'
       ? await requestOpenAiText({
@@ -781,6 +889,27 @@ export const generateTextByKind = async ({
       text: block.text,
       rewriteGuidance
     });
+    emitKindPromptTrace({
+      traceMeta,
+      kind,
+      provider,
+      model: provider === 'openai' ? models.openai : models.gemini,
+      timeoutMs,
+      upstreamContext,
+      maxOutputTokens: 150,
+      styleSource: '',
+      instructionPreview: {
+        task: 'Rewrite the existing screenplay block',
+        rewriteGuidance: rewriteGuidance || ''
+      },
+      contextPreview: {
+        genre,
+        premise,
+        blockType: block.type,
+        character: block.character || null,
+        originalText: block.text
+      }
+    });
 
     const text = provider === 'openai'
       ? await requestOpenAiText({
@@ -815,6 +944,24 @@ export const generateTextByKind = async ({
   const prompt = buildSurpriseSetupPrompt({
     targetGenre: context.targetGenre,
     genres
+  });
+  emitKindPromptTrace({
+    traceMeta,
+    kind,
+    provider,
+    model: provider === 'openai' ? models.openai : models.gemini,
+    timeoutMs,
+    upstreamContext,
+    maxOutputTokens: 350,
+    styleSource: '',
+    instructionPreview: {
+      task: 'Generate a surprise setup JSON payload',
+      targetGenreRequired: Boolean(context.targetGenre)
+    },
+    contextPreview: {
+      targetGenre: context.targetGenre || null,
+      allowedGenres: genres
+    }
   });
 
   const rawText = provider === 'openai'

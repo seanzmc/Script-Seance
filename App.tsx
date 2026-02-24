@@ -56,6 +56,11 @@ interface DraftPayload {
   savedAt: string;
 }
 
+type DebugWindow = Window & {
+  __SS_PROMPT_CONTEXT_REVISION__?: number;
+  __SS_STYLE_FINGERPRINT__?: string;
+};
+
 type RedoPayload =
   | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
   | { type: 'scene'; scene: Scene; index: number };
@@ -189,6 +194,17 @@ const buildTitleContext = (setup: SetupFormState) => {
   return parts.join(' ');
 };
 
+const buildPromptStyleFingerprint = (value: string) => {
+  const source = value.trim();
+  if (!source) return 'none';
+  let hash = 2166136261;
+  for (let i = 0; i < source.length; i += 1) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
 export const buildScriptTextExport = (scenes: Scene[]) => (
   scenes
     .map(scene => {
@@ -293,6 +309,12 @@ export default function App() {
     ].filter(Boolean);
     return parts.join(' ');
   }, [setupState.genre, setupState.length, setupState.style]);
+  const promptStyleFingerprint = useMemo(() => (
+    buildPromptStyleFingerprint([
+      scriptStyleContext,
+      context?.style || ''
+    ].join('|'))
+  ), [context?.style, scriptStyleContext]);
 
   const allBlocks = useMemo(
     () => (context ? context.scenes.flatMap(scene => scene.blocks) : []),
@@ -314,6 +336,14 @@ export default function App() {
   useEffect(() => {
     userInstructionRef.current = userInstruction;
   }, [userInstruction]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') return;
+    const debugWindow = window as DebugWindow;
+    debugWindow.__SS_PROMPT_CONTEXT_REVISION__ = promptContextRevisionRef.current;
+    debugWindow.__SS_STYLE_FINGERPRINT__ = promptStyleFingerprint;
+  }, [context, promptStyleFingerprint, setupState]);
 
   const applyContextMutation = useCallback((
     mutation: StoryContext | null | ((previous: StoryContext | null) => StoryContext | null),
