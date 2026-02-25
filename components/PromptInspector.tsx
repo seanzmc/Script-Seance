@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PromptDebugTrace } from '../services/ai';
 
-type PromptInspectorProps = {
+export type PromptInspectorProps = {
   traces: PromptDebugTrace[];
   onClear: () => void;
 };
