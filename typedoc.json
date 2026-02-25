@@ -22,6 +22,12 @@
     "**/public/**",
     "**/improve/**",
     "**/tests/**",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "vite.config.ts",
+    "tailwind.config.js",
+    "postcss.config.js",
+    "eslint.config.js",
     "**/*.test.*",
     "**/*.spec.*"
   ],

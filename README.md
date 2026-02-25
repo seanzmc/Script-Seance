@@ -13,8 +13,6 @@ The app is functional end-to-end and in active UI iteration.
 - Local draft autosave, undo/redo controls, and TXT/PDF export.
 - Automated tests for core reliability paths (client services, playback engine, server error handling).
 
-UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
-
 ## Tech Stack
 
 - React 19 + TypeScript
@@ -24,72 +22,52 @@ UI polish and layout refinements are being tracked in `improve/ui_update_v2.md`.
 - Google GenAI SDK (`@google/genai`) for optional Gemini text generation
 - Vitest + Testing Library
 
-## Environment Variables
+## Architecture at a glance
 
-Copy `.env.example` to `.env` and set:
+- Frontend orchestration is handled by `GenerationOrchestrator` (`services/orchestration/generationOrchestrator.ts`), called from `App.tsx`.
+- LLM operations use latest-wins by `scopeKey`: a new run aborts the prior run in the same scope (`superseded`).
+- Each run carries a receipt (`opId`, `opType`, `scopeKey`, `startedAt`, `status`, `metadata`). Commits only happen when the run is still active and `isFresh(...)` passes; stale/superseded outcomes are dropped.
+- Orchestrator aborts are treated as expected control flow (silent from a user-error perspective), not hard failures.
+- Text generation kinds are routed through `/api/ai/generate` and include `generateScene`, `suggestPlotTwist`, `generateScriptElement`, `regenerateScriptBlock`, and `generateSurpriseSetup` (`server/llm/types.js`).
+- Prompt templates/builders live in `server/llm/promptBuilders.js`; per-kind execution/model/token handling is in `server/llm/textGeneration.js`.
+- TTS uses `generateSpeech`/`listVoices` through the same API route. Playback, preview, and retry are driven by `hooks/useAudioPlayer.ts` + `services/scriptEngine.ts`, with cache keys in `services/ttsCacheKeys.ts`.
 
-```bash
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-5.2
-OPENAI_FAST_MODEL=gpt-5-nano
-OPENAI_BALANCED_MODEL=gpt-5-mini
-# Prompt cache retention: in-memory or 24h
-OPENAI_PROMPT_CACHE_RETENTION=24h
-OPENAI_SCENE_MAX_OUTPUT_TOKENS=2200
-OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT=1210
-OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM=2200
-OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG=2970
-OPENAI_SCENE_COMPLETION_BUFFER_TOKENS=180
-OPENAI_SCENE_USE_MINI_FOR_LONG=1
-OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS=2600
-OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP=5000
-OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS=3
-TEXT_LLM_PROVIDER=openai
-GEMINI_API_KEY=your_google_ai_studio_api_key_here
-INWORLD_API_KEY=your_inworld_api_key_here
-INWORLD_API_SECRET=your_inworld_api_secret_here
-INWORLD_WORKSPACE_ID=your_inworld_workspace_id_here
-ADMIN_PASSWORD=your_admin_password
-PORT=3001
-NODE_ENV=development
-AI_RPM=30
-AI_RPD=500
-AI_MAX_PROMPT_CHARS=8000
-AI_UPSTREAM_TIMEOUT_MS=30000
-AI_UPSTREAM_TIMEOUT_MS_SCENE=90000
-TRUST_PROXY=0
-TTS_INWORLD_MODEL=inworld-tts-1.5-max
-INWORLD_API_BASE=https://api.inworld.ai
-INWORLD_ENGINE_HOST=api-engine.inworld.ai
-VOICE_CATALOG_CACHE_TTL_MS=300000
-INWORLD_MAX_ENGLISH_VOICES=8
-INWORLD_JWT_REFRESH_BUFFER_MS=60000
-```
-
-`OPENAI_API_KEY` and `ADMIN_PASSWORD` are required for normal app usage.  
-For Inworld TTS, set `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
-`GEMINI_API_KEY` is optional unless you use Gemini text fallback (`TEXT_LLM_PROVIDER=gemini`).
-
-## Local Development
+## Local setup
 
 Prereqs:
 
 - Node.js (LTS)
 - pnpm
 
-Install:
+Copy `.env.example` to `.env`.
+
+Minimal required env vars to run locally:
+
+```bash
+OPENAI_API_KEY=...
+ADMIN_PASSWORD=...
+```
+
+Common optional env vars:
+
+- `ALLOWED_ORIGINS`: comma-separated allowed browser origins for mutating `/api/auth/*` and `/api/ai/*` requests.
+- `TEXT_LLM_PROVIDER=gemini` requires `GEMINI_API_KEY`.
+- Inworld TTS requires `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
+
+`ALLOWED_ORIGINS` behavior:
+
+- If unset, defaults to `http://localhost:3000,http://127.0.0.1:3000`.
+- Non-allowlisted origins are rejected (`ORIGIN_NOT_ALLOWED`).
+- In production, missing `Origin` on protected mutating routes is rejected (`ORIGIN_REQUIRED`).
+
+Install and run:
 
 ```bash
 pnpm install
-```
-
-Run both client and server:
-
-```bash
 pnpm start
 ```
 
-Or run them separately:
+Or run separately:
 
 ```bash
 pnpm run server
@@ -100,6 +78,37 @@ Default local endpoints:
 
 - Client: `http://localhost:3000`
 - API: `http://localhost:3001`
+
+## Debugging
+
+Browser debug flags:
+
+- `window.__SS_DEBUG_PROMPTS__ = true`
+  - Enables client prompt-trace requests and shows the in-app Prompt Inspector in non-production builds.
+  - Server-side prompt trace output also requires `SS_DEBUG_PROMPTS=1` (and non-production server mode).
+- `window.__SS_DEBUG_AI_ABORTS__ = true`
+  - Enables verbose abort/cancellation logs for AI/orchestrator flows in the browser console.
+
+Example:
+
+```js
+window.__SS_DEBUG_PROMPTS__ = true;
+window.__SS_DEBUG_AI_ABORTS__ = true;
+```
+
+## Docs
+
+```bash
+pnpm docs:typedoc   # build TypeDoc output into docs/typedoc
+pnpm docs:serve     # serve docs/typedoc locally
+pnpm docs:refresh   # regenerate typedoc + dependency graph (mermaid)
+pnpm hooks:install  # configure git to use .githooks/pre-commit
+```
+
+The pre-commit hook conditionally runs:
+
+- `pnpm docs:typedoc`
+- `pnpm docs:graph:mermaid`
 
 ## Quality Checks
 

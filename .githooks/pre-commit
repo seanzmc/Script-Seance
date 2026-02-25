@@ -12,13 +12,13 @@ run_graph=0
 
 while IFS= read -r file; do
   case "$file" in
-    App.tsx|index.tsx|types.ts|typedoc.json|tsconfig.json|README.md|components/*|hooks/*|services/*|server/*)
+    App.tsx|index.tsx|types.ts|typedoc.json|tsconfig.json|README.md|components/*|hooks/*|services/*|server/*|shared/*)
       run_typedoc=1
       ;;
   esac
 
   case "$file" in
-    App.tsx|index.tsx|types.ts|components/*|hooks/*|services/*|server/*)
+    App.tsx|index.tsx|types.ts|components/*|hooks/*|services/*|server/*|shared/*)
       case "$file" in
         *.ts|*.tsx|*.js|*.jsx)
           run_graph=1
