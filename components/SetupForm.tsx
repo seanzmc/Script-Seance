@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
-import { Users, Plus, Trash2, Shuffle, ChevronDown } from "lucide-react";
+import { Users, Plus, Trash2 } from "lucide-react";
 
 export type SetupFormState = {
   genre: string;
@@ -13,8 +13,14 @@ export type SetupFormState = {
 
 export interface SetupFormProps {
   value: SetupFormState;
-  onChange: (next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => void;
-  onRequestSurprise?: (params: { mode: 'manual' | 'auto'; targetGenre: string }) => Promise<boolean>;
+  onChange: (
+    next: Partial<SetupFormState>,
+    meta?: { source?: "user" | "system" },
+  ) => void;
+  onRequestSurprise?: (params: {
+    mode: "manual" | "auto";
+    targetGenre: string;
+  }) => Promise<boolean>;
   onStart?: () => void;
   isLoading: boolean;
   onError?: (error: unknown, fallbackMessage: string) => boolean;
@@ -33,7 +39,6 @@ const STARTER_IDEAS = [
   "One mistake rewrites the entire future",
 ];
 
-const LENGTH_OPTIONS = ["Short", "Medium", "Long"];
 export const STYLE_PRESETS = [
   "Dry humor",
   "Dark humor",
@@ -44,7 +49,7 @@ export const STYLE_PRESETS = [
   "All dialogue rhymes",
   "Characters can't hear each other (constant misunderstandings)",
   "Everyone speaks in Gen Z slang",
-  "Dead serious documentary tone"
+  "Dead serious documentary tone",
 ];
 
 export const SetupForm: React.FC<SetupFormProps> = ({
@@ -64,7 +69,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const { genre, premise, characters, style, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
   const [justSurprised, setJustSurprised] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const autoSurpriseRef = useRef(false);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -78,10 +83,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
   }, [characters, focusIndex]);
 
-  const updateValue = useCallback((next: Partial<SetupFormState>, source: 'user' | 'system' = 'user') => {
-    if (isLocked) return;
-    onChange(next, { source });
-  }, [isLocked, onChange]);
+  const updateValue = useCallback(
+    (next: Partial<SetupFormState>, source: "user" | "system" = "user") => {
+      if (isLocked) return;
+      onChange(next, { source });
+    },
+    [isLocked, onChange],
+  );
 
   const handleCharacterChange = (index: number, charValue: string) => {
     const newChars = [...characters];
@@ -106,54 +114,63 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           characters[1] !== "Villain"))
     ) {
       return window.confirm(
-        "This will overwrite your current premise and characters. Continue?"
+        "This will overwrite your current premise and characters. Continue?",
       );
     }
     return true;
   }, [characters, premise]);
 
-  const handleSurpriseMe = useCallback(async (mode: 'manual' | 'auto') => {
-    if (isLocked) return;
-    if (!checkSafety()) return;
+  const handleSurpriseMe = useCallback(
+    async (mode: "manual" | "auto") => {
+      if (isLocked) return;
+      if (!checkSafety()) return;
 
-    setIsSurprising(true);
-    const targetGenre = genre;
+      setIsSurprising(true);
+      const targetGenre = genre;
 
-    try {
-      let committed = false;
-      if (onRequestSurprise) {
-        committed = await onRequestSurprise({ mode, targetGenre });
-      } else {
-        updateValue({
-          premise: `A gripping ${targetGenre} story with unexpected twists.`,
-          characters: ["Protagonist", "Antagonist", "The Catalyst"],
-        }, 'system');
-        committed = true;
+      try {
+        let committed = false;
+        if (onRequestSurprise) {
+          committed = await onRequestSurprise({ mode, targetGenre });
+        } else {
+          updateValue(
+            {
+              premise: `A gripping ${targetGenre} story with unexpected twists.`,
+              characters: ["Protagonist", "Antagonist", "The Catalyst"],
+            },
+            "system",
+          );
+          committed = true;
+        }
+
+        if (!committed) {
+          return;
+        }
+
+        setJustSurprised(true);
+        setTimeout(() => setJustSurprised(false), 1500);
+      } catch (e) {
+        console.error("Surprise generation failed", e);
+        const handled = onError?.(e, "Failed to generate a surprise setup.");
+        if (handled) {
+          return;
+        }
+        updateValue(
+          {
+            premise: `A gripping ${targetGenre} story with unexpected twists.`,
+            characters: ["Protagonist", "Antagonist", "The Catalyst"],
+          },
+          "system",
+        );
+
+        setJustSurprised(true);
+        setTimeout(() => setJustSurprised(false), 1500);
+      } finally {
+        setIsSurprising(false);
       }
-
-      if (!committed) {
-        return;
-      }
-
-      setJustSurprised(true);
-      setTimeout(() => setJustSurprised(false), 1500);
-    } catch (e) {
-      console.error("Surprise generation failed", e);
-      const handled = onError?.(e, "Failed to generate a surprise setup.");
-      if (handled) {
-        return;
-      }
-      updateValue({
-        premise: `A gripping ${targetGenre} story with unexpected twists.`,
-        characters: ["Protagonist", "Antagonist", "The Catalyst"],
-      }, 'system');
-
-      setJustSurprised(true);
-      setTimeout(() => setJustSurprised(false), 1500);
-    } finally {
-      setIsSurprising(false);
-    }
-  }, [checkSafety, genre, isLocked, onError, onRequestSurprise, updateValue]);
+    },
+    [checkSafety, genre, isLocked, onError, onRequestSurprise, updateValue],
+  );
 
   const handlePillClick = (idea: string) => {
     if (isLocked) return;
@@ -164,7 +181,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   const handleEditSetup = () => {
     if (!onEditSetup) return;
-    const proceed = window.confirm('Editing setup will clear the current draft and regenerate the script. Continue?');
+    const proceed = window.confirm(
+      "Editing setup will clear the current draft and regenerate the script. Continue?",
+    );
     if (!proceed) return;
     onEditSetup();
   };
@@ -176,40 +195,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
     if (autoSurpriseRef.current || isSurprising || isLocked) return;
     autoSurpriseRef.current = true;
-    void handleSurpriseMe('auto');
+    void handleSurpriseMe("auto");
   }, [autoSurprise, handleSurpriseMe, isLocked, isSurprising]);
 
   const trimmedPremise = premise.trim();
-  const premiseSnippet = trimmedPremise.length > 140
-    ? `${trimmedPremise.slice(0, 140)}...`
-    : trimmedPremise || 'No premise yet.';
-  const castCount = characters.filter(char => char.trim().length > 0).length;
+  const premiseSnippet =
+    trimmedPremise.length > 140
+      ? `${trimmedPremise.slice(0, 140)}...`
+      : trimmedPremise || "No premise yet.";
+  const castCount = characters.filter((char) => char.trim().length > 0).length;
   const summaryParts = [genre, length, style.trim()].filter(Boolean);
-  const summaryLine = summaryParts.join(' / ');
+  const summaryLine = summaryParts.join(" / ");
   const isStyleBlank = !style.trim();
-  const isLengthBlank = !length;
-  const lengthHint = (() => {
-    if (isLengthBlank) {
-      return 'Defaults to a balanced scene size.';
-    }
-    if (length === 'Short') {
-      return 'Short scenes are concise and punchy.';
-    }
-    if (length === 'Medium') {
-      return 'Medium scenes keep a balanced pace and detail.';
-    }
-    return 'Long scenes allow fuller beats and richer detail.';
-  })();
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
-  const hasValidCharacter = characters.some(char => char.trim().length > 0);
-
-  useEffect(() => {
-    if (showAdvanced) return;
-    if (length && length !== "Medium") {
-      setShowAdvanced(true);
-    }
-  }, [length, showAdvanced]);
+  const hasValidCharacter = characters.some((char) => char.trim().length > 0);
 
   return (
     <div className="space-y-4">
@@ -217,7 +217,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10 space-y-3">
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-widest text-slate-400">
-              {summaryLine || 'Setup summary'}
+              {summaryLine || "Setup summary"}
             </p>
             <p className="text-xs text-slate-200">
               &quot;{premiseSnippet}&quot;
@@ -259,19 +259,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   Pick a genre, then let AI spin up a premise and cast.
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => void handleSurpriseMe('manual')}
-                className="!bg-white/[0.03] hover:!bg-indigo-500/15 !border-white/20 hover:!border-indigo-400/60 !text-slate-200 transition-colors text-[11px] py-1.5 h-auto group"
-                type="button"
-                loading={isSurprising}
-                disabled={isLoading || isSurprising || isLocked}
-                size="sm"
-                title="Randomly generate a genre, premise, and cast"
-              >
-                <Shuffle className="w-3 h-3 mr-2 opacity-80 group-hover:rotate-180 transition-transform duration-500" />
-                Let AI Surprise Me
-              </Button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               {GENRES.map((g) => (
@@ -298,12 +285,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 Style
               </label>
               <p className="text-[11px] text-indigo-100/75">
-                Pick a vibe, then tweak it. This sets the tone for future generations.
+                Pick a vibe, then tweak it. This sets the tone for future
+                generations.
               </p>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {STYLE_PRESETS.map((tag) => {
-                const isSelected = style.trim().toLowerCase() === tag.toLowerCase();
+                const isSelected =
+                  style.trim().toLowerCase() === tag.toLowerCase();
                 return (
                   <button
                     key={tag}
@@ -339,137 +328,197 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-3">
-            <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
-              <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
-                Premise
-              </label>
-              <textarea
-                rows={4}
-                value={premise}
-                onChange={(e) => updateValue({ premise: e.target.value })}
-                className={`w-full rounded-xl p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[98px] text-sm leading-relaxed ${
-                  justSurprised
-                    ? "bg-indigo-900/25 ring-1 ring-indigo-400/45 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
-                    : "bg-slate-900/75 ring-1 ring-white/10"
-                } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-                placeholder="e.g., A detective discovers his new partner is a ghost..."
-                disabled={isLocked}
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {STARTER_IDEAS.map((idea) => (
-                  <button
-                    key={idea}
-                    type="button"
-                    onClick={() => handlePillClick(idea)}
-                    disabled={isLocked}
-                    className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-colors cursor-pointer ring-1 ring-white/10 hover:ring-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {idea}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
-              <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
-                <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
-              </label>
-              <div className="space-y-2">
-                {characters.map((char, idx) => (
-                  <div key={idx} className="relative group">
-                    <input
-                      ref={(el) => {
-                        characterInputs.current[idx] = el;
-                      }}
-                      value={char}
-                      onChange={(e) => handleCharacterChange(idx, e.target.value)}
-                      className={`w-full rounded-xl p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-all duration-700 ${
-                        justSurprised
-                          ? "bg-indigo-900/25 ring-1 ring-indigo-400/45"
-                          : "bg-slate-900/80 ring-1 ring-white/10"
-                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-                      placeholder={`Character ${idx + 1}`}
-                      disabled={isLocked}
-                    />
-                    {characters.length > 1 && !isLocked && (
-                      <button
-                        onClick={() => removeCharacter(idx)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                        tabIndex={-1}
-                        aria-label="Remove character"
-                        title="Remove character"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={addCharacter}
-                  disabled={isLocked}
-                  className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ring-1 ring-dashed ring-white/20 hover:ring-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Character
-                </button>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowDetails(true);
+                void handleSurpriseMe("manual");
+              }}
+              className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100 transition-all text-center rounded-xl"
+              type="button"
+              loading={isSurprising}
+              disabled={isLoading || isSurprising || isLocked}
+            >
+              Generate AI Premise
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDetails(true)}
+              className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300 transition-all text-center rounded-xl"
+              type="button"
+              disabled={isLocked}
+            >
+              Write My Own Premise
+            </Button>
           </div>
 
-          <div className="rounded-2xl bg-slate-950/45 ring-1 ring-white/10 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((open) => !open)}
-              className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-white/[0.02] transition-colors"
-            >
-              <span className="text-[11px] uppercase tracking-[0.32em] text-slate-300">
-                Advanced options (optional)
-              </span>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-            </button>
-            {showAdvanced && (
-              <div className="px-4 pb-4 sm:px-5 sm:pb-5 space-y-3">
-                <div className="space-y-1.5 rounded-xl bg-slate-900/55 ring-1 ring-white/10 p-3.5">
+          {showDetails && (
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-3">
+                <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
-                    Target Length (optional)
+                    Premise
                   </label>
-                  <select
-                    value={length}
-                    onChange={(e) => updateValue({ length: e.target.value })}
-                    className={`w-full rounded-lg p-2.5 text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                  <textarea
+                    rows={4}
+                    value={premise}
+                    onChange={(e) => updateValue({ premise: e.target.value })}
+                    className={`w-full rounded-xl p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[98px] text-sm leading-relaxed ${
                       justSurprised
-                        ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
-                        : "bg-slate-900/80 ring-1 ring-white/15"
+                        ? "bg-indigo-900/25 ring-1 ring-indigo-400/45 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
+                        : "bg-slate-900/75 ring-1 ring-white/10"
                     } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
+                    placeholder="e.g., A detective discovers his new partner is a ghost..."
                     disabled={isLocked}
-                  >
-                    <option value="">Balanced (default)</option>
-                    {LENGTH_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {STARTER_IDEAS.map((idea) => (
+                      <button
+                        key={idea}
+                        type="button"
+                        onClick={() => handlePillClick(idea)}
+                        disabled={isLocked}
+                        className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-colors cursor-pointer ring-1 ring-white/10 hover:ring-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {idea}
+                      </button>
                     ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400">{lengthHint}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
+                  <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
+                  </label>
+                  <div className="space-y-2">
+                    {characters.map((char, idx) => (
+                      <div key={idx} className="relative group">
+                        <input
+                          ref={(el) => {
+                            characterInputs.current[idx] = el;
+                          }}
+                          value={char}
+                          onChange={(e) =>
+                            handleCharacterChange(idx, e.target.value)
+                          }
+                          className={`w-full rounded-xl p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-all duration-700 ${
+                            justSurprised
+                              ? "bg-indigo-900/25 ring-1 ring-indigo-400/45"
+                              : "bg-slate-900/80 ring-1 ring-white/10"
+                          } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
+                          placeholder={`Character ${idx + 1}`}
+                          disabled={isLocked}
+                        />
+                        {characters.length > 1 && !isLocked && (
+                          <button
+                            onClick={() => removeCharacter(idx)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                            tabIndex={-1}
+                            aria-label="Remove character"
+                            title="Remove character"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addCharacter}
+                      disabled={isLocked}
+                      className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ring-1 ring-dashed ring-white/20 hover:ring-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Character
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {showSubmit && onStart && (
-            <Button
-              variant="primary"
-              onClick={onStart}
-              className="w-full shadow-[0_14px_40px_rgba(99,102,241,0.3)] hover:shadow-[0_18px_52px_rgba(99,102,241,0.42)] !bg-indigo-600 hover:!bg-indigo-500 transition-all text-sm font-medium"
-              loading={isLoading}
-              size="lg"
-              disabled={!premise.trim() || !hasValidCharacter || isLoading || isSurprising || isLocked}
-              title="Generate your opening scene"
-            >
-              Generate First Scene
-            </Button>
+              <div className="space-y-6 pt-6 pb-2">
+                <div className="text-center">
+                  <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 block mb-6">
+                    Target Scene Length
+                  </label>
+                  <div className="relative w-full max-w-md mx-auto h-[2px] bg-slate-800 rounded-full flex items-center">
+                    <div className="absolute left-[6px] right-[6px] h-[2px] bg-white/10 top-1/2 -translate-y-1/2 rounded-full pointer-events-none" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      value={length === "Short" ? 0 : length === "Long" ? 2 : 1}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "0") updateValue({ length: "Short" });
+                        else if (val === "2") updateValue({ length: "Long" });
+                        else updateValue({ length: "Medium" });
+                      }}
+                      className="w-full absolute inset-0 opacity-0 cursor-pointer z-10"
+                      aria-label="Scene length"
+                      disabled={isLocked}
+                      title="Target Scene Length"
+                    />
+                    <div className="absolute left-0 right-0 flex justify-between pointer-events-none z-0">
+                      <div className="w-3 h-3 rounded-full bg-slate-600 -translate-y-1/2 mt-[1px]" />
+                      <div className="w-3 h-3 rounded-full bg-slate-600 -translate-y-1/2 mt-[1px]" />
+                      <div className="w-3 h-3 rounded-full bg-slate-600 -translate-y-1/2 mt-[1px]" />
+                    </div>
+                    <div
+                      className="absolute w-5 h-5 bg-indigo-500 rounded-full top-1/2 -translate-y-1/2 z-0 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-all duration-300 border-2 border-slate-900"
+                      style={{
+                        left: `calc(${(length === "Short" ? 0 : length === "Long" ? 2 : 1) * 50}% - 10px)`,
+                      }}
+                    />
+                  </div>
+                  <div className="relative w-full max-w-md mx-auto flex justify-between mt-3 text-[10px] font-bold text-slate-400">
+                    <span
+                      className={
+                        length === "Short" ? "text-indigo-300" : "opacity-60"
+                      }
+                    >
+                      SHORT
+                    </span>
+                    <span
+                      className={
+                        !length || length === "Medium"
+                          ? "text-indigo-300"
+                          : "opacity-60"
+                      }
+                    >
+                      MEDIUM
+                    </span>
+                    <span
+                      className={
+                        length === "Long" ? "text-indigo-300" : "opacity-60"
+                      }
+                    >
+                      LONG
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {showSubmit && onStart && (
+                <Button
+                  variant="primary"
+                  onClick={onStart}
+                  className="w-full shadow-[0_14px_40px_rgba(99,102,241,0.3)] hover:shadow-[0_18px_52px_rgba(99,102,241,0.42)] !bg-indigo-600 hover:!bg-indigo-500 transition-all text-sm font-medium mt-4 py-3.5"
+                  loading={isLoading}
+                  size="lg"
+                  disabled={
+                    !premise.trim() ||
+                    !hasValidCharacter ||
+                    isLoading ||
+                    isSurprising ||
+                    isLocked
+                  }
+                  title="Generate your opening scene"
+                >
+                  Generate First Scene
+                </Button>
+              )}
+            </div>
           )}
         </>
       )}

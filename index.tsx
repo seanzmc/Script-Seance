@@ -6,9 +6,12 @@ import App from "./App";
 import "./index.css";
 
 if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const w = window as any;
-  if (import.meta.env.VITE_SS_DEBUG_PROMPTS === "1") w.__SS_DEBUG_PROMPTS__ = true;
-  if (import.meta.env.VITE_SS_DEBUG_AI_ABORTS === "1") w.__SS_DEBUG_AI_ABORTS__ = true;
+  if (import.meta.env.VITE_SS_DEBUG_PROMPTS === "1")
+    w.__SS_DEBUG_PROMPTS__ = true;
+  if (import.meta.env.VITE_SS_DEBUG_AI_ABORTS === "1")
+    w.__SS_DEBUG_AI_ABORTS__ = true;
 }
 
 const rootElement = document.getElementById("root");
@@ -20,5 +23,5 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
