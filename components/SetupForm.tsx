@@ -70,6 +70,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [isSurprising, setIsSurprising] = useState(false);
   const [justSurprised, setJustSurprised] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [pendingDetailReveal, setPendingDetailReveal] = useState(false);
   const autoSurpriseRef = useRef(false);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -147,6 +148,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           return;
         }
 
+        if (!showDetails) {
+          setPendingDetailReveal(true);
+        }
         setJustSurprised(true);
         setTimeout(() => setJustSurprised(false), 1500);
       } catch (e) {
@@ -163,13 +167,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           "system",
         );
 
+        if (!showDetails) {
+          setPendingDetailReveal(true);
+        }
         setJustSurprised(true);
         setTimeout(() => setJustSurprised(false), 1500);
       } finally {
         setIsSurprising(false);
       }
     },
-    [checkSafety, genre, isLocked, onError, onRequestSurprise, updateValue],
+    [
+      checkSafety,
+      genre,
+      isLocked,
+      onError,
+      onRequestSurprise,
+      showDetails,
+      updateValue,
+    ],
   );
 
   const handlePillClick = (idea: string) => {
@@ -197,6 +212,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     autoSurpriseRef.current = true;
     void handleSurpriseMe("auto");
   }, [autoSurprise, handleSurpriseMe, isLocked, isSurprising]);
+
+  useEffect(() => {
+    if (!pendingDetailReveal) return;
+    const hasPremise = premise.trim().length > 0;
+    const hasCharacter = characters.some((char) => char.trim().length > 0);
+    if (!hasPremise || !hasCharacter) return;
+    setShowDetails(true);
+    setPendingDetailReveal(false);
+  }, [characters, pendingDetailReveal, premise]);
 
   const trimmedPremise = premise.trim();
   const premiseSnippet =
@@ -332,7 +356,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             <Button
               variant="secondary"
               onClick={() => {
-                setShowDetails(true);
                 void handleSurpriseMe("manual");
               }}
               className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100 transition-all text-center rounded-xl"
@@ -344,7 +367,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </Button>
             <Button
               variant="secondary"
-              onClick={() => setShowDetails(true)}
+              onClick={() => {
+                setPendingDetailReveal(false);
+                setShowDetails(true);
+              }}
               className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300 transition-all text-center rounded-xl"
               type="button"
               disabled={isLocked}
@@ -441,8 +467,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 block mb-6">
                     Target Scene Length
                   </label>
-                  <div className="relative w-full max-w-md mx-auto h-[2px] bg-slate-800 rounded-full flex items-center">
-                    <div className="absolute left-[6px] right-[6px] h-[2px] bg-white/10 top-1/2 -translate-y-1/2 rounded-full pointer-events-none" />
+                  <div className="relative w-full max-w-md mx-auto h-[2px] bg-slate-700/80 rounded-full flex items-center">
                     <input
                       type="range"
                       min="0"
@@ -459,10 +484,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       disabled={isLocked}
                       title="Target Scene Length"
                     />
-                    <div className="absolute left-0 right-0 flex justify-between pointer-events-none z-0">
-                      <div className="w-3 h-3 rounded-full bg-slate-600 -translate-y-1/2 mt-[1px]" />
-                      <div className="w-3 h-3 rounded-full bg-slate-600 -translate-y-1/2 mt-[1px]" />
-                      <div className="w-3 h-3 rounded-full bg-slate-600 -translate-y-1/2 mt-[1px]" />
+                    <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-0">
+                      <div className="w-[3px] h-3.5 rounded-full bg-slate-500/60" />
+                      <div className="w-[3px] h-3.5 rounded-full bg-slate-500/60" />
+                      <div className="w-[3px] h-3.5 rounded-full bg-slate-500/60" />
                     </div>
                     <div
                       className="absolute w-5 h-5 bg-indigo-500 rounded-full top-1/2 -translate-y-1/2 z-0 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-all duration-300 border-2 border-slate-900"

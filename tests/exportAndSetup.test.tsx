@@ -1,5 +1,11 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildScriptTextExport } from "../App";
 import { SetupForm, SetupFormState } from "../components/SetupForm";
@@ -221,5 +227,141 @@ describe("SetupForm submit validation", () => {
 
     expect(screen.getByTestId("context-style").textContent).toBe("Unhinged");
     expect(screen.getByTestId("prompt-revision").textContent).toBe("1");
+  });
+});
+
+describe("SetupForm detail reveal timing", () => {
+  const blankBaseValue: SetupFormState = {
+    genre: "Noir",
+    premise: "",
+    characters: ["Hero", "Villain"],
+    style: "",
+    length: "Medium",
+  };
+
+  const premisePlaceholder =
+    "e.g., A detective discovers his new partner is a ghost...";
+
+  it("reveals details immediately for write-my-own mode", () => {
+    render(
+      <SetupForm
+        value={blankBaseValue}
+        onChange={vi.fn()}
+        isLoading={false}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /write my own premise/i }),
+    );
+
+    expect(screen.queryByPlaceholderText(premisePlaceholder)).not.toBeNull();
+  });
+
+  it("keeps details hidden during manual AI generation and reveals after commit", async () => {
+    let resolveSurprise: (() => void) | null = null;
+
+    const SurpriseHarness: React.FC = () => {
+      const [setupState, setSetupState] =
+        React.useState<SetupFormState>(blankBaseValue);
+
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+
+      const onRequestSurprise = React.useCallback(async () => {
+        return await new Promise<boolean>((resolve) => {
+          resolveSurprise = () => {
+            setSetupState((prev) => ({
+              ...prev,
+              premise: "A noir courier uncovers a citywide conspiracy.",
+              characters: ["Courier", "Fixer"],
+            }));
+            resolve(true);
+          };
+        });
+      }, []);
+
+      return (
+        <div>
+          <button type="button" onClick={() => resolveSurprise?.()}>
+            Resolve surprise
+          </button>
+          <SetupForm
+            value={setupState}
+            onChange={onSetupChange}
+            onRequestSurprise={onRequestSurprise}
+            isLoading={false}
+          />
+        </div>
+      );
+    };
+
+    render(<SurpriseHarness />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /generate ai premise/i }),
+    );
+
+    expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /resolve surprise/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText(premisePlaceholder)).not.toBeNull();
+    });
+  });
+
+  it("keeps details hidden during auto surprise and reveals after commit", async () => {
+    let resolveSurprise: (() => void) | null = null;
+
+    const AutoSurpriseHarness: React.FC = () => {
+      const [setupState, setSetupState] =
+        React.useState<SetupFormState>(blankBaseValue);
+
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+
+      const onRequestSurprise = React.useCallback(async () => {
+        return await new Promise<boolean>((resolve) => {
+          resolveSurprise = () => {
+            setSetupState((prev) => ({
+              ...prev,
+              premise: "Two grifters fake hauntings and summon the real thing.",
+              characters: ["Con Artist", "Historian"],
+            }));
+            resolve(true);
+          };
+        });
+      }, []);
+
+      return (
+        <div>
+          <button type="button" onClick={() => resolveSurprise?.()}>
+            Resolve auto surprise
+          </button>
+          <SetupForm
+            value={setupState}
+            onChange={onSetupChange}
+            onRequestSurprise={onRequestSurprise}
+            isLoading={false}
+            autoSurprise
+          />
+        </div>
+      );
+    };
+
+    render(<AutoSurpriseHarness />);
+
+    expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /resolve auto surprise/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText(premisePlaceholder)).not.toBeNull();
+    });
   });
 });
