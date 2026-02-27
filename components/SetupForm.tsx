@@ -71,6 +71,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [justSurprised, setJustSurprised] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [pendingDetailReveal, setPendingDetailReveal] = useState(false);
+  const [detailRevealSource, setDetailRevealSource] = useState<
+    "manual" | "ai" | null
+  >(null);
   const autoSurpriseRef = useRef(false);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -148,7 +151,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           return;
         }
 
-        if (!showDetails) {
+        if (showDetails) {
+          setDetailRevealSource("ai");
+        } else {
           setPendingDetailReveal(true);
         }
         setJustSurprised(true);
@@ -167,7 +172,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           "system",
         );
 
-        if (!showDetails) {
+        if (showDetails) {
+          setDetailRevealSource("ai");
+        } else {
           setPendingDetailReveal(true);
         }
         setJustSurprised(true);
@@ -219,6 +226,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     const hasCharacter = characters.some((char) => char.trim().length > 0);
     if (!hasPremise || !hasCharacter) return;
     setShowDetails(true);
+    setDetailRevealSource("ai");
     setPendingDetailReveal(false);
   }, [characters, pendingDetailReveal, premise]);
 
@@ -370,6 +378,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               onClick={() => {
                 setPendingDetailReveal(false);
                 setShowDetails(true);
+                setDetailRevealSource("manual");
               }}
               className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300 transition-all text-center rounded-xl"
               type="button"
@@ -398,19 +407,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     placeholder="e.g., A detective discovers his new partner is a ghost..."
                     disabled={isLocked}
                   />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {STARTER_IDEAS.map((idea) => (
-                      <button
-                        key={idea}
-                        type="button"
-                        onClick={() => handlePillClick(idea)}
-                        disabled={isLocked}
-                        className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-colors cursor-pointer ring-1 ring-white/10 hover:ring-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {idea}
-                      </button>
-                    ))}
-                  </div>
+                  {detailRevealSource === "manual" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {STARTER_IDEAS.map((idea) => (
+                        <button
+                          key={idea}
+                          type="button"
+                          onClick={() => handlePillClick(idea)}
+                          disabled={isLocked}
+                          className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-colors cursor-pointer ring-1 ring-white/10 hover:ring-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {idea}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
@@ -485,9 +496,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       title="Target Scene Length"
                     />
                     <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-0">
-                      <div className="w-[3px] h-3.5 rounded-full bg-slate-500/60" />
-                      <div className="w-[3px] h-3.5 rounded-full bg-slate-500/60" />
-                      <div className="w-[3px] h-3.5 rounded-full bg-slate-500/60" />
+                      <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
+                      <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
+                      <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
                     </div>
                     <div
                       className="absolute w-5 h-5 bg-indigo-500 rounded-full top-1/2 -translate-y-1/2 z-0 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-all duration-300 border-2 border-slate-900"
