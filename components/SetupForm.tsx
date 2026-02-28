@@ -378,7 +378,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
     styleShufflePulseTimeoutRef.current = window.setTimeout(() => {
       setStyleShufflePulse(false);
-    }, 320);
+    }, 280);
   }, [isLocked, updateValue]);
   const handleSelectStyleFromLibrary = useCallback(
     (nextStyle: string) => {
@@ -401,14 +401,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
   const hasValidCharacter = characters.some((char) => char.trim().length > 0);
-  const motionBaseClass = "transition-all duration-200 ease-out";
-  const pressFeedbackClass = "active:scale-[0.98]";
+  const motionBaseClass =
+    "transition-[opacity,transform,box-shadow] duration-[220ms] ease-out";
+  const pressFeedbackClass =
+    "hover:-translate-y-px active:translate-y-px active:duration-[140ms] active:ease-in-out";
+  const styleCardMotionClass =
+    "transition-[box-shadow,opacity,transform] duration-[280ms] ease-in-out";
   const focusRingClass =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
   const styleCardPulseClass = styleShufflePulse
-    ? "bg-indigo-500/[0.14] ring-indigo-200/50 shadow-[0_0_0_1px_rgba(165,180,252,0.28)_inset]"
-    : "";
+    ? "shadow-[0_0_0_1px_rgba(165,180,252,0.32)_inset,0_14px_34px_-26px_rgba(129,140,248,0.85)]"
+    : "shadow-[0_0_0_1px_rgba(165,180,252,0.14)_inset,0_0_0_0_rgba(129,140,248,0)]";
 
   return (
     <div className="space-y-4">
@@ -469,7 +473,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   className={`px-3 py-2 text-xs font-medium rounded-lg text-left ring-1 ${interactiveControlClass} ${
                     genre === g
                       ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
-                      : "bg-white/[0.03] text-slate-300 ring-white/15 hover:bg-white/[0.07] hover:text-white"
+                      : "bg-white/[0.03] text-slate-300 ring-white/15 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
                   } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   {g}
@@ -490,7 +494,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </div>
             <div className="space-y-2">
               <div
-                className={`group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2 ${motionBaseClass} ${styleCardPulseClass}`}
+                className={`group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2 ${styleCardMotionClass} ${styleCardPulseClass}`}
                 aria-live="polite"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -556,7 +560,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
                       isLocked || stylesLibrary.length === 0
                         ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
-                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
+                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
                     }`}
                   >
                     Shuffle
@@ -568,7 +572,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
                       isLocked
                         ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
-                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
+                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
                     }`}
                     aria-haspopup="dialog"
                     aria-expanded={isStyleLibraryOpen}
@@ -616,7 +620,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     ref={styleLibrarySearchInputRef}
                     value={styleSearch}
                     onChange={(event) => setStyleSearch(event.target.value)}
-                    className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                    className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-[box-shadow,opacity] duration-[220ms] ease-in-out"
                     placeholder="Search styles..."
                     aria-label="Search styles"
                     disabled={isLocked}
@@ -631,7 +635,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
                           isStyleBlank
                             ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                            : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
+                            : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
                         } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                         title="Use no style"
                       >
@@ -665,7 +669,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                                 className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
                                   isSelected
                                     ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                                    : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
+                                    : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
                                 } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                                 title={`Use style: ${item.title}`}
                               >
@@ -697,7 +701,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               onClick={() => {
                 void handleSurpriseMe("manual");
               }}
-              className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100 transition-all text-center rounded-xl"
+              className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100 transition-[opacity,transform,box-shadow] duration-[220ms] ease-out active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl"
               type="button"
               loading={isSurprising}
               disabled={isLoading || isSurprising || isLocked}
@@ -711,7 +715,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 setShowDetails(true);
                 setDetailRevealSource("manual");
               }}
-              className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300 transition-all text-center rounded-xl"
+              className="w-full py-4 uppercase tracking-[0.2em] text-xs font-bold !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300 transition-[opacity,transform,box-shadow] duration-[220ms] ease-out active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl"
               type="button"
               disabled={isLocked}
             >
