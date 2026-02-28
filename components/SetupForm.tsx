@@ -85,6 +85,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   >(null);
   const [styleSearch, setStyleSearch] = useState("");
   const autoSurpriseRef = useRef(false);
+  const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -267,6 +268,32 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       ) ?? null,
     [normalizedStyle],
   );
+  const selectedStyleCategoryLabel = useMemo(() => {
+    if (!selectedLibraryStyle) return null;
+    return (
+      STYLE_CATEGORIES.find(
+        (category) => category.id === selectedLibraryStyle.category,
+      )?.label ?? null
+    );
+  }, [selectedLibraryStyle]);
+  useEffect(() => {
+    if (!selectedLibraryStyle) return;
+    const isVisibleInFilteredStyles = filteredStyles.some(
+      (item) => item.id === selectedLibraryStyle.id,
+    );
+    if (!isVisibleInFilteredStyles) return;
+    const selectedButton = styleRowRefs.current[selectedLibraryStyle.id];
+    if (
+      !selectedButton ||
+      typeof selectedButton.scrollIntoView !== "function"
+    ) {
+      return;
+    }
+    selectedButton.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [filteredStyles, selectedLibraryStyle]);
   const surpriseStyleCandidates = normalizedStyleSearch
     ? filteredStyles
     : stylesLibrary;
@@ -368,35 +395,59 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               </p>
             </div>
             <div className="space-y-2">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={styleSearch}
-                  onChange={(event) => setStyleSearch(event.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-                  placeholder="Search styles..."
-                  aria-label="Search styles"
-                  disabled={isLocked}
-                />
-                <button
-                  type="button"
-                  onClick={handleStyleSurprise}
-                  disabled={isLocked || surpriseStyleCandidates.length === 0}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
-                    isLocked || surpriseStyleCandidates.length === 0
-                      ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
-                      : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
-                  }`}
-                >
-                  Surprise me
-                </button>
-              </div>
-              <div className="max-h-64 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
-                <div className="p-2">
+              <div
+                className="rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2"
+                aria-live="polite"
+              >
+                <p className="text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
+                  Selected style
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-indigo-100">
+                    {selectedLibraryStyle?.title ??
+                      (isStyleBlank ? "None (default style)" : style.trim())}
+                  </p>
+                  {selectedStyleCategoryLabel && (
+                    <span className="rounded-full bg-indigo-500/20 ring-1 ring-indigo-200/45 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-indigo-100/85">
+                      {selectedStyleCategoryLabel}
+                    </span>
+                  )}
+                </div>
+                {selectedLibraryStyle ? (
+                  <>
+                    <p className="text-[11px] text-indigo-100/75">
+                      {selectedLibraryStyle.description}
+                    </p>
+                    <p className="text-[11px] text-indigo-100 rounded-lg bg-indigo-500/16 ring-1 ring-indigo-200/35 px-3 py-2">
+                      &quot;{selectedLibraryStyle.sampleLine}&quot;
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-indigo-100/75">
+                    {isStyleBlank
+                      ? "Using default tone settings."
+                      : "Custom style selected."}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleStyleSurprise}
+                    disabled={isLocked || surpriseStyleCandidates.length === 0}
+                    className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
+                      isLocked || surpriseStyleCandidates.length === 0
+                        ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
+                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
+                    }`}
+                  >
+                    Surprise me
+                  </button>
                   <button
                     type="button"
                     onClick={() => updateValue({ style: "" })}
                     disabled={isLocked}
-                    className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                    aria-pressed={isStyleBlank}
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold ring-1 transition-colors ${
                       isStyleBlank
                         ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
                         : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
@@ -406,6 +457,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     None (no style)
                   </button>
                 </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={styleSearch}
+                  onChange={(event) => setStyleSearch(event.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                  placeholder="Search styles..."
+                  aria-label="Search styles"
+                  disabled={isLocked}
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
                 {groupedFilteredStyles.length > 0 ? (
                   groupedFilteredStyles.map((group) => (
                     <div
@@ -421,13 +484,17 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         return (
                           <button
                             key={item.id}
+                            ref={(element) => {
+                              styleRowRefs.current[item.id] = element;
+                            }}
                             type="button"
                             onClick={() => updateValue({ style: item.title })}
                             disabled={isLocked}
+                            aria-pressed={isSelected}
                             className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
                               isSelected
                                 ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                                : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
+                              : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
                             } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                             title={`Use style: ${item.title}`}
                           >
@@ -446,11 +513,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </p>
                 )}
               </div>
-              {selectedLibraryStyle && (
-                <p className="text-[11px] text-indigo-100 rounded-lg bg-indigo-500/16 ring-1 ring-indigo-200/35 px-3 py-2">
-                  &quot;{selectedLibraryStyle.sampleLine}&quot;
-                </p>
-              )}
             </div>
             {isStyleBlank && (
               <p className="text-[10px] text-slate-300/80">Using defaults.</p>

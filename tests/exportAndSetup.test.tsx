@@ -303,6 +303,15 @@ describe("SetupForm submit validation", () => {
     expect(screen.getByTestId("selected-style").textContent).toBe(
       "Shakespearean Drama",
     );
+    const shakespeareStyle = stylesLibrary.find(
+      (item) => item.title === "Shakespearean Drama",
+    );
+    expect(shakespeareStyle).toBeTruthy();
+    expect(
+      screen.getByText((content) =>
+        content.includes(shakespeareStyle?.sampleLine ?? ""),
+      ),
+    ).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "" },
@@ -312,7 +321,45 @@ describe("SetupForm submit validation", () => {
     expect(screen.getByTestId("selected-style").textContent).toBe(
       stylesLibrary[0]?.title ?? "",
     );
+    const selectedButton = screen.getByRole("button", {
+      name: new RegExp(`^${stylesLibrary[0]?.title ?? ""}`, "i"),
+    });
+    expect(selectedButton.getAttribute("aria-pressed")).toBe("true");
     expect(randomSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("scrolls the selected style row into view when surprise me changes style", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const scrollIntoViewMock = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+
+    const SurpriseStyleHarness: React.FC = () => {
+      const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+      return (
+        <SetupForm value={setupState} onChange={onSetupChange} isLoading={false} />
+      );
+    };
+
+    try {
+      render(<SurpriseStyleHarness />);
+      fireEvent.click(screen.getByRole("button", { name: /surprise me/i }));
+
+      await waitFor(() => {
+        expect(scrollIntoViewMock).toHaveBeenCalled();
+      });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: originalScrollIntoView,
+      });
+    }
   });
 });
 
