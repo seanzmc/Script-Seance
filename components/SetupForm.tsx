@@ -443,12 +443,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 className="group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2"
                 aria-live="polite"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
                     Selected style
                   </p>
                   {!isStyleBlank && (
-                    <div className="ml-auto w-full sm:w-auto flex justify-end min-h-5">
+                    <div className="ml-auto flex-none shrink-0 w-auto min-h-5 flex items-center justify-end">
                       <button
                         type="button"
                         onClick={handleClearStyle}
