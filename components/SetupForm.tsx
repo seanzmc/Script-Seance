@@ -86,9 +86,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [styleSearch, setStyleSearch] = useState("");
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
   const [canHover, setCanHover] = useState(false);
+  const [styleShufflePulse, setStyleShufflePulse] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
+  const styleLibraryModalRef = useRef<HTMLDivElement | null>(null);
+  const styleShufflePulseTimeoutRef = useRef<number | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -239,6 +242,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     return () => hoverQuery.removeListener(syncCanHover);
   }, []);
   useEffect(() => {
+    return () => {
+      if (styleShufflePulseTimeoutRef.current !== null) {
+        window.clearTimeout(styleShufflePulseTimeoutRef.current);
+      }
+    };
+  }, []);
+  useEffect(() => {
     if (!autoSurprise) {
       autoSurpriseRef.current = false;
       return;
@@ -266,14 +276,39 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   }, [isStyleLibraryOpen]);
   useEffect(() => {
     if (!isStyleLibraryOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
+    const handleModalKeyboard = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsStyleLibraryOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const modalRoot = styleLibraryModalRef.current;
+      if (!modalRoot) return;
+      const focusableElements = modalRoot.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusableElements.length === 0) return;
+      const firstFocusable = focusableElements.item(0);
+      const lastFocusable = focusableElements.item(focusableElements.length - 1);
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (!activeElement || !modalRoot.contains(activeElement)) {
+        event.preventDefault();
+        firstFocusable?.focus();
+        return;
+      }
+      if (event.shiftKey && activeElement === firstFocusable) {
+        event.preventDefault();
+        lastFocusable?.focus();
+        return;
+      }
+      if (!event.shiftKey && activeElement === lastFocusable) {
+        event.preventDefault();
+        firstFocusable?.focus();
       }
     };
-    window.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleModalKeyboard);
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("keydown", handleModalKeyboard);
     };
   }, [isStyleLibraryOpen]);
 
@@ -337,6 +372,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     const randomStyle = stylesLibrary[randomIndex];
     if (!randomStyle) return;
     updateValue({ style: randomStyle.title });
+    setStyleShufflePulse(true);
+    if (styleShufflePulseTimeoutRef.current !== null) {
+      window.clearTimeout(styleShufflePulseTimeoutRef.current);
+    }
+    styleShufflePulseTimeoutRef.current = window.setTimeout(() => {
+      setStyleShufflePulse(false);
+    }, 320);
   }, [isLocked, updateValue]);
   const handleSelectStyleFromLibrary = useCallback(
     (nextStyle: string) => {
@@ -359,6 +401,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
   const hasValidCharacter = characters.some((char) => char.trim().length > 0);
+  const motionBaseClass = "transition-all duration-200 ease-out";
+  const pressFeedbackClass = "active:scale-[0.98]";
+  const focusRingClass =
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
+  const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
+  const styleCardPulseClass = styleShufflePulse
+    ? "bg-indigo-500/[0.14] ring-indigo-200/50 shadow-[0_0_0_1px_rgba(165,180,252,0.28)_inset]"
+    : "";
 
   return (
     <div className="space-y-4">
@@ -416,7 +466,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   type="button"
                   onClick={() => updateValue({ genre: g })}
                   disabled={isLocked}
-                  className={`px-3 py-2 text-xs font-medium rounded-lg transition-all text-left ring-1 ${
+                  className={`px-3 py-2 text-xs font-medium rounded-lg text-left ring-1 ${interactiveControlClass} ${
                     genre === g
                       ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
                       : "bg-white/[0.03] text-slate-300 ring-white/15 hover:bg-white/[0.07] hover:text-white"
@@ -440,7 +490,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </div>
             <div className="space-y-2">
               <div
-                className="group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2"
+                className={`group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2 ${motionBaseClass} ${styleCardPulseClass}`}
                 aria-live="polite"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -454,7 +504,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         onClick={handleClearStyle}
                         disabled={isLocked}
                         aria-label="Clear selected style"
-                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium text-indigo-100/80 transition-all hover:underline hover:bg-indigo-500/15 active:scale-[0.98] ${
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium text-indigo-100/80 hover:underline hover:bg-indigo-500/15 ${interactiveControlClass} ${
                           canHover
                             ? "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
                             : "opacity-100"
@@ -481,11 +531,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
                 {selectedLibraryStyle ? (
                   <>
-                    <p className="text-[11px] text-indigo-100/75">
+                    <p className="text-[11px] text-indigo-100/75 line-clamp-2 sm:line-clamp-none">
                       {selectedLibraryStyle.description}
                     </p>
-                    <p className="text-[11px] text-indigo-100/85 leading-snug">
-                      <span className="font-semibold text-indigo-100">
+                    <p className="text-[11px] text-indigo-100/85 leading-snug line-clamp-2 sm:line-clamp-none">
+                      <span className="font-semibold text-indigo-100/65">
                         Sample line:
                       </span>{" "}
                       {selectedLibraryStyle.sampleLine}
@@ -503,7 +553,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     type="button"
                     onClick={handleStyleShuffle}
                     disabled={isLocked || stylesLibrary.length === 0}
-                    className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
+                    className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
                       isLocked || stylesLibrary.length === 0
                         ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
                         : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
@@ -515,7 +565,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     type="button"
                     onClick={() => setIsStyleLibraryOpen(true)}
                     disabled={isLocked}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
                       isLocked
                         ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
                         : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
@@ -537,6 +587,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 onClick={() => setIsStyleLibraryOpen(false)}
               />
               <div
+                ref={styleLibraryModalRef}
                 className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
                 role="dialog"
                 aria-modal="true"
@@ -554,7 +605,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsStyleLibraryOpen(false)}
-                    className="rounded-lg p-1.5 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 transition-colors"
+                    className={`rounded-lg p-1.5 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 ${interactiveControlClass}`}
                     aria-label="Close style library"
                   >
                     <X className="h-4 w-4" />
@@ -577,7 +628,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         onClick={() => handleSelectStyleFromLibrary("")}
                         disabled={isLocked}
                         aria-pressed={isStyleBlank}
-                        className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                        className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
                           isStyleBlank
                             ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
                             : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
@@ -611,7 +662,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                                 }
                                 disabled={isLocked}
                                 aria-pressed={isSelected}
-                                className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                                className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
                                   isSelected
                                     ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
                                     : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
