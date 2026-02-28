@@ -272,7 +272,9 @@ describe("SetupForm submit validation", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /× clear/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /clear selected style/i }),
+    );
 
     expect(onChange).toHaveBeenCalledWith({ style: "" }, { source: "user" });
   });

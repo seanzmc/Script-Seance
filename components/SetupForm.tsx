@@ -85,6 +85,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   >(null);
   const [styleSearch, setStyleSearch] = useState("");
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
+  const [canHover, setCanHover] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -223,6 +224,20 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     onEditSetup();
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const hoverQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const syncCanHover = () => setCanHover(hoverQuery.matches);
+    syncCanHover();
+    if (typeof hoverQuery.addEventListener === "function") {
+      hoverQuery.addEventListener("change", syncCanHover);
+      return () => hoverQuery.removeEventListener("change", syncCanHover);
+    }
+    hoverQuery.addListener(syncCanHover);
+    return () => hoverQuery.removeListener(syncCanHover);
+  }, []);
   useEffect(() => {
     if (!autoSurprise) {
       autoSurpriseRef.current = false;
@@ -425,12 +440,32 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </div>
             <div className="space-y-2">
               <div
-                className="rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2"
+                className="group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2"
                 aria-live="polite"
               >
-                <p className="text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
-                  Selected style
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
+                    Selected style
+                  </p>
+                  {!isStyleBlank && (
+                    <div className="ml-auto w-full sm:w-auto flex justify-end min-h-5">
+                      <button
+                        type="button"
+                        onClick={handleClearStyle}
+                        disabled={isLocked}
+                        aria-label="Clear selected style"
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium text-indigo-100/80 transition-all hover:underline hover:bg-indigo-500/15 active:scale-[0.98] ${
+                          canHover
+                            ? "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+                            : "opacity-100"
+                        } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                        title="Clear selected style"
+                      >
+                        × Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-indigo-100">
@@ -443,21 +478,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </span>
                     )}
                   </div>
-                  {!isStyleBlank && (
-                    <div className="ml-auto w-full sm:w-auto flex justify-end">
-                      <button
-                        type="button"
-                        onClick={handleClearStyle}
-                        disabled={isLocked}
-                        className={`text-[11px] font-medium text-indigo-100/75 transition-opacity hover:opacity-100 hover:underline ${
-                          isLocked ? "opacity-60 cursor-not-allowed" : "opacity-90"
-                        }`}
-                        title="Clear selected style"
-                      >
-                        × Clear
-                      </button>
-                    </div>
-                  )}
                 </div>
                 {selectedLibraryStyle ? (
                   <>
