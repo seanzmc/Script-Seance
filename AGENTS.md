@@ -11,6 +11,8 @@ Use these rules unless the user explicitly overrides them.
 - Use `pnpm` (not `npm` or `yarn`).
 - Prefer minimal, targeted changes over broad refactors.
 - Do not modify unrelated files.
+- When referencing files, use repo-relative paths, not absolute local paths.
+- Only list files you have confirmed exist (or explicitly label as ‘unknown’)
 
 ## Definition Of Success (Mandatory Gates)
 
@@ -27,6 +29,11 @@ Requirements:
 - All three must be green in the same final state of the working tree.
 - If one fails, continue iterating until fixed or report a concrete blocker.
 - Never claim completion while any of the three checks is failing or unrun.
+
+## Spec-First Mode (Default)
+
+- For non-trivial tasks, produce a spec first (no edits), then wait for approval.
+- Non-trivial = touches more than 1 file or changes behavior or adds/changes tests/config.
 
 ## Recommended Execution Flow
 
