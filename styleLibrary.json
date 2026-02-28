@@ -1,0 +1,456 @@
+{
+    "categories": [
+        {
+            "id": "genre_format_parody",
+            "label": "Genre & Format Parodies"
+        },
+        {
+            "id": "linguistic_dialogue_constraint",
+            "label": "Linguistic & Dialogue Constraints"
+        },
+        {
+            "id": "absurdist_mechanic",
+            "label": "Absurdist & Situational Mechanics"
+        },
+        {
+            "id": "vibe_tone",
+            "label": "Pure Vibes & Tones"
+        }
+    ],
+    "styles": [
+        {
+            "id": "noir-1940s-detective",
+            "category": "genre_format_parody",
+            "title": "1940s Noir Detective",
+            "description": "Everyone speaks in brooding metaphors, rain is always falling, and there is a heavy reliance on cynical voiceovers.",
+            "sampleLine": "VOICEOVER (TIRED): The neon blinked like it knew something I didn’t, and that made two of us."
+        },
+        {
+            "id": "daytime-soap-telenovela",
+            "category": "genre_format_parody",
+            "title": "Daytime Soap Opera / Telenovela",
+            "description": "Extreme melodrama. Every scene involves a shocking gasp, a sudden betrayal, amnesia, or a long-lost evil twin.",
+            "sampleLine": "MARIANA gasps so hard the room changes temperature: “You… you’re not my brother. You’re my brother’s brother.”"
+        },
+        {
+            "id": "reality-tv-drama",
+            "category": "genre_format_parody",
+            "title": "Reality TV Drama",
+            "description": "Includes frequent \"confessional\" cutaways where characters talk trash about what just happened in the scene.",
+            "sampleLine": "CONFESSIONAL: “So when he said ‘nice idea,’ I heard ‘I hope your Wi-Fi dies.’ Just saying.”"
+        },
+        {
+            "id": "corporate-training-video",
+            "category": "genre_format_parody",
+            "title": "Corporate Training Video",
+            "description": "Unnaturally enthusiastic, full of buzzwords (\"synergy,\" \"circling back\"), forced smiles, and awkward acronyms.",
+            "sampleLine": "NARRATOR (CHEERFUL): “Let’s operationalize gratitude by aligning on next steps for our feelings deliverables.”"
+        },
+        {
+            "id": "true-crime-reenactment",
+            "category": "genre_format_parody",
+            "title": "True Crime Reenactment",
+            "description": "Mundane actions are treated with ominous dread, complete with a narrator explaining the \"chilling\" details of someone making toast.",
+            "sampleLine": "NARRATOR (LOW): She reached for the butter… unaware it would be the last normal choice she’d make that morning."
+        },
+        {
+            "id": "silent-film-era",
+            "category": "genre_format_parody",
+            "title": "Silent Film Era",
+            "description": "Dialogue is sparse and comes in \"title cards.\" Stage directions focus on exaggerated physical gestures, mustache twirling, and damsel-in-distress fainting.",
+            "sampleLine": "[TITLE CARD]: “CURSES! MY PLAN IS RUINED!” (He twirls a mustache that is clearly plotting.)"
+        },
+        {
+            "id": "nature-documentary-voiceover",
+            "category": "genre_format_parody",
+            "title": "Nature Documentary",
+            "description": "Characters' everyday human behaviors are narrated as if they are rare animals in the wild, focusing on mating rituals, territory disputes, and feeding habits.",
+            "sampleLine": "NARRATOR (HUSHED): \"Observe how the male approaches the water cooler, puffing his chest in a desperate bid for social dominance.\""
+        },
+        {
+            "id": "90s-jrpg-npc",
+            "category": "genre_format_parody",
+            "title": "90s JRPG NPC",
+            "description": "Characters speak in looping, exposition-heavy text boxes, offer unprompted side quests, and physically block doorways until arbitrary conditions are met.",
+            "sampleLine": "“Welcome to the kitchen! My grandfather built this sink. If you find 10 Golden Apples, I might give you a slightly better spatula.”"
+        },
+        {
+            "id": "live-sports-broadcast",
+            "category": "genre_format_parody",
+            "title": "Live Sports Broadcast",
+            "description": "A high-energy play-by-play announcer and an analytical color commentator break down every micro-expression and conversational pivot like a championship game.",
+            "sampleLine": "ANNOUNCER: \"Ooh, he goes for the sarcastic eye-roll! Bold strategy, Cotton, let's see if it pays off!\""
+        },
+        {
+            "id": "late-night-infomercial",
+            "category": "genre_format_parody",
+            "title": "Late Night Infomercial",
+            "description": "Characters struggle with basic human functions in a clumsy panic before suddenly presenting a brightly-colored, aggressively priced solution to their interpersonal problems.",
+            "sampleLine": "“Are you tired of your sentences trailing off? Act now, and I’ll throw in a completely unwarranted opinion, absolutely free!”"
+        },
+        {
+            "id": "celebrity-cooking-show",
+            "category": "genre_format_parody",
+            "title": "Celebrity Cooking Show",
+            "description": "Conversations are structured like recipes, with characters explaining the 'ingredients' of their mood or actions to a camera, complete with pre-prepared emotional baggage.",
+            "sampleLine": "“So what I've done here is I've let my resentment marinate overnight, and now we're just going to deglaze the argument with a little guilt.”"
+        },
+        {
+            "id": "courtroom-drama",
+            "category": "genre_format_parody",
+            "title": "Courtroom Drama",
+            "description": "Every interaction is a trial. Characters object, sustain, overrule, and demand things be stricken from the record. Evidence is presented via dramatic reveals, and someone always demands to approach the bench.",
+            "sampleLine": "OBJECTION! The witness just said they 'liked' my pasta. I have screenshots, Your Honor, proving they told Jessica it was 'mid.'"
+        },
+        {
+            "id": "childrens-educational-show",
+            "category": "genre_format_parody",
+            "title": "Children's Educational Show",
+            "description": "Characters explain everything with infinite patience, count things on their fingers, and ask rhetorical questions followed by long, hopeful pauses. Gentle songs break out to summarize emotional beats.",
+            "sampleLine": "Can YOU say 'existential dread'? Ex-is-TEN-tial DREAD! Great job! Now, what color do you think sadness is? [five-second pause] That's right! Blue!"
+        },
+        {
+            "id": "anime-shonen-battle",
+            "category": "genre_format_parody",
+            "title": "Anime Shonen Battle",
+            "description": "Characters narrate their own attacks, flashback to childhood trauma mid-fight, and unlock hidden power through the sheer unbreakable force of friendship.",
+            "sampleLine": "You think you've won? You forgot one thing— [flashback to grandma's rice balls] —I PROMISED HER I'D NEVER GIVE UP! [powers up for six minutes]"
+        },
+        {
+            "id": "spaghetti-western",
+            "category": "genre_format_parody",
+            "title": "Spaghetti Western Showdown",
+            "description": "Long, tense silences. Squinting eyes. Tumbleweeds with impeccable dramatic timing. Every conversation is framed like a high-noon duel.",
+            "sampleLine": "They locked eyes across the conference table. A tumbleweed rolled past the projector. Someone's pen clicked. It was time."
+        },
+        {
+            "id": "90s-sitcom",
+            "category": "genre_format_parody",
+            "title": "90s Sitcom",
+            "description": "Laugh tracks punctuate every line. Characters deliver catchphrases, learn tidy lessons in 22 minutes, and hug it out while piano music swells.",
+            "sampleLine": "[LAUGH TRACK] Did I do that? [AUDIENCE: WOOO!] DAD enters, sits backwards on chair. Kiddo, we need to talk. [PIANO STARTS]"
+        },
+        {
+            "id": "shakespearean-drama",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Shakespearean Drama",
+            "description": "\"Thees,\" \"thous,\" iambic pentameter, and ending scenes with dramatic rhyming couplets.",
+            "sampleLine": "PRITHEE, good sir, unhand mine anxious heart, lest dawn arrive and tear our scheme apart."
+        },
+        {
+            "id": "overly-literal",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Overly Literal",
+            "description": "Characters do not understand metaphors, sarcasm, or idioms. Everything is taken at exact face value.",
+            "sampleLine": "“Break a leg?” I will not. I need both legs for walking. Please revise your request."
+        },
+        {
+            "id": "passive-aggressive-polite",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Passive-Aggressive Polite",
+            "description": "Everyone is smiling and using incredibly polite manners, but the dialogue is laced with venomous, underlying insults (e.g., \"Southern Belle\" or \"British High Society\").",
+            "sampleLine": "“Bless your heart, that is such a brave opinion to say out loud in public.”"
+        },
+        {
+            "id": "caveman-toddler",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Caveman / Toddler",
+            "description": "Extremely limited vocabulary. Simple sentences, big emotions, and third-person self-references.",
+            "sampleLine": "ME WANT PLAN. PLAN MAKE ME HAPPY. NO PLAN MAKE ME SCREAM-CRY."
+        },
+        {
+            "id": "interrogation-mode",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Interrogation Mode",
+            "description": "Every single line of dialogue must end in a question mark? Even if they are just stating a fact?",
+            "sampleLine": "You’re telling me you brought the map, and you’re proud of that decision?"
+        },
+        {
+            "id": "spoken-word-musical",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Spoken-Word Musical",
+            "description": "Characters burst into highly choreographed, emotional monologues that read exactly like musical theater songs, but without the music.",
+            "sampleLine": "I am a suitcase full of feelings, zipped up, dragged along, hoping the handle doesn’t snap mid-chorus."
+        },
+        {
+            "id": "only-analogies",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Only Analogies",
+            "description": "Characters are unable to state anything directly and must communicate entirely through comparisons and similes, no matter how urgent the situation.",
+            "sampleLine": "It's like a bathtub, but the bathtub is my trust, and someone left the faucet running, and the faucet is you, Kevin."
+        },
+        {
+            "id": "academic-footnote",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Academic Footnote",
+            "description": "Every statement is hedged with citations, caveats, disclaimers, and footnotes, as if the character is defending a thesis rather than having a conversation.",
+            "sampleLine": "I love you (citation needed), though 'love' here refers to a non-peer-reviewed emotional response (see Appendix B)."
+        },
+        {
+            "id": "whisper-screaming",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Whisper-Screaming",
+            "description": "Stage directions insist characters are whispering, but the content and punctuation make it unmistakably clear they are absolutely screaming.",
+            "sampleLine": "(whispering) I WILL BURN THIS ENTIRE BUILDING TO THE GROUND IF YOU TOUCH MY YOGURT AGAIN, DANIEL."
+        },
+        {
+            "id": "euphemism-overload",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Euphemism Overload",
+            "description": "No one can say anything directly. Every concept, no matter how simple, is wrapped in layers of polite indirection until meaning is nearly lost.",
+            "sampleLine": "Let's just say the item you're looking for has entered a phase of, shall we say, permanent geographic flexibility."
+        },
+        {
+            "id": "translator-broke",
+            "category": "linguistic_dialogue_constraint",
+            "title": "The Translator Broke",
+            "description": "Characters speak normally, but an in-scene translator or interpreter keeps mangling their words into something wildly different — and no one can stop it.",
+            "sampleLine": "DIPLOMAT: We seek peace. TRANSLATOR: He says your hat is a war crime and your mother chose poorly."
+        },
+        {
+            "id": "three-word-limit",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Three Word Limit",
+            "description": "Characters can only speak in sentences containing exactly three words. It forces stilted, punchy, and often cryptic communication.",
+            "sampleLine": "“I hate you. Leave me alone. Take the dog.”"
+        },
+        {
+            "id": "nursery-rhyme-meter",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Nursery Rhyme Meter",
+            "description": "All dialogue must follow a bouncy, whimsical AABB or ABCB rhyme scheme, often inventing nonsense words to force the rhyme.",
+            "sampleLine": "“I will not sign this legal brief, it brings me nothing but the grief! I’d rather eat a plastic leaf!”"
+        },
+        {
+            "id": "third-person-narration",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Self-Narration in Third Person",
+            "description": "Characters speak all their actions, thoughts, and dialogue out loud as if they are the author of the book they are currently in.",
+            "sampleLine": "“‘I can’t believe this,’ Sarah said, crossing her arms defensively while secretly wondering if she left the stove on.”"
+        },
+        {
+            "id": "extreme-yes-and",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Extreme 'Yes, And'",
+            "description": "Characters are physically incapable of disagreeing or saying no. They must enthusiastically accept whatever insane premise the other person just introduced and escalate it.",
+            "sampleLine": "“Yes, the house is on fire! And I brought marshmallows! And the fire department is actually a team of acrobats!”"
+        },
+        {
+            "id": "clinical-detachment",
+            "category": "linguistic_dialogue_constraint",
+            "title": "Clinical Detachment",
+            "description": "Everyday emotions and events are described using highly technical, medical, or anatomical terminology without any emotional warmth.",
+            "sampleLine": "“My lacrimal glands are currently producing excess fluid due to a sudden spike in cortisol triggered by your previous vocalizations.”"
+        },
+        {
+            "id": "constant-fourth-wall-breaks",
+            "category": "absurdist_mechanic",
+            "title": "Constant Fourth-Wall Breaks",
+            "description": "Characters frequently pause the scene to look directly at the camera and complain to the audience about the script or other characters.",
+            "sampleLine": "(To camera) “We’re doing this scene again because someone said ‘tighten pacing’ like it’s a spell.”"
+        },
+        {
+            "id": "inner-monologue-out-loud",
+            "category": "absurdist_mechanic",
+            "title": "Inner Monologue Out Loud",
+            "description": "Characters accidentally say their deepest insecurities and true motives out loud, but everyone pretends it’s totally normal conversation.",
+            "sampleLine": "“I’m only here because I fear being forgotten,” he says aloud. “Anyway, how’s traffic?”"
+        },
+        {
+            "id": "mundane-epic",
+            "category": "absurdist_mechanic",
+            "title": "Mundane Epic",
+            "description": "High-fantasy, life-or-death stakes are applied to completely mundane tasks (e.g., treating a trip to the DMV like the quest to destroy the One Ring).",
+            "sampleLine": "He raised the sacred Ticket Number. The oracle called… B-37. The fellowship wept."
+        },
+        {
+            "id": "everyone-lying-badly",
+            "category": "absurdist_mechanic",
+            "title": "Everyone is Lying (Badly)",
+            "description": "No character tells the truth about anything, but their lies are horribly obvious and instantly disprovable.",
+            "sampleLine": "“I’ve never seen a spoon,” she says, holding a spoon, wearing a spoon-shaped hat."
+        },
+        {
+            "id": "inconvenient-narrator",
+            "category": "absurdist_mechanic",
+            "title": "The Inconvenient Narrator",
+            "description": "A narrator is present in the scene, but they keep getting the facts wrong, forcing the characters to stop acting and correct them.",
+            "sampleLine": "NARRATOR: He strode confidently into the palace. CHARACTER: “This is a Wendy’s.”"
+        },
+        {
+            "id": "time-travel-sickness",
+            "category": "absurdist_mechanic",
+            "title": "Time-Travel Sickness",
+            "description": "Characters randomly jump back and forth a few minutes in the conversation, repeating lines or answering questions before they are asked.",
+            "sampleLine": "“Yes, I did it,” she says. He blinks. “Did what?” She sighs, “Right. We haven’t asked yet.”"
+        },
+        {
+            "id": "spontaneous-physics-changes",
+            "category": "absurdist_mechanic",
+            "title": "Spontaneous Physics Changes",
+            "description": "The laws of physics (gravity, friction, density) randomly shift during the conversation, forcing characters to adapt mid-sentence without acknowledging it.",
+            "sampleLine": "“I just think that we need to—whoa, grabbing the ceiling fan—we need to talk about our budget.”"
+        },
+        {
+            "id": "mid-sentence-body-swap",
+            "category": "absurdist_mechanic",
+            "title": "Mid-Sentence Body Swapping",
+            "description": "Characters randomly swap bodies and consciousness every few lines, having to quickly figure out who they are playing now to continue the argument.",
+            "sampleLine": "“You always do this, you just—wait, I’m you now. Oh wow, my back hurts. Anyway, you're the one who always does this!”"
+        },
+        {
+            "id": "literal-object-substitution",
+            "category": "absurdist_mechanic",
+            "title": "Literal Object Substitution",
+            "description": "Instead of using key nouns, characters must produce and hold up the physical object from out of nowhere to complete their sentence.",
+            "sampleLine": "“I’m looking for a new [holds up a live duck]. Have you seen any good ones lately?”"
+        },
+        {
+            "id": "high-ping-latency",
+            "category": "absurdist_mechanic",
+            "title": "High Ping / Latency",
+            "description": "One or more characters are experiencing severe network lag in real life. Their reactions, dialogue, and movements happen 5 to 10 seconds after they should.",
+            "sampleLine": "[Silence for 8 seconds]. “HAHAHA! Wow, that’s a hilarious joke you told a minute ago!”"
+        },
+        {
+            "id": "pay-per-word-economy",
+            "category": "absurdist_mechanic",
+            "title": "Pay-Per-Word Economy",
+            "description": "Characters have a limited budget of words. They must drop physical coins into a slot to speak, leading to heavily abbreviated and stingy conversations.",
+            "sampleLine": "[Clink. Clink. Clink.] “U. O. Me. Money.” [Sighs, runs out of coins]."
+        },
+        {
+            "id": "wrong-genre-character",
+            "category": "absurdist_mechanic",
+            "title": "Wrong Genre Character",
+            "description": "One character is clearly from a completely different genre than everyone else and absolutely refuses to adapt, causing constant tonal friction.",
+            "sampleLine": "DETECTIVE: The killer is among us. PIRATE (confused but committed): Aye, and the treasure?"
+        },
+        {
+            "id": "subtitles-disagree",
+            "category": "absurdist_mechanic",
+            "title": "Subtitles Disagree",
+            "description": "On-screen subtitles directly contradict, undermine, or editorialize what the characters are actually saying out loud.",
+            "sampleLine": "CHARACTER: I'm fine, really. [SUBTITLE: He is not fine. He has been not fine since 2019.]"
+        },
+        {
+            "id": "buffering-reality",
+            "category": "absurdist_mechanic",
+            "title": "Buffering Reality",
+            "description": "The scene itself glitches, lags, and buffers. Characters freeze mid-sentence, repeat phrases, or skip ahead like a corrupted video file.",
+            "sampleLine": "She opened her mouth to say— to say— to say— [BUFFERING] —and that's why I burned the shed."
+        },
+        {
+            "id": "sentient-props",
+            "category": "absurdist_mechanic",
+            "title": "Sentient Props",
+            "description": "Inanimate objects in the scene have opinions, moods, and the ability to refuse cooperation at the worst possible moment.",
+            "sampleLine": "He grabbed the doorknob. The doorknob sighed. Not today, Craig. I just don't feel like opening."
+        },
+        {
+            "id": "mismatched-soundtrack",
+            "category": "absurdist_mechanic",
+            "title": "Mismatched Soundtrack",
+            "description": "The background music is completely wrong for the scene's tone, and the characters can hear it, react to it, and cannot make it stop.",
+            "sampleLine": "HERO: This is it. The final battle— [bossa nova kicks in] —can someone PLEASE change the music?"
+        },
+        {
+            "id": "aggressively-wholesome",
+            "category": "vibe_tone",
+            "title": "Aggressively Wholesome",
+            "description": "No conflict, no villains. Everyone is incredibly supportive, overly communicative, and eager to go to therapy.",
+            "sampleLine": "“Thank you for sharing that. Would you like a hug, a boundary, or a snack?”"
+        },
+        {
+            "id": "deeply-cynical",
+            "category": "vibe_tone",
+            "title": "Deeply Cynical",
+            "description": "No one cares about the plot. Every character is exhausted, apathetic, and just wants to go home.",
+            "sampleLine": "“Sure,” he says, not looking up. “Let’s save the world or whatever. I have leftovers.”"
+        },
+        {
+            "id": "fever-dream",
+            "category": "vibe_tone",
+            "title": "Fever Dream",
+            "description": "Logic has left the chat. Scenes transition nonsensically, characters swap names, and inanimate objects might start talking.",
+            "sampleLine": "The door clears its throat. “I’m your mother now,” it says, politely, while the sky changes fonts."
+        },
+        {
+            "id": "overstimulated-caffeine-rush",
+            "category": "vibe_tone",
+            "title": "Overstimulated / Caffeine Rush",
+            "description": "Extremely fast-paced. Sentences run together, characters constantly interrupt each other, and stage directions are chaotic and panicked.",
+            "sampleLine": "He opens his mouth and three conversations sprint out, trip over a chair, and apologize mid-fall."
+        },
+        {
+            "id": "southern-gothic-dread",
+            "category": "vibe_tone",
+            "title": "Southern Gothic Dread",
+            "description": "A suffocating atmosphere of decay, humid heat, and unspoken family curses. Everyone is sweating, swatting flies, and harboring dark, tragic secrets.",
+            "sampleLine": "“The sweet tea tastes like copper today, just like it did the summer poor Aunt Beatrice went missing in the swamp.”"
+        },
+        {
+            "id": "hyper-optimized-hustle",
+            "category": "vibe_tone",
+            "title": "Hyper-Optimized Hustle",
+            "description": "A frantic, tech-bro atmosphere where every interaction is viewed as a networking opportunity, a pivot, or a chance to maximize ROI on friendship.",
+            "sampleLine": "“I’m gonna have to pass on this emotional breakdown right now, it’s not really scaling with my current bandwidth.”"
+        },
+        {
+            "id": "ethereal-asmr-whisper",
+            "category": "vibe_tone",
+            "title": "Ethereal ASMR",
+            "description": "Extremely gentle, quiet, and intimately close. Characters speak entirely in breathy whispers and focus heavily on tapping, crinkling, and soothing acoustic sounds.",
+            "sampleLine": "[Taps fingernails on the glass cup] “I whispered to the barista... *we are out of oat milk*.”"
+        },
+        {
+            "id": "barely-contained-rage",
+            "category": "vibe_tone",
+            "title": "Barely Contained Rage",
+            "description": "A volcanic fury held behind a paper-thin mask of composure. Every word is carefully measured, every pause hums with tension, and the stage directions describe white knuckles and jaw muscles working overtime. The explosion never actually comes, which is somehow worse.",
+            "sampleLine": "No, it's fine. [Sets mug down with surgical precision.] I said it's fine. [Chair creaks under grip.] Let's move on."
+        },
+        {
+            "id": "french-art-house-ennui",
+            "category": "vibe_tone",
+            "title": "French Art House Ennui",
+            "description": "Long, uncomfortable silences, endless cigarette smoking, and a profound, poetic sadness about the utter pointlessness of the current conversation.",
+            "sampleLine": "She stares out the window for three minutes. “We are all just dust waiting to be swept. Pass the salt.”"
+        },
+        {
+            "id": "golden-hour-nostalgia",
+            "category": "vibe_tone",
+            "title": "Golden Hour Nostalgia",
+            "description": "Everything is drenched in warm, bittersweet longing. Characters speak about the present as if they're already remembering it from decades away.",
+            "sampleLine": "That was the summer we still laughed like we meant it. The porch light stayed on. It always stayed on."
+        },
+        {
+            "id": "3am-vulnerability",
+            "category": "vibe_tone",
+            "title": "3 AM Vulnerability",
+            "description": "Raw, too-honest, can't-sleep energy. Characters say things they'd never say in daylight, and the silence between lines carries weight.",
+            "sampleLine": "Do you ever feel like you're just performing being a person and one day everyone's going to notice?"
+        },
+        {
+            "id": "unhinged-optimism",
+            "category": "vibe_tone",
+            "title": "Unhinged Optimism",
+            "description": "Everything is going catastrophically wrong, but the tone is relentlessly, almost disturbingly cheerful. No one acknowledges the chaos.",
+            "sampleLine": "The building's on fire and I lost my shoes, but you know what? Today still has potential!"
+        },
+        {
+            "id": "paranoid-thriller",
+            "category": "vibe_tone",
+            "title": "Paranoid Thriller",
+            "description": "Every mundane interaction is treated as deeply suspicious. Characters trust nothing — not the mailman, not the weather, not their own sandwich.",
+            "sampleLine": "The barista spelled my name right. She's never done that. Something's wrong. Something's very wrong."
+        },
+        {
+            "id": "stoned-philosopher",
+            "category": "vibe_tone",
+            "title": "Stoned Philosopher",
+            "description": "Slow, meandering, and way too deep. Characters fixate on one mundane observation and spiral it into an existential crisis at half speed.",
+            "sampleLine": "But like… what if chairs are just tables that gave up on their dreams? That's kind of beautiful, man."
+        }
+    ]
+}

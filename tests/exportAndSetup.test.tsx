@@ -227,6 +227,7 @@ describe("SetupForm submit validation", () => {
 
     const selectedStyle = stylesLibrary[0];
     expect(selectedStyle).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /browse/i }));
     fireEvent.click(
       screen.getByRole("button", {
         name: new RegExp(`^${selectedStyle.title}`, "i"),
@@ -240,6 +241,7 @@ describe("SetupForm submit validation", () => {
     expect(
       screen.getByText((content) => content.includes(selectedStyle.sampleLine)),
     ).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: /style library/i })).toBeNull();
   });
 
   it("search filters styles by title and description", () => {
@@ -247,7 +249,7 @@ describe("SetupForm submit validation", () => {
       <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /open style search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /browse/i }));
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
     });
@@ -260,7 +262,7 @@ describe("SetupForm submit validation", () => {
     ).toBeNull();
   });
 
-  it("none option clears style to an empty string", () => {
+  it("clear control clears style to an empty string", () => {
     const onChange = vi.fn();
     render(
       <SetupForm
@@ -270,16 +272,13 @@ describe("SetupForm submit validation", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "None (no style)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 
     expect(onChange).toHaveBeenCalledWith({ style: "" }, { source: "user" });
   });
 
-  it("surprise me picks from filtered styles and full list when search is empty", () => {
-    const randomSpy = vi
-      .spyOn(Math, "random")
-      .mockReturnValueOnce(0.8)
-      .mockReturnValueOnce(0);
+  it("shuffle picks from full list even when modal search is filtered", () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
 
     const SurpriseStyleHarness: React.FC = () => {
       const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
@@ -296,59 +295,26 @@ describe("SetupForm submit validation", () => {
 
     render(<SurpriseStyleHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: /open style search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /browse/i }));
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /surprise me/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close style library/i }));
 
-    expect(screen.getByTestId("selected-style").textContent).toBe(
-      "Shakespearean Drama",
-    );
-    const shakespeareStyle = stylesLibrary.find(
-      (item) => item.title === "Shakespearean Drama",
-    );
-    expect(shakespeareStyle).toBeTruthy();
-    expect(
-      screen.getByText((content) =>
-        content.includes(shakespeareStyle?.sampleLine ?? ""),
-      ),
-    ).toBeTruthy();
-
-    fireEvent.change(screen.getByLabelText(/search styles/i), {
-      target: { value: "" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /surprise me/i }));
+    fireEvent.click(screen.getByRole("button", { name: /shuffle/i }));
 
     expect(screen.getByTestId("selected-style").textContent).toBe(
       stylesLibrary[0]?.title ?? "",
     );
-    const selectedButton = screen.getByRole("button", {
-      name: new RegExp(`^${stylesLibrary[0]?.title ?? ""}`, "i"),
-    });
-    expect(selectedButton.getAttribute("aria-pressed")).toBe("true");
-    expect(randomSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it("search icon clears existing style search quickly", () => {
-    render(
-      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /open style search/i }));
-    fireEvent.change(screen.getByLabelText(/search styles/i), {
-      target: { value: "iambic pentameter" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /clear style search/i }));
-
     expect(
-      (screen.getByLabelText(/search styles/i) as HTMLInputElement).value,
-    ).toBe("");
-    expect(screen.getByRole("button", { name: /open style search/i })).toBeTruthy();
+      screen.getByText((content) =>
+        content.includes(stylesLibrary[0]?.sampleLine ?? ""),
+      ),
+    ).toBeTruthy();
+    expect(randomSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("scrolls the selected style row into view when surprise me changes style", async () => {
+  it("scrolls the selected style row into view when shuffle changes style in the open modal", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const scrollIntoViewMock = vi.fn();
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
@@ -369,7 +335,8 @@ describe("SetupForm submit validation", () => {
 
     try {
       render(<SurpriseStyleHarness />);
-      fireEvent.click(screen.getByRole("button", { name: /surprise me/i }));
+      fireEvent.click(screen.getByRole("button", { name: /browse/i }));
+      fireEvent.click(screen.getByRole("button", { name: /shuffle/i }));
 
       await waitFor(() => {
         expect(scrollIntoViewMock).toHaveBeenCalled();

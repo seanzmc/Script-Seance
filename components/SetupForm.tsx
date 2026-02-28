@@ -84,11 +84,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     "manual" | "ai" | null
   >(null);
   const [styleSearch, setStyleSearch] = useState("");
-  const [isStyleSearchOpen, setIsStyleSearchOpen] = useState(false);
+  const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const styleSearchContainerRef = useRef<HTMLDivElement | null>(null);
-  const styleSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -244,31 +243,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     setPendingDetailReveal(false);
   }, [characters, pendingDetailReveal, premise]);
   useEffect(() => {
-    if (!isStyleSearchOpen) return;
-    styleSearchInputRef.current?.focus();
-  }, [isStyleSearchOpen]);
+    if (!isStyleLibraryOpen) return;
+    const animationId = requestAnimationFrame(() => {
+      styleLibrarySearchInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(animationId);
+  }, [isStyleLibraryOpen]);
   useEffect(() => {
-    if (!isStyleSearchOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (
-        styleSearchContainerRef.current?.contains(event.target as Node) ?? false
-      ) {
-        return;
-      }
-      setIsStyleSearchOpen(false);
-    };
+    if (!isStyleLibraryOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsStyleSearchOpen(false);
+        setIsStyleLibraryOpen(false);
       }
     };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("keydown", handleEscape);
     };
-  }, [isStyleSearchOpen]);
+  }, [isStyleLibraryOpen]);
 
   const trimmedPremise = premise.trim();
   const normalizedStyleSearch = styleSearch.trim().toLowerCase();
@@ -306,6 +298,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     );
   }, [selectedLibraryStyle]);
   useEffect(() => {
+    if (!isStyleLibraryOpen) return;
     if (!selectedLibraryStyle) return;
     const isVisibleInFilteredStyles = filteredStyles.some(
       (item) => item.id === selectedLibraryStyle.id,
@@ -322,25 +315,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       behavior: "smooth",
       block: "nearest",
     });
-  }, [filteredStyles, selectedLibraryStyle]);
-  const surpriseStyleCandidates = normalizedStyleSearch
-    ? filteredStyles
-    : stylesLibrary;
-  const handleStyleSurprise = useCallback(() => {
-    if (isLocked || surpriseStyleCandidates.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * surpriseStyleCandidates.length);
-    const randomStyle = surpriseStyleCandidates[randomIndex];
+  }, [filteredStyles, isStyleLibraryOpen, selectedLibraryStyle]);
+  const handleStyleShuffle = useCallback(() => {
+    if (isLocked || stylesLibrary.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * stylesLibrary.length);
+    const randomStyle = stylesLibrary[randomIndex];
     if (!randomStyle) return;
     updateValue({ style: randomStyle.title });
-  }, [isLocked, surpriseStyleCandidates, updateValue]);
-  const handleStyleSearchIconClick = useCallback(() => {
-    if (isLocked) return;
-    if (styleSearch.trim().length > 0) {
-      setStyleSearch("");
-      return;
-    }
-    setIsStyleSearchOpen((current) => !current);
-  }, [isLocked, styleSearch]);
+  }, [isLocked, updateValue]);
+  const handleSelectStyleFromLibrary = useCallback(
+    (nextStyle: string) => {
+      updateValue({ style: nextStyle });
+      setIsStyleLibraryOpen(false);
+    },
+    [updateValue],
+  );
+  const handleClearStyle = useCallback(() => {
+    updateValue({ style: "" });
+  }, [updateValue]);
   const premiseSnippet =
     trimmedPremise.length > 140
       ? `${trimmedPremise.slice(0, 140)}...`
@@ -472,19 +464,34 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={handleStyleSurprise}
-                    disabled={isLocked || surpriseStyleCandidates.length === 0}
+                    onClick={handleStyleShuffle}
+                    disabled={isLocked || stylesLibrary.length === 0}
                     className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
-                      isLocked || surpriseStyleCandidates.length === 0
+                      isLocked || stylesLibrary.length === 0
                         ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
                         : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
                     }`}
                   >
-                    Surprise me
+                    Shuffle
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateValue({ style: "" })}
+                    onClick={() => setIsStyleLibraryOpen(true)}
+                    disabled={isLocked}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
+                      isLocked
+                        ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
+                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
+                    }`}
+                    aria-haspopup="dialog"
+                    aria-expanded={isStyleLibraryOpen}
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    Browse
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearStyle}
                     disabled={isLocked}
                     aria-pressed={isStyleBlank}
                     className={`rounded-lg px-3 py-2 text-xs font-semibold ring-1 transition-colors ${
@@ -494,113 +501,121 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                     title="Use no style"
                   >
-                    None (no style)
+                    Clear
                   </button>
                 </div>
-              </div>
-              <div className="flex justify-end">
-                <div
-                  ref={styleSearchContainerRef}
-                  className="flex items-center justify-end gap-2"
-                >
-                  {isStyleSearchOpen && (
-                    <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-slate-900/70 ring-1 ring-indigo-200/25">
-                      <input
-                        ref={styleSearchInputRef}
-                        value={styleSearch}
-                        onChange={(event) => setStyleSearch(event.target.value)}
-                        className="w-40 sm:w-56 bg-transparent text-sm text-white placeholder-indigo-100/55 focus:outline-none"
-                        placeholder="Search styles..."
-                        aria-label="Search styles"
-                        disabled={isLocked}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsStyleSearchOpen(false)}
-                        className="rounded-md p-1 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 transition-colors"
-                        aria-label="Close style search"
-                        disabled={isLocked}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleStyleSearchIconClick}
-                    disabled={isLocked}
-                    className={`relative rounded-lg p-2 ring-1 transition-colors ${
-                      isLocked
-                        ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
-                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
-                    }`}
-                    aria-label={
-                      styleSearch.trim().length > 0
-                        ? "Clear style search"
-                        : "Open style search"
-                    }
-                    title={
-                      styleSearch.trim().length > 0
-                        ? "Clear style search"
-                        : "Search styles"
-                    }
-                  >
-                    <Search className="h-4 w-4" />
-                    {styleSearch.trim().length > 0 && (
-                      <span className="absolute -top-1 -right-1 rounded-full bg-indigo-100 text-indigo-900 p-[2px]">
-                        <X className="h-2.5 w-2.5" />
-                      </span>
-                    )}
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-64 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
-                {groupedFilteredStyles.length > 0 ? (
-                  groupedFilteredStyles.map((group) => (
-                    <div
-                      key={group.id}
-                      className="border-t border-white/10 px-2 py-2 space-y-1.5"
-                    >
-                      <p className="px-2 text-[10px] uppercase tracking-[0.26em] text-indigo-100/50">
-                        {group.label}
-                      </p>
-                      {group.items.map((item) => {
-                        const isSelected =
-                          normalizedStyle === normalizeStyleValue(item.title);
-                        return (
-                          <button
-                            key={item.id}
-                            ref={(element) => {
-                              styleRowRefs.current[item.id] = element;
-                            }}
-                            type="button"
-                            onClick={() => updateValue({ style: item.title })}
-                            disabled={isLocked}
-                            aria-pressed={isSelected}
-                            className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
-                              isSelected
-                                ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                              : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
-                            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                            title={`Use style: ${item.title}`}
-                          >
-                            <p className="text-xs font-semibold">{item.title}</p>
-                            <p className="mt-0.5 text-[11px] text-indigo-100/75">
-                              {item.description}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))
-                ) : (
-                  <p className="px-4 py-4 text-xs text-slate-300">
-                    No styles match your search.
-                  </p>
-                )}
               </div>
             </div>
           </div>
+          {isStyleLibraryOpen && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+              <div
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                onClick={() => setIsStyleLibraryOpen(false)}
+              />
+              <div
+                className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Style Library"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
+                      Style
+                    </p>
+                    <h2 className="text-sm font-semibold text-indigo-100">
+                      Style Library
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsStyleLibraryOpen(false)}
+                    className="rounded-lg p-1.5 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 transition-colors"
+                    aria-label="Close style library"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-3 p-4">
+                  <input
+                    ref={styleLibrarySearchInputRef}
+                    value={styleSearch}
+                    onChange={(event) => setStyleSearch(event.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                    placeholder="Search styles..."
+                    aria-label="Search styles"
+                    disabled={isLocked}
+                  />
+                  <div className="max-h-[58vh] overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
+                    <div className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectStyleFromLibrary("")}
+                        disabled={isLocked}
+                        aria-pressed={isStyleBlank}
+                        className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                          isStyleBlank
+                            ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
+                            : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
+                        } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                        title="Use no style"
+                      >
+                        None (no style)
+                      </button>
+                    </div>
+                    {groupedFilteredStyles.length > 0 ? (
+                      groupedFilteredStyles.map((group) => (
+                        <div
+                          key={group.id}
+                          className="border-t border-white/10 px-2 py-2 space-y-1.5"
+                        >
+                          <p className="px-2 text-[10px] uppercase tracking-[0.26em] text-indigo-100/50">
+                            {group.label}
+                          </p>
+                          {group.items.map((item) => {
+                            const isSelected =
+                              normalizedStyle === normalizeStyleValue(item.title);
+                            return (
+                              <button
+                                key={item.id}
+                                ref={(element) => {
+                                  styleRowRefs.current[item.id] = element;
+                                }}
+                                type="button"
+                                onClick={() =>
+                                  handleSelectStyleFromLibrary(item.title)
+                                }
+                                disabled={isLocked}
+                                aria-pressed={isSelected}
+                                className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                                  isSelected
+                                    ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
+                                    : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
+                                } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                                title={`Use style: ${item.title}`}
+                              >
+                                <p className="text-xs font-semibold">
+                                  {item.title}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-indigo-100/75">
+                                  {item.description}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="px-4 py-4 text-xs text-slate-300">
+                        No styles match your search.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Button
