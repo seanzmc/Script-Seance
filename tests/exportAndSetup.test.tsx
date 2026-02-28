@@ -247,6 +247,7 @@ describe("SetupForm submit validation", () => {
       <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /open style search/i }));
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
     });
@@ -295,6 +296,7 @@ describe("SetupForm submit validation", () => {
 
     render(<SurpriseStyleHarness />);
 
+    fireEvent.click(screen.getByRole("button", { name: /open style search/i }));
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
     });
@@ -326,6 +328,24 @@ describe("SetupForm submit validation", () => {
     });
     expect(selectedButton.getAttribute("aria-pressed")).toBe("true");
     expect(randomSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("search icon clears existing style search quickly", () => {
+    render(
+      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open style search/i }));
+    fireEvent.change(screen.getByLabelText(/search styles/i), {
+      target: { value: "iambic pentameter" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /clear style search/i }));
+
+    expect(
+      (screen.getByLabelText(/search styles/i) as HTMLInputElement).value,
+    ).toBe("");
+    expect(screen.getByRole("button", { name: /open style search/i })).toBeTruthy();
   });
 
   it("scrolls the selected style row into view when surprise me changes style", async () => {

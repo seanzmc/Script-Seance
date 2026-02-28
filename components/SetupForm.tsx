@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
-import { Users, Plus, Trash2 } from "lucide-react";
+import { Users, Plus, Search, Trash2, X } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
 
 export type SetupFormState = {
@@ -84,8 +84,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     "manual" | "ai" | null
   >(null);
   const [styleSearch, setStyleSearch] = useState("");
+  const [isStyleSearchOpen, setIsStyleSearchOpen] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const styleSearchContainerRef = useRef<HTMLDivElement | null>(null);
+  const styleSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -240,6 +243,32 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     setDetailRevealSource("ai");
     setPendingDetailReveal(false);
   }, [characters, pendingDetailReveal, premise]);
+  useEffect(() => {
+    if (!isStyleSearchOpen) return;
+    styleSearchInputRef.current?.focus();
+  }, [isStyleSearchOpen]);
+  useEffect(() => {
+    if (!isStyleSearchOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        styleSearchContainerRef.current?.contains(event.target as Node) ?? false
+      ) {
+        return;
+      }
+      setIsStyleSearchOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsStyleSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isStyleSearchOpen]);
 
   const trimmedPremise = premise.trim();
   const normalizedStyleSearch = styleSearch.trim().toLowerCase();
@@ -304,6 +333,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     if (!randomStyle) return;
     updateValue({ style: randomStyle.title });
   }, [isLocked, surpriseStyleCandidates, updateValue]);
+  const handleStyleSearchIconClick = useCallback(() => {
+    if (isLocked) return;
+    if (styleSearch.trim().length > 0) {
+      setStyleSearch("");
+      return;
+    }
+    setIsStyleSearchOpen((current) => !current);
+  }, [isLocked, styleSearch]);
   const premiseSnippet =
     trimmedPremise.length > 140
       ? `${trimmedPremise.slice(0, 140)}...`
@@ -418,8 +455,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     <p className="text-[11px] text-indigo-100/75">
                       {selectedLibraryStyle.description}
                     </p>
-                    <p className="text-[11px] text-indigo-100 rounded-lg bg-indigo-500/16 ring-1 ring-indigo-200/35 px-3 py-2">
-                      &quot;{selectedLibraryStyle.sampleLine}&quot;
+                    <p className="text-[11px] text-indigo-100/85 leading-snug">
+                      <span className="font-semibold text-indigo-100">
+                        Sample line:
+                      </span>{" "}
+                      {selectedLibraryStyle.sampleLine}
                     </p>
                   </>
                 ) : (
@@ -458,15 +498,61 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={styleSearch}
-                  onChange={(event) => setStyleSearch(event.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-                  placeholder="Search styles..."
-                  aria-label="Search styles"
-                  disabled={isLocked}
-                />
+              <div className="flex justify-end">
+                <div
+                  ref={styleSearchContainerRef}
+                  className="flex items-center justify-end gap-2"
+                >
+                  {isStyleSearchOpen && (
+                    <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-slate-900/70 ring-1 ring-indigo-200/25">
+                      <input
+                        ref={styleSearchInputRef}
+                        value={styleSearch}
+                        onChange={(event) => setStyleSearch(event.target.value)}
+                        className="w-40 sm:w-56 bg-transparent text-sm text-white placeholder-indigo-100/55 focus:outline-none"
+                        placeholder="Search styles..."
+                        aria-label="Search styles"
+                        disabled={isLocked}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsStyleSearchOpen(false)}
+                        className="rounded-md p-1 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 transition-colors"
+                        aria-label="Close style search"
+                        disabled={isLocked}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleStyleSearchIconClick}
+                    disabled={isLocked}
+                    className={`relative rounded-lg p-2 ring-1 transition-colors ${
+                      isLocked
+                        ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
+                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
+                    }`}
+                    aria-label={
+                      styleSearch.trim().length > 0
+                        ? "Clear style search"
+                        : "Open style search"
+                    }
+                    title={
+                      styleSearch.trim().length > 0
+                        ? "Clear style search"
+                        : "Search styles"
+                    }
+                  >
+                    <Search className="h-4 w-4" />
+                    {styleSearch.trim().length > 0 && (
+                      <span className="absolute -top-1 -right-1 rounded-full bg-indigo-100 text-indigo-900 p-[2px]">
+                        <X className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="max-h-64 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
                 {groupedFilteredStyles.length > 0 ? (
@@ -514,9 +600,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 )}
               </div>
             </div>
-            {isStyleBlank && (
-              <p className="text-[10px] text-slate-300/80">Using defaults.</p>
-            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
