@@ -431,28 +431,32 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 <p className="text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
                   Selected style
                 </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-indigo-100">
-                    {selectedLibraryStyle?.title ??
-                      (isStyleBlank ? "None (default style)" : style.trim())}
-                  </p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-indigo-100">
+                      {selectedLibraryStyle?.title ??
+                        (isStyleBlank ? "None (default style)" : style.trim())}
+                    </p>
+                    {selectedStyleCategoryLabel && (
+                      <span className="rounded-full bg-indigo-500/20 ring-1 ring-indigo-200/45 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-indigo-100/85">
+                        {selectedStyleCategoryLabel}
+                      </span>
+                    )}
+                  </div>
                   {!isStyleBlank && (
-                    <button
-                      type="button"
-                      onClick={handleClearStyle}
-                      disabled={isLocked}
-                      className={`text-[11px] font-medium text-indigo-100/75 transition-opacity hover:opacity-100 hover:underline ${
-                        isLocked ? "opacity-60 cursor-not-allowed" : "opacity-90"
-                      }`}
-                      title="Clear selected style"
-                    >
-                      × Clear
-                    </button>
-                  )}
-                  {selectedStyleCategoryLabel && (
-                    <span className="rounded-full bg-indigo-500/20 ring-1 ring-indigo-200/45 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-indigo-100/85">
-                      {selectedStyleCategoryLabel}
-                    </span>
+                    <div className="ml-auto w-full sm:w-auto flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleClearStyle}
+                        disabled={isLocked}
+                        className={`text-[11px] font-medium text-indigo-100/75 transition-opacity hover:opacity-100 hover:underline ${
+                          isLocked ? "opacity-60 cursor-not-allowed" : "opacity-90"
+                        }`}
+                        title="Clear selected style"
+                      >
+                        × Clear
+                      </button>
+                    </div>
                   )}
                 </div>
                 {selectedLibraryStyle ? (
