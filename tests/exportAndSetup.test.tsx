@@ -9,10 +9,12 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildScriptTextExport } from "../App";
 import { SetupForm, SetupFormState } from "../components/SetupForm";
+import { stylesLibrary } from "../stylesLibrary";
 import { BlockType, Scene, StoryContext } from "../types";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 describe("buildScriptTextExport", () => {
@@ -106,7 +108,7 @@ describe("SetupForm submit validation", () => {
     expect(button.disabled).toBe(false);
   });
 
-  it("preset click updates shared context style and bumps prompt revision synchronously", () => {
+  it("style library selection updates shared context style and bumps prompt revision synchronously", () => {
     const StylePresetHarness: React.FC = () => {
       const [context, setContext] = React.useState<StoryContext | null>({
         title: "Draft",
@@ -223,10 +225,94 @@ describe("SetupForm submit validation", () => {
     expect(screen.getByTestId("context-style").textContent).toBe("");
     expect(screen.getByTestId("prompt-revision").textContent).toBe("0");
 
-    fireEvent.click(screen.getByRole("button", { name: "Unhinged" }));
+    const selectedStyle = stylesLibrary[0];
+    expect(selectedStyle).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: new RegExp(`^${selectedStyle.title}`, "i"),
+      }),
+    );
 
-    expect(screen.getByTestId("context-style").textContent).toBe("Unhinged");
+    expect(screen.getByTestId("context-style").textContent).toBe(
+      selectedStyle.title,
+    );
     expect(screen.getByTestId("prompt-revision").textContent).toBe("1");
+    expect(
+      screen.getByText((content) => content.includes(selectedStyle.sampleLine)),
+    ).toBeTruthy();
+  });
+
+  it("search filters styles by title and description", () => {
+    render(
+      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/search styles/i), {
+      target: { value: "iambic pentameter" },
+    });
+
+    expect(
+      screen.getByRole("button", { name: /^Shakespearean Drama/i }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /^Fever Dream/i }),
+    ).toBeNull();
+  });
+
+  it("none option clears style to an empty string", () => {
+    const onChange = vi.fn();
+    render(
+      <SetupForm
+        value={{ ...baseValue, style: "Fever Dream" }}
+        onChange={onChange}
+        isLoading={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "None (no style)" }));
+
+    expect(onChange).toHaveBeenCalledWith({ style: "" }, { source: "user" });
+  });
+
+  it("surprise me picks from filtered styles and full list when search is empty", () => {
+    const randomSpy = vi
+      .spyOn(Math, "random")
+      .mockReturnValueOnce(0.8)
+      .mockReturnValueOnce(0);
+
+    const SurpriseStyleHarness: React.FC = () => {
+      const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+      return (
+        <div>
+          <p data-testid="selected-style">{setupState.style}</p>
+          <SetupForm value={setupState} onChange={onSetupChange} isLoading={false} />
+        </div>
+      );
+    };
+
+    render(<SurpriseStyleHarness />);
+
+    fireEvent.change(screen.getByLabelText(/search styles/i), {
+      target: { value: "iambic pentameter" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /surprise me/i }));
+
+    expect(screen.getByTestId("selected-style").textContent).toBe(
+      "Shakespearean Drama",
+    );
+
+    fireEvent.change(screen.getByLabelText(/search styles/i), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /surprise me/i }));
+
+    expect(screen.getByTestId("selected-style").textContent).toBe(
+      stylesLibrary[0]?.title ?? "",
+    );
+    expect(randomSpy).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,7 +1,14 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { Users, Plus, Trash2 } from "lucide-react";
+import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
 
 export type SetupFormState = {
   genre: string;
@@ -52,6 +59,8 @@ export const STYLE_PRESETS = [
   "Dead serious documentary tone",
 ];
 
+const normalizeStyleValue = (value: string) => value.trim().toLowerCase();
+
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
   onChange,
@@ -74,6 +83,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [detailRevealSource, setDetailRevealSource] = useState<
     "manual" | "ai" | null
   >(null);
+  const [styleSearch, setStyleSearch] = useState("");
   const autoSurpriseRef = useRef(false);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -231,6 +241,42 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   }, [characters, pendingDetailReveal, premise]);
 
   const trimmedPremise = premise.trim();
+  const normalizedStyleSearch = styleSearch.trim().toLowerCase();
+  const normalizedStyle = normalizeStyleValue(style);
+  const filteredStyles = useMemo(() => {
+    if (!normalizedStyleSearch) return stylesLibrary;
+    return stylesLibrary.filter((item) => {
+      return (
+        item.title.toLowerCase().includes(normalizedStyleSearch) ||
+        item.description.toLowerCase().includes(normalizedStyleSearch)
+      );
+    });
+  }, [normalizedStyleSearch]);
+  const groupedFilteredStyles = useMemo(
+    () =>
+      STYLE_CATEGORIES.map((category) => ({
+        ...category,
+        items: filteredStyles.filter((item) => item.category === category.id),
+      })).filter((group) => group.items.length > 0),
+    [filteredStyles],
+  );
+  const selectedLibraryStyle = useMemo(
+    () =>
+      stylesLibrary.find(
+        (item) => normalizeStyleValue(item.title) === normalizedStyle,
+      ) ?? null,
+    [normalizedStyle],
+  );
+  const surpriseStyleCandidates = normalizedStyleSearch
+    ? filteredStyles
+    : stylesLibrary;
+  const handleStyleSurprise = useCallback(() => {
+    if (isLocked || surpriseStyleCandidates.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * surpriseStyleCandidates.length);
+    const randomStyle = surpriseStyleCandidates[randomIndex];
+    if (!randomStyle) return;
+    updateValue({ style: randomStyle.title });
+  }, [isLocked, surpriseStyleCandidates, updateValue]);
   const premiseSnippet =
     trimmedPremise.length > 140
       ? `${trimmedPremise.slice(0, 140)}...`
@@ -317,44 +363,95 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 Style
               </label>
               <p className="text-[11px] text-indigo-100/75">
-                Pick a vibe, then tweak it. This sets the tone for future
+                Pick a vibe from the library. This sets tone for future
                 generations.
               </p>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {STYLE_PRESETS.map((tag) => {
-                const isSelected =
-                  style.trim().toLowerCase() === tag.toLowerCase();
-                return (
+            <div className="space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={styleSearch}
+                  onChange={(event) => setStyleSearch(event.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                  placeholder="Search styles..."
+                  aria-label="Search styles"
+                  disabled={isLocked}
+                />
+                <button
+                  type="button"
+                  onClick={handleStyleSurprise}
+                  disabled={isLocked || surpriseStyleCandidates.length === 0}
+                  className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 transition-colors ${
+                    isLocked || surpriseStyleCandidates.length === 0
+                      ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
+                      : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:bg-indigo-500/30 hover:ring-indigo-100/55"
+                  }`}
+                >
+                  Surprise me
+                </button>
+              </div>
+              <div className="max-h-64 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
+                <div className="p-2">
                   <button
-                    key={tag}
                     type="button"
-                    onClick={() => updateValue({ style: tag })}
+                    onClick={() => updateValue({ style: "" })}
                     disabled={isLocked}
-                    className={`text-[10px] px-2.5 py-1.5 rounded-full ring-1 transition-colors ${
-                      isSelected
-                        ? "text-indigo-100 bg-indigo-500/35 ring-indigo-100/55"
-                        : "text-indigo-100/90 bg-indigo-500/15 ring-indigo-200/30 hover:bg-indigo-500/24 hover:ring-indigo-100/45"
+                    className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                      isStyleBlank
+                        ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
+                        : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
                     } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                    title={`Use style: ${tag}`}
+                    title="Use no style"
                   >
-                    {tag}
+                    None (no style)
                   </button>
-                );
-              })}
+                </div>
+                {groupedFilteredStyles.length > 0 ? (
+                  groupedFilteredStyles.map((group) => (
+                    <div
+                      key={group.id}
+                      className="border-t border-white/10 px-2 py-2 space-y-1.5"
+                    >
+                      <p className="px-2 text-[10px] uppercase tracking-[0.26em] text-indigo-100/50">
+                        {group.label}
+                      </p>
+                      {group.items.map((item) => {
+                        const isSelected =
+                          normalizedStyle === normalizeStyleValue(item.title);
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => updateValue({ style: item.title })}
+                            disabled={isLocked}
+                            className={`w-full rounded-lg px-3 py-2 text-left transition-colors ring-1 ${
+                              isSelected
+                                ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
+                                : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
+                            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                            title={`Use style: ${item.title}`}
+                          >
+                            <p className="text-xs font-semibold">{item.title}</p>
+                            <p className="mt-0.5 text-[11px] text-indigo-100/75">
+                              {item.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))
+                ) : (
+                  <p className="px-4 py-4 text-xs text-slate-300">
+                    No styles match your search.
+                  </p>
+                )}
+              </div>
+              {selectedLibraryStyle && (
+                <p className="text-[11px] text-indigo-100 rounded-lg bg-indigo-500/16 ring-1 ring-indigo-200/35 px-3 py-2">
+                  &quot;{selectedLibraryStyle.sampleLine}&quot;
+                </p>
+              )}
             </div>
-            <textarea
-              rows={3}
-              value={style}
-              onChange={(e) => updateValue({ style: e.target.value })}
-              className={`w-full rounded-lg p-2.5 text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm resize-y min-h-[88px] ${
-                justSurprised
-                  ? "bg-indigo-900/20 ring-1 ring-indigo-500/55"
-                  : "bg-slate-900/80 ring-1 ring-white/15"
-              } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-              placeholder="e.g., Witty noir with clipped banter and escalating absurdity."
-              disabled={isLocked}
-            />
             {isStyleBlank && (
               <p className="text-[10px] text-slate-300/80">Using defaults.</p>
             )}
