@@ -272,9 +272,17 @@ describe("SetupForm submit validation", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    fireEvent.click(screen.getByRole("button", { name: /× clear/i }));
 
     expect(onChange).toHaveBeenCalledWith({ style: "" }, { source: "user" });
+  });
+
+  it("does not show inline clear action when no style is selected", () => {
+    render(
+      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
+    );
+
+    expect(screen.queryByRole("button", { name: /× clear/i })).toBeNull();
   });
 
   it("shuffle picks from full list even when modal search is filtered", () => {

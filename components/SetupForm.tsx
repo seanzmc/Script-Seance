@@ -436,6 +436,19 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     {selectedLibraryStyle?.title ??
                       (isStyleBlank ? "None (default style)" : style.trim())}
                   </p>
+                  {!isStyleBlank && (
+                    <button
+                      type="button"
+                      onClick={handleClearStyle}
+                      disabled={isLocked}
+                      className={`text-[11px] font-medium text-indigo-100/75 transition-opacity hover:opacity-100 hover:underline ${
+                        isLocked ? "opacity-60 cursor-not-allowed" : "opacity-90"
+                      }`}
+                      title="Clear selected style"
+                    >
+                      × Clear
+                    </button>
+                  )}
                   {selectedStyleCategoryLabel && (
                     <span className="rounded-full bg-indigo-500/20 ring-1 ring-indigo-200/45 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-indigo-100/85">
                       {selectedStyleCategoryLabel}
@@ -488,20 +501,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   >
                     <Search className="h-3.5 w-3.5" />
                     Browse
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearStyle}
-                    disabled={isLocked}
-                    aria-pressed={isStyleBlank}
-                    className={`rounded-lg px-3 py-2 text-xs font-semibold ring-1 transition-colors ${
-                      isStyleBlank
-                        ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                        : "bg-white/[0.02] ring-white/10 text-slate-200 hover:bg-white/[0.06] hover:text-white"
-                    } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                    title="Use no style"
-                  >
-                    Clear
                   </button>
                 </div>
               </div>
