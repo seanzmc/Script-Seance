@@ -832,82 +832,42 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           {showDetails && (
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5 md:items-stretch">
-                <div className={`${detailPanelClass} flex flex-col h-full`}>
+                <div className={`${detailPanelClass} flex h-full flex-col`}>
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                     Premise
                   </label>
-                  <textarea
-                    rows={8}
-                    value={premise}
-                    onChange={(e) => updateValue({ premise: e.target.value })}
-                    className={`w-full flex-1 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none min-h-[260px] md:min-h-[336px] text-sm leading-relaxed ${
-                      justSurprised
-                        ? "bg-indigo-900/25 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
-                        : "bg-slate-900/60"
-                    } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-                    placeholder="e.g., A detective discovers his new partner is a ghost..."
-                    disabled={isLocked}
-                  />
-                  {detailRevealSource === "manual" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {STARTER_IDEAS.map((idea) => (
-                        <button
-                          key={idea}
-                          type="button"
-                          onClick={() => handlePillClick(idea)}
-                          disabled={isLocked}
-                          className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-[opacity,color,background-color] duration-[220ms] ease-out cursor-pointer border border-white/10 hover:border-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {idea}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-auto border-t border-white/10 pt-3 flex items-center gap-2 text-[11px]">
-                    <span className="uppercase tracking-[0.2em] text-slate-500">
-                      Length:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCycleLength}
+                  <div className="flex flex-1 flex-col gap-2">
+                    <textarea
+                      rows={8}
+                      value={premise}
+                      onChange={(e) => updateValue({ premise: e.target.value })}
+                      className={`w-full flex-1 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none min-h-[260px] md:min-h-[336px] text-sm leading-relaxed ${
+                        justSurprised
+                          ? "bg-indigo-900/25 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
+                          : "bg-slate-900/60"
+                      } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
+                      placeholder="e.g., A detective discovers his new partner is a ghost..."
                       disabled={isLocked}
-                      className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,transform] duration-[220ms] ease-out hover:text-indigo-100 hover:-translate-y-px active:translate-y-px ${focusRingClass} ${
-                        isLocked ? "opacity-60 cursor-not-allowed" : ""
-                      }`}
-                      aria-label="Cycle scene length"
-                      title="Cycle target scene length"
-                    >
-                      <span className="relative inline-flex h-[1.1em] w-[6ch] overflow-hidden align-middle text-left">
-                        {!prefersReducedMotion && lengthOutgoing && (
-                          <span
-                            className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ease-in-out ${
-                              isLengthAnimating && lengthIncomingVisible
-                                ? "-translate-y-1.5 opacity-0"
-                                : "translate-y-0 opacity-100"
-                            }`}
+                    />
+                    {detailRevealSource === "manual" && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {STARTER_IDEAS.map((idea) => (
+                          <button
+                            key={idea}
+                            type="button"
+                            onClick={() => handlePillClick(idea)}
+                            disabled={isLocked}
+                            className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-[opacity,color,background-color] duration-[220ms] ease-out cursor-pointer border border-white/10 hover:border-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            {lengthOutgoing}
-                          </span>
-                        )}
-                        <span
-                          className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ${
-                            prefersReducedMotion
-                              ? "translate-y-0 opacity-100"
-                              : isLengthAnimating
-                                ? lengthIncomingVisible
-                                  ? "translate-y-0 opacity-100 ease-out"
-                                  : "translate-y-1.5 opacity-0 ease-in-out"
-                                : "translate-y-0 opacity-100 ease-out"
-                          }`}
-                        >
-                          {lengthDisplay}
-                        </span>
-                      </span>
-                    </button>
+                            {idea}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className={`${detailPanelClass} flex h-full flex-col gap-5`}>
+                <div className={`${detailPanelClass} flex h-full flex-col`}>
                   <div className="space-y-2 flex-1">
                     <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
                       <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
@@ -955,7 +915,55 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </button>
                     </div>
                   </div>
-                  <p className="mt-auto text-[11px] text-slate-400">
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5">
+                <div className="border-t border-white/10 pt-3 flex items-center gap-2 text-[11px]">
+                  <span className="uppercase tracking-[0.2em] text-slate-500">
+                    Length:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCycleLength}
+                    disabled={isLocked}
+                    className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,transform] duration-[220ms] ease-out hover:text-indigo-100 hover:-translate-y-px active:translate-y-px ${focusRingClass} ${
+                      isLocked ? "opacity-60 cursor-not-allowed" : ""
+                    }`}
+                    aria-label="Cycle scene length"
+                    title="Cycle target scene length"
+                  >
+                    <span className="relative inline-flex h-[1.1em] w-[6ch] overflow-hidden align-middle text-left">
+                      {!prefersReducedMotion && lengthOutgoing && (
+                        <span
+                          className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ease-in-out ${
+                            isLengthAnimating && lengthIncomingVisible
+                              ? "-translate-y-1.5 opacity-0"
+                              : "translate-y-0 opacity-100"
+                          }`}
+                        >
+                          {lengthOutgoing}
+                        </span>
+                      )}
+                      <span
+                        className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ${
+                          prefersReducedMotion
+                            ? "translate-y-0 opacity-100"
+                            : isLengthAnimating
+                              ? lengthIncomingVisible
+                                ? "translate-y-0 opacity-100 ease-out"
+                                : "translate-y-1.5 opacity-0 ease-in-out"
+                              : "translate-y-0 opacity-100 ease-out"
+                        }`}
+                      >
+                        {lengthDisplay}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex items-center md:justify-start">
+                  <p className="text-[11px] text-slate-400">
                     {characterCount}{" "}
                     {characterCount === 1 ? "character" : "characters"}
                   </p>
