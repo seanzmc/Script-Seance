@@ -86,12 +86,23 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [styleSearch, setStyleSearch] = useState("");
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
   const [canHover, setCanHover] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [styleShufflePulse, setStyleShufflePulse] = useState(false);
+  const [lengthDisplay, setLengthDisplay] = useState<"Short" | "Medium" | "Long">(
+    "Medium",
+  );
+  const [lengthOutgoing, setLengthOutgoing] = useState<
+    "Short" | "Medium" | "Long" | null
+  >(null);
+  const [isLengthAnimating, setIsLengthAnimating] = useState(false);
+  const [lengthIncomingVisible, setLengthIncomingVisible] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
   const styleLibraryModalRef = useRef<HTMLDivElement | null>(null);
   const styleShufflePulseTimeoutRef = useRef<number | null>(null);
+  const lengthAnimationTimeoutRef = useRef<number | null>(null);
+  const lengthAnimationFrameRef = useRef<number | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -246,7 +257,27 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       if (styleShufflePulseTimeoutRef.current !== null) {
         window.clearTimeout(styleShufflePulseTimeoutRef.current);
       }
+      if (lengthAnimationTimeoutRef.current !== null) {
+        window.clearTimeout(lengthAnimationTimeoutRef.current);
+      }
+      if (lengthAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(lengthAnimationFrameRef.current);
+      }
     };
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncReducedMotion = () => setPrefersReducedMotion(motionQuery.matches);
+    syncReducedMotion();
+    if (typeof motionQuery.addEventListener === "function") {
+      motionQuery.addEventListener("change", syncReducedMotion);
+      return () => motionQuery.removeEventListener("change", syncReducedMotion);
+    }
+    motionQuery.addListener(syncReducedMotion);
+    return () => motionQuery.removeListener(syncReducedMotion);
   }, []);
   useEffect(() => {
     if (!autoSurprise) {
@@ -401,6 +432,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
   const hasValidCharacter = characters.some((char) => char.trim().length > 0);
+  const normalizedLength =
+    length === "Short" || length === "Long" ? length : "Medium";
+  const characterCount = characters.length;
   const motionBaseClass =
     "transition-[opacity,transform,box-shadow] duration-[220ms] ease-out";
   const pressFeedbackClass =
@@ -414,6 +448,59 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
+  useEffect(() => {
+    if (isLengthAnimating && !prefersReducedMotion) return;
+    setLengthDisplay(normalizedLength);
+  }, [isLengthAnimating, normalizedLength, prefersReducedMotion]);
+  const handleCycleLength = useCallback(() => {
+    if (isLocked) return;
+    const currentLength = isLengthAnimating ? lengthDisplay : normalizedLength;
+    const nextLength =
+      currentLength === "Short"
+        ? "Medium"
+        : currentLength === "Medium"
+          ? "Long"
+          : "Short";
+
+    updateValue({ length: nextLength });
+
+    if (prefersReducedMotion) {
+      setLengthDisplay(nextLength);
+      setLengthOutgoing(null);
+      setIsLengthAnimating(false);
+      setLengthIncomingVisible(true);
+      return;
+    }
+
+    setLengthOutgoing(currentLength);
+    setLengthDisplay(nextLength);
+    setIsLengthAnimating(true);
+    setLengthIncomingVisible(false);
+
+    if (lengthAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(lengthAnimationFrameRef.current);
+    }
+    lengthAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      setLengthIncomingVisible(true);
+    });
+
+    if (lengthAnimationTimeoutRef.current !== null) {
+      window.clearTimeout(lengthAnimationTimeoutRef.current);
+    }
+    lengthAnimationTimeoutRef.current = window.setTimeout(() => {
+      setIsLengthAnimating(false);
+      setLengthOutgoing(null);
+      setLengthIncomingVisible(false);
+      lengthAnimationTimeoutRef.current = null;
+    }, 210);
+  }, [
+    isLengthAnimating,
+    isLocked,
+    lengthDisplay,
+    normalizedLength,
+    prefersReducedMotion,
+    updateValue,
+  ]);
 
   return (
     <div className="space-y-4">
@@ -776,6 +863,48 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       ))}
                     </div>
                   )}
+                  <div className="mt-auto border-t border-white/10 pt-3 flex items-center gap-2 text-[11px]">
+                    <span className="uppercase tracking-[0.2em] text-slate-500">
+                      Length:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCycleLength}
+                      disabled={isLocked}
+                      className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,transform] duration-[220ms] ease-out hover:text-indigo-100 hover:-translate-y-px active:translate-y-px ${focusRingClass} ${
+                        isLocked ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
+                      aria-label="Cycle scene length"
+                      title="Cycle target scene length"
+                    >
+                      <span className="relative inline-flex h-[1.1em] w-[6ch] overflow-hidden align-middle text-left">
+                        {!prefersReducedMotion && lengthOutgoing && (
+                          <span
+                            className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ease-in-out ${
+                              isLengthAnimating && lengthIncomingVisible
+                                ? "-translate-y-1.5 opacity-0"
+                                : "translate-y-0 opacity-100"
+                            }`}
+                          >
+                            {lengthOutgoing}
+                          </span>
+                        )}
+                        <span
+                          className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ${
+                            prefersReducedMotion
+                              ? "translate-y-0 opacity-100"
+                              : isLengthAnimating
+                                ? lengthIncomingVisible
+                                  ? "translate-y-0 opacity-100 ease-out"
+                                  : "translate-y-1.5 opacity-0 ease-in-out"
+                                : "translate-y-0 opacity-100 ease-out"
+                          }`}
+                        >
+                          {lengthDisplay}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className={`${detailPanelClass} flex h-full flex-col gap-5`}>
@@ -826,66 +955,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </button>
                     </div>
                   </div>
-
-                  <div className="border-t border-white/10 pt-4">
-                    <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 block mb-5">
-                      Target Scene Length
-                    </label>
-                    <div className="relative w-full h-[2px] bg-slate-700/80 rounded-full flex items-center">
-                      <input
-                        type="range"
-                        min="0"
-                        max="2"
-                        value={length === "Short" ? 0 : length === "Long" ? 2 : 1}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === "0") updateValue({ length: "Short" });
-                          else if (val === "2") updateValue({ length: "Long" });
-                          else updateValue({ length: "Medium" });
-                        }}
-                        className="w-full absolute inset-0 opacity-0 cursor-pointer z-10"
-                        aria-label="Scene length"
-                        disabled={isLocked}
-                        title="Target Scene Length"
-                      />
-                      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-0">
-                        <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
-                        <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
-                        <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
-                      </div>
-                      <div
-                        className="absolute w-5 h-5 bg-indigo-500 rounded-full top-1/2 -translate-y-1/2 z-0 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-[transform,opacity,box-shadow] duration-300 border-2 border-slate-900"
-                        style={{
-                          left: `calc(${(length === "Short" ? 0 : length === "Long" ? 2 : 1) * 50}% - 10px)`,
-                        }}
-                      />
-                    </div>
-                    <div className="relative w-full flex justify-between mt-3 text-[10px] font-bold text-slate-400">
-                      <span
-                        className={
-                          length === "Short" ? "text-indigo-300" : "opacity-60"
-                        }
-                      >
-                        SHORT
-                      </span>
-                      <span
-                        className={
-                          !length || length === "Medium"
-                            ? "text-indigo-300"
-                            : "opacity-60"
-                        }
-                      >
-                        MEDIUM
-                      </span>
-                      <span
-                        className={
-                          length === "Long" ? "text-indigo-300" : "opacity-60"
-                        }
-                      >
-                        LONG
-                      </span>
-                    </div>
-                  </div>
+                  <p className="mt-auto text-[11px] text-slate-400">
+                    {characterCount}{" "}
+                    {characterCount === 1 ? "character" : "characters"}
+                  </p>
                 </div>
               </div>
 
