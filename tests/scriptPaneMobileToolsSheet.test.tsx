@@ -335,6 +335,17 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
+  it('setup screen ignores background clicks and closes only via explicit close button', () => {
+    const onCloseSetup = vi.fn();
+    render(<ScriptPane {...createProps({ isSetupOpen: true, onCloseSetup })} />);
+
+    fireEvent.click(screen.getByTestId('setup-screen'));
+    expect(onCloseSetup).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close setup' }));
+    expect(onCloseSetup).toHaveBeenCalledTimes(1);
+  });
+
   it('390x844: export opens as compact bottom sheet and closes cleanly', async () => {
     render(<ScriptPane {...createProps()} />);
 

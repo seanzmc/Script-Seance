@@ -410,9 +410,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const focusRingClass =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
+  const setupSectionCardClass =
+    "rounded-2xl bg-slate-950/55 p-4 sm:p-5 ring-1 ring-white/10 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.95)] backdrop-blur-[2px]";
+  const setupSectionDividerClass = "border-t border-white/10 pt-3";
+  const detailPanelClass =
+    "space-y-2 rounded-2xl bg-slate-950/55 p-4 ring-1 ring-white/10 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.95)]";
   const styleCardPulseClass = styleShufflePulse
-    ? "shadow-[0_0_0_1px_rgba(165,180,252,0.32)_inset,0_14px_34px_-26px_rgba(129,140,248,0.85)]"
-    : "shadow-[0_0_0_1px_rgba(165,180,252,0.14)_inset,0_0_0_0_rgba(129,140,248,0)]";
+    ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
+    : "shadow-none";
 
   return (
     <div className="space-y-4">
@@ -452,7 +457,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
       {!isSummaryOnly && (
         <>
-          <div className="rounded-2xl bg-slate-950/55 p-4 sm:p-5 ring-1 ring-white/10 space-y-3">
+          <div className={`${setupSectionCardClass} space-y-3`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
@@ -463,42 +468,44 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              {GENRES.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => updateValue({ genre: g })}
-                  disabled={isLocked}
-                  className={`px-3 py-2 text-xs font-medium rounded-lg text-left ring-1 ${interactiveControlClass} ${
-                    genre === g
-                      ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
-                      : "bg-white/[0.03] text-slate-300 ring-white/15 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
-                  } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                >
-                  {g}
-                </button>
-              ))}
+            <div className={setupSectionDividerClass}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                {GENRES.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => updateValue({ genre: g })}
+                    disabled={isLocked}
+                    className={`px-3 py-2 text-xs font-medium rounded-lg text-left ring-1 ${interactiveControlClass} ${
+                      genre === g
+                        ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
+                        : "bg-white/[0.03] text-slate-300 ring-white/15 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
+                    } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2 rounded-2xl bg-indigo-500/[0.08] ring-1 ring-indigo-300/25 p-4 sm:p-5">
+          <div className={`${setupSectionCardClass} space-y-3`}>
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase tracking-[0.32em] text-indigo-100">
+              <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                 Style
               </label>
-              <p className="text-[11px] text-indigo-100/75">
+              <p className="text-[11px] text-slate-400">
                 Pick a vibe from the library. This sets tone for future
                 generations.
               </p>
             </div>
-            <div className="space-y-2">
+            <div className={`space-y-2 ${setupSectionDividerClass}`}>
               <div
-                className={`group rounded-xl bg-slate-950/65 ring-1 ring-indigo-200/25 p-3 space-y-2 ${styleCardMotionClass} ${styleCardPulseClass}`}
+                className={`group rounded-xl bg-white/[0.02] px-3 py-3 space-y-2 ${styleCardMotionClass} ${styleCardPulseClass}`}
                 aria-live="polite"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-[10px] uppercase tracking-[0.24em] text-indigo-100/70">
+                  <p className="min-w-0 truncate text-[10px] uppercase tracking-[0.24em] text-slate-400">
                     Selected style
                   </p>
                   {!isStyleBlank && (
@@ -508,7 +515,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         onClick={handleClearStyle}
                         disabled={isLocked}
                         aria-label="Clear selected style"
-                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium text-indigo-100/80 hover:underline hover:bg-indigo-500/15 ${interactiveControlClass} ${
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium text-slate-300 hover:text-indigo-100 hover:underline hover:bg-indigo-500/15 ${interactiveControlClass} ${
                           canHover
                             ? "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
                             : "opacity-100"
@@ -522,12 +529,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-indigo-100">
+                    <p className="text-sm font-semibold text-slate-100">
                       {selectedLibraryStyle?.title ??
                         (isStyleBlank ? "None (default style)" : style.trim())}
                     </p>
                     {selectedStyleCategoryLabel && (
-                      <span className="rounded-full bg-indigo-500/20 ring-1 ring-indigo-200/45 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-indigo-100/85">
+                      <span className="rounded-full bg-white/[0.03] ring-1 ring-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300">
                         {selectedStyleCategoryLabel}
                       </span>
                     )}
@@ -535,18 +542,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
                 {selectedLibraryStyle ? (
                   <>
-                    <p className="text-[11px] text-indigo-100/75 line-clamp-2 sm:line-clamp-none">
+                    <p className="text-[11px] text-slate-300 line-clamp-2 sm:line-clamp-none">
                       {selectedLibraryStyle.description}
                     </p>
-                    <p className="text-[11px] text-indigo-100/85 leading-snug line-clamp-2 sm:line-clamp-none">
-                      <span className="font-semibold text-indigo-100/65">
+                    <p className="text-[11px] text-slate-200 leading-snug line-clamp-2 sm:line-clamp-none">
+                      <span className="font-semibold text-slate-400">
                         Sample line:
                       </span>{" "}
                       {selectedLibraryStyle.sampleLine}
                     </p>
                   </>
                 ) : (
-                  <p className="text-[11px] text-indigo-100/75">
+                  <p className="text-[11px] text-slate-300">
                     {isStyleBlank
                       ? "Using default tone settings."
                       : "Custom style selected."}
@@ -559,8 +566,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     disabled={isLocked || stylesLibrary.length === 0}
                     className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
                       isLocked || stylesLibrary.length === 0
-                        ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
-                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
+                        ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
+                        : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
                     }`}
                   >
                     Shuffle
@@ -571,8 +578,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     disabled={isLocked}
                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
                       isLocked
-                        ? "opacity-60 cursor-not-allowed text-indigo-100/70 bg-indigo-500/10 ring-indigo-200/25"
-                        : "text-indigo-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
+                        ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
+                        : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
                     }`}
                     aria-haspopup="dialog"
                     aria-expanded={isStyleLibraryOpen}
@@ -726,7 +733,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           {showDetails && (
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-3">
-                <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
+                <div className={detailPanelClass}>
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                     Premise
                   </label>
@@ -734,10 +741,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     rows={4}
                     value={premise}
                     onChange={(e) => updateValue({ premise: e.target.value })}
-                    className={`w-full rounded-xl p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[98px] text-sm leading-relaxed ${
+                    className={`w-full rounded-xl border p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[98px] text-sm leading-relaxed ${
                       justSurprised
-                        ? "bg-indigo-900/25 ring-1 ring-indigo-400/45 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
-                        : "bg-slate-900/75 ring-1 ring-white/10"
+                        ? "bg-indigo-900/25 border-indigo-400/45 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
+                        : "bg-slate-900/65 border-white/10"
                     } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                     placeholder="e.g., A detective discovers his new partner is a ghost..."
                     disabled={isLocked}
@@ -750,7 +757,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           type="button"
                           onClick={() => handlePillClick(idea)}
                           disabled={isLocked}
-                          className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-colors cursor-pointer ring-1 ring-white/10 hover:ring-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="w-full text-left text-[10px] text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-1.5 transition-[opacity,color,background-color] duration-[220ms] ease-out cursor-pointer border border-white/10 hover:border-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {idea}
                         </button>
@@ -759,7 +766,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   )}
                 </div>
 
-                <div className="space-y-2 rounded-2xl bg-slate-950/50 p-4 ring-1 ring-white/10">
+                <div className={detailPanelClass}>
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
                     <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                   </label>
@@ -774,10 +781,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           onChange={(e) =>
                             handleCharacterChange(idx, e.target.value)
                           }
-                          className={`w-full rounded-xl p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-all duration-700 ${
+                          className={`w-full rounded-xl border p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-[background-color,border-color,box-shadow] duration-[220ms] ease-out ${
                             justSurprised
-                              ? "bg-indigo-900/25 ring-1 ring-indigo-400/45"
-                              : "bg-slate-900/80 ring-1 ring-white/10"
+                              ? "bg-indigo-900/25 border-indigo-400/45"
+                              : "bg-slate-900/70 border-white/10"
                           } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                           placeholder={`Character ${idx + 1}`}
                           disabled={isLocked}
@@ -800,7 +807,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       type="button"
                       onClick={addCharacter}
                       disabled={isLocked}
-                      className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ring-1 ring-dashed ring-white/20 hover:ring-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-[opacity,color,border-color,box-shadow] duration-[220ms] ease-out flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 border border-dashed border-white/20 hover:border-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Character
                     </button>
