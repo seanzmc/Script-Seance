@@ -95,7 +95,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     "Short" | "Medium" | "Long" | null
   >(null);
   const [isLengthAnimating, setIsLengthAnimating] = useState(false);
-  const [lengthIncomingVisible, setLengthIncomingVisible] = useState(false);
+  const [isLengthTransitionActive, setIsLengthTransitionActive] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -468,20 +468,20 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       setLengthDisplay(nextLength);
       setLengthOutgoing(null);
       setIsLengthAnimating(false);
-      setLengthIncomingVisible(true);
+      setIsLengthTransitionActive(false);
       return;
     }
 
     setLengthOutgoing(currentLength);
     setLengthDisplay(nextLength);
     setIsLengthAnimating(true);
-    setLengthIncomingVisible(false);
+    setIsLengthTransitionActive(false);
 
     if (lengthAnimationFrameRef.current !== null) {
       window.cancelAnimationFrame(lengthAnimationFrameRef.current);
     }
     lengthAnimationFrameRef.current = window.requestAnimationFrame(() => {
-      setLengthIncomingVisible(true);
+      setIsLengthTransitionActive(true);
     });
 
     if (lengthAnimationTimeoutRef.current !== null) {
@@ -490,9 +490,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     lengthAnimationTimeoutRef.current = window.setTimeout(() => {
       setIsLengthAnimating(false);
       setLengthOutgoing(null);
-      setLengthIncomingVisible(false);
+      setIsLengthTransitionActive(false);
       lengthAnimationTimeoutRef.current = null;
-    }, 210);
+    }, 260);
   }, [
     isLengthAnimating,
     isLocked,
@@ -831,17 +831,17 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
           {showDetails && (
             <div className="space-y-4 pt-2">
-              <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5 md:items-stretch">
-                <div className={`${detailPanelClass} flex h-full flex-col`}>
+              <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5 md:items-stretch md:[grid-auto-rows:1fr]">
+                <div className={`${detailPanelClass} flex h-full min-h-0 flex-col`}>
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                     Premise
                   </label>
-                  <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex flex-1 min-h-[260px] md:min-h-[336px] flex-col gap-2">
                     <textarea
                       rows={8}
                       value={premise}
                       onChange={(e) => updateValue({ premise: e.target.value })}
-                      className={`w-full flex-1 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none min-h-[260px] md:min-h-[336px] text-sm leading-relaxed ${
+                      className={`w-full flex-1 min-h-0 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none text-sm leading-relaxed ${
                         justSurprised
                           ? "bg-indigo-900/25 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
                           : "bg-slate-900/60"
@@ -867,12 +867,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
                 </div>
 
-                <div className={`${detailPanelClass} flex h-full flex-col`}>
-                  <div className="space-y-2 flex-1">
+                <div className={`${detailPanelClass} flex h-full min-h-0 flex-col`}>
+                  <div className="space-y-2 flex flex-1 min-h-0 flex-col">
                     <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
                       <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-1 min-h-0">
                       {characters.map((char, idx) => (
                         <div key={idx} className="relative group">
                           <input
@@ -933,12 +933,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     aria-label="Cycle scene length"
                     title="Cycle target scene length"
                   >
-                    <span className="relative inline-flex h-[1.1em] w-[6ch] overflow-hidden align-middle text-left">
+                    <span className="relative inline-flex h-[1.45em] w-[6ch] overflow-hidden align-middle text-left py-[0.04em]">
                       {!prefersReducedMotion && lengthOutgoing && (
                         <span
-                          className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ease-in-out ${
-                            isLengthAnimating && lengthIncomingVisible
-                              ? "-translate-y-1.5 opacity-0"
+                          className={`absolute inset-0 leading-[1.25] transition-[opacity,transform] duration-[240ms] ease-in-out ${
+                            isLengthAnimating && isLengthTransitionActive
+                              ? "-translate-y-2 opacity-0"
                               : "translate-y-0 opacity-100"
                           }`}
                         >
@@ -946,13 +946,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         </span>
                       )}
                       <span
-                        className={`absolute inset-0 transition-[opacity,transform] duration-[200ms] ${
+                        className={`absolute inset-0 leading-[1.25] transition-[opacity,transform] duration-[240ms] ${
                           prefersReducedMotion
                             ? "translate-y-0 opacity-100"
                             : isLengthAnimating
-                              ? lengthIncomingVisible
+                              ? isLengthTransitionActive
                                 ? "translate-y-0 opacity-100 ease-out"
-                                : "translate-y-1.5 opacity-0 ease-in-out"
+                                : "translate-y-2 opacity-0 ease-in-out"
                               : "translate-y-0 opacity-100 ease-out"
                         }`}
                       >
