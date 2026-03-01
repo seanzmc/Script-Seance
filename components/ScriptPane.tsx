@@ -502,8 +502,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
             <div className="space-y-1">
               <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-              <h2 className="text-xl font-semibold text-white">Start a new script</h2>
-              <p className="text-xs text-slate-300/80">Pick a genre and let AI shape your opening spark.</p>
+              <h2 className="text-xl sm:text-2xl md:text-[26px] font-semibold tracking-tight text-white">Start a new script</h2>
+              <p className="text-sm sm:text-base leading-relaxed text-slate-300/80">Pick a genre and let AI shape your opening spark.</p>
             </div>
             <button
               type="button"
