@@ -498,7 +498,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     >
       <div className="pointer-events-none absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.24),_transparent_42%)]" />
       <div className="relative mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
-        <div className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-slate-950/60 shadow-[0_35px_120px_rgba(2,6,23,0.75)] ring-1 ring-white/10 backdrop-blur-md sm:min-h-[calc(100vh-3rem)]">
+        <div className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-slate-950/60 shadow-[0_35px_120px_rgba(2,6,23,0.75)] backdrop-blur-md sm:min-h-[calc(100vh-3rem)]">
           <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
             <div className="space-y-1">
               <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>

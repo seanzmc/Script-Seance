@@ -410,9 +410,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const focusRingClass =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
-  const setupSectionCardClass =
-    "rounded-2xl bg-slate-950/55 p-4 sm:p-5 ring-1 ring-white/10 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.95)] backdrop-blur-[2px]";
-  const setupSectionDividerClass = "border-t border-white/10 pt-3";
   const detailPanelClass =
     "space-y-2 rounded-2xl bg-slate-950/55 p-4 ring-1 ring-white/10 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.95)]";
   const styleCardPulseClass = styleShufflePulse
@@ -457,7 +454,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
       {!isSummaryOnly && (
         <>
-          <div className={`${setupSectionCardClass} space-y-3`}>
+          <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
@@ -468,28 +465,28 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </p>
               </div>
             </div>
-            <div className={setupSectionDividerClass}>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                {GENRES.map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => updateValue({ genre: g })}
-                    disabled={isLocked}
-                    className={`px-3 py-2 text-xs font-medium rounded-lg text-left ring-1 ${interactiveControlClass} ${
-                      genre === g
-                        ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
-                        : "bg-white/[0.03] text-slate-300 ring-white/15 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
-                    } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              {GENRES.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => updateValue({ genre: g })}
+                  disabled={isLocked}
+                  className={`px-3 py-2 text-xs font-medium rounded-lg text-left ring-1 ${interactiveControlClass} ${
+                    genre === g
+                      ? "bg-indigo-500/22 text-indigo-200 ring-indigo-300/55 shadow-[0_0_0_1px_rgba(129,140,248,0.35)_inset]"
+                      : "bg-white/[0.03] text-slate-300 ring-white/15 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
+                  } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                >
+                  {g}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className={`${setupSectionCardClass} space-y-3`}>
+          <div className="h-px bg-white/10" aria-hidden="true" />
+
+          <div className="space-y-3">
             <div className="space-y-1">
               <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                 Style
@@ -499,7 +496,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 generations.
               </p>
             </div>
-            <div className={`space-y-2 ${setupSectionDividerClass}`}>
+            <div className="space-y-2">
               <div
                 className={`group rounded-xl bg-white/[0.02] px-3 py-3 space-y-2 ${styleCardMotionClass} ${styleCardPulseClass}`}
                 aria-live="polite"
@@ -729,6 +726,22 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               Write My Own Premise
             </Button>
           </div>
+
+          {!showDetails && (
+            <div className="rounded-xl bg-white/[0.02] px-3 py-2.5 space-y-1.5">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
+                Preview
+              </p>
+              <p className="text-xs text-slate-300">
+                <span className="text-slate-400">Premise:</span> Will be
+                generated after you click Generate AI Premise...
+              </p>
+              <p className="text-xs text-slate-300">
+                <span className="text-slate-400">Cast:</span> Will be
+                generated...
+              </p>
+            </div>
+          )}
 
           {showDetails && (
             <div className="space-y-4 pt-2">
