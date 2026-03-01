@@ -410,8 +410,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const focusRingClass =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
-  const detailPanelClass =
-    "space-y-2 rounded-2xl bg-slate-950/55 p-4 ring-1 ring-white/10 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.95)]";
+  const detailPanelClass = "space-y-2";
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
@@ -745,19 +744,19 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
           {showDetails && (
             <div className="space-y-4 pt-2">
-              <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-3">
-                <div className={detailPanelClass}>
+              <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5 md:items-stretch">
+                <div className={`${detailPanelClass} flex flex-col h-full`}>
                   <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300">
                     Premise
                   </label>
                   <textarea
-                    rows={4}
+                    rows={8}
                     value={premise}
                     onChange={(e) => updateValue({ premise: e.target.value })}
-                    className={`w-full rounded-xl border p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-none resize-none min-h-[98px] text-sm leading-relaxed ${
+                    className={`w-full flex-1 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none min-h-[260px] md:min-h-[336px] text-sm leading-relaxed ${
                       justSurprised
-                        ? "bg-indigo-900/25 border-indigo-400/45 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
-                        : "bg-slate-900/65 border-white/10"
+                        ? "bg-indigo-900/25 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
+                        : "bg-slate-900/60"
                     } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
                     placeholder="e.g., A detective discovers his new partner is a ghost..."
                     disabled={isLocked}
@@ -779,113 +778,113 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   )}
                 </div>
 
-                <div className={detailPanelClass}>
-                  <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
-                  </label>
-                  <div className="space-y-2">
-                    {characters.map((char, idx) => (
-                      <div key={idx} className="relative group">
-                        <input
-                          ref={(el) => {
-                            characterInputs.current[idx] = el;
-                          }}
-                          value={char}
-                          onChange={(e) =>
-                            handleCharacterChange(idx, e.target.value)
-                          }
-                          className={`w-full rounded-xl border p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-[background-color,border-color,box-shadow] duration-[220ms] ease-out ${
-                            justSurprised
-                              ? "bg-indigo-900/25 border-indigo-400/45"
-                              : "bg-slate-900/70 border-white/10"
-                          } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
-                          placeholder={`Character ${idx + 1}`}
-                          disabled={isLocked}
-                        />
-                        {characters.length > 1 && !isLocked && (
-                          <button
-                            onClick={() => removeCharacter(idx)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                            tabIndex={-1}
-                            aria-label="Remove character"
-                            title="Remove character"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                <div className={`${detailPanelClass} flex h-full flex-col gap-5`}>
+                  <div className="space-y-2 flex-1">
+                    <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
+                    </label>
+                    <div className="space-y-2">
+                      {characters.map((char, idx) => (
+                        <div key={idx} className="relative group">
+                          <input
+                            ref={(el) => {
+                              characterInputs.current[idx] = el;
+                            }}
+                            value={char}
+                            onChange={(e) =>
+                              handleCharacterChange(idx, e.target.value)
+                            }
+                            className={`w-full rounded-xl border p-2.5 pr-8 text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-[background-color,border-color,box-shadow] duration-[220ms] ease-out ${
+                              justSurprised
+                                ? "bg-indigo-900/25 border-indigo-400/45"
+                                : "bg-slate-900/70 border-white/10"
+                            } ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-900/60 text-slate-400" : ""}`}
+                            placeholder={`Character ${idx + 1}`}
+                            disabled={isLocked}
+                          />
+                          {characters.length > 1 && !isLocked && (
+                            <button
+                              onClick={() => removeCharacter(idx)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                              tabIndex={-1}
+                              aria-label="Remove character"
+                              title="Remove character"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
 
-                    <button
-                      type="button"
-                      onClick={addCharacter}
-                      disabled={isLocked}
-                      className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-[opacity,color,border-color,box-shadow] duration-[220ms] ease-out flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 border border-dashed border-white/20 hover:border-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add Character
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6 pt-6 pb-2">
-                <div className="text-center">
-                  <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 block mb-6">
-                    Target Scene Length
-                  </label>
-                  <div className="relative w-full max-w-md mx-auto h-[2px] bg-slate-700/80 rounded-full flex items-center">
-                    <input
-                      type="range"
-                      min="0"
-                      max="2"
-                      value={length === "Short" ? 0 : length === "Long" ? 2 : 1}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "0") updateValue({ length: "Short" });
-                        else if (val === "2") updateValue({ length: "Long" });
-                        else updateValue({ length: "Medium" });
-                      }}
-                      className="w-full absolute inset-0 opacity-0 cursor-pointer z-10"
-                      aria-label="Scene length"
-                      disabled={isLocked}
-                      title="Target Scene Length"
-                    />
-                    <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-0">
-                      <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
-                      <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
-                      <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
+                      <button
+                        type="button"
+                        onClick={addCharacter}
+                        disabled={isLocked}
+                        className="w-full py-2 rounded-xl text-slate-300 hover:text-indigo-200 text-[11px] font-medium transition-[opacity,color,border-color,box-shadow] duration-[220ms] ease-out flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 border border-dashed border-white/20 hover:border-indigo-300/55 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Character
+                      </button>
                     </div>
-                    <div
-                      className="absolute w-5 h-5 bg-indigo-500 rounded-full top-1/2 -translate-y-1/2 z-0 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-all duration-300 border-2 border-slate-900"
-                      style={{
-                        left: `calc(${(length === "Short" ? 0 : length === "Long" ? 2 : 1) * 50}% - 10px)`,
-                      }}
-                    />
                   </div>
-                  <div className="relative w-full max-w-md mx-auto flex justify-between mt-3 text-[10px] font-bold text-slate-400">
-                    <span
-                      className={
-                        length === "Short" ? "text-indigo-300" : "opacity-60"
-                      }
-                    >
-                      SHORT
-                    </span>
-                    <span
-                      className={
-                        !length || length === "Medium"
-                          ? "text-indigo-300"
-                          : "opacity-60"
-                      }
-                    >
-                      MEDIUM
-                    </span>
-                    <span
-                      className={
-                        length === "Long" ? "text-indigo-300" : "opacity-60"
-                      }
-                    >
-                      LONG
-                    </span>
+
+                  <div className="border-t border-white/10 pt-4">
+                    <label className="text-xs font-bold uppercase tracking-[0.32em] text-slate-300 block mb-5">
+                      Target Scene Length
+                    </label>
+                    <div className="relative w-full h-[2px] bg-slate-700/80 rounded-full flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="2"
+                        value={length === "Short" ? 0 : length === "Long" ? 2 : 1}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "0") updateValue({ length: "Short" });
+                          else if (val === "2") updateValue({ length: "Long" });
+                          else updateValue({ length: "Medium" });
+                        }}
+                        className="w-full absolute inset-0 opacity-0 cursor-pointer z-10"
+                        aria-label="Scene length"
+                        disabled={isLocked}
+                        title="Target Scene Length"
+                      />
+                      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-0">
+                        <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
+                        <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
+                        <div className="w-[3px] h-3.5 rounded-full bg-slate-700/80" />
+                      </div>
+                      <div
+                        className="absolute w-5 h-5 bg-indigo-500 rounded-full top-1/2 -translate-y-1/2 z-0 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-[transform,opacity,box-shadow] duration-300 border-2 border-slate-900"
+                        style={{
+                          left: `calc(${(length === "Short" ? 0 : length === "Long" ? 2 : 1) * 50}% - 10px)`,
+                        }}
+                      />
+                    </div>
+                    <div className="relative w-full flex justify-between mt-3 text-[10px] font-bold text-slate-400">
+                      <span
+                        className={
+                          length === "Short" ? "text-indigo-300" : "opacity-60"
+                        }
+                      >
+                        SHORT
+                      </span>
+                      <span
+                        className={
+                          !length || length === "Medium"
+                            ? "text-indigo-300"
+                            : "opacity-60"
+                        }
+                      >
+                        MEDIUM
+                      </span>
+                      <span
+                        className={
+                          length === "Long" ? "text-indigo-300" : "opacity-60"
+                        }
+                      >
+                        LONG
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
