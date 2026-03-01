@@ -3,7 +3,12 @@ import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
-import { SetupForm, SetupFormState, STYLE_PRESETS } from './SetupForm';
+import {
+  SetupForm,
+  SetupFormState,
+  SETUP_UI_TOKENS,
+  STYLE_PRESETS
+} from './SetupForm';
 import { BottomToolbelt, ToolKey } from './BottomToolbelt';
 import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
 import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from './ToolPanelShell';
@@ -502,8 +507,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
             <div className="space-y-1">
               <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-              <h2 className="text-xl sm:text-2xl md:text-[26px] font-semibold tracking-tight text-white">Start a new script</h2>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-300/80">Pick a genre and let AI shape your opening spark.</p>
+              <h2 className={SETUP_UI_TOKENS.title}>Start a new script</h2>
+              <p className={SETUP_UI_TOKENS.subtitle}>Pick a genre and let AI shape your opening spark.</p>
             </div>
             <button
               type="button"

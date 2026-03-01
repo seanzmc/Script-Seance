@@ -61,6 +61,18 @@ export const STYLE_PRESETS = [
 
 const normalizeStyleValue = (value: string) => value.trim().toLowerCase();
 
+export const SETUP_UI_TOKENS = {
+  title: "text-xl sm:text-2xl md:text-[26px] font-semibold tracking-tight text-white",
+  subtitle: "text-sm sm:text-base leading-relaxed text-slate-300/80",
+  sectionLabel:
+    "text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-300",
+  bodyText: "text-sm sm:text-base leading-relaxed text-slate-300",
+  bodyMutedText: "text-sm sm:text-base leading-relaxed text-slate-400",
+  panelSurface: "rounded-xl bg-white/[0.02]",
+  buttonText: "text-sm font-semibold uppercase tracking-[0.2em]",
+  metaText: "text-xs sm:text-sm text-slate-400",
+} as const;
+
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
   onChange,
@@ -106,6 +118,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const setupUi = SETUP_UI_TOKENS;
 
   useEffect(() => {
     if (focusIndex !== null && characterInputs.current[focusIndex]) {
@@ -137,7 +150,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const removeCharacter = (index: number) =>
     updateValue({ characters: characters.filter((_, i) => i !== index) });
 
-  const checkSafety = useCallback(() => {
+  const confirmSetupOverwrite = useCallback(() => {
     if (
       premise.trim().length > 0 ||
       (characters.length > 0 &&
@@ -152,10 +165,36 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     return true;
   }, [characters, premise]);
 
-  const handleSurpriseMe = useCallback(
+  const applyFallbackSurpriseSetup = useCallback(
+    (targetGenre: string) => {
+      updateValue(
+        {
+          premise: `A gripping ${targetGenre} story with unexpected twists.`,
+          characters: ["Protagonist", "Antagonist", "The Catalyst"],
+        },
+        "system",
+      );
+    },
+    [updateValue],
+  );
+
+  const revealAiDetails = useCallback(() => {
+    if (showDetails) {
+      setDetailRevealSource("ai");
+    } else {
+      setPendingDetailReveal(true);
+    }
+  }, [showDetails]);
+
+  const triggerSurpriseHighlight = useCallback(() => {
+    setJustSurprised(true);
+    setTimeout(() => setJustSurprised(false), 1500);
+  }, []);
+
+  const handleGenerateSurpriseSetup = useCallback(
     async (mode: "manual" | "auto") => {
       if (isLocked) return;
-      if (!checkSafety()) return;
+      if (!confirmSetupOverwrite()) return;
 
       setIsSurprising(true);
       const targetGenre = genre;
@@ -165,13 +204,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         if (onRequestSurprise) {
           committed = await onRequestSurprise({ mode, targetGenre });
         } else {
-          updateValue(
-            {
-              premise: `A gripping ${targetGenre} story with unexpected twists.`,
-              characters: ["Protagonist", "Antagonist", "The Catalyst"],
-            },
-            "system",
-          );
+          applyFallbackSurpriseSetup(targetGenre);
           committed = true;
         }
 
@@ -179,55 +212,45 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           return;
         }
 
-        if (showDetails) {
-          setDetailRevealSource("ai");
-        } else {
-          setPendingDetailReveal(true);
-        }
-        setJustSurprised(true);
-        setTimeout(() => setJustSurprised(false), 1500);
+        revealAiDetails();
+        triggerSurpriseHighlight();
       } catch (e) {
         console.error("Surprise generation failed", e);
         const handled = onError?.(e, "Failed to generate a surprise setup.");
         if (handled) {
           return;
         }
-        updateValue(
-          {
-            premise: `A gripping ${targetGenre} story with unexpected twists.`,
-            characters: ["Protagonist", "Antagonist", "The Catalyst"],
-          },
-          "system",
-        );
-
-        if (showDetails) {
-          setDetailRevealSource("ai");
-        } else {
-          setPendingDetailReveal(true);
-        }
-        setJustSurprised(true);
-        setTimeout(() => setJustSurprised(false), 1500);
+        applyFallbackSurpriseSetup(targetGenre);
+        revealAiDetails();
+        triggerSurpriseHighlight();
       } finally {
         setIsSurprising(false);
       }
     },
     [
-      checkSafety,
+      applyFallbackSurpriseSetup,
+      confirmSetupOverwrite,
       genre,
       isLocked,
       onError,
       onRequestSurprise,
-      showDetails,
-      updateValue,
+      revealAiDetails,
+      triggerSurpriseHighlight,
     ],
   );
 
-  const handlePillClick = (idea: string) => {
+  const handleStarterIdeaClick = (idea: string) => {
     if (isLocked) return;
-    if (checkSafety()) {
+    if (confirmSetupOverwrite()) {
       updateValue({ premise: idea });
     }
   };
+
+  const showManualDetails = useCallback(() => {
+    setPendingDetailReveal(false);
+    setShowDetails(true);
+    setDetailRevealSource("manual");
+  }, []);
 
   const handleEditSetup = () => {
     if (!onEditSetup) return;
@@ -286,8 +309,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }
     if (autoSurpriseRef.current || isSurprising || isLocked) return;
     autoSurpriseRef.current = true;
-    void handleSurpriseMe("auto");
-  }, [autoSurprise, handleSurpriseMe, isLocked, isSurprising]);
+    void handleGenerateSurpriseSetup("auto");
+  }, [autoSurprise, handleGenerateSurpriseSetup, isLocked, isSurprising]);
 
   useEffect(() => {
     if (!pendingDetailReveal) return;
@@ -445,6 +468,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
   const detailPanelClass = "space-y-2";
+  const setupSectionLabelClass = setupUi.sectionLabel;
+  const setupBodyTextClass = setupUi.bodyText;
+  const setupBodyMutedTextClass = setupUi.bodyMutedText;
+  const setupMetaTextClass = setupUi.metaText;
+  const setupPanelSurfaceClass = setupUi.panelSurface;
+  const setupActionButtonBaseClass = `w-full py-4 sm:py-[1.05rem] ${setupUi.buttonText} transition-[opacity,transform,box-shadow] duration-[220ms] ease-out active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
+  const styleActionButtonBaseClass = `rounded-lg px-3 py-2.5 ${setupUi.buttonText} ring-1 ${interactiveControlClass}`;
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
@@ -543,10 +573,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
-                <label className="text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-300">
+                <label className={setupSectionLabelClass}>
                   Genre
                 </label>
-                <p className="text-sm sm:text-base leading-relaxed text-slate-400">
+                <p className={setupBodyMutedTextClass}>
                   Pick a genre, then let AI spin up a premise and cast.
                 </p>
               </div>
@@ -574,21 +604,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-300">
+              <label className={setupSectionLabelClass}>
                 Style
               </label>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-400">
+              <p className={setupBodyMutedTextClass}>
                 Pick a vibe from the library. This sets tone for future
                 generations.
               </p>
             </div>
             <div className="space-y-2">
               <div
-                className={`group rounded-xl bg-white/[0.02] px-3 py-3 space-y-2 ${styleCardMotionClass} ${styleCardPulseClass}`}
+                className={`group ${setupPanelSurfaceClass} px-3 py-3 space-y-2 ${styleCardMotionClass} ${styleCardPulseClass}`}
                 aria-live="polite"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  <p className={`min-w-0 truncate ${setupSectionLabelClass} text-slate-400`}>
                     Selected style
                   </p>
                   {!isStyleBlank && (
@@ -612,7 +642,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex flex-wrap items-center gap-2">
-                    <p className="text-base md:text-lg font-semibold text-slate-100">
+                    <p className="text-base md:text-lg font-semibold leading-relaxed text-slate-100">
                       {selectedLibraryStyle?.title ??
                         (isStyleBlank ? "None (default style)" : style.trim())}
                     </p>
@@ -625,10 +655,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
                 {selectedLibraryStyle ? (
                   <>
-                    <p className="text-sm sm:text-base leading-relaxed text-slate-300 line-clamp-2 sm:line-clamp-none">
+                    <p className={`${setupBodyTextClass} line-clamp-2 sm:line-clamp-none`}>
                       {selectedLibraryStyle.description}
                     </p>
-                    <p className="text-sm sm:text-base leading-relaxed text-slate-200 line-clamp-2 sm:line-clamp-none">
+                    <p className={`${setupBodyTextClass} text-slate-200 line-clamp-2 sm:line-clamp-none`}>
                       <span className="font-semibold text-slate-400">
                         Sample line:
                       </span>{" "}
@@ -636,7 +666,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm sm:text-base leading-relaxed text-slate-300">
+                  <p className={setupBodyTextClass}>
                     {isStyleBlank
                       ? "Using default tone settings."
                       : "Custom style selected."}
@@ -647,7 +677,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     type="button"
                     onClick={handleStyleShuffle}
                     disabled={isLocked || stylesLibrary.length === 0}
-                    className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
+                    className={`shrink-0 ${styleActionButtonBaseClass} ${
                       isLocked || stylesLibrary.length === 0
                         ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
                         : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
@@ -659,7 +689,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     type="button"
                     onClick={() => setIsStyleLibraryOpen(true)}
                     disabled={isLocked}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass} ${
+                    className={`inline-flex items-center gap-1.5 ${styleActionButtonBaseClass} ${
                       isLocked
                         ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
                         : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
@@ -789,9 +819,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             <Button
               variant="secondary"
               onClick={() => {
-                void handleSurpriseMe("manual");
+                void handleGenerateSurpriseSetup("manual");
               }}
-              className="w-full py-4 sm:py-[1.05rem] uppercase tracking-[0.2em] text-sm font-bold !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100 transition-[opacity,transform,box-shadow] duration-[220ms] ease-out active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl"
+              className={`${setupActionButtonBaseClass} !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100`}
               type="button"
               loading={isSurprising}
               disabled={isLoading || isSurprising || isLocked}
@@ -800,12 +830,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             </Button>
             <Button
               variant="secondary"
-              onClick={() => {
-                setPendingDetailReveal(false);
-                setShowDetails(true);
-                setDetailRevealSource("manual");
-              }}
-              className="w-full py-4 sm:py-[1.05rem] uppercase tracking-[0.2em] text-sm font-bold !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300 transition-[opacity,transform,box-shadow] duration-[220ms] ease-out active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl"
+              onClick={showManualDetails}
+              className={`${setupActionButtonBaseClass} !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300`}
               type="button"
               disabled={isLocked}
             >
@@ -814,15 +840,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           </div>
 
           {!showDetails && (
-            <div className="rounded-xl bg-white/[0.02] px-3 py-2.5 space-y-1.5">
-              <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
+            <div className={`${setupPanelSurfaceClass} px-3 py-2.5 space-y-1.5`}>
+              <p className={`${setupSectionLabelClass} text-slate-400`}>
                 Preview
               </p>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-300">
+              <p className={setupBodyTextClass}>
                 <span className="text-slate-400">Premise:</span> Will be
                 generated after you click Generate AI Premise...
               </p>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-300">
+              <p className={setupBodyTextClass}>
                 <span className="text-slate-400">Cast:</span> Will be
                 generated...
               </p>
@@ -832,8 +858,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           {showDetails && (
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5 md:items-stretch md:[grid-auto-rows:1fr]">
-                <div className={`${detailPanelClass} flex h-full min-h-0 flex-col`}>
-                  <label className="text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-300">
+                <div
+                  className={`${detailPanelClass} flex h-full min-h-0 flex-col`}
+                  data-testid="setup-premise-panel"
+                >
+                  <label className={setupSectionLabelClass}>
                     Premise
                   </label>
                   <div className="flex flex-1 min-h-[260px] md:min-h-[336px] flex-col gap-2">
@@ -855,7 +884,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           <button
                             key={idea}
                             type="button"
-                            onClick={() => handlePillClick(idea)}
+                            onClick={() => handleStarterIdeaClick(idea)}
                             disabled={isLocked}
                             className="w-full text-left text-xs sm:text-sm text-slate-300 hover:text-indigo-100 bg-slate-900/65 hover:bg-indigo-500/20 rounded-full px-3 py-2 transition-[opacity,color,background-color] duration-[220ms] ease-out cursor-pointer border border-white/10 hover:border-indigo-300/50 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
@@ -867,9 +896,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
                 </div>
 
-                <div className={`${detailPanelClass} flex h-full min-h-0 flex-col`}>
-                  <div className="space-y-2 flex flex-1 min-h-0 flex-col">
-                    <label className="text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-300 flex items-center gap-2">
+                <div
+                  className={`${detailPanelClass} flex h-full min-h-0 flex-col`}
+                  data-testid="setup-characters-panel"
+                >
+                  <div className="space-y-2 flex h-full flex-1 min-h-[260px] md:min-h-[336px] flex-col">
+                    <label className={`${setupSectionLabelClass} flex items-center gap-2`}>
                       <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                     </label>
                     <div className="space-y-2 flex-1 min-h-0">
@@ -919,7 +951,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5">
-                <div className="border-t border-white/10 pt-3 flex items-center gap-2 text-[11px]">
+                <div className={`border-t border-white/10 pt-3 flex items-center gap-2 ${setupMetaTextClass}`}>
                   <span className="uppercase tracking-[0.2em] text-slate-500">
                     Length:
                   </span>
@@ -933,7 +965,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     aria-label="Cycle scene length"
                     title="Cycle target scene length"
                   >
-                    <span className="relative inline-flex h-[1.45em] w-[6ch] overflow-hidden align-middle text-left py-[0.04em]">
+                    <span
+                      className="relative inline-flex h-[1.45em] w-[6ch] overflow-hidden align-middle text-left py-[0.04em]"
+                      data-testid="setup-length-value-viewport"
+                    >
                       {!prefersReducedMotion && lengthOutgoing && (
                         <span
                           className={`absolute inset-0 leading-[1.25] transition-[opacity,transform] duration-[240ms] ease-in-out ${
@@ -946,6 +981,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         </span>
                       )}
                       <span
+                        data-testid="setup-length-value"
                         className={`absolute inset-0 leading-[1.25] transition-[opacity,transform] duration-[240ms] ${
                           prefersReducedMotion
                             ? "translate-y-0 opacity-100"
@@ -963,7 +999,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
 
                 <div className="flex items-center md:justify-start">
-                  <p className="text-[11px] text-slate-400">
+                  <p className={setupMetaTextClass}>
                     {characterCount}{" "}
                     {characterCount === 1 ? "character" : "characters"}
                   </p>
