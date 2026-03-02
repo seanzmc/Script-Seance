@@ -1159,7 +1159,7 @@ export const generateTextByKind = async ({
     targetGenre: context.targetGenre || null,
     styleId: resolvedStyleId || null,
     styleName: resolvedStyleName || '',
-    style: legacyStyle,
+    ...(resolvedStyleId ? {} : { style: legacyStyle }),
     allowedGenres: genres
   };
   const styleFingerprintSource = [

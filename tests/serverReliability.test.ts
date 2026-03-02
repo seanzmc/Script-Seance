@@ -257,12 +257,75 @@ describe('server reliability', () => {
         styleId: 'noir-1940s-detective',
         styleName: '1940s Noir Detective'
       });
+      expect(res.body?.debug?.previews?.context).not.toHaveProperty('style');
       expect(Array.isArray(res.body?.debug?.previews?.context?.allowedGenres)).toBe(true);
       expect(res.body?.debug?.previews?.context?.allowedGenres).toEqual(CANONICAL_GENRES);
       expect(res.body?.debug?.previews?.context?.allowedGenres).toContain('Thriller');
       const prompt = String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '');
       expect(prompt).toContain('Style: 1940s Noir Detective (noir-1940s-detective)');
       expect(prompt).toContain('Style guidance: Everyone speaks in brooding metaphors');
+    } finally {
+      if (previousDebugEnv === undefined) {
+        delete process.env.SS_DEBUG_PROMPTS;
+      } else {
+        process.env.SS_DEBUG_PROMPTS = previousDebugEnv;
+      }
+    }
+  });
+
+  it('keeps legacy style in surprise setup debug preview when styleId is absent', async () => {
+    const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
+    try {
+      process.env.SS_DEBUG_PROMPTS = '1';
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          genre: 'Noir',
+          premise: 'A detective takes one impossible final case.',
+          characters: ['Mara (Detective)', 'Vale (Fixer)', 'Iris (Witness)']
+        })
+      });
+
+      const req = {
+        body: {
+          kind: 'generateSurpriseSetup',
+          context: {
+            targetGenre: 'Noir',
+            style: 'Hardboiled with clipped dialogue'
+          },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 23,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+      const res = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body?.debug?.previews?.context).toMatchObject({
+        targetGenre: 'Noir',
+        styleId: null,
+        styleName: '',
+        style: 'Hardboiled with clipped dialogue'
+      });
     } finally {
       if (previousDebugEnv === undefined) {
         delete process.env.SS_DEBUG_PROMPTS;
