@@ -103,4 +103,18 @@ describe('promptBuilders style injection', () => {
     expect(prompt).not.toContain('Style:');
     expect(prompt).not.toContain('Style guidance:');
   });
+
+  it('forces Thriller when targetGenre is Thriller', () => {
+    const prompt = buildSurpriseSetupPrompt({
+      targetGenre: 'Thriller',
+      genres: ['Noir', 'Comedy', 'Thriller'],
+      style: {
+        styleId: '',
+        styleName: '',
+        styleGuidance: '',
+        legacyStyle: ''
+      }
+    });
+    expect(prompt).toContain('The genre MUST be "Thriller".');
+  });
 });

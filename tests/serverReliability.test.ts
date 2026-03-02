@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
+import { CANONICAL_GENRES } from '../server/llm/genreCatalog.js';
 
 let app: typeof import('../server/index.js').app;
 let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
@@ -256,6 +257,9 @@ describe('server reliability', () => {
         styleId: 'noir-1940s-detective',
         styleName: '1940s Noir Detective'
       });
+      expect(Array.isArray(res.body?.debug?.previews?.context?.allowedGenres)).toBe(true);
+      expect(res.body?.debug?.previews?.context?.allowedGenres).toEqual(CANONICAL_GENRES);
+      expect(res.body?.debug?.previews?.context?.allowedGenres).toContain('Thriller');
       const prompt = String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '');
       expect(prompt).toContain('Style: 1940s Noir Detective (noir-1940s-detective)');
       expect(prompt).toContain('Style guidance: Everyone speaks in brooding metaphors');
@@ -309,6 +313,39 @@ describe('server reliability', () => {
       consoleInfo.mockRestore();
       consoleError.mockRestore();
     }
+  });
+
+  it('rejects generateSurpriseSetup when targetGenre is not canonical', async () => {
+    const req = {
+      body: {
+        kind: 'generateSurpriseSetup',
+        context: {
+          targetGenre: 'Cyberpunk'
+        }
+      }
+    } as any;
+    const res = {
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    } as any;
+
+    await handleAiGenerate(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body?.error?.code).toBe('INVALID_REQUEST');
+    expect(String(res.body?.error?.message || '')).toContain('Invalid surprise setup target genre.');
   });
 
   it('returns 429 when upstream error message indicates a rate limit in mixed case', async () => {

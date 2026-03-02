@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const MAX_PREVIEW_CHARS = 260;
-const MAX_PREVIEW_ARRAY_ITEMS = 6;
+const MAX_PREVIEW_ARRAY_ITEMS = 12;
 const MAX_PREVIEW_OBJECT_KEYS = 12;
 const STYLE_FINGERPRINT_RE = /^[a-f0-9]{8,64}$/i;
 const REDACTION_PATTERNS = [

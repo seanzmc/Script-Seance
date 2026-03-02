@@ -18,6 +18,7 @@ import {
   isPromptTraceServerEnabled,
   resolvePromptTraceMeta
 } from './llm/promptTrace.js';
+import { CANONICAL_GENRES, isCanonicalGenre } from './llm/genreCatalog.js';
 import {
   applyExpressiveText,
   extractAudioBase64FromPayload,
@@ -80,10 +81,6 @@ const VOICE_CATALOG_CACHE_TTL_MS = parsePositiveInt(process.env.VOICE_CATALOG_CA
 const INWORLD_JWT_REFRESH_BUFFER_MS = parsePositiveInt(process.env.INWORLD_JWT_REFRESH_BUFFER_MS, 60 * 1000);
 const INWORLD_TOKEN_METHOD = 'ai.inworld.engine.WorldEngine/GenerateToken';
 const ALLOWED_ORIGINS = new Set(parseAllowedOrigins(process.env.ALLOWED_ORIGINS));
-
-const GENRES = [
-  'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
-];
 
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
 const VALID_SCENE_LENGTHS = new Set(['Short', 'Medium', 'Long']);
@@ -1157,6 +1154,9 @@ const handleAiGenerate = async (req, res) => {
           if (targetGenre !== undefined && targetGenre !== null && !isNonEmptyString(targetGenre, 120)) {
             return sendError(res, 400, 'Invalid generateSurpriseSetup context.', 'INVALID_REQUEST');
           }
+          if (targetGenre !== undefined && targetGenre !== null && !isCanonicalGenre(targetGenre)) {
+            return sendError(res, 400, 'Invalid surprise setup target genre.', 'INVALID_REQUEST');
+          }
           if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
             return sendError(res, 400, 'Invalid surprise setup style id.', 'INVALID_REQUEST');
           }
@@ -1168,7 +1168,7 @@ const handleAiGenerate = async (req, res) => {
           }
         }
 
-        const promptSize = getPromptSizeEstimate({ kind, context, genres: GENRES });
+        const promptSize = getPromptSizeEstimate({ kind, context, genres: CANONICAL_GENRES });
         if (!ensurePromptSize(res, promptSize)) {
           return;
         }
@@ -1180,7 +1180,7 @@ const handleAiGenerate = async (req, res) => {
         const generationResult = await generateTextByKind({
           kind,
           context,
-          genres: GENRES,
+          genres: CANONICAL_GENRES,
           provider: textProvider,
           openai: textProvider === 'openai' ? getOpenAIClient() : null,
           geminiAi: textProvider === 'gemini' ? getGeminiClient() : null,
