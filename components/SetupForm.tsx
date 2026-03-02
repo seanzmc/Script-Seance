@@ -73,6 +73,155 @@ export const SETUP_UI_TOKENS = {
   metaText: "text-xs sm:text-sm text-slate-400",
 } as const;
 
+type SceneLengthValue = "Short" | "Medium" | "Long";
+type LengthTickPhase = "idle" | "prep" | "animate";
+
+const normalizeLengthValue = (value: string): SceneLengthValue =>
+  value === "Short" || value === "Long" ? value : "Medium";
+
+const getNextLengthValue = (value: SceneLengthValue): SceneLengthValue =>
+  value === "Short" ? "Medium" : value === "Medium" ? "Long" : "Short";
+
+type LengthCycleWheelProps = {
+  value: SceneLengthValue;
+  disabled?: boolean;
+  prefersReducedMotion: boolean;
+  focusRingClass: string;
+  onChange: (nextValue: SceneLengthValue) => void;
+};
+
+const LENGTH_TICK_DURATION_MS = 240;
+
+const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
+  value,
+  disabled = false,
+  prefersReducedMotion,
+  focusRingClass,
+  onChange,
+}) => {
+  const [currentValue, setCurrentValue] = useState<SceneLengthValue>(value);
+  const [nextValue, setNextValue] = useState<SceneLengthValue | null>(null);
+  const [phase, setPhase] = useState<LengthTickPhase>("idle");
+  const timeoutRef = useRef<number | null>(null);
+  const frameRef = useRef<number | null>(null);
+
+  const clearScheduledAnimation = useCallback(() => {
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearScheduledAnimation();
+    };
+  }, [clearScheduledAnimation]);
+
+  useEffect(() => {
+    if (phase !== "idle") return;
+    if (currentValue === value) return;
+    setCurrentValue(value);
+  }, [currentValue, phase, value]);
+
+  useEffect(() => {
+    if (!prefersReducedMotion || phase === "idle" || nextValue === null) return;
+    clearScheduledAnimation();
+    setCurrentValue(nextValue);
+    setNextValue(null);
+    setPhase("idle");
+  }, [clearScheduledAnimation, nextValue, phase, prefersReducedMotion]);
+
+  const handleClick = useCallback(() => {
+    if (disabled) return;
+    const baseValue = nextValue ?? currentValue;
+    const nextLength = getNextLengthValue(baseValue);
+    onChange(nextLength);
+
+    if (prefersReducedMotion) {
+      clearScheduledAnimation();
+      setCurrentValue(nextLength);
+      setNextValue(null);
+      setPhase("idle");
+      return;
+    }
+
+    clearScheduledAnimation();
+    setNextValue(nextLength);
+    setPhase("prep");
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      setPhase("animate");
+    });
+
+    timeoutRef.current = window.setTimeout(() => {
+      setCurrentValue(nextLength);
+      setNextValue(null);
+      setPhase("idle");
+      timeoutRef.current = null;
+    }, LENGTH_TICK_DURATION_MS);
+  }, [
+    clearScheduledAnimation,
+    currentValue,
+    disabled,
+    nextValue,
+    onChange,
+    prefersReducedMotion,
+  ]);
+
+  const isAnimating = !prefersReducedMotion && phase !== "idle" && nextValue !== null;
+  const incomingValue = nextValue ?? currentValue;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,transform] duration-[220ms] ease-out hover:text-indigo-100 hover:-translate-y-px active:translate-y-px ${focusRingClass} ${
+        disabled ? "opacity-60 cursor-not-allowed" : ""
+      }`}
+      aria-label="Cycle scene length"
+      title="Cycle target scene length"
+    >
+      <span
+        className="relative inline-flex h-[1.7em] w-[7ch] overflow-hidden align-middle py-[0.12em] text-left"
+        data-testid="setup-length-value-viewport"
+      >
+        {isAnimating && (
+          <span
+            className={`absolute inset-x-0 top-0 flex h-full items-center leading-[1.15] transition-[opacity,transform] duration-[240ms] ease-in ${
+              phase === "animate"
+                ? "-translate-y-[58%] opacity-0"
+                : "translate-y-0 opacity-100"
+            }`}
+          >
+            {currentValue}
+          </span>
+        )}
+        <span
+          data-testid="setup-length-value"
+          className={`absolute inset-x-0 top-0 flex h-full items-center leading-[1.15] ${
+            isAnimating
+              ? `transition-[opacity,transform] duration-[240ms] ${
+                  phase === "animate"
+                    ? "translate-y-0 opacity-100 ease-out"
+                    : "translate-y-[58%] opacity-0 ease-in"
+                }`
+              : "opacity-100"
+          }`}
+        >
+          {incomingValue}
+        </span>
+      </span>
+    </button>
+  );
+};
+
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
   onChange,
@@ -100,21 +249,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [canHover, setCanHover] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [styleShufflePulse, setStyleShufflePulse] = useState(false);
-  const [lengthDisplay, setLengthDisplay] = useState<"Short" | "Medium" | "Long">(
-    "Medium",
-  );
-  const [lengthOutgoing, setLengthOutgoing] = useState<
-    "Short" | "Medium" | "Long" | null
-  >(null);
-  const [isLengthAnimating, setIsLengthAnimating] = useState(false);
-  const [isLengthTransitionActive, setIsLengthTransitionActive] = useState(false);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
   const styleLibraryModalRef = useRef<HTMLDivElement | null>(null);
   const styleShufflePulseTimeoutRef = useRef<number | null>(null);
-  const lengthAnimationTimeoutRef = useRef<number | null>(null);
-  const lengthAnimationFrameRef = useRef<number | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -279,12 +418,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     return () => {
       if (styleShufflePulseTimeoutRef.current !== null) {
         window.clearTimeout(styleShufflePulseTimeoutRef.current);
-      }
-      if (lengthAnimationTimeoutRef.current !== null) {
-        window.clearTimeout(lengthAnimationTimeoutRef.current);
-      }
-      if (lengthAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(lengthAnimationFrameRef.current);
       }
     };
   }, []);
@@ -455,8 +588,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
   const hasValidCharacter = characters.some((char) => char.trim().length > 0);
-  const normalizedLength =
-    length === "Short" || length === "Long" ? length : "Medium";
+  const normalizedLength = normalizeLengthValue(length);
   const characterCount = characters.length;
   const motionBaseClass =
     "transition-[opacity,transform,box-shadow] duration-[220ms] ease-out";
@@ -478,59 +610,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
-  useEffect(() => {
-    if (isLengthAnimating && !prefersReducedMotion) return;
-    setLengthDisplay(normalizedLength);
-  }, [isLengthAnimating, normalizedLength, prefersReducedMotion]);
-  const handleCycleLength = useCallback(() => {
-    if (isLocked) return;
-    const currentLength = isLengthAnimating ? lengthDisplay : normalizedLength;
-    const nextLength =
-      currentLength === "Short"
-        ? "Medium"
-        : currentLength === "Medium"
-          ? "Long"
-          : "Short";
-
-    updateValue({ length: nextLength });
-
-    if (prefersReducedMotion) {
-      setLengthDisplay(nextLength);
-      setLengthOutgoing(null);
-      setIsLengthAnimating(false);
-      setIsLengthTransitionActive(false);
-      return;
-    }
-
-    setLengthOutgoing(currentLength);
-    setLengthDisplay(nextLength);
-    setIsLengthAnimating(true);
-    setIsLengthTransitionActive(false);
-
-    if (lengthAnimationFrameRef.current !== null) {
-      window.cancelAnimationFrame(lengthAnimationFrameRef.current);
-    }
-    lengthAnimationFrameRef.current = window.requestAnimationFrame(() => {
-      setIsLengthTransitionActive(true);
-    });
-
-    if (lengthAnimationTimeoutRef.current !== null) {
-      window.clearTimeout(lengthAnimationTimeoutRef.current);
-    }
-    lengthAnimationTimeoutRef.current = window.setTimeout(() => {
-      setIsLengthAnimating(false);
-      setLengthOutgoing(null);
-      setIsLengthTransitionActive(false);
-      lengthAnimationTimeoutRef.current = null;
-    }, 260);
-  }, [
-    isLengthAnimating,
-    isLocked,
-    lengthDisplay,
-    normalizedLength,
-    prefersReducedMotion,
-    updateValue,
-  ]);
 
   return (
     <div className="space-y-4">
@@ -955,47 +1034,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   <span className="uppercase tracking-[0.2em] text-slate-500">
                     Length:
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleCycleLength}
+                  <LengthCycleWheel
+                    value={normalizedLength}
                     disabled={isLocked}
-                    className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,transform] duration-[220ms] ease-out hover:text-indigo-100 hover:-translate-y-px active:translate-y-px ${focusRingClass} ${
-                      isLocked ? "opacity-60 cursor-not-allowed" : ""
-                    }`}
-                    aria-label="Cycle scene length"
-                    title="Cycle target scene length"
-                  >
-                    <span
-                      className="relative inline-flex h-[1.45em] w-[6ch] overflow-hidden align-middle text-left py-[0.04em]"
-                      data-testid="setup-length-value-viewport"
-                    >
-                      {!prefersReducedMotion && lengthOutgoing && (
-                        <span
-                          className={`absolute inset-0 leading-[1.25] transition-[opacity,transform] duration-[240ms] ease-in-out ${
-                            isLengthAnimating && isLengthTransitionActive
-                              ? "-translate-y-2 opacity-0"
-                              : "translate-y-0 opacity-100"
-                          }`}
-                        >
-                          {lengthOutgoing}
-                        </span>
-                      )}
-                      <span
-                        data-testid="setup-length-value"
-                        className={`absolute inset-0 leading-[1.25] transition-[opacity,transform] duration-[240ms] ${
-                          prefersReducedMotion
-                            ? "translate-y-0 opacity-100"
-                            : isLengthAnimating
-                              ? isLengthTransitionActive
-                                ? "translate-y-0 opacity-100 ease-out"
-                                : "translate-y-2 opacity-0 ease-in-out"
-                              : "translate-y-0 opacity-100 ease-out"
-                        }`}
-                      >
-                        {lengthDisplay}
-                      </span>
-                    </span>
-                  </button>
+                    prefersReducedMotion={prefersReducedMotion}
+                    focusRingClass={focusRingClass}
+                    onChange={(nextLength) => updateValue({ length: nextLength })}
+                  />
                 </div>
 
                 <div className="flex items-center md:justify-start">

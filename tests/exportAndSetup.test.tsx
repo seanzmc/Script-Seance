@@ -108,6 +108,55 @@ describe("SetupForm submit validation", () => {
     expect(button.disabled).toBe(false);
   });
 
+  it("cycles length and stages incoming wheel text before animating", async () => {
+    const LengthCycleHarness: React.FC = () => {
+      const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
+      const handleSetupChange = React.useCallback(
+        (next: Partial<SetupFormState>) => {
+          setSetupState((previous) => ({ ...previous, ...next }));
+        },
+        [],
+      );
+
+      return (
+        <SetupForm
+          value={setupState}
+          onChange={handleSetupChange}
+          isLoading={false}
+        />
+      );
+    };
+
+    render(<LengthCycleHarness />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /write my own premise/i }),
+    );
+
+    const cycleButton = screen.getByRole("button", {
+      name: /cycle scene length/i,
+    });
+    const lengthValue = screen.getByTestId("setup-length-value");
+
+    expect(lengthValue.textContent).toBe("Medium");
+
+    fireEvent.click(cycleButton);
+    expect(lengthValue.textContent).toBe("Long");
+    expect(lengthValue.className).toContain("translate-y-[58%]");
+    await waitFor(() => {
+      expect(lengthValue.className).toContain("translate-y-0");
+    });
+
+    fireEvent.click(cycleButton);
+    await waitFor(() => {
+      expect(lengthValue.textContent).toBe("Short");
+    });
+
+    fireEvent.click(cycleButton);
+    await waitFor(() => {
+      expect(lengthValue.textContent).toBe("Medium");
+    });
+  });
+
   it("style library selection updates shared context style and bumps prompt revision synchronously", () => {
     const StylePresetHarness: React.FC = () => {
       const [context, setContext] = React.useState<StoryContext | null>({
