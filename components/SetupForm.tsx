@@ -183,7 +183,7 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
       type="button"
       onClick={handleClick}
       disabled={disabled}
-      className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,transform] duration-[220ms] ease-out hover:text-indigo-100 hover:-translate-y-px active:translate-y-px ${focusRingClass} ${
+      className={`rounded-sm px-1.5 py-0.5 text-slate-200 transition-[opacity,color] duration-[220ms] ease-out hover:text-indigo-100 hover:underline hover:opacity-90 ${focusRingClass} ${
         disabled ? "opacity-60 cursor-not-allowed" : ""
       }`}
       aria-label="Cycle scene length"
@@ -1048,7 +1048,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5">
                 <div className={`border-t border-white/10 pt-3 flex items-center gap-2 ${setupMetaTextClass}`}>
                   <span className="uppercase tracking-[0.2em] text-slate-500">
-                    Length:
+                    Scene Length:
                   </span>
                   <LengthCycleWheel
                     value={normalizedLength}
