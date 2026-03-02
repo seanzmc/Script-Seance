@@ -325,7 +325,10 @@ describe("SetupForm submit validation", () => {
       screen.getByRole("button", { name: /clear selected style/i }),
     );
 
-    expect(onChange).toHaveBeenCalledWith({ style: "" }, { source: "user" });
+    expect(onChange).toHaveBeenCalledWith(
+      { styleId: null, style: "" },
+      { source: "user" },
+    );
   });
 
   it("does not show inline clear action when no style is selected", () => {

@@ -537,13 +537,24 @@ export const executeRewriteBlock = async (
   return data.text?.trim() || block.text;
 };
 
+export type SurpriseSetupContext = {
+  targetGenre?: string;
+  styleId?: string;
+  styleName?: string;
+  // Legacy freeform style text; retained for backward compatibility.
+  style?: string;
+};
+
 export const executeGenerateSurpriseSetup = async (
-  targetGenre?: string,
+  contextOrTargetGenre?: string | SurpriseSetupContext,
   options?: RequestOptions
 ): Promise<{ genre: string; premise: string; characters: string[] }> => {
+  const context = typeof contextOrTargetGenre === 'string'
+    ? { targetGenre: contextOrTargetGenre }
+    : (contextOrTargetGenre ?? {});
   const request = createAiRequest<{ genre: string; premise: string; characters: string[] }>(
     AI_KINDS.generateSurpriseSetup,
-    { targetGenre },
+    context,
     options
   );
   return request.promise;
@@ -588,10 +599,10 @@ export const regenerateScriptBlock = async (
 };
 
 export const generateSurpriseSetup = async (
-  targetGenre?: string,
+  contextOrTargetGenre?: string | SurpriseSetupContext,
   options?: RequestOptions
 ): Promise<{ genre: string; premise: string; characters: string[] }> => {
-  return executeGenerateSurpriseSetup(targetGenre, options);
+  return executeGenerateSurpriseSetup(contextOrTargetGenre, options);
 };
 
 // --- TTS Generation ---

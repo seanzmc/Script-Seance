@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SetupFormState } from './components/SetupForm';
+import { stylesLibrary } from './stylesLibrary';
 import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
 import { VoicesPanel } from './components/VoicesPanel';
@@ -77,6 +78,7 @@ const DEFAULT_SETUP_STATE: SetupFormState = {
   genre: GENRES[0],
   premise: '',
   characters: ['Hero', 'Villain'],
+  styleId: null,
   style: '',
   length: 'Medium'
 };
@@ -187,12 +189,61 @@ const buildFallbackTitle = (premise: string, genre: string) => {
   return words.map(word => word[0]?.toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 };
 
+const STYLE_BY_ID = new Map(stylesLibrary.map((item) => [item.id, item]));
+const STYLE_BY_NORMALIZED_TITLE = new Map(
+  stylesLibrary.map((item) => [item.title.trim().toLowerCase(), item])
+);
+
+const normalizeStyleId = (value: unknown) => (
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : ''
+);
+
+const normalizeStyleText = (value: unknown) => (
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : ''
+);
+
+const resolveSetupStyleSelection = (setup: Pick<SetupFormState, 'styleId' | 'style'>) => {
+  const explicitStyleId = normalizeStyleId(setup.styleId);
+  const explicitStyleText = normalizeStyleText(setup.style);
+  const styleFromId = explicitStyleId ? STYLE_BY_ID.get(explicitStyleId) : undefined;
+  if (styleFromId) {
+    return {
+      styleId: styleFromId.id,
+      styleName: styleFromId.title,
+      legacyStyle: explicitStyleText
+    };
+  }
+  if (!explicitStyleText) {
+    return {
+      styleId: null,
+      styleName: '',
+      legacyStyle: ''
+    };
+  }
+  // Backward-compat fallback for title-only persisted setups.
+  const fallbackByTitle = STYLE_BY_NORMALIZED_TITLE.get(explicitStyleText.toLowerCase());
+  if (fallbackByTitle) {
+    return {
+      styleId: fallbackByTitle.id,
+      styleName: fallbackByTitle.title,
+      legacyStyle: explicitStyleText
+    };
+  }
+  return {
+    styleId: null,
+    styleName: explicitStyleText,
+    legacyStyle: explicitStyleText
+  };
+};
+
 const buildTitleContext = (setup: SetupFormState) => {
+  const resolvedStyle = resolveSetupStyleSelection(setup);
+  const styleLabel = resolvedStyle.styleName || resolvedStyle.legacyStyle;
   const parts = [
     setup.genre ? `Genre: ${setup.genre}.` : '',
     setup.premise.trim() ? `Premise: ${setup.premise.trim()}` : '',
     setup.characters.length ? `Characters: ${setup.characters.filter(char => char.trim()).join(', ')}.` : '',
-    setup.style.trim() ? `Style: ${setup.style.trim()}.` : '',
+    styleLabel ? `Style: ${styleLabel}.` : '',
     setup.length.trim() ? `Length: ${setup.length.trim()}.` : ''
   ].filter(Boolean);
   return parts.join(' ');
@@ -305,11 +356,18 @@ export default function App() {
 
   const canRedo = redoCount > 0;
   const canUndo = undoCount > 0;
+  const resolvedSetupStyle = useMemo(
+    () => resolveSetupStyleSelection({
+      style: setupState.style,
+      styleId: setupState.styleId ?? null
+    }),
+    [setupState.style, setupState.styleId]
+  );
   const scriptStyleContext = useMemo(() => {
     const genre = context ? context.genre : setupState.genre;
     const style = context
       ? (typeof context.style === 'string' ? context.style.trim() : '')
-      : setupState.style.trim();
+      : resolvedSetupStyle.styleName;
     const length = context
       ? (typeof context.targetLength === 'string' ? context.targetLength.trim() : '')
       : setupState.length.trim();
@@ -319,7 +377,7 @@ export default function App() {
       length ? `Length: ${length}.` : ''
     ].filter(Boolean);
     return parts.join(' ');
-  }, [context, setupState.genre, setupState.length, setupState.style]);
+  }, [context, resolvedSetupStyle.styleName, setupState.genre, setupState.length]);
   const promptStyleFingerprint = useMemo(() => (
     buildPromptStyleFingerprint(scriptStyleContext)
   ), [scriptStyleContext]);
@@ -527,10 +585,23 @@ export default function App() {
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => {
     const source = meta?.source ?? 'user';
-    const hasStyle = Object.prototype.hasOwnProperty.call(next, 'style');
-    if (hasStyle && contextRef.current) {
-      const rawStyle = typeof next.style === 'string' ? next.style : '';
-      const normalizedStyle = rawStyle.trim() ? rawStyle.trim() : undefined;
+    const hasStyleSelection =
+      Object.prototype.hasOwnProperty.call(next, 'style') ||
+      Object.prototype.hasOwnProperty.call(next, 'styleId');
+    if (hasStyleSelection && contextRef.current) {
+      const baseState = setupStateRef.current;
+      const requestedStyle = Object.prototype.hasOwnProperty.call(next, 'style')
+        ? next.style
+        : baseState.style;
+      const requestedStyleId = Object.prototype.hasOwnProperty.call(next, 'styleId')
+        ? next.styleId
+        : (baseState.styleId ?? null);
+      const resolved = resolveSetupStyleSelection({
+        ...baseState,
+        style: typeof requestedStyle === 'string' ? requestedStyle : '',
+        styleId: typeof requestedStyleId === 'string' ? requestedStyleId : null
+      });
+      const normalizedStyle = resolved.styleName ? resolved.styleName : undefined;
       const didMutateContext = applyContextMutation((prev) => {
         if (!prev) return prev;
         if (prev.style === normalizedStyle) {
@@ -538,7 +609,12 @@ export default function App() {
         }
         return { ...prev, style: normalizedStyle };
       });
-      applySetupStateMutation((prev) => ({ ...prev, ...next }), {
+      applySetupStateMutation((prev) => ({
+        ...prev,
+        ...next,
+        styleId: resolved.styleId,
+        style: resolved.styleName
+      }), {
         source,
         bumpPromptRevision: !didMutateContext
       });
@@ -707,6 +783,10 @@ export default function App() {
         genre: context.genre,
         premise: context.premise,
         characters: context.characters,
+        styleId: resolveSetupStyleSelection({
+          styleId: null,
+          style: typeof context.style === 'string' ? context.style : ''
+        }).styleId,
         style: typeof context.style === 'string' ? context.style : '',
         length: normalizeTargetLength(context.targetLength)
       }), {
@@ -997,7 +1077,7 @@ export default function App() {
         characters: normalizedCharacters,
         title: DEFAULT_TITLE,
         scenes: [],
-        style: setupState.style.trim() || undefined,
+        style: resolvedSetupStyle.styleName || undefined,
         targetLength: normalizeTargetLength(setupState.length)
       };
       const startedPromptContextRevision = promptContextRevisionRef.current;
@@ -1346,12 +1426,26 @@ export default function App() {
       ? scopeKeys.setupAutoSurprise(startedSetupSessionId)
       : scopeKeys.setupSurprise(startedSetupSessionId);
 
+    const resolvedStyleSelection = resolveSetupStyleSelection(setupStateRef.current);
+    const surpriseSetupContext = {
+      targetGenre: params.targetGenre,
+      ...(resolvedStyleSelection.styleId
+        ? {
+            styleId: resolvedStyleSelection.styleId,
+            styleName: resolvedStyleSelection.styleName
+          }
+        : {}),
+      ...(!resolvedStyleSelection.styleId && resolvedStyleSelection.legacyStyle
+        ? { style: resolvedStyleSelection.legacyStyle }
+        : {})
+    };
+
     const outcome = await orchestratorRef.current.run<{ genre: string; premise: string; characters: string[] }>({
       opType,
       scopeKey,
       trigger: params.mode === 'auto' ? 'system' : 'user',
       execute: (signal) => executeGenerateSurpriseSetup(
-        params.targetGenre,
+        surpriseSetupContext,
         { signal, opType, scopeKey }
       ),
       isFresh: () => {
@@ -1546,7 +1640,7 @@ export default function App() {
     if (!didMutateContext) {
       return;
     }
-    applySetupStateMutation((prev) => ({ ...prev, style: normalizedStyle ?? '' }), {
+    applySetupStateMutation((prev) => ({ ...prev, styleId: null, style: normalizedStyle ?? '' }), {
       source: 'system',
       bumpPromptRevision: false
     });

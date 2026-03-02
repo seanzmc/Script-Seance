@@ -2,6 +2,7 @@ export const SCRIPT_ELEMENT_SYSTEM_INSTRUCTION =
   'You are a screenwriting assistant. Output ONLY the raw script text requested. Do not add quotes, prefixes, or formatting.';
 
 const STYLE_BLOCK_MAX_CHARS = 500;
+const SURPRISE_STYLE_GUIDANCE_MAX_CHARS = 240;
 const collapseWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
 
 export const formatStyleBlock = (style) => {
@@ -214,12 +215,30 @@ export const buildSurpriseSetupPrompt = ({ targetGenre, genres, style }) => {
   const genreInstruction = targetGenre
     ? `The genre MUST be "${targetGenre}".`
     : `Pick a genre from this list if suitable: ${genres.join(', ')}, otherwise choose a fitting one.`;
-  const styleBlock = formatStyleBlock(style);
+  const normalizedStyleId = typeof style?.styleId === 'string' ? collapseWhitespace(style.styleId) : '';
+  const normalizedStyleName = typeof style?.styleName === 'string' ? collapseWhitespace(style.styleName) : '';
+  const normalizedLegacyStyle = typeof style?.legacyStyle === 'string'
+    ? collapseWhitespace(style.legacyStyle)
+    : '';
+  const styleLabel = normalizedStyleName || normalizedLegacyStyle;
+  const styleHeading = normalizedStyleId
+    ? (styleLabel ? `Style: ${styleLabel} (${normalizedStyleId})` : `Style: ${normalizedStyleId}`)
+    : (styleLabel ? `Style: ${styleLabel}` : '');
+  const normalizedStyleGuidance = typeof style?.styleGuidance === 'string'
+    ? collapseWhitespace(style.styleGuidance)
+    : '';
+  const cappedStyleGuidance = normalizedStyleGuidance.length > SURPRISE_STYLE_GUIDANCE_MAX_CHARS
+    ? normalizedStyleGuidance.slice(0, SURPRISE_STYLE_GUIDANCE_MAX_CHARS).trim()
+    : normalizedStyleGuidance;
+  const styleGuidanceLine = cappedStyleGuidance
+    ? `Style guidance: ${cappedStyleGuidance}`
+    : '';
 
   return [
     'Generate a creative, unique, and interesting movie premise.',
     genreInstruction,
-    styleBlock,
+    styleHeading,
+    styleGuidanceLine,
     'Return a JSON object with:',
     `'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''},`,
     "'premise' (string, 1-2 sentences),",

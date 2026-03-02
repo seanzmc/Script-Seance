@@ -8,6 +8,7 @@ import {
   buildRegenerateBlockPrompt,
   buildSurpriseSetupPrompt
 } from './promptBuilders.js';
+import { resolveLibraryStyleById } from './styleCatalog.js';
 import { getTextModels } from './llmClient.js';
 import { isTextGenerationKind } from './types.js';
 import {
@@ -727,10 +728,16 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
   }
 
   if (kind === 'generateSurpriseSetup') {
+    const canonicalStyle = resolveLibraryStyleById(context.styleId);
     return buildSurpriseSetupPrompt({
       targetGenre: context.targetGenre,
       genres,
-      style: context.style || ''
+      style: {
+        styleId: canonicalStyle?.id || context.styleId || '',
+        styleName: canonicalStyle?.title || context.styleName || context.style || '',
+        styleGuidance: canonicalStyle?.description || '',
+        legacyStyle: context.style || ''
+      }
     }).length;
   }
 
@@ -1126,10 +1133,22 @@ export const generateTextByKind = async ({
     };
   }
 
+  const canonicalStyle = resolveLibraryStyleById(context.styleId);
+  const resolvedStyleId = canonicalStyle?.id || '';
+  const resolvedStyleName = canonicalStyle?.title || (
+    typeof context.styleName === 'string' ? context.styleName.trim() : ''
+  );
+  const legacyStyle = typeof context.style === 'string' ? context.style.trim() : '';
+
   const prompt = buildSurpriseSetupPrompt({
     targetGenre: context.targetGenre,
     genres,
-    style: context.style
+    style: {
+      styleId: resolvedStyleId,
+      styleName: resolvedStyleName || legacyStyle,
+      styleGuidance: canonicalStyle?.description || '',
+      legacyStyle
+    }
   });
   const surpriseModel = provider === 'openai' ? models.openai : models.gemini;
   const instructionPreview = {
@@ -1138,9 +1157,17 @@ export const generateTextByKind = async ({
   };
   const contextPreview = {
     targetGenre: context.targetGenre || null,
-    style: context.style || '',
+    styleId: resolvedStyleId || null,
+    styleName: resolvedStyleName || '',
+    style: legacyStyle,
     allowedGenres: genres
   };
+  const styleFingerprintSource = [
+    resolvedStyleId,
+    resolvedStyleName,
+    canonicalStyle?.description || '',
+    legacyStyle
+  ].filter(Boolean).join('|');
   emitKindPromptTrace({
     traceMeta,
     kind,
@@ -1149,7 +1176,7 @@ export const generateTextByKind = async ({
     timeoutMs,
     upstreamContext,
     maxOutputTokens: 350,
-    styleSource: context.style || '',
+    styleSource: styleFingerprintSource,
     instructionPreview,
     contextPreview
   });
@@ -1208,7 +1235,7 @@ export const generateTextByKind = async ({
         maxOutputTokens: provider === 'openai'
           ? responsePayload.finalMaxOutputTokens
           : null,
-        styleSource: context.style || '',
+        styleSource: styleFingerprintSource,
         instructionPreview,
         contextPreview,
         promptPreview: prompt,

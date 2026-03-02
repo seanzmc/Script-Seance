@@ -78,8 +78,29 @@ describe('promptBuilders style injection', () => {
     const prompt = buildSurpriseSetupPrompt({
       targetGenre: 'Noir',
       genres: ['Noir', 'Comedy'],
-      style: 'All dialogue rhymes'
+      style: {
+        styleId: 'all-dialogue-rhymes',
+        styleName: 'All dialogue rhymes',
+        styleGuidance: 'Every spoken line should rhyme while remaining natural enough for performance.',
+        legacyStyle: ''
+      }
     });
-    expect(prompt).toContain('Style Theme: All dialogue rhymes');
+    expect(prompt).toContain('Style: All dialogue rhymes (all-dialogue-rhymes)');
+    expect(prompt).toContain('Style guidance: Every spoken line should rhyme while remaining natural enough for performance.');
+  });
+
+  it('omits surprise setup style block when no style is provided', () => {
+    const prompt = buildSurpriseSetupPrompt({
+      targetGenre: 'Noir',
+      genres: ['Noir', 'Comedy'],
+      style: {
+        styleId: '',
+        styleName: '',
+        styleGuidance: '',
+        legacyStyle: ''
+      }
+    });
+    expect(prompt).not.toContain('Style:');
+    expect(prompt).not.toContain('Style guidance:');
   });
 });

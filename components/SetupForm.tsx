@@ -14,6 +14,7 @@ export type SetupFormState = {
   genre: string;
   premise: string;
   characters: string[];
+  styleId?: string | null;
   style: string;
   length: string;
 };
@@ -236,7 +237,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   variant = "full",
   autoSurprise = false,
 }) => {
-  const { genre, premise, characters, style, length } = value;
+  const { genre, premise, characters, style, styleId, length } = value;
   const [isSurprising, setIsSurprising] = useState(false);
   const [justSurprised, setJustSurprised] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -502,6 +503,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const trimmedPremise = premise.trim();
   const normalizedStyleSearch = styleSearch.trim().toLowerCase();
   const normalizedStyle = normalizeStyleValue(style);
+  const normalizedStyleId =
+    typeof styleId === "string" && styleId.trim().length > 0
+      ? styleId.trim()
+      : "";
   const filteredStyles = useMemo(() => {
     if (!normalizedStyleSearch) return stylesLibrary;
     return stylesLibrary.filter((item) => {
@@ -519,13 +524,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       })).filter((group) => group.items.length > 0),
     [filteredStyles],
   );
-  const selectedLibraryStyle = useMemo(
-    () =>
+  const selectedLibraryStyle = useMemo(() => {
+    const byId = normalizedStyleId
+      ? stylesLibrary.find((item) => item.id === normalizedStyleId) ?? null
+      : null;
+    if (byId) return byId;
+    // Legacy fallback for persisted title-only setups.
+    return (
       stylesLibrary.find(
         (item) => normalizeStyleValue(item.title) === normalizedStyle,
-      ) ?? null,
-    [normalizedStyle],
-  );
+      ) ?? null
+    );
+  }, [normalizedStyle, normalizedStyleId]);
   const selectedStyleCategoryLabel = useMemo(() => {
     if (!selectedLibraryStyle) return null;
     return (
@@ -558,7 +568,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     const randomIndex = Math.floor(Math.random() * stylesLibrary.length);
     const randomStyle = stylesLibrary[randomIndex];
     if (!randomStyle) return;
-    updateValue({ style: randomStyle.title });
+    updateValue({ styleId: randomStyle.id, style: randomStyle.title });
     setStyleShufflePulse(true);
     if (styleShufflePulseTimeoutRef.current !== null) {
       window.clearTimeout(styleShufflePulseTimeoutRef.current);
@@ -568,23 +578,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     }, 280);
   }, [isLocked, updateValue]);
   const handleSelectStyleFromLibrary = useCallback(
-    (nextStyle: string) => {
-      updateValue({ style: nextStyle });
+    (nextStyle: { styleId: string | null; style: string }) => {
+      updateValue(nextStyle);
       setIsStyleLibraryOpen(false);
     },
     [updateValue],
   );
   const handleClearStyle = useCallback(() => {
-    updateValue({ style: "" });
+    updateValue({ styleId: null, style: "" });
   }, [updateValue]);
   const premiseSnippet =
     trimmedPremise.length > 140
       ? `${trimmedPremise.slice(0, 140)}...`
       : trimmedPremise || "No premise yet.";
   const castCount = characters.filter((char) => char.trim().length > 0).length;
-  const summaryParts = [genre, length, style.trim()].filter(Boolean);
+  const resolvedStyleLabel = selectedLibraryStyle?.title ?? style.trim();
+  const summaryParts = [genre, length, resolvedStyleLabel].filter(Boolean);
   const summaryLine = summaryParts.join(" / ");
-  const isStyleBlank = !style.trim();
+  const isStyleBlank = !resolvedStyleLabel;
   const isSummaryOnly = variant === "summary";
   const showSummary = isLocked || isSummaryOnly;
   const hasValidCharacter = characters.some((char) => char.trim().length > 0);
@@ -828,7 +839,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     <div className="p-2">
                       <button
                         type="button"
-                        onClick={() => handleSelectStyleFromLibrary("")}
+                        onClick={() =>
+                          handleSelectStyleFromLibrary({
+                            styleId: null,
+                            style: "",
+                          })
+                        }
                         disabled={isLocked}
                         aria-pressed={isStyleBlank}
                         className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
@@ -851,8 +867,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             {group.label}
                           </p>
                           {group.items.map((item) => {
-                            const isSelected =
-                              normalizedStyle === normalizeStyleValue(item.title);
+                            const isSelected = selectedLibraryStyle?.id === item.id;
                             return (
                               <button
                                 key={item.id}
@@ -861,7 +876,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                                 }}
                                 type="button"
                                 onClick={() =>
-                                  handleSelectStyleFromLibrary(item.title)
+                                  handleSelectStyleFromLibrary({
+                                    styleId: item.id,
+                                    style: item.title,
+                                  })
                                 }
                                 disabled={isLocked}
                                 aria-pressed={isSelected}

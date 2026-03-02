@@ -1153,9 +1153,18 @@ const handleAiGenerate = async (req, res) => {
             return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
           }
         } else if (kind === 'generateSurpriseSetup') {
-          const { targetGenre } = context;
+          const { targetGenre, styleId, styleName, style } = context;
           if (targetGenre !== undefined && targetGenre !== null && !isNonEmptyString(targetGenre, 120)) {
             return sendError(res, 400, 'Invalid generateSurpriseSetup context.', 'INVALID_REQUEST');
+          }
+          if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
+            return sendError(res, 400, 'Invalid surprise setup style id.', 'INVALID_REQUEST');
+          }
+          if (styleName !== undefined && styleName !== null && !isNonEmptyString(styleName, 200)) {
+            return sendError(res, 400, 'Invalid surprise setup style name.', 'INVALID_REQUEST');
+          }
+          if (style !== undefined && style !== null && !isNonEmptyString(style, 400)) {
+            return sendError(res, 400, 'Invalid surprise setup style.', 'INVALID_REQUEST');
           }
         }
 

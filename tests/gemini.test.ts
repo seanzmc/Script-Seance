@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BlockType } from '../types';
-import { createGenerateSpeechRequest, executeSuggestPlotTwist, generateScriptElement } from '../services/ai';
+import {
+  createGenerateSpeechRequest,
+  executeGenerateSurpriseSetup,
+  executeSuggestPlotTwist,
+  generateScriptElement
+} from '../services/ai';
 
 type MockResponse = {
   ok: boolean;
@@ -143,5 +148,33 @@ describe('AI API wrapper', () => {
     const requestWithoutTrace = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
     expect(requestWithoutTrace.promptTrace).toBeUndefined();
     expect((fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)?.['X-SS-Debug-Prompts']).toBeUndefined();
+  });
+
+  it('sends surprise setup style contract with styleId/styleName only', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createMockResponse(200, {
+        data: {
+          genre: 'Noir',
+          premise: 'A detective takes one last impossible case.',
+          characters: ['Mara (Detective)', 'Vale (Fixer)', 'Iris (Witness)']
+        }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await executeGenerateSurpriseSetup({
+      targetGenre: 'Noir',
+      styleId: 'noir-1940s-detective',
+      styleName: '1940s Noir Detective'
+    });
+
+    const requestPayload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
+    expect(requestPayload.kind).toBe('generateSurpriseSetup');
+    expect(requestPayload.context).toMatchObject({
+      targetGenre: 'Noir',
+      styleId: 'noir-1940s-detective',
+      styleName: '1940s Noir Detective'
+    });
+    expect(requestPayload.context.styleDescription).toBeUndefined();
   });
 });
