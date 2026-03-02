@@ -859,18 +859,18 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-[1.12fr_0.88fr] gap-5 md:items-stretch md:[grid-auto-rows:1fr]">
                 <div
-                  className={`${detailPanelClass} flex h-full min-h-0 flex-col`}
+                  className={`${detailPanelClass} flex h-full flex-col`}
                   data-testid="setup-premise-panel"
                 >
                   <label className={setupSectionLabelClass}>
                     Premise
                   </label>
-                  <div className="flex flex-1 min-h-[260px] md:min-h-[336px] flex-col gap-2">
+                  <div className="flex flex-1 flex-col gap-2">
                     <textarea
                       rows={8}
                       value={premise}
                       onChange={(e) => updateValue({ premise: e.target.value })}
-                      className={`w-full flex-1 min-h-0 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none text-sm sm:text-base leading-relaxed ${
+                      className={`w-full flex-1 min-h-[220px] rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none transition-none resize-none text-sm sm:text-base leading-relaxed ${
                         justSurprised
                           ? "bg-indigo-900/25 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
                           : "bg-slate-900/60"
@@ -897,10 +897,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
 
                 <div
-                  className={`${detailPanelClass} flex h-full min-h-0 flex-col`}
+                  className={`${detailPanelClass} flex h-full flex-col`}
                   data-testid="setup-characters-panel"
                 >
-                  <div className="space-y-2 flex h-full flex-1 min-h-[260px] md:min-h-[336px] flex-col">
+                  <div className="space-y-2 flex h-full flex-1 flex-col">
                     <label className={`${setupSectionLabelClass} flex items-center gap-2`}>
                       <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                     </label>
