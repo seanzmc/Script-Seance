@@ -190,15 +190,13 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
       title="Cycle target scene length"
     >
       <span
-        className="relative inline-flex h-[1.7em] w-[7ch] overflow-hidden align-middle py-[0.12em] text-left"
+        className="relative inline-flex h-[2.1em] w-[7ch] overflow-hidden align-middle text-left"
         data-testid="setup-length-value-viewport"
       >
         {isAnimating && (
           <span
-            className={`absolute inset-x-0 top-0 flex h-full items-center leading-[1.15] transition-[opacity,transform] duration-[240ms] ease-in ${
-              phase === "animate"
-                ? "-translate-y-[58%] opacity-0"
-                : "translate-y-0 opacity-100"
+            className={`absolute inset-0 flex items-center leading-[1.3] transition-[opacity,transform] duration-[240ms] ease-in-out ${
+              phase === "animate" ? "-translate-y-[6px] opacity-0" : "translate-y-0 opacity-100"
             }`}
           >
             {currentValue}
@@ -206,12 +204,12 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
         )}
         <span
           data-testid="setup-length-value"
-          className={`absolute inset-x-0 top-0 flex h-full items-center leading-[1.15] ${
+          className={`absolute inset-0 flex items-center leading-[1.3] ${
             isAnimating
               ? `transition-[opacity,transform] duration-[240ms] ${
                   phase === "animate"
-                    ? "translate-y-0 opacity-100 ease-out"
-                    : "translate-y-[58%] opacity-0 ease-in"
+                    ? "translate-y-0 opacity-100 ease-in-out"
+                    : "translate-y-[6px] opacity-0 ease-in-out"
                 }`
               : "opacity-100"
           }`}
