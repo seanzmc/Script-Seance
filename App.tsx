@@ -166,15 +166,24 @@ const ensureBlockRevision = (block: ScriptBlock): ScriptBlock => {
   return { ...block, blockRevision };
 };
 
-const normalizeSceneCharacters = (scene: Scene, characters: string[]) => ({
-  ...scene,
-  blocks: scene.blocks.map((rawBlock) => {
-    const block = ensureBlockRevision(rawBlock);
-    return block.character
-      ? { ...block, character: resolveCharacterName(block.character, characters) }
-      : block;
-  })
-});
+export const normalizeSceneCharacters = (scene: Scene, characters: string[]): Scene => {
+  const legacyHeadingBlock = scene.blocks.find((block) => block.type === BlockType.HEADING);
+  const legacyHeadingText = legacyHeadingBlock?.text?.trim();
+  const normalizedHeading = scene.heading.trim() || (legacyHeadingText ? legacyHeadingText.toUpperCase() : '');
+
+  return {
+    ...scene,
+    heading: normalizedHeading,
+    blocks: scene.blocks
+      .filter((rawBlock) => rawBlock.type !== BlockType.HEADING)
+      .map((rawBlock) => {
+        const block = ensureBlockRevision(rawBlock);
+        return block.character
+          ? { ...block, character: resolveCharacterName(block.character, characters) }
+          : block;
+      })
+  };
+};
 
 const getVoiceIdList = (voices: TtsVoice[]) => voices.map((voice) => voice.id);
 
@@ -270,9 +279,6 @@ export const buildScriptTextExport = (scenes: Scene[]) => (
         lines.push(`\n${heading.toUpperCase()}\n`);
       }
       scene.blocks.forEach(block => {
-        if (block.type === BlockType.HEADING) {
-          return;
-        }
         if (block.type === BlockType.DIALOGUE) {
           const speaker = block.character?.trim().toUpperCase() || 'UNKNOWN';
           lines.push(`\n${speaker}\n`);
@@ -296,9 +302,7 @@ type InsertableBlockRef = {
 
 const collectInsertableBlocks = (storyContext: StoryContext): InsertableBlockRef[] => (
   storyContext.scenes.flatMap((scene) => (
-    scene.blocks
-      .filter((block) => block.type !== BlockType.HEADING)
-      .map((block) => ({ sceneId: scene.id, block }))
+    scene.blocks.map((block) => ({ sceneId: scene.id, block }))
   ))
 );
 

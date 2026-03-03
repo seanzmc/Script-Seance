@@ -977,9 +977,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [context]);
   const insertableBlockCount = useMemo(() => {
     if (!context) return 0;
-    return context.scenes.reduce((total, scene) => (
-      total + scene.blocks.filter((block) => block.type !== BlockType.HEADING).length
-    ), 0);
+    return context.scenes.reduce((total, scene) => total + scene.blocks.length, 0);
   }, [context]);
   useEffect(() => {
     if (rewriteOptions.length === 0) {

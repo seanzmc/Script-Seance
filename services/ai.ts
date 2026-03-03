@@ -468,12 +468,14 @@ const mapSceneGenerationData = (data: SceneGenerationData): Scene => ({
   id: crypto.randomUUID(),
   heading: data.heading,
   summary: data.summary,
-  blocks: data.blocks.map((block) => createBlock({
-    type: block.type,
-    text: block.text,
-    character: block.character ?? undefined,
-    parenthetical: block.parenthetical ?? undefined
-  }))
+  blocks: data.blocks
+    .filter((block) => block.type !== BlockType.HEADING)
+    .map((block) => createBlock({
+      type: block.type,
+      text: block.text,
+      character: block.character ?? undefined,
+      parenthetical: block.parenthetical ?? undefined
+    }))
 });
 
 // --- Text Generation ---

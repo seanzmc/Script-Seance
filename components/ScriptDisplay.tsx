@@ -271,9 +271,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     const ids: string[] = [];
     scenes.forEach(scene => {
       scene.blocks.forEach(block => {
-        if (block.type !== BlockType.HEADING) {
-          ids.push(block.id);
-        }
+        ids.push(block.id);
       });
     });
     return ids;
@@ -581,7 +579,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   }, [activeInsertIndex, insertComposer, onRequestInsert]);
 
   const renderedScenes = scenes.length === 0 ? null : scenes.map((scene, sceneIndex) => {
-      const blocks = scene.blocks.filter(block => block.type !== BlockType.HEADING);
+      const blocks = scene.blocks;
       const isFirstScene = sceneIndex === 0;
       const isLastScene = sceneIndex === scenes.length - 1;
 

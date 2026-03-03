@@ -7,7 +7,11 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildScriptTextExport, sanitizeGeneratedInsertText } from "../App";
+import {
+  buildScriptTextExport,
+  normalizeSceneCharacters,
+  sanitizeGeneratedInsertText,
+} from "../App";
 import { SetupForm, SetupFormState } from "../components/SetupForm";
 import { stylesLibrary } from "../stylesLibrary";
 import { BlockType, Scene, StoryContext } from "../types";
@@ -38,12 +42,6 @@ describe("buildScriptTextExport", () => {
             text: "We are out of time.",
             blockRevision: 1,
           },
-          {
-            id: "b3",
-            type: BlockType.HEADING,
-            text: "INT. SHOULD NOT DUPLICATE - DAY",
-            blockRevision: 1,
-          },
         ],
       },
     ];
@@ -53,7 +51,64 @@ describe("buildScriptTextExport", () => {
     expect(text).toContain("INT. APARTMENT - NIGHT");
     expect(text).toContain("Rain hammers the window.");
     expect(text).toContain("ALEX");
-    expect(text).not.toContain("INT. SHOULD NOT DUPLICATE - DAY");
+  });
+});
+
+describe("normalizeSceneCharacters", () => {
+  it("drops legacy heading blocks while preserving explicit scene heading", () => {
+    const scene: Scene = {
+      id: "scene-legacy",
+      heading: "INT. OFFICE - NIGHT",
+      summary: "Legacy heading block should be removed.",
+      blocks: [
+        {
+          id: "legacy-h",
+          type: BlockType.HEADING,
+          text: "INT. LEGACY - DAY",
+          blockRevision: 1,
+        },
+        {
+          id: "legacy-a",
+          type: BlockType.ACTION,
+          text: "A desk lamp flickers.",
+          blockRevision: 1,
+        },
+      ],
+    };
+
+    const normalized = normalizeSceneCharacters(scene, []);
+
+    expect(normalized.heading).toBe("INT. OFFICE - NIGHT");
+    expect(normalized.blocks).toHaveLength(1);
+    expect(normalized.blocks[0].type).toBe(BlockType.ACTION);
+  });
+
+  it("promotes legacy heading block text when scene heading is blank", () => {
+    const scene: Scene = {
+      id: "scene-legacy-promote",
+      heading: "   ",
+      summary: "Blank heading should be recovered from legacy heading block.",
+      blocks: [
+        {
+          id: "legacy-h",
+          type: BlockType.HEADING,
+          text: "int. garage - dawn",
+          blockRevision: 1,
+        },
+        {
+          id: "legacy-a",
+          type: BlockType.ACTION,
+          text: "A chain rattles in the dark.",
+          blockRevision: 1,
+        },
+      ],
+    };
+
+    const normalized = normalizeSceneCharacters(scene, []);
+
+    expect(normalized.heading).toBe("INT. GARAGE - DAWN");
+    expect(normalized.blocks).toHaveLength(1);
+    expect(normalized.blocks[0].type).toBe(BlockType.ACTION);
   });
 });
 
