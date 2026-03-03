@@ -1,5 +1,5 @@
 import React, { createRef } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { SetupFormState } from '../components/SetupForm';
@@ -76,6 +76,9 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onInsertError: vi.fn(),
   onRegenerate: vi.fn(),
   onDeleteBlock: vi.fn(),
+  onRequestInsert: vi.fn(),
+  onInsertAtIndex: vi.fn(),
+  onGenerateInsertAtIndex: vi.fn(async () => {}),
   onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
@@ -110,6 +113,101 @@ afterEach(() => {
 });
 
 describe('ScriptPane block interactions', () => {
+  it('opens and closes the insert composer via cancel, escape, and outside click', async () => {
+    render(<ScriptPane {...createProps()} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    const openComposer = screen.getByRole('dialog', { name: 'Insert Block' });
+    expect(openComposer).toBeTruthy();
+
+    fireEvent.click(within(openComposer).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    fireEvent.mouseDown(document.body);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
+  });
+
+  it('manual composer insert sends one block to the correct insert index', () => {
+    const onInsertAtIndex = vi.fn();
+    render(<ScriptPane {...createProps({ onInsertAtIndex })} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'A deliberate action beat.' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert' }));
+
+    expect(onInsertAtIndex).toHaveBeenCalledTimes(1);
+    expect(onInsertAtIndex).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        type: BlockType.ACTION,
+        text: 'A deliberate action beat.',
+        blockRevision: 1
+      })
+    );
+  });
+
+  it('composer generate shows loading and inline error state on failure', async () => {
+    const onGenerateInsertAtIndex = vi.fn(async () => {
+      throw new Error('Generation failed');
+    });
+    render(<ScriptPane {...createProps({ onGenerateInsertAtIndex })} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-2'));
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Generate' }));
+
+    expect(screen.getByText('Generating...')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Generation failed');
+    });
+    expect(onGenerateInsertAtIndex).toHaveBeenCalledWith(
+      expect.objectContaining({ insertIndex: 2, type: BlockType.ACTION })
+    );
+  });
+
+  it('activates inline insert slots between blocks and at script end', () => {
+    const onRequestInsert = vi.fn();
+    render(<ScriptPane {...createProps({ onRequestInsert })} />);
+
+    const betweenSlot = screen.getByTestId('insert-slot-1');
+    const endSlot = screen.getByTestId('insert-slot-2');
+
+    fireEvent.click(betweenSlot);
+    expect(onRequestInsert).toHaveBeenCalledWith(1);
+    expect(betweenSlot.getAttribute('data-active')).toBe('true');
+    expect(endSlot.getAttribute('data-active')).toBe('false');
+
+    fireEvent.click(endSlot);
+    expect(onRequestInsert).toHaveBeenCalledWith(2);
+    expect(endSlot.getAttribute('data-active')).toBe('true');
+  });
+
+  it('supports keyboard activation for inline insert slots', () => {
+    const onRequestInsert = vi.fn();
+    render(<ScriptPane {...createProps({ onRequestInsert })} />);
+
+    const betweenSlot = screen.getByTestId('insert-slot-1');
+    betweenSlot.focus();
+
+    fireEvent.keyDown(betweenSlot, { key: 'Enter' });
+    fireEvent.keyDown(betweenSlot, { key: ' ' });
+
+    expect(onRequestInsert).toHaveBeenNthCalledWith(1, 1);
+    expect(onRequestInsert).toHaveBeenNthCalledWith(2, 1);
+  });
+
   it('selects a block and clears selection on outside click', () => {
     const { container } = render(<ScriptPane {...createProps()} />);
 

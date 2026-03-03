@@ -288,6 +288,84 @@ export const buildScriptTextExport = (scenes: Scene[]) => (
     .join('\n***\n')
 );
 
+type InsertableBlockRef = {
+  sceneId: string;
+  block: ScriptBlock;
+};
+
+const collectInsertableBlocks = (storyContext: StoryContext): InsertableBlockRef[] => (
+  storyContext.scenes.flatMap((scene) => (
+    scene.blocks
+      .filter((block) => block.type !== BlockType.HEADING)
+      .map((block) => ({ sceneId: scene.id, block }))
+  ))
+);
+
+const resolveInsertTargetFromIndex = (
+  storyContext: StoryContext,
+  insertIndex: number
+): { sceneId: string; blockId: string } | null => {
+  if (storyContext.scenes.length === 0) return null;
+  const orderedBlocks = collectInsertableBlocks(storyContext);
+  if (insertIndex < 0 || insertIndex > orderedBlocks.length) return null;
+  if (insertIndex === 0) {
+    return { sceneId: storyContext.scenes[0].id, blockId: INSERT_TOP_ID };
+  }
+  if (insertIndex === orderedBlocks.length) {
+    const lastScene = storyContext.scenes[storyContext.scenes.length - 1];
+    return { sceneId: lastScene.id, blockId: INSERT_BOTTOM_ID };
+  }
+  const before = orderedBlocks[insertIndex - 1];
+  return before ? { sceneId: before.sceneId, blockId: before.block.id } : null;
+};
+
+const collapsePromptWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+const truncatePromptText = (value: string, maxChars: number) => {
+  const compact = collapsePromptWhitespace(value);
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, maxChars).trim()}...`;
+};
+
+const serializeBlockForInsertPrompt = (block: ScriptBlock) => {
+  const label = block.type.toUpperCase();
+  if (block.type === BlockType.DIALOGUE) {
+    const character = block.character?.trim() || 'UNKNOWN';
+    const parenthetical = block.parenthetical?.trim() ? ` (${block.parenthetical.trim()})` : '';
+    return `${label} ${character}${parenthetical}: ${truncatePromptText(block.text, 240)}`;
+  }
+  return `${label}: ${truncatePromptText(block.text, 240)}`;
+};
+
+const removeDialoguePrefix = (value: string, character: string) => {
+  const escapedCharacter = character.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (!escapedCharacter) return value.trim();
+  return value.replace(new RegExp(`^${escapedCharacter}\\s*[:\\-–—]\\s*`, 'i'), '').trim();
+};
+
+const sanitizeGeneratedInsertText = (
+  type: BlockType,
+  rawText: string,
+  character?: string
+) => {
+  const trimmed = rawText.trim();
+  if (!trimmed) return '';
+  if (type === BlockType.DIALOGUE) {
+    const normalized = collapsePromptWhitespace(trimmed);
+    const withoutPrefix = character ? removeDialoguePrefix(normalized, character) : normalized;
+    return withoutPrefix.replace(/^["'“”]+|["'“”]+$/g, '').trim();
+  }
+  if (type === BlockType.HEADING || type === BlockType.TRANSITION) {
+    const firstLine = trimmed
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)[0] || '';
+    return firstLine;
+  }
+  const firstSentence = collapsePromptWhitespace(trimmed).match(/^(.+?[.!?])(?:\s|$)/)?.[1];
+  return firstSentence || collapsePromptWhitespace(trimmed);
+};
+
 export default function App() {
   // State
   const [context, setContext] = useState<StoryContext | null>(null);
@@ -1309,6 +1387,124 @@ export default function App() {
     setInsertCompleteToken(token => token + 1);
   }, [handleInsertAfter, insertTarget, pendingInsertBlock]);
 
+  const handleInsertAtIndex = useCallback((insertIndex: number, block: ScriptBlock) => {
+    const latestContext = contextRef.current;
+    if (!latestContext) return;
+    const target = resolveInsertTargetFromIndex(latestContext, insertIndex);
+    if (!target) return;
+    setInsertScrollTargetId(block.id);
+    setInsertScrollToken((token) => token + 1);
+    handleInsertAfter(target, block);
+    setInsertCompleteToken((token) => token + 1);
+  }, [handleInsertAfter]);
+
+  const handleGenerateInsertAtIndex = useCallback(async (params: {
+    insertIndex: number;
+    type: BlockType;
+    content: string;
+    character?: string;
+  }) => {
+    const latestContext = contextRef.current;
+    if (!latestContext) {
+      throw new Error('Script context unavailable.');
+    }
+    const initialTarget = resolveInsertTargetFromIndex(latestContext, params.insertIndex);
+    if (!initialTarget) {
+      throw new Error('Insertion point is no longer available.');
+    }
+
+    const orderedBlocks = collectInsertableBlocks(latestContext);
+    const previousBlock = params.insertIndex > 0 ? orderedBlocks[params.insertIndex - 1]?.block : null;
+    const nextBlock = params.insertIndex < orderedBlocks.length ? orderedBlocks[params.insertIndex]?.block : null;
+    const selectedCharacter = params.type === BlockType.DIALOGUE
+      ? resolveCharacterName(params.character ?? latestContext.characters[0] ?? 'Narrator', latestContext.characters)
+      : undefined;
+    const trimmedDirection = params.content.trim();
+    const instructionLines = [
+      `Generate exactly one screenplay block of type "${params.type}".`,
+      params.type === BlockType.HEADING
+        ? 'Return one scene heading slugline only (for example: INT. LOCATION - DAY).'
+        : '',
+      params.type === BlockType.ACTION
+        ? 'Return one concise action line only. Do not include dialogue labels, transitions, or extra blocks.'
+        : '',
+      params.type === BlockType.DIALOGUE
+        ? `Return one dialogue line only for character "${selectedCharacter}". Do not include speaker labels or parentheticals.`
+        : '',
+      params.type === BlockType.TRANSITION
+        ? 'Return one transition cue only (for example: CUT TO:).'
+        : '',
+      trimmedDirection
+        ? `Direction: ${truncatePromptText(trimmedDirection, 420)}`
+        : 'Direction: Choose the most coherent insertion for this exact position.',
+      previousBlock
+        ? `Previous block: ${serializeBlockForInsertPrompt(previousBlock)}`
+        : 'Previous block: Start of script.',
+      nextBlock
+        ? `Next block: ${serializeBlockForInsertPrompt(nextBlock)}`
+        : 'Next block: End of script.',
+      'Output plain text for that one block only. No lists, no extra formatting, no surrounding explanation.'
+    ].filter(Boolean);
+    const instruction = instructionLines.join('\n');
+    const styleContext = [
+      `Genre: ${latestContext.genre}.`,
+      `Premise: ${truncatePromptText(latestContext.premise, 520)}`,
+      latestContext.style ? `Style: ${truncatePromptText(latestContext.style, 260)}.` : '',
+      latestContext.characters.length ? `Characters: ${latestContext.characters.join(', ')}.` : ''
+    ].filter(Boolean).join('\n');
+    const startedPromptContextRevision = promptContextRevisionRef.current;
+    const scopeKey = scopeKeys.insertSurpriseText(scriptIdRef.current, params.insertIndex);
+
+    const outcome = await orchestratorRef.current.run<string>({
+      opType: 'insertSurpriseText',
+      scopeKey,
+      execute: (signal) => executeGenerateScriptElement(
+        params.type,
+        selectedCharacter ?? undefined,
+        instruction,
+        styleContext,
+        { signal, opType: 'insertSurpriseText', scopeKey }
+      ),
+      isFresh: () => {
+        const currentContext = contextRef.current;
+        if (!currentContext) return false;
+        if (promptContextRevisionRef.current !== startedPromptContextRevision) return false;
+        return Boolean(resolveInsertTargetFromIndex(currentContext, params.insertIndex));
+      },
+      commit: (generatedText) => {
+        const currentContext = contextRef.current;
+        if (!currentContext) return;
+        const target = resolveInsertTargetFromIndex(currentContext, params.insertIndex);
+        if (!target) return;
+        const text = sanitizeGeneratedInsertText(params.type, generatedText, selectedCharacter ?? undefined);
+        if (!text) {
+          throw new Error('AI returned empty content for insert.');
+        }
+        const generatedBlock: ScriptBlock = {
+          id: crypto.randomUUID(),
+          type: params.type,
+          text,
+          blockRevision: 1,
+          character: params.type === BlockType.DIALOGUE
+            ? selectedCharacter
+            : undefined
+        };
+        setInsertScrollTargetId(generatedBlock.id);
+        setInsertScrollToken((token) => token + 1);
+        handleInsertAfter(target, generatedBlock);
+        setInsertCompleteToken((token) => token + 1);
+      }
+    });
+
+    if (outcome.kind === 'failed') {
+      const { message } = getErrorMeta(outcome.error);
+      throw new Error(message || 'Failed to generate insert block.');
+    }
+    if (outcome.kind !== 'committed') {
+      throw new Error('Insert generation was interrupted.');
+    }
+  }, [handleInsertAfter]);
+
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
     applyContextMutation((prev) => {
@@ -1966,6 +2162,8 @@ export default function App() {
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
         onRegenerate={handleRegenerateBlock}
         onDeleteBlock={handleDeleteBlock}
+        onInsertAtIndex={handleInsertAtIndex}
+        onGenerateInsertAtIndex={handleGenerateInsertAtIndex}
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
         isPlaying={isPlaying}

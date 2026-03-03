@@ -30,6 +30,10 @@ export interface ScriptDisplayProps {
   onClearBlockTarget?: () => void;
   onRewriteBlock?: (target: { sceneId: string; blockId: string }) => void;
   onDeleteBlock?: (target: { sceneId: string; blockId: string }) => void;
+  activeInsertIndex?: number | null;
+  onRequestInsert?: (insertIndex: number) => void;
+  insertComposer?: React.ReactNode;
+  onCloseInsertComposer?: () => void;
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
@@ -250,7 +254,11 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   onSelectBlockTarget,
   onClearBlockTarget,
   onRewriteBlock,
-  onDeleteBlock
+  onDeleteBlock,
+  activeInsertIndex = null,
+  onRequestInsert,
+  insertComposer,
+  onCloseInsertComposer
 }) => {
   const insertHighlightTimeoutRef = useRef<number | null>(null);
   const playableBlockIds = useMemo(() => {
@@ -269,9 +277,17 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       ? playableBlockIds[currentBlockIndex]
       : currentBlockId;
   const selectedBlockId = selectedBlockTarget?.blockId ?? null;
+  const totalScriptBlocks = playableBlockIds.length;
   const isInsertMode = insertModeActive;
   const isRewriteMode = rewriteModeActive && !isInsertMode;
   const hasPendingPreview = Boolean(pendingInsertBlock && insertTarget);
+  const blockOrderIndexById = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    playableBlockIds.forEach((blockId, index) => {
+      indexMap.set(blockId, index);
+    });
+    return indexMap;
+  }, [playableBlockIds]);
   const getDisplayCharacter = useCallback((name?: string) => {
     if (!name) return '';
     const normalized = normalizeCharacterName(name);
@@ -345,6 +361,35 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       document.removeEventListener('touchstart', handlePointerDown, true);
     };
   }, [isInsertMode, onClearBlockTarget, selectedBlockTarget]);
+
+  useEffect(() => {
+    if (isInsertMode || activeInsertIndex === null || !onCloseInsertComposer) return;
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      const composerNode = document.querySelector('[data-insert-composer="true"]');
+      if (composerNode?.contains(targetNode)) {
+        return;
+      }
+      onCloseInsertComposer();
+    };
+    document.addEventListener('mousedown', handlePointerDown, true);
+    document.addEventListener('touchstart', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown, true);
+      document.removeEventListener('touchstart', handlePointerDown, true);
+    };
+  }, [activeInsertIndex, isInsertMode, onCloseInsertComposer]);
+
+  useEffect(() => {
+    if (isInsertMode || activeInsertIndex === null || !onCloseInsertComposer) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      onCloseInsertComposer();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeInsertIndex, isInsertMode, onCloseInsertComposer]);
 
   useEffect(() => {
     if (isInsertMode || !selectedBlockTarget || !onClearBlockTarget) return;
@@ -468,6 +513,53 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     },
     [insertTarget, onCancelInsertMode, onConfirmInsertMode, onSelectInsertTarget, pendingInsertBlock]
   );
+  const renderInlineInsertSlot = useCallback((insertIndex: number) => {
+    const isActive = activeInsertIndex === insertIndex;
+    return (
+      <div className="script-export-chrome relative h-5" data-insert-slot-wrapper="true">
+        <button
+          type="button"
+          data-testid={`insert-slot-${insertIndex}`}
+          data-active={isActive ? 'true' : 'false'}
+          aria-label={`Insert at slot ${insertIndex}`}
+          aria-pressed={isActive}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRequestInsert?.(insertIndex);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            event.stopPropagation();
+            onRequestInsert?.(insertIndex);
+          }}
+          className={`group/slot absolute inset-x-4 top-1/2 h-5 -translate-y-1/2 rounded-full transition-[opacity,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+            isActive ? 'opacity-100' : 'opacity-0 hover:opacity-100 focus-visible:opacity-100'
+          }`}
+        >
+          <span
+            className={`pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors ${
+              isActive ? 'bg-indigo-400/85' : 'bg-indigo-300/70 group-hover/slot:bg-indigo-400/75'
+            }`}
+          />
+          <span
+            className={`pointer-events-none absolute left-1/2 top-1/2 inline-flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#f6f1e7]/95 text-indigo-600 shadow-sm transition-[opacity,transform] duration-200 ${
+              isActive
+                ? 'scale-100 opacity-100'
+                : 'scale-90 opacity-0 group-hover/slot:scale-100 group-hover/slot:opacity-100 group-focus-visible/slot:scale-100 group-focus-visible/slot:opacity-100'
+            }`}
+          >
+            <PlusCircle className="h-3.5 w-3.5" />
+          </span>
+        </button>
+        {isActive && insertComposer && (
+          <div className="absolute left-1/2 top-[calc(100%+0.4rem)] z-30 w-[min(26rem,calc(100vw-3rem))] -translate-x-1/2">
+            {insertComposer}
+          </div>
+        )}
+      </div>
+    );
+  }, [activeInsertIndex, insertComposer, onRequestInsert]);
 
   const renderedScenes = scenes.length === 0 ? null : scenes.map((scene, sceneIndex) => {
       const blocks = scene.blocks.filter(block => block.type !== BlockType.HEADING);
@@ -507,6 +599,8 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               const showBottomLabel = isLastScene && isLastBlock;
               const rewriteDisabled = Boolean(block.locked) || !onRewriteBlock;
               const deleteDisabled = !onDeleteBlock;
+              const globalBlockOrder = blockOrderIndexById.get(block.id);
+              const nextInsertIndex = typeof globalBlockOrder === 'number' ? globalBlockOrder + 1 : null;
 
               let content = null;
 
@@ -648,6 +742,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     { sceneId: scene.id, blockId: block.id },
                     showBottomLabel ? 'Insert at bottom' : undefined
                   )}
+                  {!isInsertMode && !isLastBlock && typeof nextInsertIndex === 'number' && renderInlineInsertSlot(nextInsertIndex)}
                   {isInsertMode && hasPendingPreview && insertTarget?.sceneId === scene.id && insertTarget?.blockId === block.id && pendingInsertBlock && (
                     renderPreviewBlock(pendingInsertBlock)
                   )}
@@ -685,6 +780,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         tabIndex={-1}
       >
         {renderedScenes}
+        {!isInsertMode && renderInlineInsertSlot(totalScriptBlocks)}
       </div>
     </div>
   );

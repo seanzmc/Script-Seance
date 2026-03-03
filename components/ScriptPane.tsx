@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
+import { InsertComposerPopover } from './InsertComposerPopover';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import {
@@ -61,6 +62,14 @@ export interface ScriptPaneProps {
   onInsertError: (error: unknown) => void;
   onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
   onDeleteBlock?: (sceneId: string, blockId: string) => void;
+  onRequestInsert?: (index: number) => void;
+  onInsertAtIndex?: (index: number, block: ScriptBlock) => void;
+  onGenerateInsertAtIndex?: (params: {
+    insertIndex: number;
+    type: BlockType;
+    content: string;
+    character?: string;
+  }) => Promise<void>;
   onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
   isPlaying: boolean;
@@ -190,6 +199,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onInsertError,
   onRegenerate,
   onDeleteBlock,
+  onRequestInsert,
+  onInsertAtIndex,
+  onGenerateInsertAtIndex,
   onToggleLock,
   isGenerating,
   isPlaying,
@@ -234,6 +246,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [styleDraft, setStyleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [selectedBlockTarget, setSelectedBlockTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [activeInsertIndex, setActiveInsertIndex] = useState<number | null>(null);
+  const [composerBlockType, setComposerBlockType] = useState<BlockType>(BlockType.ACTION);
+  const [composerContent, setComposerContent] = useState('');
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [isComposerGenerating, setIsComposerGenerating] = useState(false);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
   const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
@@ -392,6 +409,101 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onDeleteBlock(target.sceneId, target.blockId);
     setSelectedBlockTarget(null);
   }, [onDeleteBlock]);
+  const handleRequestInsert = useCallback((index: number) => {
+    if (isComposerGenerating) return;
+    setActiveInsertIndex(index);
+    setComposerError(null);
+    onRequestInsert?.(index);
+  }, [isComposerGenerating, onRequestInsert]);
+  const closeInsertComposer = useCallback(() => {
+    if (isComposerGenerating) return;
+    setActiveInsertIndex(null);
+    setComposerError(null);
+  }, [isComposerGenerating]);
+  const handleComposerInsert = useCallback(() => {
+    if (activeInsertIndex === null) return;
+    if (!context) {
+      setComposerError('Script context unavailable.');
+      return;
+    }
+    if (!onInsertAtIndex) {
+      setComposerError('Insert handler unavailable.');
+      return;
+    }
+    const trimmedContent = composerContent.trim();
+    if (!trimmedContent) {
+      setComposerError('Add content before inserting manually.');
+      return;
+    }
+    const block: ScriptBlock = {
+      id: crypto.randomUUID(),
+      type: composerBlockType,
+      text: trimmedContent,
+      blockRevision: 1,
+      character: composerBlockType === BlockType.DIALOGUE
+        ? (context.characters[0] || 'Narrator')
+        : undefined
+    };
+    onInsertAtIndex(activeInsertIndex, block);
+    setComposerContent('');
+    setComposerError(null);
+    setActiveInsertIndex(null);
+  }, [activeInsertIndex, composerBlockType, composerContent, context, onInsertAtIndex]);
+  const handleComposerGenerate = useCallback(async () => {
+    if (activeInsertIndex === null) return;
+    if (!context) {
+      setComposerError('Script context unavailable.');
+      return;
+    }
+    if (!onGenerateInsertAtIndex) {
+      setComposerError('Generate handler unavailable.');
+      return;
+    }
+    setComposerError(null);
+    setIsComposerGenerating(true);
+    try {
+      await onGenerateInsertAtIndex({
+        insertIndex: activeInsertIndex,
+        type: composerBlockType,
+        content: composerContent.trim(),
+        character: composerBlockType === BlockType.DIALOGUE
+          ? (context.characters[0] || 'Narrator')
+          : undefined
+      });
+      setComposerContent('');
+      setActiveInsertIndex(null);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Failed to generate insert block.';
+      setComposerError(message);
+    } finally {
+      setIsComposerGenerating(false);
+    }
+  }, [activeInsertIndex, composerBlockType, composerContent, context, onGenerateInsertAtIndex]);
+  const insertComposerNode = activeInsertIndex !== null ? (
+    <InsertComposerPopover
+      blockType={composerBlockType}
+      onBlockTypeChange={(next) => {
+        setComposerBlockType(next);
+        setComposerError(null);
+      }}
+      content={composerContent}
+      onContentChange={(next) => {
+        setComposerContent(next);
+        if (composerError) {
+          setComposerError(null);
+        }
+      }}
+      onGenerate={() => {
+        void handleComposerGenerate();
+      }}
+      onInsert={handleComposerInsert}
+      onCancel={closeInsertComposer}
+      isGenerating={isComposerGenerating}
+      errorMessage={composerError}
+    />
+  ) : null;
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -413,6 +525,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onClearBlockTarget={handleClearSelectedBlock}
       onRewriteBlock={handleInlineRewrite}
       onDeleteBlock={onDeleteBlock ? handleInlineDelete : undefined}
+      activeInsertIndex={activeInsertIndex}
+      onRequestInsert={handleRequestInsert}
+      insertComposer={insertComposerNode}
+      onCloseInsertComposer={closeInsertComposer}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
@@ -438,7 +554,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   useEffect(() => {
     if (!insertModeActive) return;
     setSelectedBlockTarget(null);
+    setActiveInsertIndex(null);
+    setComposerError(null);
+    setIsComposerGenerating(false);
   }, [insertModeActive]);
+
+  useEffect(() => {
+    if (context) return;
+    setActiveInsertIndex(null);
+    setComposerError(null);
+    setIsComposerGenerating(false);
+  }, [context]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -687,6 +813,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       })
     ));
   }, [context]);
+  const insertableBlockCount = useMemo(() => {
+    if (!context) return 0;
+    return context.scenes.reduce((total, scene) => (
+      total + scene.blocks.filter((block) => block.type !== BlockType.HEADING).length
+    ), 0);
+  }, [context]);
   useEffect(() => {
     if (rewriteOptions.length === 0) {
       setRewriteTarget(null);
@@ -713,6 +845,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setSelectedBlockTarget(null);
     }
   }, [rewriteOptions, selectedBlockTarget]);
+  useEffect(() => {
+    if (activeInsertIndex === null) return;
+    if (activeInsertIndex <= insertableBlockCount) return;
+    setActiveInsertIndex(null);
+  }, [activeInsertIndex, insertableBlockCount]);
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
     <div className="space-y-2">
