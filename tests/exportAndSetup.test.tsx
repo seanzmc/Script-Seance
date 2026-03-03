@@ -7,7 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildScriptTextExport } from "../App";
+import { buildScriptTextExport, sanitizeGeneratedInsertText } from "../App";
 import { SetupForm, SetupFormState } from "../components/SetupForm";
 import { stylesLibrary } from "../stylesLibrary";
 import { BlockType, Scene, StoryContext } from "../types";
@@ -54,6 +54,51 @@ describe("buildScriptTextExport", () => {
     expect(text).toContain("Rain hammers the window.");
     expect(text).toContain("ALEX");
     expect(text).not.toContain("INT. SHOULD NOT DUPLICATE - DAY");
+  });
+});
+
+describe("sanitizeGeneratedInsertText", () => {
+  it("strips a leading Action: label from generated insert content", () => {
+    const result = sanitizeGeneratedInsertText(
+      BlockType.ACTION,
+      "   Action: A glass tumbles off the table.",
+    );
+
+    expect(result).toBe("A glass tumbles off the table.");
+    expect(result.startsWith("Action:")).toBe(false);
+  });
+
+  it("strips other known leading block labels case-insensitively", () => {
+    expect(
+      sanitizeGeneratedInsertText(
+        BlockType.DIALOGUE,
+        " dialogue: \"We move now.\"",
+        "Alex",
+      ),
+    ).toBe("We move now.");
+    expect(
+      sanitizeGeneratedInsertText(
+        BlockType.TRANSITION,
+        " Transition: CUT TO:\nMore text",
+      ),
+    ).toBe("CUT TO:");
+    expect(
+      sanitizeGeneratedInsertText(
+        BlockType.HEADING,
+        " scene heading: INT. STUDIO - DAY",
+      ),
+    ).toBe("INT. STUDIO - DAY");
+  });
+
+  it("keeps generated dialogue insert content free of Dialogue: prefix", () => {
+    const result = sanitizeGeneratedInsertText(
+      BlockType.DIALOGUE,
+      " Dialogue: Keep your voice down.",
+      "Alex",
+    );
+
+    expect(result).toBe("Keep your voice down.");
+    expect(result.startsWith("Dialogue:")).toBe(false);
   });
 });
 

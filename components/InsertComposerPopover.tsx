@@ -5,12 +5,16 @@ import { Button } from './Button';
 export interface InsertComposerPopoverProps {
   blockType: BlockType;
   onBlockTypeChange: (next: BlockType) => void;
+  characters: string[];
+  selectedCharacter: string;
+  onCharacterChange: (next: string) => void;
   content: string;
   onContentChange: (next: string) => void;
   onGenerate: () => void;
   onInsert: () => void;
   onCancel: () => void;
   isGenerating: boolean;
+  actionsDisabled?: boolean;
   errorMessage: string | null;
 }
 
@@ -24,14 +28,23 @@ const BLOCK_TYPE_OPTIONS: Array<{ type: BlockType; label: string }> = [
 export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
   blockType,
   onBlockTypeChange,
+  characters,
+  selectedCharacter,
+  onCharacterChange,
   content,
   onContentChange,
   onGenerate,
   onInsert,
   onCancel,
   isGenerating,
+  actionsDisabled = false,
   errorMessage
 }) => {
+  const isDialogueType = blockType === BlockType.DIALOGUE;
+  const hasCharacters = characters.length > 0;
+  const dialogueUnavailable = isDialogueType && !hasCharacters;
+  const disableActions = isGenerating || actionsDisabled || dialogueUnavailable;
+
   return (
     <div
       data-insert-composer="true"
@@ -67,6 +80,31 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
         })}
       </div>
 
+      {isDialogueType && (
+        <div className="mt-2 space-y-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+            Character
+          </label>
+          {hasCharacters ? (
+            <select
+              value={selectedCharacter}
+              onChange={(event) => onCharacterChange(event.target.value)}
+              className="h-9 w-full rounded-lg border border-gray-300 bg-white/95 px-2.5 text-sm text-gray-800 outline-none transition-[opacity,transform] duration-150 ease-out focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              disabled={isGenerating}
+              aria-label="Character"
+            >
+              {characters.map((character) => (
+                <option key={character} value={character}>{character}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="rounded-lg border border-amber-300/70 bg-amber-50/85 px-2.5 py-2 text-xs text-amber-800">
+              Add a character first
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-2 space-y-1">
         <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
           Content (Optional)
@@ -99,7 +137,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
           variant="secondary"
           size="sm"
           onClick={onInsert}
-          disabled={isGenerating}
+          disabled={disableActions}
         >
           Insert
         </Button>
@@ -108,6 +146,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
           variant="primary"
           size="sm"
           onClick={onGenerate}
+          disabled={disableActions}
           loading={isGenerating}
         >
           Generate

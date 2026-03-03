@@ -43,6 +43,11 @@ const setupStateFixture: SetupFormState = {
   length: 'Medium'
 };
 
+const contextWithoutCharacters: StoryContext = {
+  ...contextFixture,
+  characters: []
+};
+
 const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps => ({
   context: contextFixture,
   titleInputRef: createRef<HTMLInputElement>(),
@@ -155,6 +160,45 @@ describe('ScriptPane block interactions', () => {
         text: 'A deliberate action beat.',
         blockRevision: 1
       })
+    );
+  });
+
+  it('shows character selector only when dialogue type is selected', () => {
+    render(<ScriptPane {...createProps()} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    expect(within(composer).queryByLabelText('Character')).toBeNull();
+
+    fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
+    const selector = within(composer).getByLabelText('Character') as HTMLSelectElement;
+    expect(selector.value).toBe('Alex');
+  });
+
+  it('shows dialogue empty state and disables actions when no characters exist', () => {
+    render(<ScriptPane {...createProps({ context: contextWithoutCharacters })} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
+
+    expect(within(composer).getByText('Add a character first')).toBeTruthy();
+    expect((within(composer).getByRole('button', { name: 'Generate' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(composer).getByRole('button', { name: 'Insert' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('dialogue generate request includes selected speaker', () => {
+    const onGenerateInsertAtIndex = vi.fn(async () => {});
+    render(<ScriptPane {...createProps({ onGenerateInsertAtIndex })} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
+    fireEvent.change(within(composer).getByLabelText('Character'), { target: { value: 'Sam' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Generate' }));
+
+    expect(onGenerateInsertAtIndex).toHaveBeenCalledWith(
+      expect.objectContaining({ type: BlockType.DIALOGUE, character: 'Sam' })
     );
   });
 

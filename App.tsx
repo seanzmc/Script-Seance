@@ -343,12 +343,19 @@ const removeDialoguePrefix = (value: string, character: string) => {
   return value.replace(new RegExp(`^${escapedCharacter}\\s*[:\\-–—]\\s*`, 'i'), '').trim();
 };
 
-const sanitizeGeneratedInsertText = (
+const LEADING_INSERT_TYPE_LABEL_PATTERN = /^\s*(action|dialogue|transition|scene heading)\s*:\s*/i;
+
+export const stripLeadingInsertTypeLabel = (value: string) => (
+  value.replace(LEADING_INSERT_TYPE_LABEL_PATTERN, '')
+);
+
+export const sanitizeGeneratedInsertText = (
   type: BlockType,
   rawText: string,
   character?: string
 ) => {
-  const trimmed = rawText.trim();
+  const withoutTypeLabel = stripLeadingInsertTypeLabel(rawText);
+  const trimmed = withoutTypeLabel.trim();
   if (!trimmed) return '';
   if (type === BlockType.DIALOGUE) {
     const normalized = collapsePromptWhitespace(trimmed);
@@ -1429,7 +1436,7 @@ export default function App() {
         ? 'Return one concise action line only. Do not include dialogue labels, transitions, or extra blocks.'
         : '',
       params.type === BlockType.DIALOGUE
-        ? `Return one dialogue line only for character "${selectedCharacter}". Do not include speaker labels or parentheticals.`
+        ? `Return one dialogue line only. The speaker MUST be "${selectedCharacter}". Do not include speaker labels, parentheticals, or labels like "Dialogue:".`
         : '',
       params.type === BlockType.TRANSITION
         ? 'Return one transition cue only (for example: CUT TO:).'
@@ -1443,6 +1450,8 @@ export default function App() {
       nextBlock
         ? `Next block: ${serializeBlockForInsertPrompt(nextBlock)}`
         : 'Next block: End of script.',
+      'Return ONLY the block content text. Do NOT include the block type label (for example, do not write "Action:", "Dialogue:", "Transition:", or "Scene Heading:").',
+      'If you return JSON, return exactly {"content":"..."} and keep content free of any block type label prefix.',
       'Output plain text for that one block only. No lists, no extra formatting, no surrounding explanation.'
     ].filter(Boolean);
     const instruction = instructionLines.join('\n');
@@ -1602,7 +1611,7 @@ export default function App() {
         promptContextRevisionRef.current === startedPromptContextRevision &&
         doesInsertAnchorResolve(anchorSnapshot, contextRef.current),
       commit: (generatedText) => {
-        params.onCommit(generatedText);
+        params.onCommit(stripLeadingInsertTypeLabel(generatedText));
       }
     });
 

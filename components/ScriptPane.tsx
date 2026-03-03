@@ -248,6 +248,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [selectedBlockTarget, setSelectedBlockTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [activeInsertIndex, setActiveInsertIndex] = useState<number | null>(null);
   const [composerBlockType, setComposerBlockType] = useState<BlockType>(BlockType.ACTION);
+  const [composerCharacter, setComposerCharacter] = useState('');
   const [composerContent, setComposerContent] = useState('');
   const [composerError, setComposerError] = useState<string | null>(null);
   const [isComposerGenerating, setIsComposerGenerating] = useState(false);
@@ -409,6 +410,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onDeleteBlock(target.sceneId, target.blockId);
     setSelectedBlockTarget(null);
   }, [onDeleteBlock]);
+  const composerCharacters = context?.characters ?? [];
+  const dialogueCharacterUnavailable = composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
   const handleRequestInsert = useCallback((index: number) => {
     if (isComposerGenerating) return;
     setActiveInsertIndex(index);
@@ -430,6 +433,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setComposerError('Insert handler unavailable.');
       return;
     }
+    if (composerBlockType === BlockType.DIALOGUE && !composerCharacter) {
+      setComposerError('Add a character first.');
+      return;
+    }
     const trimmedContent = composerContent.trim();
     if (!trimmedContent) {
       setComposerError('Add content before inserting manually.');
@@ -441,14 +448,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       text: trimmedContent,
       blockRevision: 1,
       character: composerBlockType === BlockType.DIALOGUE
-        ? (context.characters[0] || 'Narrator')
+        ? composerCharacter
         : undefined
     };
     onInsertAtIndex(activeInsertIndex, block);
     setComposerContent('');
     setComposerError(null);
     setActiveInsertIndex(null);
-  }, [activeInsertIndex, composerBlockType, composerContent, context, onInsertAtIndex]);
+  }, [activeInsertIndex, composerBlockType, composerCharacter, composerContent, context, onInsertAtIndex]);
   const handleComposerGenerate = useCallback(async () => {
     if (activeInsertIndex === null) return;
     if (!context) {
@@ -459,6 +466,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setComposerError('Generate handler unavailable.');
       return;
     }
+    if (composerBlockType === BlockType.DIALOGUE && !composerCharacter) {
+      setComposerError('Add a character first.');
+      return;
+    }
     setComposerError(null);
     setIsComposerGenerating(true);
     try {
@@ -467,7 +478,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         type: composerBlockType,
         content: composerContent.trim(),
         character: composerBlockType === BlockType.DIALOGUE
-          ? (context.characters[0] || 'Narrator')
+          ? composerCharacter
           : undefined
       });
       setComposerContent('');
@@ -480,13 +491,24 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     } finally {
       setIsComposerGenerating(false);
     }
-  }, [activeInsertIndex, composerBlockType, composerContent, context, onGenerateInsertAtIndex]);
+  }, [activeInsertIndex, composerBlockType, composerCharacter, composerContent, context, onGenerateInsertAtIndex]);
   const insertComposerNode = activeInsertIndex !== null ? (
     <InsertComposerPopover
       blockType={composerBlockType}
       onBlockTypeChange={(next) => {
         setComposerBlockType(next);
+        if (next === BlockType.DIALOGUE && composerCharacters.length > 0 && !composerCharacter) {
+          setComposerCharacter(composerCharacters[0]);
+        }
         setComposerError(null);
+      }}
+      characters={composerCharacters}
+      selectedCharacter={composerCharacter}
+      onCharacterChange={(next) => {
+        setComposerCharacter(next);
+        if (composerError) {
+          setComposerError(null);
+        }
       }}
       content={composerContent}
       onContentChange={(next) => {
@@ -501,6 +523,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onInsert={handleComposerInsert}
       onCancel={closeInsertComposer}
       isGenerating={isComposerGenerating}
+      actionsDisabled={dialogueCharacterUnavailable}
       errorMessage={composerError}
     />
   ) : null;
@@ -564,6 +587,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     setActiveInsertIndex(null);
     setComposerError(null);
     setIsComposerGenerating(false);
+    setComposerCharacter('');
+  }, [context]);
+
+  useEffect(() => {
+    if (!context || context.characters.length === 0) {
+      setComposerCharacter('');
+      return;
+    }
+    setComposerCharacter((current) => (
+      current && context.characters.includes(current) ? current : context.characters[0]
+    ));
   }, [context]);
 
   useEffect(() => {
