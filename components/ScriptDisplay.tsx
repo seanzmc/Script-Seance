@@ -34,6 +34,9 @@ export interface ScriptDisplayProps {
   onRequestInsert?: (insertIndex: number) => void;
   insertComposer?: React.ReactNode;
   onCloseInsertComposer?: () => void;
+  activeRewriteBlockId?: string | null;
+  rewriteComposer?: React.ReactNode;
+  onCloseRewriteComposer?: () => void;
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
@@ -258,7 +261,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   activeInsertIndex = null,
   onRequestInsert,
   insertComposer,
-  onCloseInsertComposer
+  onCloseInsertComposer,
+  activeRewriteBlockId = null,
+  rewriteComposer,
+  onCloseRewriteComposer
 }) => {
   const insertHighlightTimeoutRef = useRef<number | null>(null);
   const playableBlockIds = useMemo(() => {
@@ -277,6 +283,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       ? playableBlockIds[currentBlockIndex]
       : currentBlockId;
   const selectedBlockId = selectedBlockTarget?.blockId ?? null;
+  const isRewriteComposerOpen = Boolean(activeRewriteBlockId && rewriteComposer);
   const totalScriptBlocks = playableBlockIds.length;
   const isInsertMode = insertModeActive;
   const isRewriteMode = rewriteModeActive && !isInsertMode;
@@ -349,7 +356,15 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       if (!targetNode) return;
       const selectedBlockElement = document.getElementById(blockElementId);
       const inlineActionsElement = document.getElementById(actionsElementId);
+      const rewriteComposerNode = document.querySelector('[data-rewrite-composer="true"]');
       if (selectedBlockElement?.contains(targetNode) || inlineActionsElement?.contains(targetNode)) {
+        return;
+      }
+      if (rewriteComposerNode?.contains(targetNode)) {
+        return;
+      }
+      if (isRewriteComposerOpen && onCloseRewriteComposer) {
+        onCloseRewriteComposer();
         return;
       }
       onClearBlockTarget();
@@ -360,7 +375,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       document.removeEventListener('mousedown', handlePointerDown, true);
       document.removeEventListener('touchstart', handlePointerDown, true);
     };
-  }, [isInsertMode, onClearBlockTarget, selectedBlockTarget]);
+  }, [isInsertMode, isRewriteComposerOpen, onClearBlockTarget, onCloseRewriteComposer, selectedBlockTarget]);
 
   useEffect(() => {
     if (isInsertMode || activeInsertIndex === null || !onCloseInsertComposer) return;
@@ -395,11 +410,15 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     if (isInsertMode || !selectedBlockTarget || !onClearBlockTarget) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (isRewriteComposerOpen && onCloseRewriteComposer) {
+        onCloseRewriteComposer();
+        return;
+      }
       onClearBlockTarget();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isInsertMode, onClearBlockTarget, selectedBlockTarget]);
+  }, [isInsertMode, isRewriteComposerOpen, onClearBlockTarget, onCloseRewriteComposer, selectedBlockTarget]);
 
   const renderPreviewBlock = (block: ScriptBlock) => {
     const baseClasses = 'script-block script-export-chrome relative rounded border border-dashed border-indigo-400/60 bg-indigo-50/60 px-4 py-3 shadow-sm';
@@ -736,6 +755,11 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       </div>
                     )}
                     {content}
+                    {!isInsertMode && activeRewriteBlockId === block.id && rewriteComposer && (
+                      <div className="script-export-chrome absolute left-1/2 top-[calc(100%+0.4rem)] z-30 w-[min(28rem,calc(100vw-3rem))] -translate-x-1/2">
+                        {rewriteComposer}
+                      </div>
+                    )}
                   </div>
 
                   {isInsertMode && renderInsertTarget(

@@ -80,6 +80,8 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onChangeSpeaker: vi.fn(),
   onInsertError: vi.fn(),
   onRegenerate: vi.fn(),
+  onGenerateRewritePreview: vi.fn(async () => 'A sharper rewrite lands.'),
+  onApplyRewritePreview: vi.fn(),
   onDeleteBlock: vi.fn(),
   onRequestInsert: vi.fn(),
   onInsertAtIndex: vi.fn(),
@@ -280,21 +282,105 @@ describe('ScriptPane block interactions', () => {
     expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
   });
 
-  it('routes inline rewrite/delete actions to existing handlers', () => {
-    const onRegenerate = vi.fn();
+  it('opens rewrite composer from inline actions and keeps delete flow wired', async () => {
     const onDeleteBlock = vi.fn();
     const { container } = render(
-      <ScriptPane {...createProps({ onRegenerate, onDeleteBlock })} />
+      <ScriptPane {...createProps({ onDeleteBlock })} />
     );
 
     const block = container.querySelector('#block-block-1') as HTMLElement;
     fireEvent.click(block);
 
     fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
-    expect(onRegenerate).toHaveBeenCalledWith('scene-1', 'block-1');
+    expect(screen.getByRole('dialog', { name: 'Rewrite Block' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete selected block' }));
     expect(onDeleteBlock).toHaveBeenCalledWith('scene-1', 'block-1');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Rewrite Block' })).toBeNull();
+    });
+  });
+
+  it('rewrite composer generates preview and applies content for selected block', async () => {
+    const onGenerateRewritePreview = vi.fn(async () => 'The ledger reveals a coded confession.');
+    const onApplyRewritePreview = vi.fn();
+    const { container } = render(
+      <ScriptPane {...createProps({ onGenerateRewritePreview, onApplyRewritePreview })} />
+    );
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
+    const composer = screen.getByRole('dialog', { name: 'Rewrite Block' });
+
+    fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'Shorten and add menace.' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Generate Rewrite' }));
+
+    expect(screen.getByText('Generating...')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('The ledger reveals a coded confession.')).toBeTruthy();
+    });
+    expect(onGenerateRewritePreview).toHaveBeenCalledWith({
+      sceneId: 'scene-1',
+      blockId: 'block-1',
+      instructions: 'Shorten and add menace.'
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApplyRewritePreview).toHaveBeenCalledWith({
+      sceneId: 'scene-1',
+      blockId: 'block-1',
+      text: 'The ledger reveals a coded confession.'
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Rewrite Block' })).toBeNull();
+    });
+    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+  });
+
+  it('rewrite composer closes on cancel, escape, and outside click while keeping selection', async () => {
+    const { container } = render(<ScriptPane {...createProps()} />);
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Rewrite Block' })).toBeNull();
+    });
+    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Rewrite Block' })).toBeNull();
+    });
+    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
+    fireEvent.mouseDown(document.body);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Rewrite Block' })).toBeNull();
+    });
+    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+  });
+
+  it('rewrite composer shows inline error on generation failure', async () => {
+    const onGenerateRewritePreview = vi.fn(async () => {
+      throw new Error('Rewrite failed');
+    });
+    const { container } = render(
+      <ScriptPane {...createProps({ onGenerateRewritePreview })} />
+    );
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Rewrite' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Rewrite failed');
+    });
   });
 
   it('disables inline rewrite for locked blocks and stubs delete when handler is missing', () => {

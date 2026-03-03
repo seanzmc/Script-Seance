@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BlockType, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
+import { RewriteComposerPopover } from './RewriteComposerPopover';
 import { InsertBlock } from './InsertBlock';
 import { Button } from './Button';
 import {
@@ -61,6 +62,16 @@ export interface ScriptPaneProps {
   }) => Promise<void>;
   onInsertError: (error: unknown) => void;
   onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
+  onGenerateRewritePreview?: (params: {
+    sceneId: string;
+    blockId: string;
+    instructions: string;
+  }) => Promise<string>;
+  onApplyRewritePreview?: (params: {
+    sceneId: string;
+    blockId: string;
+    text: string;
+  }) => void;
   onDeleteBlock?: (sceneId: string, blockId: string) => void;
   onRequestInsert?: (index: number) => void;
   onInsertAtIndex?: (index: number, block: ScriptBlock) => void;
@@ -198,6 +209,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onInsertSurprise,
   onInsertError,
   onRegenerate,
+  onGenerateRewritePreview,
+  onApplyRewritePreview,
   onDeleteBlock,
   onRequestInsert,
   onInsertAtIndex,
@@ -246,6 +259,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [styleDraft, setStyleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [selectedBlockTarget, setSelectedBlockTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [rewriteComposerTarget, setRewriteComposerTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [rewriteInstructions, setRewriteInstructions] = useState('');
+  const [rewriteCandidateText, setRewriteCandidateText] = useState('');
+  const [rewriteComposerError, setRewriteComposerError] = useState<string | null>(null);
+  const [isRewriteComposerGenerating, setIsRewriteComposerGenerating] = useState(false);
   const [activeInsertIndex, setActiveInsertIndex] = useState<number | null>(null);
   const [composerBlockType, setComposerBlockType] = useState<BlockType>(BlockType.ACTION);
   const [composerCharacter, setComposerCharacter] = useState('');
@@ -402,18 +420,90 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     setSelectedBlockTarget(null);
   }, []);
   const handleInlineRewrite = useCallback((target: { sceneId: string; blockId: string }) => {
+    if (isComposerGenerating) return;
     setRewriteTarget(target);
-    onRegenerate(target.sceneId, target.blockId);
-  }, [onRegenerate]);
+    setSelectedBlockTarget(target);
+    setActiveInsertIndex(null);
+    setComposerError(null);
+    setRewriteComposerTarget(target);
+    setRewriteInstructions('');
+    setRewriteCandidateText('');
+    setRewriteComposerError(null);
+  }, [isComposerGenerating]);
   const handleInlineDelete = useCallback((target: { sceneId: string; blockId: string }) => {
     if (!onDeleteBlock) return;
     onDeleteBlock(target.sceneId, target.blockId);
     setSelectedBlockTarget(null);
+    setRewriteComposerTarget((current) => (
+      current?.sceneId === target.sceneId && current?.blockId === target.blockId ? null : current
+    ));
   }, [onDeleteBlock]);
+  const closeRewriteComposer = useCallback(() => {
+    if (isRewriteComposerGenerating) return;
+    setRewriteComposerTarget(null);
+    setRewriteComposerError(null);
+    setRewriteCandidateText('');
+    setRewriteInstructions('');
+  }, [isRewriteComposerGenerating]);
+  const handleGenerateRewriteComposer = useCallback(async () => {
+    if (!rewriteComposerTarget) return;
+    if (!onGenerateRewritePreview) {
+      setRewriteComposerError('Rewrite preview handler unavailable.');
+      return;
+    }
+    setRewriteComposerError(null);
+    setIsRewriteComposerGenerating(true);
+    try {
+      const generated = await onGenerateRewritePreview({
+        sceneId: rewriteComposerTarget.sceneId,
+        blockId: rewriteComposerTarget.blockId,
+        instructions: rewriteInstructions.trim()
+      });
+      const normalized = generated.trim();
+      if (!normalized) {
+        setRewriteComposerError('AI returned empty rewrite content.');
+        setRewriteCandidateText('');
+        return;
+      }
+      setRewriteCandidateText(normalized);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Failed to generate rewrite.';
+      setRewriteComposerError(message);
+    } finally {
+      setIsRewriteComposerGenerating(false);
+    }
+  }, [onGenerateRewritePreview, rewriteComposerTarget, rewriteInstructions]);
+  const handleApplyRewriteComposer = useCallback(() => {
+    if (!rewriteComposerTarget) return;
+    if (!onApplyRewritePreview) {
+      setRewriteComposerError('Rewrite apply handler unavailable.');
+      return;
+    }
+    const candidate = rewriteCandidateText.trim();
+    if (!candidate) {
+      setRewriteComposerError('Generate a rewrite before applying.');
+      return;
+    }
+    onApplyRewritePreview({
+      sceneId: rewriteComposerTarget.sceneId,
+      blockId: rewriteComposerTarget.blockId,
+      text: candidate
+    });
+    setRewriteComposerTarget(null);
+    setRewriteComposerError(null);
+    setRewriteCandidateText('');
+    setRewriteInstructions('');
+  }, [onApplyRewritePreview, rewriteCandidateText, rewriteComposerTarget]);
   const composerCharacters = context?.characters ?? [];
   const dialogueCharacterUnavailable = composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
   const handleRequestInsert = useCallback((index: number) => {
     if (isComposerGenerating) return;
+    setRewriteComposerTarget(null);
+    setRewriteComposerError(null);
+    setRewriteCandidateText('');
+    setRewriteInstructions('');
     setActiveInsertIndex(index);
     setComposerError(null);
     onRequestInsert?.(index);
@@ -527,6 +617,33 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       errorMessage={composerError}
     />
   ) : null;
+  const rewriteComposerBlock = useMemo(() => {
+    if (!context || !rewriteComposerTarget) return null;
+    const scene = context.scenes.find((entry) => entry.id === rewriteComposerTarget.sceneId);
+    const block = scene?.blocks.find((entry) => entry.id === rewriteComposerTarget.blockId);
+    return block ?? null;
+  }, [context, rewriteComposerTarget]);
+  const rewriteComposerNode = rewriteComposerTarget && rewriteComposerBlock ? (
+    <RewriteComposerPopover
+      blockType={rewriteComposerBlock.type}
+      snippet={rewriteComposerBlock.text.replace(/\s+/g, ' ').trim() || '(No text)'}
+      instructions={rewriteInstructions}
+      onInstructionsChange={(next) => {
+        setRewriteInstructions(next);
+        if (rewriteComposerError) {
+          setRewriteComposerError(null);
+        }
+      }}
+      candidateText={rewriteCandidateText}
+      onGenerate={() => {
+        void handleGenerateRewriteComposer();
+      }}
+      onApply={handleApplyRewriteComposer}
+      onCancel={closeRewriteComposer}
+      isGenerating={isRewriteComposerGenerating}
+      errorMessage={rewriteComposerError}
+    />
+  ) : null;
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -552,6 +669,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onRequestInsert={handleRequestInsert}
       insertComposer={insertComposerNode}
       onCloseInsertComposer={closeInsertComposer}
+      activeRewriteBlockId={rewriteComposerTarget?.blockId ?? null}
+      rewriteComposer={rewriteComposerNode}
+      onCloseRewriteComposer={closeRewriteComposer}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
@@ -580,6 +700,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     setActiveInsertIndex(null);
     setComposerError(null);
     setIsComposerGenerating(false);
+    setRewriteComposerTarget(null);
+    setRewriteInstructions('');
+    setRewriteCandidateText('');
+    setRewriteComposerError(null);
+    setIsRewriteComposerGenerating(false);
   }, [insertModeActive]);
 
   useEffect(() => {
@@ -588,6 +713,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     setComposerError(null);
     setIsComposerGenerating(false);
     setComposerCharacter('');
+    setRewriteComposerTarget(null);
+    setRewriteInstructions('');
+    setRewriteCandidateText('');
+    setRewriteComposerError(null);
+    setIsRewriteComposerGenerating(false);
   }, [context]);
 
   useEffect(() => {
@@ -840,6 +970,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         return {
           sceneId: scene.id,
           blockId: block.id,
+          type: block.type,
           label,
           locked: Boolean(block.locked),
           displayText: displayText || '(No text)'
@@ -879,6 +1010,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setSelectedBlockTarget(null);
     }
   }, [rewriteOptions, selectedBlockTarget]);
+  useEffect(() => {
+    if (!rewriteComposerTarget) return;
+    const targetStillExists = rewriteOptions.some((option) => (
+      option.sceneId === rewriteComposerTarget.sceneId && option.blockId === rewriteComposerTarget.blockId
+    ));
+    if (targetStillExists) return;
+    setRewriteComposerTarget(null);
+    setRewriteInstructions('');
+    setRewriteCandidateText('');
+    setRewriteComposerError(null);
+  }, [rewriteComposerTarget, rewriteOptions]);
   useEffect(() => {
     if (activeInsertIndex === null) return;
     if (activeInsertIndex <= insertableBlockCount) return;

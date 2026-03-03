@@ -301,6 +301,17 @@ const collectInsertableBlocks = (storyContext: StoryContext): InsertableBlockRef
   ))
 );
 
+const findInsertableBlockById = (
+  storyContext: StoryContext,
+  sceneId: string,
+  blockId: string
+): { block: ScriptBlock; index: number; ordered: InsertableBlockRef[] } | null => {
+  const ordered = collectInsertableBlocks(storyContext);
+  const index = ordered.findIndex((entry) => entry.sceneId === sceneId && entry.block.id === blockId);
+  if (index < 0) return null;
+  return { block: ordered[index].block, index, ordered };
+};
+
 const resolveInsertTargetFromIndex = (
   storyContext: StoryContext,
   insertIndex: number
@@ -371,6 +382,28 @@ export const sanitizeGeneratedInsertText = (
   }
   const firstSentence = collapsePromptWhitespace(trimmed).match(/^(.+?[.!?])(?:\s|$)/)?.[1];
   return firstSentence || collapsePromptWhitespace(trimmed);
+};
+
+const buildRewritePreviewGuidance = (params: {
+  block: ScriptBlock;
+  instructions: string;
+  previousBlock: ScriptBlock | null;
+  nextBlock: ScriptBlock | null;
+}) => {
+  const trimmedInstructions = params.instructions.trim();
+  return [
+    'Rewrite this block and return exactly one block of the same screenplay type.',
+    params.block.type === BlockType.DIALOGUE && params.block.character
+      ? `The speaker MUST remain "${params.block.character}".`
+      : '',
+    params.block.type === BlockType.DIALOGUE
+      ? 'Do not include speaker labels or parentheticals.'
+      : '',
+    'Return ONLY block content text. Do NOT include type labels like "Action:", "Dialogue:", "Transition:", or "Scene Heading:".',
+    trimmedInstructions ? `User rewrite instructions: ${truncatePromptText(trimmedInstructions, 360)}` : '',
+    params.previousBlock ? `Previous block: ${serializeBlockForInsertPrompt(params.previousBlock)}` : 'Previous block: Start of script.',
+    params.nextBlock ? `Next block: ${serializeBlockForInsertPrompt(params.nextBlock)}` : 'Next block: End of script.'
+  ].filter(Boolean).join('\n');
 };
 
 export default function App() {
@@ -1514,6 +1547,110 @@ export default function App() {
     }
   }, [handleInsertAfter]);
 
+  const handleGenerateRewritePreview = useCallback(async (params: {
+    sceneId: string;
+    blockId: string;
+    instructions: string;
+  }) => {
+    const latestContext = contextRef.current;
+    if (!latestContext) {
+      throw new Error('Script context unavailable.');
+    }
+    const targetInfo = findInsertableBlockById(latestContext, params.sceneId, params.blockId);
+    if (!targetInfo) {
+      throw new Error('Selected block is no longer available.');
+    }
+    const targetBlock = targetInfo.block;
+    if (targetBlock.locked) {
+      throw new Error('Locked blocks cannot be rewritten.');
+    }
+    const previousBlock = targetInfo.index > 0 ? targetInfo.ordered[targetInfo.index - 1]?.block : null;
+    const nextBlock = targetInfo.index < targetInfo.ordered.length - 1
+      ? targetInfo.ordered[targetInfo.index + 1]?.block
+      : null;
+    const rewriteGuidance = buildRewritePreviewGuidance({
+      block: targetBlock,
+      instructions: params.instructions,
+      previousBlock: previousBlock ?? null,
+      nextBlock: nextBlock ?? null
+    });
+    const startedBlockRevision = targetBlock.blockRevision;
+    const startedPromptContextRevision = promptContextRevisionRef.current;
+    const scopeKey = scopeKeys.rewriteBlock(scriptIdRef.current, params.blockId);
+    let previewText = '';
+    const outcome = await orchestratorRef.current.run<string>({
+      opType: 'rewriteBlock',
+      scopeKey,
+      execute: (signal) => executeRewriteBlock(
+        targetBlock,
+        latestContext.genre,
+        latestContext.premise,
+        latestContext.style,
+        rewriteGuidance,
+        { signal, opType: 'rewriteBlock', scopeKey }
+      ),
+      isFresh: () => isRewriteFresh({
+        context: contextRef.current,
+        sceneId: params.sceneId,
+        blockId: params.blockId,
+        startedBlockRevision,
+        startedPromptContextRevision,
+        currentPromptContextRevision: promptContextRevisionRef.current
+      }),
+      commit: (generatedText) => {
+        const sanitized = sanitizeGeneratedInsertText(
+          targetBlock.type,
+          generatedText,
+          targetBlock.character ?? undefined
+        );
+        if (!sanitized) {
+          throw new Error('AI returned empty rewrite content.');
+        }
+        previewText = sanitized;
+      }
+    });
+    if (outcome.kind === 'failed') {
+      const { message } = getErrorMeta(outcome.error);
+      throw new Error(message || 'Failed to generate rewrite preview.');
+    }
+    if (outcome.kind !== 'committed') {
+      throw new Error('Rewrite generation was interrupted.');
+    }
+    return previewText;
+  }, []);
+
+  const handleApplyRewritePreview = useCallback((params: {
+    sceneId: string;
+    blockId: string;
+    text: string;
+  }) => {
+    const nextText = params.text.trim();
+    if (!nextText) return;
+    clearRedo();
+    let applied = false;
+    applyContextMutation((prev) => {
+      if (!prev) return null;
+      const nextScenes = prev.scenes.map((scene) => (
+        scene.id === params.sceneId
+          ? {
+              ...scene,
+              blocks: scene.blocks.map((block) => {
+                if (block.id !== params.blockId) {
+                  return block;
+                }
+                applied = true;
+                return { ...block, text: nextText, blockRevision: block.blockRevision + 1 };
+              })
+            }
+          : scene
+      ));
+      return { ...prev, scenes: nextScenes };
+    });
+    if (!applied) return;
+    setInsertScrollTargetId(params.blockId);
+    setInsertScrollToken((token) => token + 1);
+  }, [applyContextMutation, clearRedo]);
+
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
     applyContextMutation((prev) => {
@@ -2170,6 +2307,8 @@ export default function App() {
         onInsertSurprise={handleInsertSurprise}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
         onRegenerate={handleRegenerateBlock}
+        onGenerateRewritePreview={handleGenerateRewritePreview}
+        onApplyRewritePreview={handleApplyRewritePreview}
         onDeleteBlock={handleDeleteBlock}
         onInsertAtIndex={handleInsertAtIndex}
         onGenerateInsertAtIndex={handleGenerateInsertAtIndex}
