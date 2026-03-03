@@ -25,6 +25,11 @@ export interface ScriptDisplayProps {
   scrollable?: boolean;
   insertScrollTargetId?: string | null;
   insertScrollToken?: number;
+  selectedBlockTarget?: { sceneId: string; blockId: string } | null;
+  onSelectBlockTarget?: (target: { sceneId: string; blockId: string }) => void;
+  onClearBlockTarget?: () => void;
+  onRewriteBlock?: (target: { sceneId: string; blockId: string }) => void;
+  onDeleteBlock?: (target: { sceneId: string; blockId: string }) => void;
 }
 
 const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
@@ -240,7 +245,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   className = '',
   scrollable = false,
   insertScrollTargetId,
-  insertScrollToken
+  insertScrollToken,
+  selectedBlockTarget = null,
+  onSelectBlockTarget,
+  onClearBlockTarget,
+  onRewriteBlock,
+  onDeleteBlock
 }) => {
   const insertHighlightTimeoutRef = useRef<number | null>(null);
   const playableBlockIds = useMemo(() => {
@@ -258,6 +268,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     currentBlockIndex >= 0 && currentBlockIndex < playableBlockIds.length
       ? playableBlockIds[currentBlockIndex]
       : currentBlockId;
+  const selectedBlockId = selectedBlockTarget?.blockId ?? null;
   const isInsertMode = insertModeActive;
   const isRewriteMode = rewriteModeActive && !isInsertMode;
   const hasPendingPreview = Boolean(pendingInsertBlock && insertTarget);
@@ -312,6 +323,38 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       }, 1600);
     });
   }, [insertScrollTargetId, insertScrollToken]);
+
+  useEffect(() => {
+    if (isInsertMode || !selectedBlockTarget || !onClearBlockTarget) return;
+    const blockElementId = `block-${selectedBlockTarget.blockId}`;
+    const actionsElementId = `block-inline-actions-${selectedBlockTarget.blockId}`;
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      const selectedBlockElement = document.getElementById(blockElementId);
+      const inlineActionsElement = document.getElementById(actionsElementId);
+      if (selectedBlockElement?.contains(targetNode) || inlineActionsElement?.contains(targetNode)) {
+        return;
+      }
+      onClearBlockTarget();
+    };
+    document.addEventListener('mousedown', handlePointerDown, true);
+    document.addEventListener('touchstart', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown, true);
+      document.removeEventListener('touchstart', handlePointerDown, true);
+    };
+  }, [isInsertMode, onClearBlockTarget, selectedBlockTarget]);
+
+  useEffect(() => {
+    if (isInsertMode || !selectedBlockTarget || !onClearBlockTarget) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      onClearBlockTarget();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isInsertMode, onClearBlockTarget, selectedBlockTarget]);
 
   const renderPreviewBlock = (block: ScriptBlock) => {
     const baseClasses = 'script-block script-export-chrome relative rounded border border-dashed border-indigo-400/60 bg-indigo-50/60 px-4 py-3 shadow-sm';
@@ -446,17 +489,24 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             {blocks.map((block, index) => {
               const isInsertTarget = insertTarget?.blockId === block.id;
               const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
+              const isSelectedBlock = selectedBlockTarget?.sceneId === scene.id && selectedBlockId === block.id;
               const isError = blockStatuses[block.id] === 'error';
               const blockWrapperClasses = `group relative rounded transition-colors ${
                 isInsertTarget ? 'ring-1 ring-indigo-500/50 bg-indigo-100/30' : ''
               } ${
                 isRewriteTarget ? 'ring-2 ring-sky-400/60 bg-sky-100/40' : ''
               } ${
-                isRewriteMode ? 'cursor-pointer hover:bg-sky-100/20' : ''
+                isSelectedBlock ? 'bg-slate-900/[0.08]' : ''
+              } ${
+                !isInsertMode ? 'cursor-pointer hover:bg-slate-900/[0.045]' : ''
+              } ${
+                isRewriteMode ? 'hover:bg-sky-100/20' : ''
               }`;
               const blockStatusClasses = isError ? ERROR_CLASSES : '';
               const isLastBlock = index === blocks.length - 1;
               const showBottomLabel = isLastScene && isLastBlock;
+              const rewriteDisabled = Boolean(block.locked) || !onRewriteBlock;
+              const deleteDisabled = !onDeleteBlock;
 
               let content = null;
 
@@ -497,23 +547,72 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     className={`${blockWrapperClasses} ${blockStatusClasses} script-block`}
                     data-block-type={block.type}
                     onClick={() => {
-                      if (!isRewriteMode || !onSelectRewriteTarget) return;
-                      onSelectRewriteTarget({ sceneId: scene.id, blockId: block.id });
+                      if (isInsertMode) return;
+                      const target = { sceneId: scene.id, blockId: block.id };
+                      onSelectBlockTarget?.(target);
+                      if (isRewriteMode && onSelectRewriteTarget) {
+                        onSelectRewriteTarget(target);
+                      }
                     }}
                     onKeyDown={(event) => {
-                      if (!isRewriteMode || !onSelectRewriteTarget) return;
+                      if (isInsertMode) return;
+                      if (event.key === 'Escape' && isSelectedBlock) {
+                        event.preventDefault();
+                        onClearBlockTarget?.();
+                        return;
+                      }
                       if (event.key !== 'Enter' && event.key !== ' ') return;
                       event.preventDefault();
-                      onSelectRewriteTarget({ sceneId: scene.id, blockId: block.id });
+                      const target = { sceneId: scene.id, blockId: block.id };
+                      onSelectBlockTarget?.(target);
+                      if (isRewriteMode && onSelectRewriteTarget) {
+                        onSelectRewriteTarget(target);
+                      }
                     }}
-                    role={isRewriteMode ? 'button' : undefined}
-                    tabIndex={isRewriteMode ? 0 : undefined}
-                    aria-pressed={isRewriteMode ? isRewriteTarget : undefined}
+                    role={!isInsertMode ? 'button' : undefined}
+                    tabIndex={!isInsertMode ? 0 : undefined}
+                    aria-pressed={!isInsertMode ? isSelectedBlock : undefined}
                   >
                     {isError && (
                       <span className="script-export-chrome absolute left-2 top-2 text-[9px] uppercase tracking-widest text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
                         Audio error
                       </span>
+                    )}
+                    {!isInsertMode && isSelectedBlock && (
+                      <div
+                        id={`block-inline-actions-${block.id}`}
+                        data-testid={`selected-block-actions-${block.id}`}
+                        className="script-export-chrome absolute right-10 top-1 z-20 flex items-center gap-1 rounded-full border border-gray-300/80 bg-[#f6f1e7]/95 px-1.5 py-1 shadow-sm"
+                      >
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (rewriteDisabled) return;
+                            onRewriteBlock({ sceneId: scene.id, blockId: block.id });
+                          }}
+                          disabled={rewriteDisabled}
+                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+                          title={block.locked ? 'Locked blocks cannot be rewritten' : 'Rewrite selected block'}
+                          aria-label="Rewrite selected block"
+                        >
+                          Rewrite
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (deleteDisabled) return;
+                            onDeleteBlock({ sceneId: scene.id, blockId: block.id });
+                          }}
+                          disabled={deleteDisabled}
+                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+                          title={deleteDisabled ? 'Delete flow is not wired yet' : 'Delete selected block'}
+                          aria-label="Delete selected block"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     )}
                     {!isInsertMode && (
                       <div

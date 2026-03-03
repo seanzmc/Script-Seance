@@ -1572,6 +1572,64 @@ export default function App() {
     }
   }, [applyContextMutation, clearRedo, context, handleAiError, isGenerating]);
 
+  const handleDeleteBlock = useCallback((sceneId: string, blockId: string) => {
+    let deletedBlock: ScriptBlock | null = null;
+    let deletedIndex = -1;
+
+    clearRedo();
+    const didMutate = applyContextMutation((prev) => {
+      if (!prev) return prev;
+      const sceneIndex = prev.scenes.findIndex((scene) => scene.id === sceneId);
+      if (sceneIndex === -1) return prev;
+
+      const scene = prev.scenes[sceneIndex];
+      const blockIndex = scene.blocks.findIndex((block) => block.id === blockId);
+      if (blockIndex === -1) return prev;
+
+      deletedBlock = scene.blocks[blockIndex];
+      deletedIndex = blockIndex;
+
+      const nextBlocks = [...scene.blocks];
+      nextBlocks.splice(blockIndex, 1);
+      const nextScenes = [...prev.scenes];
+      nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+      return { ...prev, scenes: nextScenes };
+    });
+
+    if (!didMutate || !deletedBlock || deletedIndex < 0) {
+      return;
+    }
+    const restoredBlock = deletedBlock;
+    const restoredIndex = deletedIndex;
+
+    setToast({
+      message: 'Block deleted',
+      onUndo: () => {
+        clearRedo();
+        applyContextMutation((prev) => {
+          if (!prev) return prev;
+          const sceneIndex = prev.scenes.findIndex((scene) => scene.id === sceneId);
+          if (sceneIndex === -1) return prev;
+
+          const scene = prev.scenes[sceneIndex];
+          if (scene.blocks.some((block) => block.id === restoredBlock.id)) {
+            return prev;
+          }
+
+          const nextBlocks = [...scene.blocks];
+          const insertIndex = Math.min(restoredIndex, nextBlocks.length);
+          nextBlocks.splice(insertIndex, 0, restoredBlock);
+          const nextScenes = [...prev.scenes];
+          nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+          return { ...prev, scenes: nextScenes };
+        });
+        setInsertScrollTargetId(restoredBlock.id);
+        setInsertScrollToken((token) => token + 1);
+        setToast(null);
+      }
+    });
+  }, [applyContextMutation, clearRedo]);
+
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
     const defaultVoiceId = voiceIds[0] || resolveDefaultNarratorVoiceId(availableVoices);
@@ -1907,6 +1965,7 @@ export default function App() {
         onInsertSurprise={handleInsertSurprise}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
         onRegenerate={handleRegenerateBlock}
+        onDeleteBlock={handleDeleteBlock}
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
         isPlaying={isPlaying}

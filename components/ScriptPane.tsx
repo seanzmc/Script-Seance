@@ -60,6 +60,7 @@ export interface ScriptPaneProps {
   }) => Promise<void>;
   onInsertError: (error: unknown) => void;
   onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
+  onDeleteBlock?: (sceneId: string, blockId: string) => void;
   onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
   isPlaying: boolean;
@@ -188,6 +189,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onInsertSurprise,
   onInsertError,
   onRegenerate,
+  onDeleteBlock,
   onToggleLock,
   isGenerating,
   isPlaying,
@@ -231,6 +233,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
   const [styleDraft, setStyleDraft] = useState('');
   const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
+  const [selectedBlockTarget, setSelectedBlockTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
   const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
@@ -367,11 +370,28 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
   const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     setRewriteTarget(target);
+    setSelectedBlockTarget(target);
     if (isNarrowViewport && currentTool === 'rewrite') {
       setRewriteMode('configure');
       setToolsSheet('tool');
     }
   }, [currentTool, isNarrowViewport]);
+  const handleSelectBlockTarget = useCallback((target: { sceneId: string; blockId: string }) => {
+    setSelectedBlockTarget(target);
+    setRewriteTarget(target);
+  }, []);
+  const handleClearSelectedBlock = useCallback(() => {
+    setSelectedBlockTarget(null);
+  }, []);
+  const handleInlineRewrite = useCallback((target: { sceneId: string; blockId: string }) => {
+    setRewriteTarget(target);
+    onRegenerate(target.sceneId, target.blockId);
+  }, [onRegenerate]);
+  const handleInlineDelete = useCallback((target: { sceneId: string; blockId: string }) => {
+    if (!onDeleteBlock) return;
+    onDeleteBlock(target.sceneId, target.blockId);
+    setSelectedBlockTarget(null);
+  }, [onDeleteBlock]);
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -388,6 +408,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       rewriteTarget={rewriteTarget}
       rewriteModeActive={currentTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
       onSelectRewriteTarget={handleSelectRewriteTarget}
+      selectedBlockTarget={selectedBlockTarget}
+      onSelectBlockTarget={handleSelectBlockTarget}
+      onClearBlockTarget={handleClearSelectedBlock}
+      onRewriteBlock={handleInlineRewrite}
+      onDeleteBlock={onDeleteBlock ? handleInlineDelete : undefined}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
@@ -409,6 +434,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
+
+  useEffect(() => {
+    if (!insertModeActive) return;
+    setSelectedBlockTarget(null);
+  }, [insertModeActive]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -660,6 +690,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   useEffect(() => {
     if (rewriteOptions.length === 0) {
       setRewriteTarget(null);
+      setSelectedBlockTarget(null);
       return;
     }
     // Mobile rewrite select mode requires explicit target selection.
@@ -673,6 +704,15 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       }
     }
   }, [currentTool, isNarrowViewport, rewriteMode, rewriteOptions, rewriteTarget]);
+  useEffect(() => {
+    if (!selectedBlockTarget) return;
+    const targetStillExists = rewriteOptions.some((option) => (
+      option.sceneId === selectedBlockTarget.sceneId && option.blockId === selectedBlockTarget.blockId
+    ));
+    if (!targetStillExists) {
+      setSelectedBlockTarget(null);
+    }
+  }, [rewriteOptions, selectedBlockTarget]);
   const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
   const rewriteContent = context ? (
     <div className="space-y-2">
