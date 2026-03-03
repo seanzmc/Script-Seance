@@ -186,7 +186,7 @@ describe("SetupForm submit validation", () => {
 
     fireEvent.click(cycleButton);
     expect(lengthValue.textContent).toBe("Long");
-    expect(lengthValue.className).toContain("translate-y-[6px]");
+    expect(lengthValue.className).toContain("translate-y-[8px]");
     await waitFor(() => {
       expect(lengthValue.className).toContain("translate-y-0");
     });
