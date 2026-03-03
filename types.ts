@@ -1,4 +1,6 @@
 
+import sharedGenres from './shared/catalog/genres.json';
+
 export enum BlockType {
   HEADING = 'heading',
   ACTION = 'action',
@@ -61,9 +63,14 @@ export interface TtsVoice {
 
 export type VoiceCatalogState = 'idle' | 'loading' | 'ready' | 'error';
 
-export const GENRES = [
-  'Sci-Fi', 'Noir', 'Comedy', 'Horror', 'Romance', 'Fantasy', 'Thriller'
-];
+const loadGenres = (value: unknown): readonly string[] => {
+  if (!Array.isArray(value) || value.some((genre) => typeof genre !== 'string')) {
+    throw new Error('shared/catalog/genres.json must be an array of strings.');
+  }
+  return Object.freeze([...value]);
+};
+
+export const GENRES: readonly string[] = loadGenres(sharedGenres);
 
 export interface PlayerState {
   isPlaying: boolean;
