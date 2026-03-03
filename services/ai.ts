@@ -1,4 +1,5 @@
 import { Scene, StoryContext, BlockType, ScriptBlock, TtsVoice } from '../types';
+import { createBlock } from '../domain/blocks';
 
 type ApiError = {
   message: string;
@@ -467,10 +468,11 @@ const mapSceneGenerationData = (data: SceneGenerationData): Scene => ({
   id: crypto.randomUUID(),
   heading: data.heading,
   summary: data.summary,
-  blocks: data.blocks.map((block) => ({
-    ...block,
-    id: crypto.randomUUID(),
-    blockRevision: 1
+  blocks: data.blocks.map((block) => createBlock({
+    type: block.type,
+    text: block.text,
+    character: block.character ?? undefined,
+    parenthetical: block.parenthetical ?? undefined
   }))
 });
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BlockType, ScriptBlock } from '../types';
+import { createBlock, sanitizeGeneratedText } from '../domain/blocks';
 import { Button } from './Button';
 
 const normalizeCharacterName = (value: string) =>
@@ -7,66 +8,6 @@ const normalizeCharacterName = (value: string) =>
 const resolveCharacterName = (value: string, characters: string[]) => {
   const normalized = normalizeCharacterName(value);
   return characters.find(char => normalizeCharacterName(char) === normalized) || value;
-};
-const escapeRegExp = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const collapseWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
-const toSingleSentence = (value: string) => {
-  const compact = collapseWhitespace(value);
-  if (!compact) return '';
-  const sentenceMatch = compact.match(/^(.+?[.!?])(?:\s|$)/);
-  return sentenceMatch?.[1]?.trim() || compact;
-};
-const removeDialogueSpeakerPrefix = (value: string, character: string) => {
-  const escaped = escapeRegExp(character.trim());
-  if (!escaped) return value.trim();
-
-  const withColonRemoved = value.replace(new RegExp(`^${escaped}\\s*[:\\-–—]\\s*`, 'i'), '');
-  const lines = withColonRemoved
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
-  if (lines.length >= 2) {
-    const firstLineNormalized = normalizeCharacterName(lines[0]);
-    if (firstLineNormalized === normalizeCharacterName(character)) {
-      return lines.slice(1).join(' ');
-    }
-  }
-  return lines.join(' ');
-};
-const sanitizeGeneratedDialogue = (rawText: string, character: string) => {
-  const withoutSpeaker = removeDialogueSpeakerPrefix(rawText, character);
-  const noQuotes = withoutSpeaker.replace(/^["'“”]+|["'“”]+$/g, '');
-  return collapseWhitespace(noQuotes);
-};
-const looksLikeTransition = (line: string) =>
-  /^(CUT TO|SMASH CUT TO|MATCH CUT TO|DISSOLVE TO|FADE IN|FADE OUT|WIPE TO|JUMP CUT TO)\b/i.test(line) ||
-  /:\s*$/.test(line);
-const looksLikeSpeakerLabel = (line: string) =>
-  /^[A-Z][A-Z0-9 .'\-()]{1,40}$/.test(line) || /^[A-Z][A-Z0-9 .'\-()]{1,40}\s*:/.test(line);
-const sanitizeGeneratedAction = (rawText: string) => {
-  const lines = rawText
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
-  const filtered = lines.filter(line => !looksLikeTransition(line) && !looksLikeSpeakerLabel(line));
-  const base = filtered[0] || lines[0] || '';
-  return toSingleSentence(base);
-};
-const sanitizeGeneratedText = (type: BlockType, rawText: string, character: string) => {
-  if (type === BlockType.DIALOGUE) {
-    return sanitizeGeneratedDialogue(rawText, character);
-  }
-  if (type === BlockType.ACTION) {
-    return sanitizeGeneratedAction(rawText);
-  }
-  if (type === BlockType.TRANSITION || type === BlockType.HEADING) {
-    return rawText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)[0] || '';
-  }
-  return collapseWhitespace(rawText);
 };
 const buildSurpriseInstruction = (
   type: BlockType,
@@ -167,11 +108,9 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     setTooltip({ message, anchor });
   };
 
-  const buildBlock = (trimmedContent: string): ScriptBlock => ({
-    id: crypto.randomUUID(),
+  const buildBlock = (trimmedContent: string): ScriptBlock => createBlock({
     type: elementType,
     text: trimmedContent,
-    blockRevision: 1,
     character: elementType === BlockType.DIALOGUE ? resolveCharacterName(selectedChar, characters) : undefined
   });
 

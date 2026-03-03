@@ -16,6 +16,7 @@ import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './Playbac
 import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from './ToolPanelShell';
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
+import { createBlock } from '../domain/blocks';
 import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
 export interface InsertTarget {
@@ -532,15 +533,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setComposerError('Add content before inserting manually.');
       return;
     }
-    const block: ScriptBlock = {
-      id: crypto.randomUUID(),
+    const block: ScriptBlock = createBlock({
       type: composerBlockType,
       text: trimmedContent,
-      blockRevision: 1,
-      character: composerBlockType === BlockType.DIALOGUE
-        ? composerCharacter
-        : undefined
-    };
+      character: composerBlockType === BlockType.DIALOGUE ? composerCharacter : undefined
+    });
     onInsertAtIndex(activeInsertIndex, block);
     setComposerContent('');
     setComposerError(null);

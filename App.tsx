@@ -47,6 +47,7 @@ import {
   isSetupAutoSurpriseFresh,
   isTitleSuggestionFresh
 } from './services/orchestration';
+import { createBlock, sanitizeGeneratedText, updateBlock } from './domain/blocks';
 import { RotateCcw } from 'lucide-react';
 
 interface ToastState {
@@ -348,41 +349,11 @@ const serializeBlockForInsertPrompt = (block: ScriptBlock) => {
   return `${label}: ${truncatePromptText(block.text, 240)}`;
 };
 
-const removeDialoguePrefix = (value: string, character: string) => {
-  const escapedCharacter = character.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (!escapedCharacter) return value.trim();
-  return value.replace(new RegExp(`^${escapedCharacter}\\s*[:\\-–—]\\s*`, 'i'), '').trim();
-};
-
-const LEADING_INSERT_TYPE_LABEL_PATTERN = /^\s*(action|dialogue|transition|scene heading)\s*:\s*/i;
-
-export const stripLeadingInsertTypeLabel = (value: string) => (
-  value.replace(LEADING_INSERT_TYPE_LABEL_PATTERN, '')
-);
-
 export const sanitizeGeneratedInsertText = (
   type: BlockType,
   rawText: string,
   character?: string
-) => {
-  const withoutTypeLabel = stripLeadingInsertTypeLabel(rawText);
-  const trimmed = withoutTypeLabel.trim();
-  if (!trimmed) return '';
-  if (type === BlockType.DIALOGUE) {
-    const normalized = collapsePromptWhitespace(trimmed);
-    const withoutPrefix = character ? removeDialoguePrefix(normalized, character) : normalized;
-    return withoutPrefix.replace(/^["'“”]+|["'“”]+$/g, '').trim();
-  }
-  if (type === BlockType.HEADING || type === BlockType.TRANSITION) {
-    const firstLine = trimmed
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)[0] || '';
-    return firstLine;
-  }
-  const firstSentence = collapsePromptWhitespace(trimmed).match(/^(.+?[.!?])(?:\s|$)/)?.[1];
-  return firstSentence || collapsePromptWhitespace(trimmed);
-};
+) => sanitizeGeneratedText(type, rawText, character);
 
 const buildRewritePreviewGuidance = (params: {
   block: ScriptBlock;
@@ -1522,15 +1493,11 @@ export default function App() {
         if (!text) {
           throw new Error('AI returned empty content for insert.');
         }
-        const generatedBlock: ScriptBlock = {
-          id: crypto.randomUUID(),
+        const generatedBlock = createBlock({
           type: params.type,
           text,
-          blockRevision: 1,
-          character: params.type === BlockType.DIALOGUE
-            ? selectedCharacter
-            : undefined
-        };
+          character: params.type === BlockType.DIALOGUE ? selectedCharacter : undefined
+        });
         setInsertScrollTargetId(generatedBlock.id);
         setInsertScrollToken((token) => token + 1);
         handleInsertAfter(target, generatedBlock);
@@ -1639,7 +1606,7 @@ export default function App() {
                   return block;
                 }
                 applied = true;
-                return { ...block, text: nextText, blockRevision: block.blockRevision + 1 };
+                return updateBlock(block, { text: nextText });
               })
             }
           : scene
@@ -1716,7 +1683,7 @@ export default function App() {
             if (block.character === resolvedCharacter) {
               return block;
             }
-            return { ...block, character: resolvedCharacter, blockRevision: block.blockRevision + 1 };
+            return updateBlock(block, { character: resolvedCharacter });
           })
         } : scene)
       };
@@ -1748,7 +1715,7 @@ export default function App() {
         promptContextRevisionRef.current === startedPromptContextRevision &&
         doesInsertAnchorResolve(anchorSnapshot, contextRef.current),
       commit: (generatedText) => {
-        params.onCommit(stripLeadingInsertTypeLabel(generatedText));
+        params.onCommit(generatedText);
       }
     });
 
@@ -1862,6 +1829,14 @@ export default function App() {
           currentPromptContextRevision: promptContextRevisionRef.current
         }),
         commit: (newText) => {
+          const sanitizedText = sanitizeGeneratedInsertText(
+            block.type,
+            newText,
+            block.character ?? undefined
+          );
+          if (!sanitizedText) {
+            throw new Error('AI returned empty rewrite content.');
+          }
           clearRedo();
           applyContextMutation((prev) => {
             if (!prev) return null;
@@ -1871,7 +1846,7 @@ export default function App() {
                 ...s,
                 blocks: s.blocks.map((b) => (
                   b.id === blockId
-                    ? { ...b, text: newText, blockRevision: b.blockRevision + 1 }
+                    ? updateBlock(b, { text: sanitizedText })
                     : b
                 ))
               } : s)
@@ -1890,7 +1865,7 @@ export default function App() {
                     ...s,
                     blocks: s.blocks.map((b) => (
                       b.id === blockId
-                        ? { ...b, text: originalText, blockRevision: b.blockRevision + 1 }
+                        ? updateBlock(b, { text: originalText })
                         : b
                     ))
                   } : s)
