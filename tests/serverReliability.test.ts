@@ -222,7 +222,8 @@ describe('server reliability', () => {
           context: {
             targetGenre: 'Noir',
             styleId: 'noir-1940s-detective',
-            styleName: 'Client supplied label'
+            styleName: 'Client supplied label',
+            style: 'Hardboiled with clipped dialogue'
           },
           promptTrace: {
             enabled: true,

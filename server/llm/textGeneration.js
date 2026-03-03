@@ -342,6 +342,17 @@ const resolveStyleFingerprintForTrace = (explicitStyleFingerprint, styleSource) 
   explicitStyleFingerprint || createStyleFingerprint(styleSource)
 );
 
+const sanitizeContextPreviewForDebug = (contextPreview) => {
+  if (!contextPreview || typeof contextPreview !== 'object' || Array.isArray(contextPreview)) {
+    return contextPreview;
+  }
+  const sanitizedContextPreview = { ...contextPreview };
+  if (sanitizedContextPreview.styleId) {
+    delete sanitizedContextPreview.style;
+  }
+  return sanitizedContextPreview;
+};
+
 const getSceneSummariesPreview = (scenes) => (
   Array.isArray(scenes)
     ? scenes
@@ -367,6 +378,7 @@ const emitKindPromptTrace = ({
   contextPreview
 }) => {
   if (!traceMeta?.enabled) return;
+  const sanitizedContextPreview = sanitizeContextPreviewForDebug(contextPreview);
   emitPromptTrace({
     enabled: true,
     kind,
@@ -377,7 +389,7 @@ const emitKindPromptTrace = ({
     promptContextRevision: traceMeta.promptContextRevision,
     styleFingerprint: resolveStyleFingerprintForTrace(traceMeta.styleFingerprint, styleSource),
     instructionPreview,
-    contextPreview
+    contextPreview: sanitizedContextPreview
   });
 };
 
@@ -437,7 +449,7 @@ const buildKindDebugMeta = ({
   tokenUsage: normalizeTokenUsage(requestMetrics?.usage),
   previews: {
     instruction: buildPromptPreviewValue(instructionPreview),
-    context: buildPromptPreviewValue(contextPreview),
+    context: buildPromptPreviewValue(sanitizeContextPreviewForDebug(contextPreview)),
     prompt: traceMeta?.enabled ? buildPromptPreviewText(promptPreview) : null
   }
 });
