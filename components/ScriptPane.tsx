@@ -16,7 +16,7 @@ import { PlaybackMiniPlayer, PlaybackPanel, PlaybackPanelProps } from './Playbac
 import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from './ToolPanelShell';
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
-import { createBlock } from '../domain/blocks';
+import { useScriptController } from '../hooks/useScriptController';
 import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
 export interface InsertTarget {
@@ -258,21 +258,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [titleDraft, setTitleDraft] = useState('');
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
   const [styleDraft, setStyleDraft] = useState('');
-  const [rewriteTarget, setRewriteTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
-  const [selectedBlockTarget, setSelectedBlockTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
-  const [rewriteComposerTarget, setRewriteComposerTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
-  const [rewriteInstructions, setRewriteInstructions] = useState('');
-  const [rewriteCandidateText, setRewriteCandidateText] = useState('');
-  const [rewriteComposerError, setRewriteComposerError] = useState<string | null>(null);
-  const [isRewriteComposerGenerating, setIsRewriteComposerGenerating] = useState(false);
-  const [activeInsertIndex, setActiveInsertIndex] = useState<number | null>(null);
-  const [composerBlockType, setComposerBlockType] = useState<BlockType>(BlockType.ACTION);
-  const [composerCharacter, setComposerCharacter] = useState('');
-  const [composerContent, setComposerContent] = useState('');
-  const [composerError, setComposerError] = useState<string | null>(null);
-  const [isComposerGenerating, setIsComposerGenerating] = useState(false);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
+  const rewriteAutoSelectEnabled = !(isNarrowViewport && currentTool === 'rewrite' && rewriteMode === 'select');
+  const scriptController = useScriptController({
+    context,
+    insertModeActive,
+    rewriteAutoSelectEnabled,
+    onGenerateNext,
+    onDeleteBlock,
+    onRequestInsert,
+    onInsertAtIndex,
+    onGenerateInsertAtIndex,
+    onGenerateRewritePreview,
+    onApplyRewritePreview
+  });
   const lastInsertCompleteTokenRef = useRef(insertCompleteToken);
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
@@ -390,7 +390,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           Plot Twist
         </Button>
         <Button
-          onClick={onGenerateNext}
+          onClick={() => {
+            void scriptController.generateNextScene();
+          }}
           loading={isGenerating}
           disabled={isPlaying}
           className="shadow-lg shadow-indigo-500/20"
@@ -406,239 +408,59 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <p className="text-[11px] text-gray-500">Start a script to generate new scenes.</p>
   );
   const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
-    setRewriteTarget(target);
-    setSelectedBlockTarget(target);
+    scriptController.selectBlockTarget(target);
     if (isNarrowViewport && currentTool === 'rewrite') {
       setRewriteMode('configure');
       setToolsSheet('tool');
     }
-  }, [currentTool, isNarrowViewport]);
+  }, [currentTool, isNarrowViewport, scriptController]);
   const handleSelectBlockTarget = useCallback((target: { sceneId: string; blockId: string }) => {
-    setSelectedBlockTarget(target);
-    setRewriteTarget(target);
-  }, []);
+    scriptController.selectBlockTarget(target);
+  }, [scriptController]);
   const handleClearSelectedBlock = useCallback(() => {
-    setSelectedBlockTarget(null);
-  }, []);
-  const handleInlineRewrite = useCallback((target: { sceneId: string; blockId: string }) => {
-    if (isComposerGenerating) return;
-    setRewriteTarget(target);
-    setSelectedBlockTarget(target);
-    setActiveInsertIndex(null);
-    setComposerError(null);
-    setRewriteComposerTarget(target);
-    setRewriteInstructions('');
-    setRewriteCandidateText('');
-    setRewriteComposerError(null);
-  }, [isComposerGenerating]);
-  const handleInlineDelete = useCallback((target: { sceneId: string; blockId: string }) => {
-    if (!onDeleteBlock) return;
-    onDeleteBlock(target.sceneId, target.blockId);
-    setSelectedBlockTarget(null);
-    setRewriteComposerTarget((current) => (
-      current?.sceneId === target.sceneId && current?.blockId === target.blockId ? null : current
-    ));
-  }, [onDeleteBlock]);
-  const closeRewriteComposer = useCallback(() => {
-    if (isRewriteComposerGenerating) return;
-    setRewriteComposerTarget(null);
-    setRewriteComposerError(null);
-    setRewriteCandidateText('');
-    setRewriteInstructions('');
-  }, [isRewriteComposerGenerating]);
-  const handleGenerateRewriteComposer = useCallback(async () => {
-    if (!rewriteComposerTarget) return;
-    if (!onGenerateRewritePreview) {
-      setRewriteComposerError('Rewrite preview handler unavailable.');
-      return;
-    }
-    setRewriteComposerError(null);
-    setIsRewriteComposerGenerating(true);
-    try {
-      const generated = await onGenerateRewritePreview({
-        sceneId: rewriteComposerTarget.sceneId,
-        blockId: rewriteComposerTarget.blockId,
-        instructions: rewriteInstructions.trim()
-      });
-      const normalized = generated.trim();
-      if (!normalized) {
-        setRewriteComposerError('AI returned empty rewrite content.');
-        setRewriteCandidateText('');
-        return;
-      }
-      setRewriteCandidateText(normalized);
-    } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Failed to generate rewrite.';
-      setRewriteComposerError(message);
-    } finally {
-      setIsRewriteComposerGenerating(false);
-    }
-  }, [onGenerateRewritePreview, rewriteComposerTarget, rewriteInstructions]);
-  const handleApplyRewriteComposer = useCallback(() => {
-    if (!rewriteComposerTarget) return;
-    if (!onApplyRewritePreview) {
-      setRewriteComposerError('Rewrite apply handler unavailable.');
-      return;
-    }
-    const candidate = rewriteCandidateText.trim();
-    if (!candidate) {
-      setRewriteComposerError('Generate a rewrite before applying.');
-      return;
-    }
-    onApplyRewritePreview({
-      sceneId: rewriteComposerTarget.sceneId,
-      blockId: rewriteComposerTarget.blockId,
-      text: candidate
-    });
-    setRewriteComposerTarget(null);
-    setRewriteComposerError(null);
-    setRewriteCandidateText('');
-    setRewriteInstructions('');
-  }, [onApplyRewritePreview, rewriteCandidateText, rewriteComposerTarget]);
+    scriptController.clearBlockTarget();
+  }, [scriptController]);
   const composerCharacters = context?.characters ?? [];
-  const dialogueCharacterUnavailable = composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
-  const handleRequestInsert = useCallback((index: number) => {
-    if (isComposerGenerating) return;
-    setRewriteComposerTarget(null);
-    setRewriteComposerError(null);
-    setRewriteCandidateText('');
-    setRewriteInstructions('');
-    setActiveInsertIndex(index);
-    setComposerError(null);
-    onRequestInsert?.(index);
-  }, [isComposerGenerating, onRequestInsert]);
-  const closeInsertComposer = useCallback(() => {
-    if (isComposerGenerating) return;
-    setActiveInsertIndex(null);
-    setComposerError(null);
-  }, [isComposerGenerating]);
-  const handleComposerInsert = useCallback(() => {
-    if (activeInsertIndex === null) return;
-    if (!context) {
-      setComposerError('Script context unavailable.');
-      return;
-    }
-    if (!onInsertAtIndex) {
-      setComposerError('Insert handler unavailable.');
-      return;
-    }
-    if (composerBlockType === BlockType.DIALOGUE && !composerCharacter) {
-      setComposerError('Add a character first.');
-      return;
-    }
-    const trimmedContent = composerContent.trim();
-    if (!trimmedContent) {
-      setComposerError('Add content before inserting manually.');
-      return;
-    }
-    const block: ScriptBlock = createBlock({
-      type: composerBlockType,
-      text: trimmedContent,
-      character: composerBlockType === BlockType.DIALOGUE ? composerCharacter : undefined
-    });
-    onInsertAtIndex(activeInsertIndex, block);
-    setComposerContent('');
-    setComposerError(null);
-    setActiveInsertIndex(null);
-  }, [activeInsertIndex, composerBlockType, composerCharacter, composerContent, context, onInsertAtIndex]);
-  const handleComposerGenerate = useCallback(async () => {
-    if (activeInsertIndex === null) return;
-    if (!context) {
-      setComposerError('Script context unavailable.');
-      return;
-    }
-    if (!onGenerateInsertAtIndex) {
-      setComposerError('Generate handler unavailable.');
-      return;
-    }
-    if (composerBlockType === BlockType.DIALOGUE && !composerCharacter) {
-      setComposerError('Add a character first.');
-      return;
-    }
-    setComposerError(null);
-    setIsComposerGenerating(true);
-    try {
-      await onGenerateInsertAtIndex({
-        insertIndex: activeInsertIndex,
-        type: composerBlockType,
-        content: composerContent.trim(),
-        character: composerBlockType === BlockType.DIALOGUE
-          ? composerCharacter
-          : undefined
-      });
-      setComposerContent('');
-      setActiveInsertIndex(null);
-    } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Failed to generate insert block.';
-      setComposerError(message);
-    } finally {
-      setIsComposerGenerating(false);
-    }
-  }, [activeInsertIndex, composerBlockType, composerCharacter, composerContent, context, onGenerateInsertAtIndex]);
-  const insertComposerNode = activeInsertIndex !== null ? (
+  const dialogueCharacterUnavailable = scriptController.composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
+  const insertComposerNode = scriptController.activeInsertIndex !== null ? (
     <InsertComposerPopover
-      blockType={composerBlockType}
-      onBlockTypeChange={(next) => {
-        setComposerBlockType(next);
-        if (next === BlockType.DIALOGUE && composerCharacters.length > 0 && !composerCharacter) {
-          setComposerCharacter(composerCharacters[0]);
-        }
-        setComposerError(null);
-      }}
+      blockType={scriptController.composerBlockType}
+      onBlockTypeChange={scriptController.setComposerBlockType}
       characters={composerCharacters}
-      selectedCharacter={composerCharacter}
-      onCharacterChange={(next) => {
-        setComposerCharacter(next);
-        if (composerError) {
-          setComposerError(null);
-        }
-      }}
-      content={composerContent}
-      onContentChange={(next) => {
-        setComposerContent(next);
-        if (composerError) {
-          setComposerError(null);
-        }
-      }}
+      selectedCharacter={scriptController.composerCharacter}
+      onCharacterChange={scriptController.setComposerCharacter}
+      content={scriptController.composerContent}
+      onContentChange={scriptController.setComposerContent}
       onGenerate={() => {
-        void handleComposerGenerate();
+        void scriptController.generateInsertAtActiveAnchor();
       }}
-      onInsert={handleComposerInsert}
-      onCancel={closeInsertComposer}
-      isGenerating={isComposerGenerating}
+      onInsert={scriptController.insertAtActiveAnchor}
+      onCancel={scriptController.closeInsertComposer}
+      isGenerating={scriptController.isComposerGenerating}
       actionsDisabled={dialogueCharacterUnavailable}
-      errorMessage={composerError}
+      errorMessage={scriptController.composerError}
     />
   ) : null;
   const rewriteComposerBlock = useMemo(() => {
-    if (!context || !rewriteComposerTarget) return null;
-    const scene = context.scenes.find((entry) => entry.id === rewriteComposerTarget.sceneId);
-    const block = scene?.blocks.find((entry) => entry.id === rewriteComposerTarget.blockId);
+    if (!context || !scriptController.rewriteComposerTarget) return null;
+    const scene = context.scenes.find((entry) => entry.id === scriptController.rewriteComposerTarget?.sceneId);
+    const block = scene?.blocks.find((entry) => entry.id === scriptController.rewriteComposerTarget?.blockId);
     return block ?? null;
-  }, [context, rewriteComposerTarget]);
-  const rewriteComposerNode = rewriteComposerTarget && rewriteComposerBlock ? (
+  }, [context, scriptController.rewriteComposerTarget]);
+  const rewriteComposerNode = scriptController.rewriteComposerTarget && rewriteComposerBlock ? (
     <RewriteComposerPopover
       blockType={rewriteComposerBlock.type}
       snippet={rewriteComposerBlock.text.replace(/\s+/g, ' ').trim() || '(No text)'}
-      instructions={rewriteInstructions}
-      onInstructionsChange={(next) => {
-        setRewriteInstructions(next);
-        if (rewriteComposerError) {
-          setRewriteComposerError(null);
-        }
-      }}
-      candidateText={rewriteCandidateText}
+      instructions={scriptController.rewriteInstructions}
+      onInstructionsChange={scriptController.setRewriteInstructions}
+      candidateText={scriptController.rewriteCandidateText}
       onGenerate={() => {
-        void handleGenerateRewriteComposer();
+        void scriptController.generateRewritePreview();
       }}
-      onApply={handleApplyRewriteComposer}
-      onCancel={closeRewriteComposer}
-      isGenerating={isRewriteComposerGenerating}
-      errorMessage={rewriteComposerError}
+      onApply={scriptController.applyRewritePreview}
+      onCancel={scriptController.closeRewriteComposer}
+      isGenerating={scriptController.isRewriteComposerGenerating}
+      errorMessage={scriptController.rewriteComposerError}
     />
   ) : null;
   const previewSection = context ? (
@@ -654,21 +476,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onChangeSpeaker={onChangeSpeaker}
       characters={context.characters}
       insertTarget={insertTarget}
-      rewriteTarget={rewriteTarget}
+      rewriteTarget={scriptController.rewriteTarget}
       rewriteModeActive={currentTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
       onSelectRewriteTarget={handleSelectRewriteTarget}
-      selectedBlockTarget={selectedBlockTarget}
+      selectedBlockTarget={scriptController.selectedBlockTarget}
       onSelectBlockTarget={handleSelectBlockTarget}
       onClearBlockTarget={handleClearSelectedBlock}
-      onRewriteBlock={handleInlineRewrite}
-      onDeleteBlock={onDeleteBlock ? handleInlineDelete : undefined}
-      activeInsertIndex={activeInsertIndex}
-      onRequestInsert={handleRequestInsert}
+      onRewriteBlock={scriptController.openRewrite}
+      onDeleteBlock={onDeleteBlock ? scriptController.deleteBlock : undefined}
+      activeInsertIndex={scriptController.activeInsertIndex}
+      onRequestInsert={scriptController.requestInsert}
       insertComposer={insertComposerNode}
-      onCloseInsertComposer={closeInsertComposer}
-      activeRewriteBlockId={rewriteComposerTarget?.blockId ?? null}
+      onCloseInsertComposer={scriptController.closeInsertComposer}
+      activeRewriteBlockId={scriptController.activeRewriteBlockId ?? null}
       rewriteComposer={rewriteComposerNode}
-      onCloseRewriteComposer={closeRewriteComposer}
+      onCloseRewriteComposer={scriptController.closeRewriteComposer}
       insertModeActive={isInsertModeView}
       pendingInsertBlock={pendingInsertBlock}
       onConfirmInsertMode={onConfirmInsertMode}
@@ -690,42 +512,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [insertModeActive, onCancelInsertMode]);
-
-  useEffect(() => {
-    if (!insertModeActive) return;
-    setSelectedBlockTarget(null);
-    setActiveInsertIndex(null);
-    setComposerError(null);
-    setIsComposerGenerating(false);
-    setRewriteComposerTarget(null);
-    setRewriteInstructions('');
-    setRewriteCandidateText('');
-    setRewriteComposerError(null);
-    setIsRewriteComposerGenerating(false);
-  }, [insertModeActive]);
-
-  useEffect(() => {
-    if (context) return;
-    setActiveInsertIndex(null);
-    setComposerError(null);
-    setIsComposerGenerating(false);
-    setComposerCharacter('');
-    setRewriteComposerTarget(null);
-    setRewriteInstructions('');
-    setRewriteCandidateText('');
-    setRewriteComposerError(null);
-    setIsRewriteComposerGenerating(false);
-  }, [context]);
-
-  useEffect(() => {
-    if (!context || context.characters.length === 0) {
-      setComposerCharacter('');
-      return;
-    }
-    setComposerCharacter((current) => (
-      current && context.characters.includes(current) ? current : context.characters[0]
-    ));
-  }, [context]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -904,7 +690,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     }
     if (tool === 'rewrite') {
       setRewriteMode('select');
-      setRewriteTarget(null);
+      scriptController.setRewriteTarget(null);
       setToolsSheet('collapsed');
       return;
     }
@@ -952,76 +738,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onTitleChange(nextTitle);
     setIsTitleModalOpen(false);
   };
-  const rewriteOptions = useMemo(() => {
-    if (!context) return [];
-    return context.scenes.flatMap((scene, sceneIndex) => (
-      scene.blocks.map((block, blockIndex) => {
-        const typeLabel = block.type.charAt(0).toUpperCase() + block.type.slice(1);
-        const label = `Scene ${sceneIndex + 1}: ${scene.heading} — ${typeLabel} ${blockIndex + 1}`;
-        const dialogueText = [
-          block.character?.trim() ? block.character.trim().toUpperCase() : '',
-          block.parenthetical?.trim() || '',
-          block.text
-        ].filter(Boolean).join('\n');
-        const displayText = block.type === BlockType.DIALOGUE ? dialogueText : block.text;
-        return {
-          sceneId: scene.id,
-          blockId: block.id,
-          type: block.type,
-          label,
-          locked: Boolean(block.locked),
-          displayText: displayText || '(No text)'
-        };
-      })
-    ));
-  }, [context]);
-  const insertableBlockCount = useMemo(() => {
-    if (!context) return 0;
-    return context.scenes.reduce((total, scene) => total + scene.blocks.length, 0);
-  }, [context]);
-  useEffect(() => {
-    if (rewriteOptions.length === 0) {
-      setRewriteTarget(null);
-      setSelectedBlockTarget(null);
-      return;
-    }
-    // Mobile rewrite select mode requires explicit target selection.
-    if (isNarrowViewport && currentTool === 'rewrite' && rewriteMode === 'select') {
-      return;
-    }
-    if (!rewriteTarget || !rewriteOptions.some(option => option.blockId === rewriteTarget.blockId)) {
-      const [first] = rewriteOptions;
-      if (first) {
-        setRewriteTarget({ sceneId: first.sceneId, blockId: first.blockId });
-      }
-    }
-  }, [currentTool, isNarrowViewport, rewriteMode, rewriteOptions, rewriteTarget]);
-  useEffect(() => {
-    if (!selectedBlockTarget) return;
-    const targetStillExists = rewriteOptions.some((option) => (
-      option.sceneId === selectedBlockTarget.sceneId && option.blockId === selectedBlockTarget.blockId
-    ));
-    if (!targetStillExists) {
-      setSelectedBlockTarget(null);
-    }
-  }, [rewriteOptions, selectedBlockTarget]);
-  useEffect(() => {
-    if (!rewriteComposerTarget) return;
-    const targetStillExists = rewriteOptions.some((option) => (
-      option.sceneId === rewriteComposerTarget.sceneId && option.blockId === rewriteComposerTarget.blockId
-    ));
-    if (targetStillExists) return;
-    setRewriteComposerTarget(null);
-    setRewriteInstructions('');
-    setRewriteCandidateText('');
-    setRewriteComposerError(null);
-  }, [rewriteComposerTarget, rewriteOptions]);
-  useEffect(() => {
-    if (activeInsertIndex === null) return;
-    if (activeInsertIndex <= insertableBlockCount) return;
-    setActiveInsertIndex(null);
-  }, [activeInsertIndex, insertableBlockCount]);
-  const selectedRewrite = rewriteOptions.find(option => option.blockId === rewriteTarget?.blockId);
+  const selectedRewrite = scriptController.rewriteOptions.find(
+    (option) => option.blockId === scriptController.rewriteTarget?.blockId
+  );
   const rewriteContent = context ? (
     <div className="space-y-2">
       <div className={toolSectionClass}>
@@ -1077,12 +796,16 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </div>
           <Button
             onClick={() => {
-              if (rewriteTarget) {
+              if (scriptController.rewriteTarget) {
                 const guidance = rewriteGuidance.trim();
-                onRegenerate(rewriteTarget.sceneId, rewriteTarget.blockId, guidance || undefined);
+                onRegenerate(
+                  scriptController.rewriteTarget.sceneId,
+                  scriptController.rewriteTarget.blockId,
+                  guidance || undefined
+                );
               }
             }}
-            disabled={!rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
+            disabled={!scriptController.rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
             size="sm"
             className="shadow-lg shadow-indigo-500/20"
             title="Regenerate the selected block"
