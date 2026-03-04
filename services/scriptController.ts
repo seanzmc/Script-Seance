@@ -54,9 +54,11 @@ type InsertableBlockRef = {
   block: ScriptBlock;
 };
 
-type UndoAction =
+export type ScriptMutationAction =
   | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
   | { type: 'scene'; scene: Scene; index: number };
+
+type UndoAction = ScriptMutationAction;
 
 type StoryContextMutation = StoryContext | null | ((previous: StoryContext | null) => StoryContext | null);
 
@@ -157,6 +159,12 @@ export const buildRewritePreviewGuidance = (params: {
 
 export interface ScriptMutationController {
   resolveInsertTargetFromIndex: (context: StoryContext, insertIndex: number) => ScriptBlockTarget | null;
+  applySnapshot: (params: {
+    context: StoryContext;
+    action: ScriptMutationAction;
+    mode: 'undo' | 'redo';
+  }) => { nextContext: StoryContext; applied: boolean };
+  addBlock: (block: ScriptBlock) => void;
   insertBlock: (target: ScriptBlockTarget, block: ScriptBlock) => void;
   insertBlockAtIndex: (insertIndex: number, block: ScriptBlock) => void;
   generateInsertAtIndex: (params: {
@@ -181,6 +189,9 @@ export interface ScriptMutationController {
     sceneId?: string;
     clearRedo?: boolean;
   }) => boolean;
+  toggleBlockLock: (sceneId: string, blockId: string) => void;
+  changeSpeaker: (sceneId: string, blockId: string, character: string) => void;
+  deleteBlock: (sceneId: string, blockId: string) => void;
   rewriteBlock: (params: {
     context: StoryContext | null;
     isGenerating: boolean;
@@ -222,6 +233,120 @@ export interface CreateScriptMutationControllerDeps {
 export const createScriptMutationController = (
   deps: CreateScriptMutationControllerDeps
 ): ScriptMutationController => {
+  const applySnapshot = (params: {
+    context: StoryContext;
+    action: ScriptMutationAction;
+    mode: 'undo' | 'redo';
+  }) => {
+    const { context, action, mode } = params;
+    if (mode === 'undo') {
+      if (action.type === 'scene') {
+        const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.scene.id);
+        if (sceneIndex === -1) {
+          return { nextContext: context, applied: false };
+        }
+        const nextScenes = [...context.scenes];
+        nextScenes.splice(sceneIndex, 1);
+        return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+      }
+
+      const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
+      if (sceneIndex === -1) {
+        return { nextContext: context, applied: false };
+      }
+      const scene = context.scenes[sceneIndex];
+      const blockIndex = scene.blocks.findIndex((block) => block.id === action.block.id);
+      if (blockIndex === -1) {
+        return { nextContext: context, applied: false };
+      }
+      const nextBlocks = [...scene.blocks];
+      nextBlocks.splice(blockIndex, 1);
+      const nextScenes = [...context.scenes];
+      nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+      return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+    }
+
+    if (action.type === 'scene') {
+      const existing = context.scenes.some((scene) => scene.id === action.scene.id);
+      if (existing) {
+        return { nextContext: context, applied: false };
+      }
+      const nextScenes = [...context.scenes];
+      const insertIndex = Math.min(action.index, nextScenes.length);
+      nextScenes.splice(insertIndex, 0, action.scene);
+      return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+    }
+
+    const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
+    if (sceneIndex === -1) {
+      return { nextContext: context, applied: false };
+    }
+    const scene = context.scenes[sceneIndex];
+    const alreadyExists = scene.blocks.some((block) => block.id === action.block.id);
+    if (alreadyExists) {
+      return { nextContext: context, applied: false };
+    }
+    const nextBlocks = [...scene.blocks];
+    const insertIndex = Math.min(action.index, nextBlocks.length);
+    nextBlocks.splice(insertIndex, 0, action.block);
+    const nextScenes = [...context.scenes];
+    nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+    return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+  };
+
+  const addBlock = (block: ScriptBlock) => {
+    if (!deps.contextRef.current) return;
+    deps.clearRedo();
+    deps.setInsertScrollTargetId(block.id);
+    deps.setInsertScrollToken((token) => token + 1);
+
+    deps.applyContextMutation((previous) => {
+      if (!previous) return null;
+      const normalizedBlock = block.character
+        ? { ...block, character: deps.resolveCharacterName(block.character, previous.characters) }
+        : block;
+      const nextScenes = [...previous.scenes];
+
+      if (normalizedBlock.type === BlockType.HEADING) {
+        const nextScene: Scene = {
+          id: crypto.randomUUID(),
+          heading: normalizedBlock.text.toUpperCase(),
+          summary: 'New user created scene',
+          blocks: []
+        };
+        nextScenes.push(nextScene);
+        deps.pushUndoAction({ type: 'scene', scene: nextScene, index: nextScenes.length - 1 });
+        return { ...previous, scenes: nextScenes };
+      }
+
+      if (nextScenes.length > 0) {
+        const lastSceneIndex = nextScenes.length - 1;
+        const updatedScene = {
+          ...nextScenes[lastSceneIndex],
+          blocks: [...nextScenes[lastSceneIndex].blocks, normalizedBlock]
+        };
+        nextScenes[lastSceneIndex] = updatedScene;
+        deps.pushUndoAction({
+          type: 'block',
+          sceneId: updatedScene.id,
+          block: normalizedBlock,
+          index: updatedScene.blocks.length - 1
+        });
+        return { ...previous, scenes: nextScenes };
+      }
+
+      const nextScene: Scene = {
+        id: crypto.randomUUID(),
+        heading: 'EXT. UNKNOWN - DAY',
+        summary: 'Start',
+        blocks: [normalizedBlock]
+      };
+      nextScenes.push(nextScene);
+      deps.pushUndoAction({ type: 'scene', scene: nextScene, index: nextScenes.length - 1 });
+      return { ...previous, scenes: nextScenes };
+    });
+  };
+
   const insertBlock = (target: ScriptBlockTarget, block: ScriptBlock) => {
     deps.clearRedo();
     deps.applyContextMutation((previous) => {
@@ -303,6 +428,113 @@ export const createScriptMutationController = (
       return { ...previous, scenes: nextScenes };
     });
     return applied;
+  };
+
+  const toggleBlockLock = (sceneId: string, blockId: string) => {
+    deps.clearRedo();
+    deps.applyContextMutation((previous) => {
+      if (!previous) return null;
+      return {
+        ...previous,
+        scenes: previous.scenes.map((scene) => (
+          scene.id !== sceneId
+            ? scene
+            : {
+                ...scene,
+                blocks: scene.blocks.map((block) => (
+                  block.id === blockId
+                    ? { ...block, locked: !block.locked }
+                    : block
+                ))
+              }
+        ))
+      };
+    });
+  };
+
+  const changeSpeaker = (sceneId: string, blockId: string, character: string) => {
+    deps.clearRedo();
+    deps.applyContextMutation((previous) => {
+      if (!previous) return null;
+      const resolvedCharacter = deps.resolveCharacterName(character, previous.characters);
+      return {
+        ...previous,
+        scenes: previous.scenes.map((scene) => (
+          scene.id !== sceneId
+            ? scene
+            : {
+                ...scene,
+                blocks: scene.blocks.map((block) => {
+                  if (block.id !== blockId) {
+                    return block;
+                  }
+                  if (block.character === resolvedCharacter) {
+                    return block;
+                  }
+                  return applyBlockPatch(block, { character: resolvedCharacter });
+                })
+              }
+        ))
+      };
+    });
+  };
+
+  const deleteBlock = (sceneId: string, blockId: string) => {
+    let deletedBlock: ScriptBlock | null = null;
+    let deletedIndex = -1;
+
+    deps.clearRedo();
+    const didMutate = deps.applyContextMutation((previous) => {
+      if (!previous) return previous;
+      const sceneIndex = previous.scenes.findIndex((scene) => scene.id === sceneId);
+      if (sceneIndex === -1) return previous;
+
+      const scene = previous.scenes[sceneIndex];
+      const blockIndex = scene.blocks.findIndex((block) => block.id === blockId);
+      if (blockIndex === -1) return previous;
+
+      deletedBlock = scene.blocks[blockIndex];
+      deletedIndex = blockIndex;
+
+      const nextBlocks = [...scene.blocks];
+      nextBlocks.splice(blockIndex, 1);
+      const nextScenes = [...previous.scenes];
+      nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+      return { ...previous, scenes: nextScenes };
+    });
+
+    if (!didMutate || deletedBlock === null || deletedIndex < 0) {
+      return;
+    }
+    const restoredBlock = deletedBlock;
+    const restoredIndex = deletedIndex;
+
+    deps.setToast({
+      message: 'Block deleted',
+      onUndo: () => {
+        deps.clearRedo();
+        deps.applyContextMutation((previous) => {
+          if (!previous) return previous;
+          const sceneIndex = previous.scenes.findIndex((scene) => scene.id === sceneId);
+          if (sceneIndex === -1) return previous;
+
+          const scene = previous.scenes[sceneIndex];
+          if (scene.blocks.some((block) => block.id === restoredBlock.id)) {
+            return previous;
+          }
+
+          const nextBlocks = [...scene.blocks];
+          const insertIndex = Math.min(restoredIndex, nextBlocks.length);
+          nextBlocks.splice(insertIndex, 0, restoredBlock);
+          const nextScenes = [...previous.scenes];
+          nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+          return { ...previous, scenes: nextScenes };
+        });
+        deps.setInsertScrollTargetId(restoredBlock.id);
+        deps.setInsertScrollToken((token) => token + 1);
+        deps.setToast(null);
+      }
+    });
   };
 
   const applyRewritePreview = (params: {
@@ -656,12 +888,17 @@ export const createScriptMutationController = (
 
   return {
     resolveInsertTargetFromIndex,
+    applySnapshot,
+    addBlock,
     insertBlock,
     insertBlockAtIndex,
     generateInsertAtIndex,
     generateRewritePreview,
     applyRewritePreview,
     updateBlock,
+    toggleBlockLock,
+    changeSpeaker,
+    deleteBlock,
     rewriteBlock,
     generateNextScene
   };

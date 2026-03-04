@@ -43,8 +43,7 @@ import {
   isSetupAutoSurpriseFresh,
   isTitleSuggestionFresh
 } from './services/orchestration';
-import { updateBlock } from './domain/blocks';
-import { createScriptMutationController } from './services/scriptController';
+import { createScriptMutationController, type ScriptMutationAction } from './services/scriptController';
 import { RotateCcw } from 'lucide-react';
 
 interface ToastState {
@@ -63,11 +62,6 @@ type DebugWindow = Window & {
   __SS_PROMPT_CONTEXT_REVISION__?: number;
   __SS_STYLE_FINGERPRINT__?: string;
 };
-
-type RedoPayload =
-  | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
-  | { type: 'scene'; scene: Scene; index: number };
-type UndoAction = RedoPayload;
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
 const DRAFT_DEBOUNCE_MS = 800;
@@ -337,8 +331,8 @@ export default function App() {
   const [setupAutoSurprise, setSetupAutoSurprise] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
-  const undoStackRef = useRef<UndoAction[]>([]);
-  const redoStackRef = useRef<UndoAction[]>([]);
+  const undoStackRef = useRef<ScriptMutationAction[]>([]);
+  const redoStackRef = useRef<ScriptMutationAction[]>([]);
   const setupStateRef = useRef<SetupFormState>(DEFAULT_SETUP_STATE);
   const voiceConfigsRef = useRef<VoiceConfig[]>([]);
 
@@ -491,62 +485,6 @@ export default function App() {
     return true;
   }, []);
 
-  const applyUndoAction = useCallback((current: StoryContext, action: UndoAction) => {
-    if (action.type === 'scene') {
-      const sceneIndex = current.scenes.findIndex(scene => scene.id === action.scene.id);
-      if (sceneIndex === -1) {
-        return { nextContext: current, applied: false };
-      }
-      const nextScenes = [...current.scenes];
-      nextScenes.splice(sceneIndex, 1);
-      return { nextContext: { ...current, scenes: nextScenes }, applied: true };
-    }
-
-    const sceneIndex = current.scenes.findIndex(scene => scene.id === action.sceneId);
-    if (sceneIndex === -1) {
-      return { nextContext: current, applied: false };
-    }
-    const scene = current.scenes[sceneIndex];
-    const blockIndex = scene.blocks.findIndex(block => block.id === action.block.id);
-    if (blockIndex === -1) {
-      return { nextContext: current, applied: false };
-    }
-    const nextBlocks = [...scene.blocks];
-    nextBlocks.splice(blockIndex, 1);
-    const nextScenes = [...current.scenes];
-    nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
-    return { nextContext: { ...current, scenes: nextScenes }, applied: true };
-  }, []);
-
-  const applyRedoAction = useCallback((current: StoryContext, action: UndoAction) => {
-    if (action.type === 'scene') {
-      const existing = current.scenes.some(scene => scene.id === action.scene.id);
-      if (existing) {
-        return { nextContext: current, applied: false };
-      }
-      const nextScenes = [...current.scenes];
-      const insertIndex = Math.min(action.index, nextScenes.length);
-      nextScenes.splice(insertIndex, 0, action.scene);
-      return { nextContext: { ...current, scenes: nextScenes }, applied: true };
-    }
-
-    const sceneIndex = current.scenes.findIndex(scene => scene.id === action.sceneId);
-    if (sceneIndex === -1) {
-      return { nextContext: current, applied: false };
-    }
-    const scene = current.scenes[sceneIndex];
-    const alreadyExists = scene.blocks.some(block => block.id === action.block.id);
-    if (alreadyExists) {
-      return { nextContext: current, applied: false };
-    }
-    const nextBlocks = [...scene.blocks];
-    const insertIndex = Math.min(action.index, nextBlocks.length);
-    nextBlocks.splice(insertIndex, 0, action.block);
-    const nextScenes = [...current.scenes];
-    nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
-    return { nextContext: { ...current, scenes: nextScenes }, applied: true };
-  }, []);
-
   const clearRedo = useCallback(() => {
     redoStackRef.current = [];
     setRedoCount(0);
@@ -557,7 +495,7 @@ export default function App() {
     setUndoCount(0);
     setRedoCount(0);
   }, []);
-  const pushUndoAction = useCallback((action: UndoAction) => {
+  const pushUndoAction = useCallback((action: ScriptMutationAction) => {
     undoStackRef.current.push(action);
     setUndoCount(undoStackRef.current.length);
   }, []);
@@ -566,7 +504,7 @@ export default function App() {
     setUndoCount(undoStackRef.current.length);
     return action;
   }, []);
-  const pushRedoAction = useCallback((action: UndoAction) => {
+  const pushRedoAction = useCallback((action: ScriptMutationAction) => {
     redoStackRef.current.push(action);
     setRedoCount(redoStackRef.current.length);
   }, []);
@@ -1201,56 +1139,9 @@ export default function App() {
     }
   };
 
-  const handleAddBlock = (block: ScriptBlock) => {
-    if (!context) return;
-    clearRedo();
-    setInsertScrollTargetId(block.id);
-    setInsertScrollToken(token => token + 1);
-    
-    applyContextMutation((prev) => {
-      if (!prev) return null;
-      const newScenes = [...prev.scenes];
-      const normalizedBlock = block.character
-        ? { ...block, character: resolveCharacterName(block.character, prev.characters) }
-        : block;
-      
-      if (normalizedBlock.type === BlockType.HEADING) {
-        const newScene: Scene = {
-          id: crypto.randomUUID(),
-          heading: normalizedBlock.text.toUpperCase(),
-          summary: "New user created scene",
-          blocks: []
-        };
-        newScenes.push(newScene);
-        pushUndoAction({ type: 'scene', scene: newScene, index: newScenes.length - 1 });
-      } else {
-        if (newScenes.length > 0) {
-          const lastSceneIndex = newScenes.length - 1;
-          const updatedScene = { 
-            ...newScenes[lastSceneIndex],
-            blocks: [...newScenes[lastSceneIndex].blocks, normalizedBlock]
-          };
-          newScenes[lastSceneIndex] = updatedScene;
-          pushUndoAction({
-            type: 'block',
-            sceneId: updatedScene.id,
-            block: normalizedBlock,
-            index: updatedScene.blocks.length - 1
-          });
-        } else {
-          const newScene: Scene = {
-            id: crypto.randomUUID(),
-            heading: "EXT. UNKNOWN - DAY",
-            summary: "Start",
-            blocks: [normalizedBlock]
-          };
-          newScenes.push(newScene);
-          pushUndoAction({ type: 'scene', scene: newScene, index: newScenes.length - 1 });
-        }
-      }
-      return { ...prev, scenes: newScenes };
-    });
-  };
+  const handleAddBlock = useCallback((block: ScriptBlock) => {
+    scriptMutationController.addBlock(block);
+  }, [scriptMutationController]);
 
   const handleInsertAfter = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
     scriptMutationController.insertBlock(target, block);
@@ -1301,7 +1192,11 @@ export default function App() {
       if (!prev || prev.scenes.length === 0) return prev;
       const lastAction = popUndoAction();
       if (!lastAction) return prev;
-      const { nextContext, applied } = applyUndoAction(prev, lastAction);
+      const { nextContext, applied } = scriptMutationController.applySnapshot({
+        context: prev,
+        action: lastAction,
+        mode: 'undo'
+      });
       if (!applied) {
         pushUndoAction(lastAction);
         return prev;
@@ -1319,7 +1214,11 @@ export default function App() {
         pushRedoAction(action);
         return prev;
       }
-      const { nextContext, applied } = applyRedoAction(prev, action);
+      const { nextContext, applied } = scriptMutationController.applySnapshot({
+        context: prev,
+        action,
+        mode: 'redo'
+      });
       if (!applied) {
         pushRedoAction(action);
         return prev;
@@ -1330,42 +1229,12 @@ export default function App() {
   };
 
   const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
-    clearRedo();
-    applyContextMutation((prev) => {
-      if (!prev) return null;
-      const newScenes = prev.scenes.map(scene => {
-        if (scene.id !== sceneId) return scene;
-        return {
-          ...scene,
-          blocks: scene.blocks.map(b => b.id === blockId ? { ...b, locked: !b.locked } : b)
-        };
-      });
-      return { ...prev, scenes: newScenes };
-    });
-  }, [applyContextMutation, clearRedo]);
+    scriptMutationController.toggleBlockLock(sceneId, blockId);
+  }, [scriptMutationController]);
 
   const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
-    clearRedo();
-    applyContextMutation((prev) => {
-      if (!prev) return null;
-      const resolvedCharacter = resolveCharacterName(character, prev.characters);
-      return {
-        ...prev,
-        scenes: prev.scenes.map(scene => scene.id === sceneId ? {
-          ...scene,
-          blocks: scene.blocks.map((block) => {
-            if (block.id !== blockId) {
-              return block;
-            }
-            if (block.character === resolvedCharacter) {
-              return block;
-            }
-            return updateBlock(block, { character: resolvedCharacter });
-          })
-        } : scene)
-      };
-    });
-  }, [applyContextMutation, clearRedo]);
+    scriptMutationController.changeSpeaker(sceneId, blockId, character);
+  }, [scriptMutationController]);
 
   const handleInsertSurprise = useCallback(async (params: {
     elementType: BlockType;
@@ -1480,62 +1349,8 @@ export default function App() {
   }, [context, isGenerating, scriptMutationController]);
 
   const handleDeleteBlock = useCallback((sceneId: string, blockId: string) => {
-    let deletedBlock: ScriptBlock | null = null;
-    let deletedIndex = -1;
-
-    clearRedo();
-    const didMutate = applyContextMutation((prev) => {
-      if (!prev) return prev;
-      const sceneIndex = prev.scenes.findIndex((scene) => scene.id === sceneId);
-      if (sceneIndex === -1) return prev;
-
-      const scene = prev.scenes[sceneIndex];
-      const blockIndex = scene.blocks.findIndex((block) => block.id === blockId);
-      if (blockIndex === -1) return prev;
-
-      deletedBlock = scene.blocks[blockIndex];
-      deletedIndex = blockIndex;
-
-      const nextBlocks = [...scene.blocks];
-      nextBlocks.splice(blockIndex, 1);
-      const nextScenes = [...prev.scenes];
-      nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
-      return { ...prev, scenes: nextScenes };
-    });
-
-    if (!didMutate || !deletedBlock || deletedIndex < 0) {
-      return;
-    }
-    const restoredBlock = deletedBlock;
-    const restoredIndex = deletedIndex;
-
-    setToast({
-      message: 'Block deleted',
-      onUndo: () => {
-        clearRedo();
-        applyContextMutation((prev) => {
-          if (!prev) return prev;
-          const sceneIndex = prev.scenes.findIndex((scene) => scene.id === sceneId);
-          if (sceneIndex === -1) return prev;
-
-          const scene = prev.scenes[sceneIndex];
-          if (scene.blocks.some((block) => block.id === restoredBlock.id)) {
-            return prev;
-          }
-
-          const nextBlocks = [...scene.blocks];
-          const insertIndex = Math.min(restoredIndex, nextBlocks.length);
-          nextBlocks.splice(insertIndex, 0, restoredBlock);
-          const nextScenes = [...prev.scenes];
-          nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
-          return { ...prev, scenes: nextScenes };
-        });
-        setInsertScrollTargetId(restoredBlock.id);
-        setInsertScrollToken((token) => token + 1);
-        setToast(null);
-      }
-    });
-  }, [applyContextMutation, clearRedo]);
+    scriptMutationController.deleteBlock(sceneId, blockId);
+  }, [scriptMutationController]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
     const voiceIds = getVoiceIdList(availableVoices);
