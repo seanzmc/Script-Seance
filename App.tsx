@@ -12,7 +12,6 @@ import { PrivacyModal } from './components/PrivacyModal';
 import {
   executeGenerateScene,
   executeSuggestPlotTwist,
-  executeRewriteBlock,
   executeGenerateScriptElement,
   executeGenerateSurpriseSetup,
   listVoices,
@@ -29,9 +28,7 @@ import {
   VoiceCatalogState,
   ScriptBlock,
   BlockType,
-  GENRES,
-  INSERT_TOP_ID,
-  INSERT_BOTTOM_ID
+  GENRES
 } from './types';
 import {
   DEFAULT_VOICE_CONFIG,
@@ -43,11 +40,11 @@ import {
   scopeKeys,
   doesInsertAnchorResolve,
   captureInsertAnchorSnapshot,
-  isRewriteFresh,
   isSetupAutoSurpriseFresh,
   isTitleSuggestionFresh
 } from './services/orchestration';
-import { createBlock, sanitizeGeneratedText, updateBlock } from './domain/blocks';
+import { updateBlock } from './domain/blocks';
+import { createScriptMutationController } from './services/scriptController';
 import { RotateCcw } from 'lucide-react';
 
 interface ToastState {
@@ -294,92 +291,7 @@ export const buildScriptTextExport = (scenes: Scene[]) => (
     })
     .join('\n***\n')
 );
-
-type InsertableBlockRef = {
-  sceneId: string;
-  block: ScriptBlock;
-};
-
-const collectInsertableBlocks = (storyContext: StoryContext): InsertableBlockRef[] => (
-  storyContext.scenes.flatMap((scene) => (
-    scene.blocks.map((block) => ({ sceneId: scene.id, block }))
-  ))
-);
-
-const findInsertableBlockById = (
-  storyContext: StoryContext,
-  sceneId: string,
-  blockId: string
-): { block: ScriptBlock; index: number; ordered: InsertableBlockRef[] } | null => {
-  const ordered = collectInsertableBlocks(storyContext);
-  const index = ordered.findIndex((entry) => entry.sceneId === sceneId && entry.block.id === blockId);
-  if (index < 0) return null;
-  return { block: ordered[index].block, index, ordered };
-};
-
-const resolveInsertTargetFromIndex = (
-  storyContext: StoryContext,
-  insertIndex: number
-): { sceneId: string; blockId: string } | null => {
-  if (storyContext.scenes.length === 0) return null;
-  const orderedBlocks = collectInsertableBlocks(storyContext);
-  if (insertIndex < 0 || insertIndex > orderedBlocks.length) return null;
-  if (insertIndex === 0) {
-    return { sceneId: storyContext.scenes[0].id, blockId: INSERT_TOP_ID };
-  }
-  if (insertIndex === orderedBlocks.length) {
-    const lastScene = storyContext.scenes[storyContext.scenes.length - 1];
-    return { sceneId: lastScene.id, blockId: INSERT_BOTTOM_ID };
-  }
-  const before = orderedBlocks[insertIndex - 1];
-  return before ? { sceneId: before.sceneId, blockId: before.block.id } : null;
-};
-
-const collapsePromptWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
-
-const truncatePromptText = (value: string, maxChars: number) => {
-  const compact = collapsePromptWhitespace(value);
-  if (compact.length <= maxChars) return compact;
-  return `${compact.slice(0, maxChars).trim()}...`;
-};
-
-const serializeBlockForInsertPrompt = (block: ScriptBlock) => {
-  const label = block.type.toUpperCase();
-  if (block.type === BlockType.DIALOGUE) {
-    const character = block.character?.trim() || 'UNKNOWN';
-    const parenthetical = block.parenthetical?.trim() ? ` (${block.parenthetical.trim()})` : '';
-    return `${label} ${character}${parenthetical}: ${truncatePromptText(block.text, 240)}`;
-  }
-  return `${label}: ${truncatePromptText(block.text, 240)}`;
-};
-
-export const sanitizeGeneratedInsertText = (
-  type: BlockType,
-  rawText: string,
-  character?: string
-) => sanitizeGeneratedText(type, rawText, character);
-
-const buildRewritePreviewGuidance = (params: {
-  block: ScriptBlock;
-  instructions: string;
-  previousBlock: ScriptBlock | null;
-  nextBlock: ScriptBlock | null;
-}) => {
-  const trimmedInstructions = params.instructions.trim();
-  return [
-    'Rewrite this block and return exactly one block of the same screenplay type.',
-    params.block.type === BlockType.DIALOGUE && params.block.character
-      ? `The speaker MUST remain "${params.block.character}".`
-      : '',
-    params.block.type === BlockType.DIALOGUE
-      ? 'Do not include speaker labels or parentheticals.'
-      : '',
-    'Return ONLY block content text. Do NOT include type labels like "Action:", "Dialogue:", "Transition:", or "Scene Heading:".',
-    trimmedInstructions ? `User rewrite instructions: ${truncatePromptText(trimmedInstructions, 360)}` : '',
-    params.previousBlock ? `Previous block: ${serializeBlockForInsertPrompt(params.previousBlock)}` : 'Previous block: Start of script.',
-    params.nextBlock ? `Next block: ${serializeBlockForInsertPrompt(params.nextBlock)}` : 'Next block: End of script.'
-  ].filter(Boolean).join('\n');
-};
+export { sanitizeGeneratedInsertText } from './services/scriptController';
 
 export default function App() {
   // State
@@ -755,6 +667,33 @@ export default function App() {
     setError(message || fallbackMessage);
     return false;
   }, []);
+
+  const scriptMutationController = useMemo(() => createScriptMutationController({
+    applyContextMutation,
+    clearRedo,
+    pushUndoAction,
+    resolveCharacterName,
+    normalizeSceneCharacters,
+    handleAiError,
+    contextRef,
+    promptContextRevisionRef,
+    scriptIdRef,
+    activeGenerationScopeRef,
+    orchestratorRef,
+    setInsertTarget,
+    setInsertScrollTargetId,
+    setInsertScrollToken,
+    setInsertCompleteToken,
+    setUserInstruction,
+    setIsGenerating,
+    setError,
+    setToast
+  }), [
+    applyContextMutation,
+    clearRedo,
+    pushUndoAction,
+    handleAiError
+  ]);
 
   const handleAudioSkip = useCallback((block: ScriptBlock) => {
     const rawText = block.text.trim();
@@ -1216,52 +1155,13 @@ export default function App() {
     }
   };
 
-  const handleGenerateNext = async () => {
-    if (!context || isGenerating) return;
-    try {
-      clearRedo();
-      const prompt = userInstruction || "Continue the story logically.";
-      const startedPromptContextRevision = promptContextRevisionRef.current;
-      const scopeKey = scopeKeys.generateNextScene(scriptIdRef.current);
-      activeGenerationScopeRef.current = scopeKey;
-      setIsGenerating(true);
-      setError(null);
-
-      const outcome = await orchestratorRef.current.run<Scene>({
-        opType: 'generateNextScene',
-        scopeKey,
-        execute: (signal) => executeGenerateScene(
-          context,
-          prompt,
-          false,
-          { signal, opType: 'generateNextScene', scopeKey }
-        ),
-        isFresh: () => promptContextRevisionRef.current === startedPromptContextRevision,
-        commit: (nextScene) => {
-          const normalizedScene = normalizeSceneCharacters(nextScene, context.characters);
-          const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
-          applyContextMutation((prev) => {
-            if (!prev) return null;
-            const updatedScenes = [...prev.scenes, normalizedScene];
-            return { ...prev, scenes: updatedScenes };
-          });
-          setInsertScrollTargetId(lastBlockId ?? 'bottom');
-          setInsertScrollToken(token => token + 1);
-          setUserInstruction('');
-        }
-      });
-      if (outcome.kind === 'failed') {
-        handleAiError(outcome.error, 'Failed to generate scene.');
-      }
-    } catch (err: unknown) {
-      handleAiError(err, 'Failed to generate scene.');
-    } finally {
-      if (activeGenerationScopeRef.current === scopeKeys.generateNextScene(scriptIdRef.current)) {
-        activeGenerationScopeRef.current = null;
-      }
-      setIsGenerating(false);
-    }
-  };
+  const handleGenerateNext = useCallback(async () => {
+    await scriptMutationController.generateNextScene({
+      context,
+      isGenerating,
+      userInstruction
+    });
+  }, [context, isGenerating, scriptMutationController, userInstruction]);
 
   const handleTwist = async () => {
     if (!context || isGenerating) return;
@@ -1353,44 +1253,8 @@ export default function App() {
   };
 
   const handleInsertAfter = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
-    clearRedo();
-    applyContextMutation((prev) => {
-      if (!prev) return null;
-      const sceneIndex = prev.scenes.findIndex(scene => scene.id === target.sceneId);
-      if (sceneIndex === -1) return prev;
-
-      const normalizedBlock = block.character
-        ? { ...block, character: resolveCharacterName(block.character, prev.characters) }
-        : block;
-      const newScenes = [...prev.scenes];
-      if (normalizedBlock.type === BlockType.HEADING) {
-        const newScene: Scene = {
-          id: crypto.randomUUID(),
-          heading: normalizedBlock.text.toUpperCase(),
-          summary: 'New user created scene',
-          blocks: []
-        };
-        const insertIndex = target.blockId === INSERT_TOP_ID ? sceneIndex : sceneIndex + 1;
-        newScenes.splice(insertIndex, 0, newScene);
-        pushUndoAction({ type: 'scene', scene: newScene, index: insertIndex });
-        return { ...prev, scenes: newScenes };
-      }
-
-      const scene = newScenes[sceneIndex];
-      const blockIndex = scene.blocks.findIndex(b => b.id === target.blockId);
-      const insertIndex = target.blockId === INSERT_TOP_ID
-        ? 0
-        : blockIndex === -1 || target.blockId === INSERT_BOTTOM_ID
-          ? scene.blocks.length
-          : blockIndex + 1;
-      const updatedBlocks = [...scene.blocks];
-      updatedBlocks.splice(insertIndex, 0, normalizedBlock);
-      newScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
-      pushUndoAction({ type: 'block', sceneId: scene.id, block: normalizedBlock, index: insertIndex });
-      return { ...prev, scenes: newScenes };
-    });
-    setInsertTarget(null);
-  }, [applyContextMutation, clearRedo, pushUndoAction]);
+    scriptMutationController.insertBlock(target, block);
+  }, [scriptMutationController]);
 
   const handleConfirmInsert = useCallback(() => {
     if (!pendingInsertBlock || !insertTarget) return;
@@ -1403,15 +1267,8 @@ export default function App() {
   }, [handleInsertAfter, insertTarget, pendingInsertBlock]);
 
   const handleInsertAtIndex = useCallback((insertIndex: number, block: ScriptBlock) => {
-    const latestContext = contextRef.current;
-    if (!latestContext) return;
-    const target = resolveInsertTargetFromIndex(latestContext, insertIndex);
-    if (!target) return;
-    setInsertScrollTargetId(block.id);
-    setInsertScrollToken((token) => token + 1);
-    handleInsertAfter(target, block);
-    setInsertCompleteToken((token) => token + 1);
-  }, [handleInsertAfter]);
+    scriptMutationController.insertBlockAtIndex(insertIndex, block);
+  }, [scriptMutationController]);
 
   const handleGenerateInsertAtIndex = useCallback(async (params: {
     insertIndex: number;
@@ -1419,208 +1276,24 @@ export default function App() {
     content: string;
     character?: string;
   }) => {
-    const latestContext = contextRef.current;
-    if (!latestContext) {
-      throw new Error('Script context unavailable.');
-    }
-    const initialTarget = resolveInsertTargetFromIndex(latestContext, params.insertIndex);
-    if (!initialTarget) {
-      throw new Error('Insertion point is no longer available.');
-    }
-
-    const orderedBlocks = collectInsertableBlocks(latestContext);
-    const previousBlock = params.insertIndex > 0 ? orderedBlocks[params.insertIndex - 1]?.block : null;
-    const nextBlock = params.insertIndex < orderedBlocks.length ? orderedBlocks[params.insertIndex]?.block : null;
-    const selectedCharacter = params.type === BlockType.DIALOGUE
-      ? resolveCharacterName(params.character ?? latestContext.characters[0] ?? 'Narrator', latestContext.characters)
-      : undefined;
-    const trimmedDirection = params.content.trim();
-    const instructionLines = [
-      `Generate exactly one screenplay block of type "${params.type}".`,
-      params.type === BlockType.HEADING
-        ? 'Return one scene heading slugline only (for example: INT. LOCATION - DAY).'
-        : '',
-      params.type === BlockType.ACTION
-        ? 'Return one concise action line only. Do not include dialogue labels, transitions, or extra blocks.'
-        : '',
-      params.type === BlockType.DIALOGUE
-        ? `Return one dialogue line only. The speaker MUST be "${selectedCharacter}". Do not include speaker labels, parentheticals, or labels like "Dialogue:".`
-        : '',
-      params.type === BlockType.TRANSITION
-        ? 'Return one transition cue only (for example: CUT TO:).'
-        : '',
-      trimmedDirection
-        ? `Direction: ${truncatePromptText(trimmedDirection, 420)}`
-        : 'Direction: Choose the most coherent insertion for this exact position.',
-      previousBlock
-        ? `Previous block: ${serializeBlockForInsertPrompt(previousBlock)}`
-        : 'Previous block: Start of script.',
-      nextBlock
-        ? `Next block: ${serializeBlockForInsertPrompt(nextBlock)}`
-        : 'Next block: End of script.',
-      'Return ONLY the block content text. Do NOT include the block type label (for example, do not write "Action:", "Dialogue:", "Transition:", or "Scene Heading:").',
-      'If you return JSON, return exactly {"content":"..."} and keep content free of any block type label prefix.',
-      'Output plain text for that one block only. No lists, no extra formatting, no surrounding explanation.'
-    ].filter(Boolean);
-    const instruction = instructionLines.join('\n');
-    const styleContext = [
-      `Genre: ${latestContext.genre}.`,
-      `Premise: ${truncatePromptText(latestContext.premise, 520)}`,
-      latestContext.style ? `Style: ${truncatePromptText(latestContext.style, 260)}.` : '',
-      latestContext.characters.length ? `Characters: ${latestContext.characters.join(', ')}.` : ''
-    ].filter(Boolean).join('\n');
-    const startedPromptContextRevision = promptContextRevisionRef.current;
-    const scopeKey = scopeKeys.insertSurpriseText(scriptIdRef.current, params.insertIndex);
-
-    const outcome = await orchestratorRef.current.run<string>({
-      opType: 'insertSurpriseText',
-      scopeKey,
-      execute: (signal) => executeGenerateScriptElement(
-        params.type,
-        selectedCharacter ?? undefined,
-        instruction,
-        styleContext,
-        { signal, opType: 'insertSurpriseText', scopeKey }
-      ),
-      isFresh: () => {
-        const currentContext = contextRef.current;
-        if (!currentContext) return false;
-        if (promptContextRevisionRef.current !== startedPromptContextRevision) return false;
-        return Boolean(resolveInsertTargetFromIndex(currentContext, params.insertIndex));
-      },
-      commit: (generatedText) => {
-        const currentContext = contextRef.current;
-        if (!currentContext) return;
-        const target = resolveInsertTargetFromIndex(currentContext, params.insertIndex);
-        if (!target) return;
-        const text = sanitizeGeneratedInsertText(params.type, generatedText, selectedCharacter ?? undefined);
-        if (!text) {
-          throw new Error('AI returned empty content for insert.');
-        }
-        const generatedBlock = createBlock({
-          type: params.type,
-          text,
-          character: params.type === BlockType.DIALOGUE ? selectedCharacter : undefined
-        });
-        setInsertScrollTargetId(generatedBlock.id);
-        setInsertScrollToken((token) => token + 1);
-        handleInsertAfter(target, generatedBlock);
-        setInsertCompleteToken((token) => token + 1);
-      }
-    });
-
-    if (outcome.kind === 'failed') {
-      const { message } = getErrorMeta(outcome.error);
-      throw new Error(message || 'Failed to generate insert block.');
-    }
-    if (outcome.kind !== 'committed') {
-      throw new Error('Insert generation was interrupted.');
-    }
-  }, [handleInsertAfter]);
+    await scriptMutationController.generateInsertAtIndex(params);
+  }, [scriptMutationController]);
 
   const handleGenerateRewritePreview = useCallback(async (params: {
     sceneId: string;
     blockId: string;
     instructions: string;
   }) => {
-    const latestContext = contextRef.current;
-    if (!latestContext) {
-      throw new Error('Script context unavailable.');
-    }
-    const targetInfo = findInsertableBlockById(latestContext, params.sceneId, params.blockId);
-    if (!targetInfo) {
-      throw new Error('Selected block is no longer available.');
-    }
-    const targetBlock = targetInfo.block;
-    if (targetBlock.locked) {
-      throw new Error('Locked blocks cannot be rewritten.');
-    }
-    const previousBlock = targetInfo.index > 0 ? targetInfo.ordered[targetInfo.index - 1]?.block : null;
-    const nextBlock = targetInfo.index < targetInfo.ordered.length - 1
-      ? targetInfo.ordered[targetInfo.index + 1]?.block
-      : null;
-    const rewriteGuidance = buildRewritePreviewGuidance({
-      block: targetBlock,
-      instructions: params.instructions,
-      previousBlock: previousBlock ?? null,
-      nextBlock: nextBlock ?? null
-    });
-    const startedBlockRevision = targetBlock.blockRevision;
-    const startedPromptContextRevision = promptContextRevisionRef.current;
-    const scopeKey = scopeKeys.rewriteBlock(scriptIdRef.current, params.blockId);
-    let previewText = '';
-    const outcome = await orchestratorRef.current.run<string>({
-      opType: 'rewriteBlock',
-      scopeKey,
-      execute: (signal) => executeRewriteBlock(
-        targetBlock,
-        latestContext.genre,
-        latestContext.premise,
-        latestContext.style,
-        rewriteGuidance,
-        { signal, opType: 'rewriteBlock', scopeKey }
-      ),
-      isFresh: () => isRewriteFresh({
-        context: contextRef.current,
-        sceneId: params.sceneId,
-        blockId: params.blockId,
-        startedBlockRevision,
-        startedPromptContextRevision,
-        currentPromptContextRevision: promptContextRevisionRef.current
-      }),
-      commit: (generatedText) => {
-        const sanitized = sanitizeGeneratedInsertText(
-          targetBlock.type,
-          generatedText,
-          targetBlock.character ?? undefined
-        );
-        if (!sanitized) {
-          throw new Error('AI returned empty rewrite content.');
-        }
-        previewText = sanitized;
-      }
-    });
-    if (outcome.kind === 'failed') {
-      const { message } = getErrorMeta(outcome.error);
-      throw new Error(message || 'Failed to generate rewrite preview.');
-    }
-    if (outcome.kind !== 'committed') {
-      throw new Error('Rewrite generation was interrupted.');
-    }
-    return previewText;
-  }, []);
+    return scriptMutationController.generateRewritePreview(params);
+  }, [scriptMutationController]);
 
   const handleApplyRewritePreview = useCallback((params: {
     sceneId: string;
     blockId: string;
     text: string;
   }) => {
-    const nextText = params.text.trim();
-    if (!nextText) return;
-    clearRedo();
-    let applied = false;
-    applyContextMutation((prev) => {
-      if (!prev) return null;
-      const nextScenes = prev.scenes.map((scene) => (
-        scene.id === params.sceneId
-          ? {
-              ...scene,
-              blocks: scene.blocks.map((block) => {
-                if (block.id !== params.blockId) {
-                  return block;
-                }
-                applied = true;
-                return updateBlock(block, { text: nextText });
-              })
-            }
-          : scene
-      ));
-      return { ...prev, scenes: nextScenes };
-    });
-    if (!applied) return;
-    setInsertScrollTargetId(params.blockId);
-    setInsertScrollToken((token) => token + 1);
-  }, [applyContextMutation, clearRedo]);
+    scriptMutationController.applyRewritePreview(params);
+  }, [scriptMutationController]);
 
   const handleUndo = () => {
     if (!context || context.scenes.length === 0) return;
@@ -1797,101 +1470,14 @@ export default function App() {
   }, []);
 
   const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string, rewriteGuidance?: string) => {
-    if (!context || isGenerating) return;
-
-    const scene = context.scenes.find(s => s.id === sceneId);
-    const block = scene?.blocks.find(b => b.id === blockId);
-
-    if (!block || block.locked) return;
-
-    const originalText = block.text;
-    const startedBlockRevision = block.blockRevision;
-    const startedPromptContextRevision = promptContextRevisionRef.current;
-    const scopeKey = scopeKeys.rewriteBlock(scriptIdRef.current, blockId);
-    try {
-      activeGenerationScopeRef.current = scopeKey;
-      setIsGenerating(true);
-      setError(null);
-
-      const outcome = await orchestratorRef.current.run<string>({
-        opType: 'rewriteBlock',
-        scopeKey,
-        execute: (signal) => executeRewriteBlock(
-          block,
-          context.genre,
-          context.premise,
-          context.style,
-          rewriteGuidance,
-          { signal, opType: 'rewriteBlock', scopeKey }
-        ),
-        isFresh: () => isRewriteFresh({
-          context: contextRef.current,
-          sceneId,
-          blockId,
-          startedBlockRevision,
-          startedPromptContextRevision,
-          currentPromptContextRevision: promptContextRevisionRef.current
-        }),
-        commit: (newText) => {
-          const sanitizedText = sanitizeGeneratedInsertText(
-            block.type,
-            newText,
-            block.character ?? undefined
-          );
-          if (!sanitizedText) {
-            throw new Error('AI returned empty rewrite content.');
-          }
-          clearRedo();
-          applyContextMutation((prev) => {
-            if (!prev) return null;
-            return {
-              ...prev,
-              scenes: prev.scenes.map(s => s.id === sceneId ? {
-                ...s,
-                blocks: s.blocks.map((b) => (
-                  b.id === blockId
-                    ? updateBlock(b, { text: sanitizedText })
-                    : b
-                ))
-              } : s)
-            };
-          });
-          setInsertScrollTargetId(blockId);
-          setInsertScrollToken(token => token + 1);
-          setToast({
-            message: 'Block regenerated',
-            onUndo: () => {
-              applyContextMutation((prev) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  scenes: prev.scenes.map(s => s.id === sceneId ? {
-                    ...s,
-                    blocks: s.blocks.map((b) => (
-                      b.id === blockId
-                        ? updateBlock(b, { text: originalText })
-                        : b
-                    ))
-                  } : s)
-                };
-              });
-              setToast(null);
-            }
-          });
-        }
-      });
-      if (outcome.kind === 'failed') {
-        handleAiError(outcome.error, 'Failed to regenerate block.');
-      }
-    } catch (err: unknown) {
-      handleAiError(err, 'Failed to regenerate block.');
-    } finally {
-      if (activeGenerationScopeRef.current === scopeKey) {
-        activeGenerationScopeRef.current = null;
-      }
-      setIsGenerating(false);
-    }
-  }, [applyContextMutation, clearRedo, context, handleAiError, isGenerating]);
+    await scriptMutationController.rewriteBlock({
+      context,
+      isGenerating,
+      sceneId,
+      blockId,
+      rewriteGuidance
+    });
+  }, [context, isGenerating, scriptMutationController]);
 
   const handleDeleteBlock = useCallback((sceneId: string, blockId: string) => {
     let deletedBlock: ScriptBlock | null = null;
