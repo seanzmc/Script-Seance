@@ -110,6 +110,50 @@ describe("normalizeSceneCharacters", () => {
     expect(normalized.blocks).toHaveLength(1);
     expect(normalized.blocks[0].type).toBe(BlockType.ACTION);
   });
+
+  it("enforces canonical per-type block fields during normalization", () => {
+    const scene = {
+      id: "scene-canonicalize",
+      heading: " scene heading: ext. alley - night ",
+      summary: "Normalize invalid persisted block payloads.",
+      blocks: [
+        {
+          id: "legacy-a",
+          type: BlockType.ACTION,
+          text: " Action: A neon sign flickers. ",
+          blockRevision: 0,
+          character: "Alex",
+          parenthetical: "(whispering)"
+        },
+        {
+          id: "legacy-d",
+          type: BlockType.DIALOGUE,
+          text: " Dialogue: Keep moving. ",
+          blockRevision: 0,
+          character: "   "
+        }
+      ]
+    } as unknown as Scene;
+
+    const normalized = normalizeSceneCharacters(scene, ["Morgan"]);
+
+    expect(normalized.heading).toBe("EXT. ALLEY - NIGHT");
+    expect(normalized.blocks).toEqual([
+      {
+        id: "legacy-a",
+        type: BlockType.ACTION,
+        text: "A neon sign flickers.",
+        blockRevision: 1
+      },
+      {
+        id: "legacy-d",
+        type: BlockType.DIALOGUE,
+        text: "Keep moving.",
+        blockRevision: 1,
+        character: "Morgan"
+      }
+    ]);
+  });
 });
 
 describe("sanitizeGeneratedInsertText", () => {

@@ -44,6 +44,7 @@ import {
   isTitleSuggestionFresh
 } from './services/orchestration';
 import { createScriptMutationController, type ScriptMutationAction } from './services/scriptController';
+import { normalizeSceneBlocks, normalizeSceneHeading } from './domain/blocks';
 import { RotateCcw } from 'lucide-react';
 
 interface ToastState {
@@ -148,31 +149,25 @@ const resolveCharacterName = (value: string | null | undefined, characters: stri
   return match ?? value;
 };
 
-const ensureBlockRevision = (block: ScriptBlock): ScriptBlock => {
-  const rawRevision = (block as ScriptBlock & { blockRevision?: number }).blockRevision;
-  const blockRevision =
-    typeof rawRevision === 'number' && Number.isFinite(rawRevision) && rawRevision > 0
-      ? Math.floor(rawRevision)
-      : 1;
-  return { ...block, blockRevision };
-};
-
 export const normalizeSceneCharacters = (scene: Scene, characters: string[]): Scene => {
   const legacyHeadingBlock = scene.blocks.find((block) => block.type === BlockType.HEADING);
-  const legacyHeadingText = legacyHeadingBlock?.text?.trim();
-  const normalizedHeading = scene.heading.trim() || (legacyHeadingText ? legacyHeadingText.toUpperCase() : '');
+  const normalizedHeading = normalizeSceneHeading(scene.heading) || normalizeSceneHeading(legacyHeadingBlock?.text);
+  const fallbackDialogueCharacter = characters.find((character) => character.trim()) || 'Narrator';
+  const normalizedBlocks = normalizeSceneBlocks(scene.blocks, { fallbackDialogueCharacter })
+    .map((block) => {
+      if (block.type !== BlockType.DIALOGUE) {
+        return block;
+      }
+      const resolvedCharacter = resolveCharacterName(block.character, characters) ?? block.character;
+      return resolvedCharacter === block.character
+        ? block
+        : { ...block, character: resolvedCharacter };
+    });
 
   return {
     ...scene,
     heading: normalizedHeading,
-    blocks: scene.blocks
-      .filter((rawBlock) => rawBlock.type !== BlockType.HEADING)
-      .map((rawBlock) => {
-        const block = ensureBlockRevision(rawBlock);
-        return block.character
-          ? { ...block, character: resolveCharacterName(block.character, characters) }
-          : block;
-      })
+    blocks: normalizedBlocks
   };
 };
 

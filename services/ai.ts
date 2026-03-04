@@ -465,6 +465,8 @@ type SceneGenerationData = {
 };
 
 const mapSceneGenerationData = (data: SceneGenerationData): Scene => ({
+  // Keep AI-generated blocks tagged at creation for later provenance-aware features.
+  // Scene headings remain scene metadata and are not persisted in scene.blocks.
   id: crypto.randomUUID(),
   heading: data.heading,
   summary: data.summary,
@@ -474,7 +476,11 @@ const mapSceneGenerationData = (data: SceneGenerationData): Scene => ({
       type: block.type,
       text: block.text,
       character: block.character ?? undefined,
-      parenthetical: block.parenthetical ?? undefined
+      parenthetical: block.parenthetical ?? undefined,
+      meta: {
+        origin: 'ai',
+        createdAt: new Date().toISOString()
+      }
     }))
 });
 

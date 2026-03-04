@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createBlock, sanitizeGeneratedText, updateBlock } from '../domain/blocks';
-import { BlockType } from '../types';
+import { createBlock, normalizeSceneBlocks, sanitizeGeneratedText, updateBlock } from '../domain/blocks';
+import { BlockType, ScriptBlock } from '../types';
 
 describe('domain/blocks', () => {
   it('createBlock requires character for dialogue', () => {
@@ -31,5 +31,78 @@ describe('domain/blocks', () => {
 
     expect(sanitized).toBe('A glass tumbles off the table.');
     expect(sanitized.startsWith('Action:')).toBe(false);
+  });
+
+  it('createBlock accepts sanitized metadata payloads', () => {
+    const block = createBlock({
+      type: BlockType.ACTION,
+      text: 'Action: The lamp sputters.',
+      meta: {
+        origin: 'user',
+        createdAt: ' 2026-03-04T15:12:00.000Z ',
+        opId: ' insert-1 '
+      }
+    });
+
+    expect(block.meta).toEqual({
+      origin: 'user',
+      createdAt: '2026-03-04T15:12:00.000Z',
+      opId: 'insert-1'
+    });
+  });
+
+  it('normalizeSceneBlocks drops heading blocks and enforces type field rules', () => {
+    const legacyBlocks = [
+      {
+        id: 'legacy-heading',
+        type: BlockType.HEADING,
+        text: 'INT. LAB - DAY',
+        blockRevision: 1
+      },
+      {
+        id: 'legacy-action',
+        type: BlockType.ACTION,
+        text: ' Action: A warning light flashes. ',
+        blockRevision: 0,
+        character: 'Alex',
+        parenthetical: '(whispering)',
+        meta: {
+          origin: 'invalid-origin',
+          createdAt: ' 2026-03-04T10:00:00.000Z ',
+          opId: ' '
+        }
+      },
+      {
+        id: 'legacy-dialogue',
+        type: BlockType.DIALOGUE,
+        text: ' Dialogue: Move now. ',
+        blockRevision: -3,
+        character: '   ',
+        parenthetical: ' (urgent) '
+      }
+    ] as unknown as ScriptBlock[];
+
+    const normalized = normalizeSceneBlocks(legacyBlocks, {
+      fallbackDialogueCharacter: 'Sam'
+    });
+
+    expect(normalized).toHaveLength(2);
+    expect(normalized[0]).toEqual({
+      id: 'legacy-action',
+      type: BlockType.ACTION,
+      text: 'A warning light flashes.',
+      blockRevision: 1,
+      meta: {
+        createdAt: '2026-03-04T10:00:00.000Z'
+      }
+    });
+    expect(normalized[1]).toEqual({
+      id: 'legacy-dialogue',
+      type: BlockType.DIALOGUE,
+      text: 'Move now.',
+      blockRevision: 1,
+      character: 'Sam',
+      parenthetical: '(urgent)'
+    });
   });
 });

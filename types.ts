@@ -8,6 +8,14 @@ export enum BlockType {
   TRANSITION = 'transition'
 }
 
+export type ScriptBlockOrigin = 'ai' | 'user' | 'rewrite';
+
+export interface ScriptBlockMeta {
+  origin?: ScriptBlockOrigin;
+  createdAt?: string;
+  opId?: string;
+}
+
 export interface ScriptBlock {
   id: string;
   type: BlockType;
@@ -16,6 +24,7 @@ export interface ScriptBlock {
   character?: string;
   parenthetical?: string;
   locked?: boolean;
+  meta?: ScriptBlockMeta;
 }
 
 export interface Scene {
