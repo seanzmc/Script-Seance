@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { BlockType, ScriptBlock } from '../types';
-import { createBlock, sanitizeGeneratedText } from '../domain/blocks';
+import { BlockType, ScriptAnchor, ScriptBlock } from '../types';
+import { createBlock } from '../domain/blocks';
 import { Button } from './Button';
 
 const normalizeCharacterName = (value: string) =>
@@ -30,22 +30,17 @@ const buildSurpriseInstruction = (
 
 export interface InsertBlockProps {
   characters: string[];
-  genre: string;
-  onAddBlock: (block: ScriptBlock) => void;
-  onStartInsertMode: (block: ScriptBlock) => void;
-  onRequestSurprise?: (params: {
-    elementType: BlockType;
-    selectedChar: string;
-    instruction: string;
-    promptContext: string;
-    onCommit: (generatedText: string) => void;
+  sceneEndAnchor: ScriptAnchor | null;
+  onInsertAtAnchor?: (anchor: ScriptAnchor, block: ScriptBlock) => void;
+  onGenerateInsertAtAnchor?: (params: {
+    anchor: ScriptAnchor;
+    type: BlockType;
+    content: string;
+    character?: string;
   }) => Promise<void>;
-  insertModeActive: boolean;
   insertCompleteToken: number;
   onError?: (error: unknown) => void;
   disabled?: boolean;
-  insertTarget?: { sceneId: string; blockId: string } | null;
-  styleContext?: string;
 }
 
 const HINTS: Record<BlockType, string> = {
@@ -56,17 +51,13 @@ const HINTS: Record<BlockType, string> = {
 };
 
 export const InsertBlock: React.FC<InsertBlockProps> = ({ 
-  characters, 
-  genre, 
-  onAddBlock,
-  onStartInsertMode,
-  onRequestSurprise,
-  insertModeActive,
+  characters,
+  sceneEndAnchor,
+  onInsertAtAnchor,
+  onGenerateInsertAtAnchor,
   insertCompleteToken,
   onError,
-  disabled,
-  insertTarget,
-  styleContext
+  disabled
 }) => {
   const labelClass = 'text-[10px] uppercase font-bold text-gray-400 tracking-widest';
   const selectClass = 'h-9 bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
@@ -75,9 +66,7 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [tooltip, setTooltip] = useState<{ message: string; anchor: 'add' | 'insert' } | null>(null);
-  const addMessage = tooltip?.anchor === 'add' ? tooltip.message : null;
-  const insertMessage = tooltip?.anchor === 'insert' ? tooltip.message : null;
+  const [tooltip, setTooltip] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tooltip) return;
@@ -104,8 +93,8 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     }
   }, [characters, selectedChar]);
 
-  const showTooltip = (message: string, anchor: 'add' | 'insert') => {
-    setTooltip({ message, anchor });
+  const showTooltip = (message: string) => {
+    setTooltip(message);
   };
 
   const buildBlock = (trimmedContent: string): ScriptBlock => createBlock({
@@ -114,51 +103,34 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
     character: elementType === BlockType.DIALOGUE ? resolveCharacterName(selectedChar, characters) : undefined
   });
 
-  const handleAddBlock = () => {
+  const handleAddToEnd = () => {
     const trimmedContent = content.trim();
     if (!trimmedContent) {
-      showTooltip('Add content first', 'add');
+      showTooltip('Add content first');
       return;
     }
-    if (disabled || isGenerating) return;
-
-    onAddBlock(buildBlock(trimmedContent));
+    if (disabled || isGenerating || !sceneEndAnchor || !onInsertAtAnchor) return;
+    onInsertAtAnchor(sceneEndAnchor, buildBlock(trimmedContent));
     setContent(''); 
   };
 
-  const handleInsertMode = () => {
-    const trimmedContent = content.trim();
-    if (!trimmedContent) {
-      showTooltip('Add content first', 'insert');
-      return;
-    }
-    if (disabled || isGenerating || insertModeActive) return;
-
-    onStartInsertMode(buildBlock(trimmedContent));
-  };
-
   const handleSurpriseMe = async () => {
-    if (disabled || isGenerating || !onRequestSurprise) return;
+    if (disabled || isGenerating || !onGenerateInsertAtAnchor || !sceneEndAnchor) return;
     setIsGenerating(true);
     const requestType = elementType;
-    const requestCharacter = selectedChar;
+    const requestCharacter = resolveCharacterName(selectedChar, characters);
     const instruction = buildSurpriseInstruction(requestType, content, requestCharacter);
 
     try {
-      const promptContext = styleContext?.trim() ? styleContext : genre;
-      await onRequestSurprise({
-        elementType: requestType,
-        selectedChar: requestCharacter,
-        instruction,
-        promptContext,
-        onCommit: (generatedText) => {
-          const sanitized = sanitizeGeneratedText(requestType, generatedText, requestCharacter);
-          if (!sanitized) return;
-          setContent(sanitized);
-        }
+      await onGenerateInsertAtAnchor({
+        anchor: sceneEndAnchor,
+        type: requestType,
+        content: instruction,
+        character: requestType === BlockType.DIALOGUE ? requestCharacter : undefined
       });
-    } catch (e) {
-      console.error("Generation failed", e);
+      setContent('');
+    } catch (e: unknown) {
+      console.error('Generation failed', e);
       onError?.(e);
     } finally {
       setIsGenerating(false);
@@ -202,20 +174,15 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         )}
         <Button
           onClick={handleSurpriseMe}
-          disabled={disabled || isGenerating || !onRequestSurprise}
+          disabled={disabled || isGenerating || !onGenerateInsertAtAnchor || !sceneEndAnchor}
           size="sm"
           variant="secondary"
           loading={isGenerating}
           className="w-full lg:w-auto whitespace-nowrap lg:self-end"
-          title="Generate a new block in the editor"
+          title="Generate and insert at the end of your script"
         >
           Surprise
         </Button>
-        {insertTarget && (
-          <p className={`text-[10px] text-indigo-300 ${elementType === BlockType.DIALOGUE ? 'md:col-span-2 lg:col-span-3' : 'lg:col-span-2'}`}>
-            Insertion point selected.
-          </p>
-        )}
       </div>
 
       <div className="grid gap-1">
@@ -235,35 +202,23 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           <div className="flex flex-col gap-1 min-w-0">
             <Button
-              onClick={handleAddBlock}
-              disabled={disabled || isGenerating}
+              onClick={handleAddToEnd}
+              disabled={disabled || isGenerating || !onInsertAtAnchor || !sceneEndAnchor}
               className="w-full"
               size="sm"
               variant="secondary"
-              title="Add the block to the end of your script"
+              title="Insert this block at the end of your script"
             >
               Add to End
             </Button>
-            {addMessage && (
-              <span className="text-[10px] text-amber-300">{addMessage}</span>
-            )}
           </div>
-          <div className="flex flex-col gap-1 min-w-0">
-            <Button
-              onClick={handleInsertMode}
-              disabled={disabled || isGenerating || insertModeActive}
-              className="w-full shadow-lg"
-              size="sm"
-              variant="primary"
-              title="Pick an insertion point in the script"
-            >
-              Insert at Point
-            </Button>
-            {insertMessage && (
-              <span className="text-[10px] text-amber-300">{insertMessage}</span>
-            )}
-          </div>
+          <p className="text-[10px] leading-snug text-gray-500 sm:self-center">
+            Use inline <span className="font-semibold text-gray-400">+</span> slots in the script to insert at specific points.
+          </p>
         </div>
+        {tooltip && (
+          <span className="text-[10px] text-amber-300">{tooltip}</span>
+        )}
       </div>
     </div>
   );

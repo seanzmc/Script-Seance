@@ -171,19 +171,11 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onInstructionChange: vi.fn(),
   onGenerateNext: vi.fn(),
   onPlotTwist: vi.fn(),
-  onAddBlock: vi.fn(),
   onUndo: vi.fn(),
   onRedo: vi.fn(),
   canUndo: true,
   canRedo: true,
-  insertTarget: null,
-  insertModeActive: false,
-  pendingInsertBlock: null,
-  onStartInsertMode: vi.fn(),
-  onCancelInsertMode: vi.fn(),
-  onConfirmInsertMode: vi.fn(),
   insertCompleteToken: 0,
-  onSelectInsertTarget: vi.fn(),
   onChangeSpeaker: vi.fn(),
   onInsertError: vi.fn(),
   onRegenerate: vi.fn(),
@@ -205,7 +197,6 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onSetupChange: vi.fn(),
   onStartSetup: vi.fn(),
   setupAutoSurprise: false,
-  styleContext: '',
   onExportTxt: vi.fn(),
   onExportPdf: vi.fn(),
   canExport: true,
@@ -254,7 +245,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(screen.getByRole('button', { name: /generate next/i })).toBeTruthy();
   });
 
-  it('390x844: insert pick mode collapses tools and restores tool panel after completion token', async () => {
+  it('390x844: insert tool restores after completion token while inline composer remains primary', async () => {
     const { rerender } = render(<ScriptPane {...createProps()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /tools/i }));
@@ -265,12 +256,10 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
     });
 
-    rerender(<ScriptPane {...createProps({ insertModeActive: true, insertCompleteToken: 0 })} />);
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
-    });
+    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    expect(screen.getByTestId('mobile-tools-menu-sheet')).toBeTruthy();
 
-    rerender(<ScriptPane {...createProps({ insertModeActive: false, insertCompleteToken: 1 })} />);
+    rerender(<ScriptPane {...createProps({ insertCompleteToken: 1 })} />);
     await waitFor(() => {
       expect(screen.getByTestId('mobile-tool-sheet-insert')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();

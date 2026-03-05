@@ -39,8 +39,6 @@ import { useAudioPlayer } from './hooks/useAudioPlayer';
 import {
   GenerationOrchestrator,
   scopeKeys,
-  doesInsertAnchorResolve,
-  captureInsertAnchorSnapshot,
   isSetupAutoSurpriseFresh,
   isTitleSuggestionFresh
 } from './services/orchestration';
@@ -317,9 +315,6 @@ export default function App() {
   const hasManualTitleRef = useRef(false);
 
   const [setupState, setSetupState] = useState<SetupFormState>(DEFAULT_SETUP_STATE);
-  const [insertTarget, setInsertTarget] = useState<{ sceneId: string; blockId: string } | null>(null);
-  const [insertModeActive, setInsertModeActive] = useState(false);
-  const [pendingInsertBlock, setPendingInsertBlock] = useState<ScriptBlock | null>(null);
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
   const [insertScrollToken, setInsertScrollToken] = useState(0);
   const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
@@ -561,23 +556,6 @@ export default function App() {
     }
     applySetupStateMutation((prev) => ({ ...prev, ...next }), { source });
   }, [applyContextMutation, applySetupStateMutation]);
-  const handleSelectInsertTarget = useCallback((target: { sceneId: string; blockId: string }) => {
-    if (!insertModeActive) return;
-    setInsertTarget(target);
-  }, [insertModeActive]);
-
-  const handleStartInsertMode = useCallback((block: ScriptBlock) => {
-    setPendingInsertBlock(block);
-    setInsertTarget(null);
-    setInsertModeActive(true);
-  }, []);
-
-  const handleCancelInsertMode = useCallback(() => {
-    setInsertModeActive(false);
-    setPendingInsertBlock(null);
-    setInsertTarget(null);
-  }, []);
-
   const handleAiError = useCallback((err: unknown, fallbackMessage: string) => {
     const { code, status, message } = getErrorMeta(err);
     if (code === 'REQUEST_ABORTED') {
@@ -614,7 +592,6 @@ export default function App() {
     scriptIdRef,
     activeGenerationScopeRef,
     orchestratorRef,
-    setInsertTarget,
     setInsertScrollTargetId,
     setInsertScrollToken,
     setInsertCompleteToken,
@@ -761,10 +738,6 @@ export default function App() {
       });
     }
   }, [applySetupStateMutation, context]);
-
-  useEffect(() => {
-    setInsertTarget(null);
-  }, [context]);
 
   useEffect(() => {
     let active = true;
@@ -948,9 +921,6 @@ export default function App() {
     scriptIdRef.current = crypto.randomUUID();
     manualTitleRevisionRef.current = 0;
     activeGenerationScopeRef.current = null;
-    setInsertTarget(null);
-    setInsertModeActive(false);
-    setPendingInsertBlock(null);
     setError(null);
     setToast(null);
     setAutosaveError(null);
@@ -1135,24 +1105,6 @@ export default function App() {
     }
   };
 
-  const handleAddBlock = useCallback((block: ScriptBlock) => {
-    scriptMutationController.addBlock(block);
-  }, [scriptMutationController]);
-
-  const handleInsertAfter = useCallback((target: { sceneId: string; blockId: string }, block: ScriptBlock) => {
-    scriptMutationController.insertBlock(target, block);
-  }, [scriptMutationController]);
-
-  const handleConfirmInsert = useCallback(() => {
-    if (!pendingInsertBlock || !insertTarget) return;
-    setInsertScrollTargetId(pendingInsertBlock.id);
-    setInsertScrollToken(token => token + 1);
-    handleInsertAfter(insertTarget, pendingInsertBlock);
-    setPendingInsertBlock(null);
-    setInsertModeActive(false);
-    setInsertCompleteToken(token => token + 1);
-  }, [handleInsertAfter, insertTarget, pendingInsertBlock]);
-
   const handleInsertAtAnchor = useCallback((anchor: ScriptAnchor, block: ScriptBlock) => {
     scriptMutationController.insertBlockAtAnchor(anchor, block);
   }, [scriptMutationController]);
@@ -1231,40 +1183,6 @@ export default function App() {
   const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
     scriptMutationController.changeSpeaker(sceneId, blockId, character);
   }, [scriptMutationController]);
-
-  const handleInsertSurprise = useCallback(async (params: {
-    elementType: BlockType;
-    selectedChar: string;
-    instruction: string;
-    promptContext: string;
-    onCommit: (generatedText: string) => void;
-  }) => {
-    const startedPromptContextRevision = promptContextRevisionRef.current;
-    const anchorSnapshot = captureInsertAnchorSnapshot(contextRef.current, insertTarget);
-    const scopeKey = scopeKeys.insertSurpriseText(scriptIdRef.current, anchorSnapshot.anchorIdOrIndex);
-
-    const outcome = await orchestratorRef.current.run<string>({
-      opType: 'insertSurpriseText',
-      scopeKey,
-      execute: (signal) => executeGenerateScriptElement(
-        params.elementType,
-        params.selectedChar,
-        params.instruction,
-        params.promptContext,
-        { signal, opType: 'insertSurpriseText', scopeKey }
-      ),
-      isFresh: () =>
-        promptContextRevisionRef.current === startedPromptContextRevision &&
-        doesInsertAnchorResolve(anchorSnapshot, contextRef.current),
-      commit: (generatedText) => {
-        params.onCommit(generatedText);
-      }
-    });
-
-    if (outcome.kind === 'failed') {
-      handleAiError(outcome.error, 'Failed to generate block.');
-    }
-  }, [handleAiError, insertTarget]);
 
   const handleSetupSurprise = useCallback(async (params: {
     mode: 'manual' | 'auto';
@@ -1666,21 +1584,12 @@ export default function App() {
         onInstructionChange={setUserInstruction}
         onGenerateNext={handleGenerateNext}
         onPlotTwist={handleTwist}
-        onAddBlock={handleAddBlock}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
-        insertTarget={insertTarget}
-        insertModeActive={insertModeActive}
-        pendingInsertBlock={pendingInsertBlock}
-        onStartInsertMode={handleStartInsertMode}
-        onCancelInsertMode={handleCancelInsertMode}
-        onConfirmInsertMode={handleConfirmInsert}
         insertCompleteToken={insertCompleteToken}
-        onSelectInsertTarget={handleSelectInsertTarget}
         onChangeSpeaker={handleChangeSpeaker}
-        onInsertSurprise={handleInsertSurprise}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
         onRegenerate={handleRegenerateBlock}
         onGenerateRewritePreview={handleGenerateRewritePreview}
@@ -1708,7 +1617,6 @@ export default function App() {
         onSetupSurprise={handleSetupSurprise}
         onStartSetup={handleStart}
         setupAutoSurprise={setupAutoSurprise}
-        styleContext={scriptStyleContext}
         onSetupError={handleAiError}
         onExportTxt={handleDownload}
         onExportPdf={handleExportPdf}

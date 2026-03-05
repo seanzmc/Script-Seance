@@ -280,7 +280,6 @@ export interface CreateScriptMutationControllerDeps {
   activeGenerationScopeRef: RefValue<string | null>;
   orchestratorRef: RefValue<GenerationOrchestrator>;
 
-  setInsertTarget: (target: ScriptBlockTarget | null) => void;
   setInsertScrollTargetId: (targetId: string | null) => void;
   setInsertScrollToken: NumberStateSetter;
   setInsertCompleteToken: NumberStateSetter;
@@ -407,8 +406,14 @@ export const createScriptMutationController = (
     });
   };
 
-  const insertBlock = (target: ScriptBlockTarget, block: ScriptBlock) => {
-    deps.clearRedo();
+  const insertBlock = (
+    target: ScriptBlockTarget,
+    block: ScriptBlock,
+    options?: { clearRedo?: boolean }
+  ) => {
+    if (options?.clearRedo ?? true) {
+      deps.clearRedo();
+    }
     deps.applyContextMutation((previous) => {
       if (!previous) return null;
       const sceneIndex = previous.scenes.findIndex((scene) => scene.id === target.sceneId);
@@ -444,21 +449,56 @@ export const createScriptMutationController = (
       deps.pushUndoAction({ type: 'block', sceneId: scene.id, block: normalizedBlock, index: insertIndex });
       return { ...previous, scenes: nextScenes };
     });
-    deps.setInsertTarget(null);
   };
 
   const resolveAnchor = (context: StoryContext, anchor: ScriptAnchor) => (
     resolveInsertTargetFromAnchor(context, anchor)
   );
 
-  const insertBlockAtAnchor = (anchor: ScriptAnchor, block: ScriptBlock) => {
+  const normalizeBlocksForInsert = (context: StoryContext, blocks: ScriptBlock[]) => (
+    blocks.map((block) => (
+      block.character
+        ? { ...block, character: deps.resolveCharacterName(block.character, context.characters) }
+        : block
+    ))
+  );
+
+  const bumpBlockRevisions = (blocks: ScriptBlock[]) => (
+    blocks.map((block) => {
+      const nextRevision = Number.isInteger(block.blockRevision)
+        ? Math.max(1, block.blockRevision)
+        : 1;
+      return nextRevision === block.blockRevision
+        ? block
+        : { ...block, blockRevision: nextRevision };
+    })
+  );
+
+  const applyGeneratedBlocks = (anchor: ScriptAnchor, blocks: ScriptBlock[]) => {
     const latestContext = deps.contextRef.current;
-    if (!latestContext) return;
-    const target = resolveAnchor(latestContext, anchor);
-    if (!target) return;
-    deps.setInsertScrollTargetId(block.id);
+    if (!latestContext || blocks.length === 0) return [];
+    const initialTarget = resolveAnchor(latestContext, anchor);
+    if (!initialTarget) return [];
+
+    const normalizedBlocks = normalizeBlocksForInsert(latestContext, blocks);
+    const preparedBlocks = bumpBlockRevisions(normalizedBlocks);
+
+    let currentTarget = initialTarget;
+    preparedBlocks.forEach((block, index) => {
+      insertBlock(currentTarget, block, { clearRedo: index === 0 });
+      if (block.type !== BlockType.HEADING) {
+        currentTarget = { sceneId: currentTarget.sceneId, blockId: block.id };
+      }
+    });
+    return preparedBlocks;
+  };
+
+  const insertBlockAtAnchor = (anchor: ScriptAnchor, block: ScriptBlock) => {
+    const insertedBlocks = applyGeneratedBlocks(anchor, [block]);
+    const [inserted] = insertedBlocks;
+    if (!inserted) return;
+    deps.setInsertScrollTargetId(inserted.id);
     deps.setInsertScrollToken((token) => token + 1);
-    insertBlock(target, block);
     deps.setInsertCompleteToken((token) => token + 1);
   };
 
@@ -707,10 +747,6 @@ export const createScriptMutationController = (
         return Boolean(resolveAnchor(currentContext, params.anchor));
       },
       commit: (generatedText) => {
-        const currentContext = deps.contextRef.current;
-        if (!currentContext) return;
-        const target = resolveAnchor(currentContext, params.anchor);
-        if (!target) return;
         const text = sanitizeGeneratedInsertText(params.type, generatedText, selectedCharacter ?? undefined);
         if (!text) {
           throw new Error('AI returned empty content for insert.');
@@ -720,9 +756,12 @@ export const createScriptMutationController = (
           text,
           character: params.type === BlockType.DIALOGUE ? selectedCharacter : undefined
         });
-        deps.setInsertScrollTargetId(generatedBlock.id);
+        const [inserted] = applyGeneratedBlocks(params.anchor, [generatedBlock]);
+        if (!inserted) {
+          throw new Error('Insertion point is no longer available.');
+        }
+        deps.setInsertScrollTargetId(inserted.id);
         deps.setInsertScrollToken((token) => token + 1);
-        insertBlock(target, generatedBlock);
         deps.setInsertCompleteToken((token) => token + 1);
       }
     });

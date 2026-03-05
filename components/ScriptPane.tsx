@@ -17,12 +17,8 @@ import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
 import { useScriptController } from '../hooks/useScriptController';
+import { createAfterBlockAnchor, createSceneTopAnchor } from '../services/scriptController';
 import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
-
-export interface InsertTarget {
-  sceneId: string;
-  blockId: string;
-}
 
 export interface ScriptPaneProps {
   context: StoryContext | null;
@@ -40,27 +36,12 @@ export interface ScriptPaneProps {
   onInstructionChange: (value: string) => void;
   onGenerateNext: () => void;
   onPlotTwist: () => void;
-  onAddBlock: (block: ScriptBlock) => void;
   onUndo: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
-  insertTarget: InsertTarget | null;
-  insertModeActive: boolean;
-  pendingInsertBlock: ScriptBlock | null;
-  onStartInsertMode: (block: ScriptBlock) => void;
-  onCancelInsertMode: () => void;
-  onConfirmInsertMode: () => void;
   insertCompleteToken: number;
-  onSelectInsertTarget: (target: InsertTarget) => void;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
-  onInsertSurprise?: (params: {
-    elementType: BlockType;
-    selectedChar: string;
-    instruction: string;
-    promptContext: string;
-    onCommit: (generatedText: string) => void;
-  }) => Promise<void>;
   onInsertError: (error: unknown) => void;
   onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
   onGenerateRewritePreview?: (params: {
@@ -102,7 +83,6 @@ export interface ScriptPaneProps {
   onSetupSurprise?: (params: { mode: 'manual' | 'auto'; targetGenre: string }) => Promise<boolean>;
   onStartSetup: () => void;
   setupAutoSurprise: boolean;
-  styleContext?: string;
   onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
   onExportTxt: () => void;
   onExportPdf?: () => void;
@@ -193,21 +173,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onInstructionChange,
   onGenerateNext,
   onPlotTwist,
-  onAddBlock,
   onUndo,
   onRedo,
   canUndo,
   canRedo,
-  insertTarget,
-  insertModeActive,
-  pendingInsertBlock,
-  onStartInsertMode,
-  onCancelInsertMode,
-  onConfirmInsertMode,
   insertCompleteToken,
-  onSelectInsertTarget,
   onChangeSpeaker,
-  onInsertSurprise,
   onInsertError,
   onRegenerate,
   onGenerateRewritePreview,
@@ -236,7 +207,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onSetupSurprise,
   onStartSetup,
   setupAutoSurprise,
-  styleContext,
   onSetupError,
   onExportTxt,
   onExportPdf,
@@ -263,7 +233,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const rewriteAutoSelectEnabled = !(isNarrowViewport && currentTool === 'rewrite' && rewriteMode === 'select');
   const scriptController = useScriptController({
     context,
-    insertModeActive,
+    insertModeActive: false,
     rewriteAutoSelectEnabled,
     onGenerateNext,
     onDeleteBlock,
@@ -277,10 +247,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const promptCount = userInstruction.length;
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
-  const isInsertModeView = insertModeActive && Boolean(context);
-  const previewClassName = `w-full ${
-    isInsertModeView ? 'ring-2 ring-indigo-400/60 shadow-[0_0_30px_rgba(79,70,229,0.25)]' : ''
-  }`.trim();
+  const previewClassName = 'w-full';
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const styleLabel = context?.style?.trim() || '';
@@ -417,6 +384,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const handleSelectBlockTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     scriptController.selectBlockTarget(target);
   }, [scriptController]);
+  const handleLegacyInsertTargetSelection = useCallback(() => {
+    // Legacy insert mode is deprecated; inline anchor composer is the primary path.
+  }, []);
   const handleClearSelectedBlock = useCallback(() => {
     scriptController.clearBlockTarget();
   }, [scriptController]);
@@ -472,10 +442,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       showHighlights={showHighlights}
       autoScroll={autoScroll}
       onToggleLock={onToggleLock}
-      onSelectInsertTarget={onSelectInsertTarget}
+      onSelectInsertTarget={handleLegacyInsertTargetSelection}
       onChangeSpeaker={onChangeSpeaker}
       characters={context.characters}
-      insertTarget={insertTarget}
       rewriteTarget={scriptController.rewriteTarget}
       rewriteModeActive={currentTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
       onSelectRewriteTarget={handleSelectRewriteTarget}
@@ -491,27 +460,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       activeRewriteBlockId={scriptController.activeRewriteBlockId ?? null}
       rewriteComposer={rewriteComposerNode}
       onCloseRewriteComposer={scriptController.closeRewriteComposer}
-      insertModeActive={isInsertModeView}
-      pendingInsertBlock={pendingInsertBlock}
-      onConfirmInsertMode={onConfirmInsertMode}
-      onCancelInsertMode={onCancelInsertMode}
       className={previewClassName}
       scrollable
       insertScrollTargetId={insertScrollTargetId}
       insertScrollToken={insertScrollToken}
     />
   ) : null;
-
-  useEffect(() => {
-    if (!insertModeActive) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCancelInsertMode();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [insertModeActive, onCancelInsertMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -539,13 +493,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       setToolsSheet('collapsed');
     }
   }, [currentTool, isNarrowViewport, toolsSheet]);
-
-  useEffect(() => {
-    if (!isNarrowViewport || currentTool !== 'insert') return;
-    if (insertModeActive) {
-      setToolsSheet('collapsed');
-    }
-  }, [currentTool, insertModeActive, isNarrowViewport]);
 
   useEffect(() => {
     if (!isNarrowViewport || currentTool !== 'insert') {
@@ -584,19 +531,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       : currentTool === 'playback'
         ? isPlaybackExpanded ? 'Playback details open' : 'Playback mini-player open'
         : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
-  const insertModeToolbar = isInsertModeView ? (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3">
-      <div className="space-y-1">
-        <p className="text-[10px] uppercase tracking-[0.4em] text-indigo-200">Insert Mode</p>
-        <p className="text-xs text-indigo-100/80">Select a spot below, then confirm inline.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onCancelInsertMode}>
-          Cancel
-        </Button>
-      </div>
-    </div>
-  ) : null;
   const setupModal = isSetupOpen ? (
     <div
       className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
@@ -818,22 +752,26 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[10px] text-gray-500">Generate a script to unlock rewrite tools.</p>
   );
+  const sceneEndAnchor = useMemo(() => {
+    if (!context || context.scenes.length === 0) return null;
+    const lastScene = context.scenes[context.scenes.length - 1];
+    const lastBlock = lastScene.blocks[lastScene.blocks.length - 1];
+    return lastBlock
+      ? createAfterBlockAnchor(lastBlock.id)
+      : createSceneTopAnchor(lastScene.id);
+  }, [context]);
   const insertContent = context ? (
     <InsertBlock
       characters={context.characters}
-      genre={context.genre}
-      onAddBlock={onAddBlock}
-      onStartInsertMode={onStartInsertMode}
-      onRequestSurprise={onInsertSurprise}
-      insertModeActive={isInsertModeView}
+      sceneEndAnchor={sceneEndAnchor}
+      onInsertAtAnchor={onInsertAtAnchor}
+      onGenerateInsertAtAnchor={onGenerateInsertAtAnchor}
       insertCompleteToken={insertCompleteToken}
       onError={onInsertError}
       disabled={isPlaying || isGenerating}
-      insertTarget={insertTarget}
-      styleContext={styleContext}
     />
   ) : (
-    <p className="text-[11px] text-gray-500">Generate a script to unlock insert mode.</p>
+    <p className="text-[11px] text-gray-500">Generate a script to unlock insert tools.</p>
   );
   const playbackContent = context && playbackProps ? (
     <PlaybackPanel {...playbackProps} />
@@ -889,7 +827,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     >
       {context && (
         <div
-          className={`shrink-0 border-b border-gray-800 bg-gray-900/40 ${isInsertModeView ? 'pointer-events-none opacity-60' : ''}`}
+          className="shrink-0 border-b border-gray-800 bg-gray-900/40"
         >
           <div className="max-w-7xl mx-auto px-6 max-[900px]:px-4 max-[640px]:px-3 py-2.5">
             <div className="grid grid-cols-1 gap-3 max-[900px]:gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
@@ -988,7 +926,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             {errorBanner}
 
             <div className="flex flex-col gap-2 flex-1 min-h-0 min-w-0">
-              {insertModeToolbar}
               <div className="flex-1 min-h-0 min-w-0">
                 {previewSection}
               </div>

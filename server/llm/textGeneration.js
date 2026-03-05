@@ -106,7 +106,7 @@ const buildSceneJsonSchema = (lengthProfile) => ({
               parenthetical: { type: ['string', 'null'] },
               text: { type: 'string' }
             },
-            required: ['type', 'character', 'text']
+            required: ['type', 'character', 'text', 'parenthetical']
           }
         ]
       }

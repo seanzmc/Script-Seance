@@ -64,19 +64,11 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onInstructionChange: vi.fn(),
   onGenerateNext: vi.fn(),
   onPlotTwist: vi.fn(),
-  onAddBlock: vi.fn(),
   onUndo: vi.fn(),
   onRedo: vi.fn(),
   canUndo: true,
   canRedo: true,
-  insertTarget: null,
-  insertModeActive: false,
-  pendingInsertBlock: null,
-  onStartInsertMode: vi.fn(),
-  onCancelInsertMode: vi.fn(),
-  onConfirmInsertMode: vi.fn(),
   insertCompleteToken: 0,
-  onSelectInsertTarget: vi.fn(),
   onChangeSpeaker: vi.fn(),
   onInsertError: vi.fn(),
   onRegenerate: vi.fn(),
@@ -104,7 +96,6 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onSetupChange: vi.fn(),
   onStartSetup: vi.fn(),
   setupAutoSurprise: false,
-  styleContext: '',
   onExportTxt: vi.fn(),
   onExportPdf: vi.fn(),
   canExport: true,
@@ -285,6 +276,29 @@ describe('ScriptPane block interactions', () => {
       position: 'after',
       id: 'block:block-1:after'
     }));
+  });
+
+  it('routes insert panel Add to End through the same anchor insert callback', () => {
+    const onInsertAtAnchor = vi.fn();
+    render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'An ending beat closes the scene.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to End' }));
+
+    expect(onInsertAtAnchor).toHaveBeenCalledTimes(1);
+    expect(onInsertAtAnchor).toHaveBeenCalledWith(
+      expect.objectContaining<ScriptAnchor>({
+        kind: 'block',
+        blockId: 'block-2',
+        position: 'after',
+        id: 'block:block-2:after'
+      }),
+      expect.objectContaining({
+        type: BlockType.ACTION,
+        text: 'An ending beat closes the scene.'
+      })
+    );
   });
 
   it('selects a block and clears selection on outside click', () => {

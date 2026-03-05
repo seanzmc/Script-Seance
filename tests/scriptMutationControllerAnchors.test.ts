@@ -66,7 +66,6 @@ const createControllerHarness = (context = buildContext()) => {
     scriptIdRef: { current: 'script-1' },
     activeGenerationScopeRef: { current: null },
     orchestratorRef: { current: new GenerationOrchestrator() },
-    setInsertTarget: vi.fn(),
     setInsertScrollTargetId: vi.fn(),
     setInsertScrollToken: vi.fn(),
     setInsertCompleteToken: vi.fn(),
