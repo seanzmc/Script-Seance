@@ -83,6 +83,8 @@ const INWORLD_TOKEN_METHOD = 'ai.inworld.engine.WorldEngine/GenerateToken';
 const ALLOWED_ORIGINS = new Set(parseAllowedOrigins(process.env.ALLOWED_ORIGINS));
 
 const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition']);
+const VALID_SCENE_BLOCK_TYPES = new Set(['action', 'dialogue', 'transition']);
+const VALID_REWRITE_BLOCK_TYPES = new Set(['action', 'dialogue', 'transition']);
 const VALID_SCENE_LENGTHS = new Set(['Short', 'Medium', 'Long']);
 const sessions = new Map();
 const rateBuckets = new Map();
@@ -162,20 +164,23 @@ const isNonEmptyString = (value, max = 4000) => (
 );
 const isStringWithin = (value, max) => typeof value === 'string' && value.length <= max;
 
-const isValidBlock = (block) => {
+const isValidSceneBlock = (block) => {
   if (!isObject(block)) return false;
-  if (!VALID_BLOCK_TYPES.has(block.type)) return false;
+  if (!VALID_SCENE_BLOCK_TYPES.has(block.type)) return false;
   if (!isStringWithin(block.text, MAX_BLOCK_TEXT_CHARS)) return false;
 
-  if (block.character !== undefined && block.character !== null) {
-    if (!isStringWithin(block.character, MAX_BLOCK_CHARACTER_CHARS)) return false;
+  const hasCharacterField = block.character !== undefined;
+  const hasParentheticalField = block.parenthetical !== undefined;
+
+  if (block.type === 'dialogue') {
+    if (!isNonEmptyString(block.character, MAX_BLOCK_CHARACTER_CHARS)) return false;
+    if (hasParentheticalField && block.parenthetical !== null) {
+      if (!isStringWithin(block.parenthetical, MAX_BLOCK_PARENTHETICAL_CHARS)) return false;
+    }
+    return true;
   }
 
-  if (block.parenthetical !== undefined && block.parenthetical !== null) {
-    if (!isStringWithin(block.parenthetical, MAX_BLOCK_PARENTHETICAL_CHARS)) return false;
-  }
-
-  return true;
+  return !hasCharacterField && !hasParentheticalField;
 };
 
 const validateAiResponse = (kind, data) => {
@@ -193,7 +198,7 @@ const validateAiResponse = (kind, data) => {
     if (!Array.isArray(data.blocks) || data.blocks.length > MAX_SCENE_BLOCKS) {
       return { ok: false, reason: 'Scene blocks missing or too many.' };
     }
-    if (!data.blocks.every(isValidBlock)) {
+    if (!data.blocks.every(isValidSceneBlock)) {
       return { ok: false, reason: 'Scene blocks invalid.' };
     }
     return { ok: true };
@@ -1136,7 +1141,7 @@ const handleAiGenerate = async (req, res) => {
           const { type, text, character } = block;
           if (
             !isNonEmptyString(type, 24) ||
-            !VALID_BLOCK_TYPES.has(type) ||
+            !VALID_REWRITE_BLOCK_TYPES.has(type) ||
             !isNonEmptyString(text, 2000)
           ) {
             return sendError(res, 400, 'Invalid block data.', 'INVALID_REQUEST');

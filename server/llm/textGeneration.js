@@ -78,15 +78,37 @@ const buildSceneJsonSchema = (lengthProfile) => ({
       minItems: lengthProfile.minBlocks,
       maxItems: lengthProfile.maxBlocks,
       items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          type: { type: 'string', enum: ['heading', 'action', 'dialogue', 'transition'] },
-          character: { type: ['string', 'null'] },
-          parenthetical: { type: ['string', 'null'] },
-          text: { type: 'string' }
-        },
-        required: ['type', 'character', 'parenthetical', 'text']
+        anyOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              type: { type: 'string', enum: ['action'] },
+              text: { type: 'string' }
+            },
+            required: ['type', 'text']
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              type: { type: 'string', enum: ['transition'] },
+              text: { type: 'string' }
+            },
+            required: ['type', 'text']
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              type: { type: 'string', enum: ['dialogue'] },
+              character: { type: ['string', 'null'], minLength: 1 },
+              parenthetical: { type: ['string', 'null'] },
+              text: { type: 'string' }
+            },
+            required: ['type', 'character', 'text']
+          }
+        ]
       }
     }
   },
@@ -854,7 +876,7 @@ export const generateTextByKind = async ({
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      type: { type: Type.STRING, enum: ['heading', 'action', 'dialogue', 'transition'] },
+                      type: { type: Type.STRING, enum: ['action', 'dialogue', 'transition'] },
                       character: { type: Type.STRING, nullable: true },
                       parenthetical: { type: Type.STRING, nullable: true },
                       text: { type: Type.STRING }

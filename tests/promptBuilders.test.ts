@@ -33,6 +33,8 @@ describe('promptBuilders style injection', () => {
       targetLength: 'Medium'
     });
     expect(prompt).toContain('Style Theme: Dead serious documentary tone');
+    expect(prompt).toContain('"type": "action" | "dialogue" | "transition"');
+    expect(prompt).toContain('Do NOT emit a heading block inside "blocks".');
   });
 
   it('injects style into suggestPlotTwist prompt', () => {

@@ -118,13 +118,17 @@ export const buildGenerateScenePrompt = ({
       "summary": "A one sentence summary of what happens in this scene for context tracking.",
       "blocks": [
         {
-          "type": "heading" | "action" | "dialogue" | "transition",
+          "type": "action" | "dialogue" | "transition",
           "character": "CHARACTER NAME (only for dialogue)",
           "parenthetical": "(optional parenthetical instruction)",
           "text": "The content of the block"
         }
       ]
     }
+
+    Scene heading contract:
+    - Put the scene heading ONLY in top-level "heading".
+    - Do NOT emit a heading block inside "blocks".
 
     Ensure the output is valid JSON.
   `;
