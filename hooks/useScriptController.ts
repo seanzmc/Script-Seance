@@ -17,7 +17,7 @@ export interface RewriteOption {
   displayText: string;
 }
 
-interface UseScriptControllerParams {
+export interface UseScriptControllerParams {
   context: StoryContext | null;
   insertModeActive: boolean;
   rewriteAutoSelectEnabled: boolean;

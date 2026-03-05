@@ -44,7 +44,7 @@ export interface ScriptControllerToast {
   onUndo?: () => void;
 }
 
-type InsertableBlockRef = {
+export type InsertableBlockRef = {
   sceneId: string;
   block: ScriptBlock;
 };
@@ -55,11 +55,11 @@ export type ScriptMutationAction =
 
 type UndoAction = ScriptMutationAction;
 
-type StoryContextMutation = StoryContext | null | ((previous: StoryContext | null) => StoryContext | null);
+export type StoryContextMutation = StoryContext | null | ((previous: StoryContext | null) => StoryContext | null);
 
-type NumberStateSetter = (value: number | ((previous: number) => number)) => void;
+export type NumberStateSetter = (value: number | ((previous: number) => number)) => void;
 
-type RefValue<T> = {
+export type RefValue<T> = {
   current: T;
 };
 
