@@ -154,6 +154,60 @@ describe("normalizeSceneCharacters", () => {
       }
     ]);
   });
+
+  it("preserves heading contract and applies fallback dialogue invariants when character list is empty", () => {
+    const scene = {
+      id: "scene-heading-invariants",
+      heading: " ",
+      summary: "Legacy payload with mixed invalid block fields.",
+      blocks: [
+        {
+          id: "legacy-heading",
+          type: BlockType.HEADING,
+          text: " scene heading: ext. tunnels - night ",
+          blockRevision: 1
+        },
+        {
+          id: "legacy-action",
+          type: BlockType.ACTION,
+          text: " Action: A damp wind whistles through cracked pipes. ",
+          blockRevision: 0,
+          character: "Alex",
+          parenthetical: "(low)"
+        },
+        {
+          id: "legacy-dialogue",
+          type: BlockType.DIALOGUE,
+          text: " Dialogue: Keep moving. ",
+          blockRevision: 0,
+          character: " "
+        }
+      ]
+    } as unknown as Scene;
+
+    const normalized = normalizeSceneCharacters(scene, []);
+
+    expect(normalized.heading).toBe("EXT. TUNNELS - NIGHT");
+    expect(normalized.blocks.map((block) => block.type)).toEqual([
+      BlockType.ACTION,
+      BlockType.DIALOGUE
+    ]);
+    expect(normalized.blocks).toEqual([
+      {
+        id: "legacy-action",
+        type: BlockType.ACTION,
+        text: "A damp wind whistles through cracked pipes.",
+        blockRevision: 1
+      },
+      {
+        id: "legacy-dialogue",
+        type: BlockType.DIALOGUE,
+        text: "Keep moving.",
+        blockRevision: 1,
+        character: "Narrator"
+      }
+    ]);
+  });
 });
 
 describe("sanitizeGeneratedInsertText", () => {

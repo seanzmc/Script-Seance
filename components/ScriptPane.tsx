@@ -99,13 +99,12 @@ const MOBILE_TOOLS_DOCK_PADDING = 'calc(4.75rem + env(safe-area-inset-bottom))';
 const MOBILE_PLAYBACK_SHEET_COLLAPSED_PX = 88;
 const MOBILE_PLAYBACK_SHEET_EXPANDED_PX = 200;
 const MOBILE_PLAYBACK_SHEET_EXPANDED_MAX = `min(${MOBILE_PLAYBACK_SHEET_EXPANDED_PX}px, 34vh)`;
-const MOBILE_EXPORT_SHEET_ESTIMATED_PX = 152;
-const MOBILE_EXPORT_SHEET_ESTIMATED_HEIGHT = `${MOBILE_EXPORT_SHEET_ESTIMATED_PX}px`;
-const MOBILE_EXPORT_SHEET_MAX_HEIGHT = getToolPanelMaxHeight('mobile-sheet', 'compact');
+const DESKTOP_PLAYBACK_SHEET_COLLAPSED_PX = 88;
+const DESKTOP_PLAYBACK_SHEET_EXPANDED_MAX = 'min(320px, 44vh)';
 const MOBILE_GENERATE_SHEET_MAX_HEIGHT = getToolPanelMaxHeight('mobile-sheet', 'medium');
 const MOBILE_TOOL_SHEET_MAX_HEIGHT = getToolPanelMaxHeight('mobile-sheet', 'default');
 const MOBILE_MENU_SHEET_MAX_HEIGHT = '50vh';
-const TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices', 'playback', 'export'];
+const LEGACY_TOOL_ORDER: ToolKey[] = ['generate', 'insert', 'rewrite', 'voices'];
 const TOOL_LABELS: Record<ToolKey, string> = {
   generate: 'Generate',
   insert: 'Insert',
@@ -224,8 +223,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [titleDraft, setTitleDraft] = useState('');
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
   const [styleDraft, setStyleDraft] = useState('');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const rewriteAutoSelectEnabled = !(isNarrowViewport && currentTool === 'rewrite' && rewriteMode === 'select');
   const scriptController = useScriptController({
     context,
@@ -387,7 +388,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     scriptController.clearBlockTarget();
   }, [scriptController]);
   const composerCharacters = context?.characters ?? [];
+  const totalScriptBlocks = useMemo(
+    () => context?.scenes.reduce((count, scene) => count + scene.blocks.length, 0) ?? 0,
+    [context]
+  );
   const dialogueCharacterUnavailable = scriptController.composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
+  const isBottomInsertSlotActive =
+    scriptController.activeInsertIndex !== null && scriptController.activeInsertIndex === totalScriptBlocks;
   const insertComposerNode = scriptController.activeInsertIndex !== null ? (
     <InsertComposerPopover
       blockType={scriptController.composerBlockType}
@@ -402,7 +409,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       }}
       onInsert={scriptController.insertAtActiveAnchor}
       onCancel={scriptController.closeInsertComposer}
+      onGenerateNextScene={() => {
+        scriptController.closeInsertComposer();
+        void scriptController.generateNextScene();
+      }}
       isGenerating={scriptController.isComposerGenerating}
+      isGeneratingNextScene={isGenerating}
+      showGenerateNextSceneAction={isBottomInsertSlotActive}
+      generateNextSceneDisabled={isPlaying || isGenerating}
       actionsDisabled={dialogueCharacterUnavailable}
       errorMessage={scriptController.composerError}
     />
@@ -480,6 +494,27 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isExportMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      if (exportMenuRef.current?.contains(targetNode)) return;
+      setIsExportMenuOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isExportMenuOpen]);
+
+  useEffect(() => {
     if (!isNarrowViewport) {
       setToolsSheet('collapsed');
       setRewriteMode('configure');
@@ -504,29 +539,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
   const mobileSheetEnabled = isNarrowViewport && Boolean(context);
   const isMenuSheetOpen = mobileSheetEnabled && toolsSheet === 'menu';
+  const isLegacyToolSelected = Boolean(currentTool && LEGACY_TOOL_ORDER.includes(currentTool));
   const isMobileStandardToolSheetVisible = mobileSheetEnabled
     && toolsSheet === 'tool'
-    && Boolean(currentTool)
-    && currentTool !== 'playback'
-    && currentTool !== 'export';
-  const isMobilePlaybackMiniVisible = mobileSheetEnabled
-    && currentTool === 'playback'
-    && toolsSheet === 'collapsed'
-    && Boolean(playbackProps);
-  const isMobileExportSheetVisible = mobileSheetEnabled
-    && currentTool === 'export'
-    && toolsSheet === 'tool';
+    && isLegacyToolSelected;
+  const isMobileFloatingPlaybackVisible = mobileSheetEnabled && Boolean(playbackProps);
   const isMobileRewriteSelectMode = mobileSheetEnabled && currentTool === 'rewrite' && rewriteMode === 'select';
   const activeToolLabel = currentTool ? TOOL_LABELS[currentTool] : null;
   const mobileDockLabel = isMenuSheetOpen
     ? 'Choose a tool'
     : isMobileStandardToolSheetVisible
       ? activeToolLabel ? `${activeToolLabel} open` : 'Tool panel open'
-      : isMobileExportSheetVisible
-        ? 'Export open'
-      : currentTool === 'playback'
-        ? isPlaybackExpanded ? 'Playback details open' : 'Playback mini-player open'
-        : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
+      : activeToolLabel ? `View ${activeToolLabel}` : 'Open tools';
   const setupModal = isSetupOpen ? (
     <div
       className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
@@ -578,28 +602,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const handleToolClose = () => {
     setCurrentTool(null);
     setToolsSheet('collapsed');
-    setIsPlaybackExpanded(false);
-    focusScriptScroll();
-  };
-  const handlePlaybackMiniClose = () => {
-    playbackProps?.onStop();
-    setCurrentTool(null);
-    setToolsSheet('collapsed');
-    setIsPlaybackExpanded(false);
     focusScriptScroll();
   };
   const handleMobileToolPanelClose = () => {
-    if (mobileSheetEnabled && currentTool === 'playback') {
-      setToolsSheet('collapsed');
-      return;
-    }
     handleToolClose();
   };
   const handleActiveToolDismiss = () => {
-    if (mobileSheetEnabled && currentTool === 'playback') {
-      handlePlaybackMiniClose();
-      return;
-    }
     handleToolClose();
   };
   const handleDesktopToolSelect = (tool: ToolKey) => {
@@ -607,26 +615,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       handleToolClose();
       return;
     }
-    if (tool !== 'playback') {
-      setIsPlaybackExpanded(false);
-    }
     setCurrentTool(tool);
     setRewriteMode('configure');
   };
   const handleSelectToolFromMenu = (tool: ToolKey) => {
     setCurrentTool(tool);
-    if (tool !== 'playback') {
-      setIsPlaybackExpanded(false);
-    }
     if (tool === 'rewrite') {
       setRewriteMode('select');
       scriptController.setRewriteTarget(null);
-      setToolsSheet('collapsed');
-      return;
-    }
-    if (tool === 'playback') {
-      setRewriteMode('configure');
-      setIsPlaybackExpanded(false);
       setToolsSheet('collapsed');
       return;
     }
@@ -775,21 +771,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
   );
 
-  useEffect(() => {
-    if (currentTool !== 'playback') {
-      setIsPlaybackExpanded(false);
-    }
-  }, [currentTool]);
-
-  useEffect(() => {
-    if (!isNarrowViewport || currentTool !== 'playback') return;
-    if (toolsSheet === 'tool') {
-      setToolsSheet('collapsed');
-    }
-  }, [currentTool, isNarrowViewport, toolsSheet]);
-
-  const playbackTargetHeight = isMobilePlaybackMiniVisible
+  const mobilePlaybackTargetHeight = isMobileFloatingPlaybackVisible
     ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_MAX : `${MOBILE_PLAYBACK_SHEET_COLLAPSED_PX}px`)
+    : '0px';
+  const isDesktopFloatingPlaybackVisible = Boolean(context && playbackProps && !mobileSheetEnabled);
+  const desktopPlaybackTargetHeight = isDesktopFloatingPlaybackVisible
+    ? (isPlaybackExpanded ? DESKTOP_PLAYBACK_SHEET_EXPANDED_MAX : `${DESKTOP_PLAYBACK_SHEET_COLLAPSED_PX}px`)
     : '0px';
   const mobileStandardToolSheetMaxHeight = currentTool === 'generate'
     ? MOBILE_GENERATE_SHEET_MAX_HEIGHT
@@ -806,11 +793,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         : currentTool === 'voices'
           ? (voicesContent ?? <p className="text-[11px] text-gray-500">Voices panel unavailable.</p>)
           : null;
-  const mobileOverlayHeight = isMobilePlaybackMiniVisible
-    ? playbackTargetHeight
-    : isMobileExportSheetVisible
-      ? MOBILE_EXPORT_SHEET_ESTIMATED_HEIGHT
-      : '0px';
+  const mobileOverlayHeight = isMobileFloatingPlaybackVisible ? mobilePlaybackTargetHeight : '0px';
   const mobileBottomPadding = mobileSheetEnabled
     ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobileOverlayHeight})`
     : undefined;
@@ -904,6 +887,61 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   >
                     Clear Draft
                   </button>
+                  <div className="relative" ref={exportMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsExportMenuOpen((previous) => !previous)}
+                      disabled={!canExport}
+                      className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Open export menu"
+                      aria-haspopup="menu"
+                      aria-expanded={isExportMenuOpen}
+                      aria-label="Open export menu"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Export
+                    </button>
+                    {isExportMenuOpen && (
+                      <div
+                        role="menu"
+                        aria-label="Export options"
+                        className="absolute right-0 top-[calc(100%+0.35rem)] z-50 min-w-[12rem] rounded-lg border border-gray-700 bg-gray-950/95 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)] backdrop-blur"
+                      >
+                        <div className="space-y-1">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              onExportTxt();
+                              setIsExportMenuOpen(false);
+                            }}
+                            disabled={!canExport}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Export script as a .txt file"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Export Script (.txt)
+                          </button>
+                          {onExportPdf && (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                onExportPdf();
+                                setIsExportMenuOpen(false);
+                              }}
+                              disabled={!canExport}
+                              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title="Export script as a PDF via print dialog"
+                            >
+                              <FileDown className="h-3.5 w-3.5" />
+                              Export PDF
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -943,6 +981,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           activeTool={currentTool}
           onSelectTool={handleDesktopToolSelect}
           onCloseTool={handleToolClose}
+          visibleTools={LEGACY_TOOL_ORDER}
           onExportTxt={onExportTxt}
           onExportPdf={onExportPdf}
           exportDisabled={!canExport}
@@ -962,7 +1001,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           sheetTestId="mobile-tools-menu-sheet"
         >
           <div className="grid grid-cols-1 gap-2">
-            {TOOL_ORDER.map((tool) => {
+            {LEGACY_TOOL_ORDER.map((tool) => {
               const isActive = currentTool === tool;
               return (
                 <button
@@ -995,11 +1034,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           {mobileStandardToolSheetContent}
         </MobileBottomSheet>
       )}
-      {isMobilePlaybackMiniVisible && playbackProps && (
+      {isMobileFloatingPlaybackVisible && playbackProps && (
         <div
           className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5 transition-[height] duration-200 ease-out`}
           style={{
-            height: playbackTargetHeight
+            height: mobilePlaybackTargetHeight
           }}
           data-testid="playback-mini-player"
         >
@@ -1007,53 +1046,27 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             {...playbackProps}
             isExpanded={isPlaybackExpanded}
             onToggleExpanded={handleTogglePlaybackExpanded}
-            onClose={handlePlaybackMiniClose}
+            onClose={() => {}}
+            showCloseButton={false}
           />
         </div>
       )}
-      {isMobileExportSheetVisible && (
-        <MobileBottomSheet
-          title="EXPORT"
-          maxHeight={MOBILE_EXPORT_SHEET_MAX_HEIGHT}
-          bodyClassName="px-4 py-2"
-          onBackdropClick={handleMobileToolPanelClose}
-          onClose={handleMobileToolPanelClose}
-          closeLabel="Close export panel"
-          sheetTestId="mobile-export-sheet"
+      {isDesktopFloatingPlaybackVisible && playbackProps && (
+        <div
+          className="fixed bottom-3 right-3 z-[75] w-[min(30rem,calc(100vw-1.25rem))] transition-[height] duration-200 ease-out"
+          style={{
+            height: desktopPlaybackTargetHeight
+          }}
+          data-testid="desktop-floating-playback"
         >
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Export options</p>
-              <p className="text-[10px] text-gray-500">Current draft only</p>
-            </div>
-            <div className="grid grid-cols-1 gap-1.5">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onExportTxt}
-                disabled={!canExport}
-                className="w-full text-xs"
-                title="Export script as a .txt file"
-              >
-                <Download className="w-3 h-3 mr-2" />
-                Export Script (.txt)
-              </Button>
-              {onExportPdf && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={onExportPdf}
-                  disabled={!canExport}
-                  className="w-full text-xs"
-                  title="Export script as a PDF via print dialog"
-                >
-                  <FileDown className="w-3 h-3 mr-2" />
-                  Export PDF
-                </Button>
-              )}
-            </div>
-          </div>
-        </MobileBottomSheet>
+          <PlaybackMiniPlayer
+            {...playbackProps}
+            isExpanded={isPlaybackExpanded}
+            onToggleExpanded={handleTogglePlaybackExpanded}
+            onClose={() => {}}
+            showCloseButton={false}
+          />
+        </div>
       )}
       {mobileSheetEnabled && (
         <div className="fixed inset-x-0 bottom-0 z-[74] pb-[max(0.5rem,env(safe-area-inset-bottom))]">

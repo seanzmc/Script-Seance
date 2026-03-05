@@ -276,6 +276,43 @@ describe('ScriptPane block interactions', () => {
     }));
   });
 
+  it('shows Generate Next Scene only on the end insert slot and routes to append scene', async () => {
+    const onGenerateNext = vi.fn();
+    render(<ScriptPane {...createProps({ onGenerateNext })} />);
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+    expect(screen.queryByRole('button', { name: 'Generate Next Scene' })).toBeNull();
+
+    fireEvent.click(screen.getByTestId('insert-slot-2'));
+    const generateNextSceneButton = screen.getByRole('button', { name: 'Generate Next Scene' });
+    fireEvent.click(generateNextSceneButton);
+
+    expect(onGenerateNext).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
+  });
+
+  it('disables end-slot Generate Next Scene while playback or generation is active', () => {
+    const onGenerateNext = vi.fn();
+    const { rerender } = render(
+      <ScriptPane {...createProps({ onGenerateNext, isPlaying: true })} />
+    );
+
+    fireEvent.click(screen.getByTestId('insert-slot-2'));
+    const playingDisabledButton = screen.getByRole('button', { name: 'Generate Next Scene' }) as HTMLButtonElement;
+    expect(playingDisabledButton.disabled).toBe(true);
+    fireEvent.click(playingDisabledButton);
+    expect(onGenerateNext).toHaveBeenCalledTimes(0);
+
+    rerender(<ScriptPane {...createProps({ onGenerateNext, isGenerating: true })} />);
+    fireEvent.click(screen.getByTestId('insert-slot-2'));
+    const generatingDisabledButton = screen.getByRole('button', { name: 'Generate Next Scene' }) as HTMLButtonElement;
+    expect(generatingDisabledButton.disabled).toBe(true);
+    fireEvent.click(generatingDisabledButton);
+    expect(onGenerateNext).toHaveBeenCalledTimes(0);
+  });
+
   it('routes insert panel Add to End through the same anchor insert callback', () => {
     const onInsertAtAnchor = vi.fn();
     render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);

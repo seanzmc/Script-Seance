@@ -47,6 +47,7 @@ export interface PlaybackMiniPlayerProps extends PlaybackPanelProps {
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onClose: () => void;
+  showCloseButton?: boolean;
 }
 
 type PlaybackState = 'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error';
@@ -424,7 +425,8 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
   onToggleAutoScroll,
   isExpanded,
   onToggleExpanded,
-  onClose
+  onClose,
+  showCloseButton = true
 }) => {
   const {
     currentStatus,
@@ -522,15 +524,17 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
             {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
             {isExpanded ? 'Less' : 'More'}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-            aria-label="Close playback mini-player"
-            title="Close playback mini-player"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {showCloseButton && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+              aria-label="Close playback mini-player"
+              title="Close playback mini-player"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[11px] text-gray-300">{statusDetail}</p>

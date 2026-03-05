@@ -35,6 +35,7 @@ export interface BottomToolbeltProps {
   activeTool: ToolKey | null;
   onSelectTool: (tool: ToolKey) => void;
   onCloseTool: () => void;
+  visibleTools?: ToolKey[];
   showSelector?: boolean;
   edgeToEdge?: boolean;
   className?: string;
@@ -53,6 +54,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   activeTool,
   onSelectTool,
   onCloseTool,
+  visibleTools = TOOL_ORDER,
   showSelector = true,
   edgeToEdge = false,
   className = '',
@@ -84,7 +86,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
   const hasPlaybackPanel = activeTool === 'playback' && Boolean(playbackContent);
   const hasVoicesPanel = activeTool === 'voices' && Boolean(voicesContent);
   const hasInsertPanel = activeTool === 'insert' && Boolean(insertContent);
-  const hasActivePanel = Boolean(activeTool);
+  const hasActivePanel = Boolean(activeTool && visibleTools.includes(activeTool));
   const desktopPanelPreset: ToolPanelPreset = activeTool === 'export'
     ? 'compact'
     : activeTool === 'generate'
@@ -296,7 +298,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               </button>
             ) : (
               <div className="flex flex-wrap gap-2 pr-1 text-gray-400 sm:pr-0 lg:flex-nowrap">
-                {TOOL_ORDER.map((tool, index) => renderToolButton(tool, 'inline', index))}
+                {visibleTools.map((tool, index) => renderToolButton(tool, 'inline', index))}
               </div>
             )}
           </div>
@@ -333,7 +335,7 @@ export const BottomToolbelt: React.FC<BottomToolbeltProps> = ({
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-3">
                 <div className="flex flex-col gap-2">
-                  {TOOL_ORDER.map((tool, index) => renderToolButton(tool, 'drawer', index))}
+                  {visibleTools.map((tool, index) => renderToolButton(tool, 'drawer', index))}
                 </div>
               </div>
             </div>

@@ -284,17 +284,11 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     });
   });
 
-  it('390x844: playback expands in-place via More/Less and never opens full-screen tool panel', async () => {
-    const onStop = vi.fn();
-    render(<ScriptPane {...createProps({ playbackProps: createPlaybackProps({ onStop }) })} />);
+  it('390x844: playback controller is persistent and expands/collapses in place', async () => {
+    render(<ScriptPane {...createProps()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Playback' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
-    });
-    expect(screen.queryByTestId('mobile-tool-sheet-playback')).toBeNull();
+    expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close playback mini-player' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand playback details' }));
@@ -303,7 +297,6 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
       expect(screen.getByText('Refresh Audio')).toBeTruthy();
     });
     expect(screen.getByText('Less')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse playback details' }));
 
@@ -312,14 +305,6 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     });
     expect(screen.queryByText('Refresh Audio')).toBeNull();
     expect(screen.getByText('More')).toBeTruthy();
-    expect(onStop).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close playback mini-player' }));
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('playback-mini-player')).toBeNull();
-    });
-    expect(onStop).toHaveBeenCalledTimes(1);
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {
@@ -333,25 +318,42 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(onCloseSetup).toHaveBeenCalledTimes(1);
   });
 
-  it('390x844: export opens as compact bottom sheet and closes cleanly', async () => {
-    render(<ScriptPane {...createProps()} />);
+  it('390x844: export opens from header menu and closes cleanly', async () => {
+    const onExportTxt = vi.fn();
+    const onExportPdf = vi.fn();
+    render(<ScriptPane {...createProps({ onExportTxt, onExportPdf })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open export menu' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('mobile-export-sheet')).toBeTruthy();
-    });
-    expect(screen.getByText('Export options')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /export script \(\.txt\)/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /export pdf/i })).toBeTruthy();
-    expect(screen.queryByTestId('mobile-tool-sheet-export')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
+    const exportMenu = await screen.findByRole('menu', { name: 'Export options' });
+    expect(exportMenu).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export Script (.txt)' }));
+    expect(onExportTxt).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close export panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open export menu' }));
+    expect(await screen.findByRole('menu', { name: 'Export options' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export PDF' }));
+    expect(onExportPdf).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('mobile-export-sheet')).toBeNull();
-    });
+    expect(screen.queryByRole('menu', { name: 'Export options' })).toBeNull();
+  });
+
+  it('1280x800: keeps floating playback and header export while legacy toolbelt excludes playback/export tools', async () => {
+    matchMediaMock.setViewport(1280, 800);
+    const onExportTxt = vi.fn();
+    render(<ScriptPane {...createProps({ onExportTxt })} />);
+
+    expect(screen.getByTestId('desktop-floating-playback')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Insert' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Rewrite' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Voices' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Playback' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open export menu' }));
+    expect(await screen.findByRole('menu', { name: 'Export options' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export Script (.txt)' }));
+    expect(onExportTxt).toHaveBeenCalledTimes(1);
   });
 });

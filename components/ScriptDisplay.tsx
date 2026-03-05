@@ -534,7 +534,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const renderInlineInsertSlot = useCallback((insertIndex: number, anchor: ScriptAnchor | null) => {
     const isActive = activeInsertIndex === insertIndex;
     return (
-      <div className="script-export-chrome relative h-5" data-insert-slot-wrapper="true">
+      <div className="script-export-chrome relative h-6" data-insert-slot-wrapper="true">
         <button
           type="button"
           data-testid={`insert-slot-${insertIndex}`}
@@ -553,27 +553,27 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             if (!anchor) return;
             onRequestInsert?.(anchor);
           }}
-          className={`group/slot absolute inset-x-4 top-1/2 h-5 -translate-y-1/2 rounded-full transition-[opacity,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-            isActive ? 'opacity-100' : 'opacity-0 hover:opacity-100 focus-visible:opacity-100'
+          className={`group/slot absolute inset-x-3 top-1/2 h-6 -translate-y-1/2 rounded-full transition-[opacity,transform,filter] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+            isActive ? 'opacity-100' : 'opacity-0 hover:opacity-100 hover:scale-[1.01] focus-visible:scale-[1.01] focus-visible:opacity-100'
           }`}
         >
           <span
-            className={`pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors ${
+            className={`pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors duration-200 ${
               isActive ? 'bg-indigo-400/85' : 'bg-indigo-300/70 group-hover/slot:bg-indigo-400/75'
             }`}
           />
           <span
-            className={`pointer-events-none absolute left-1/2 top-1/2 inline-flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#f6f1e7]/95 text-indigo-600 shadow-sm transition-[opacity,transform] duration-200 ${
+            className={`pointer-events-none absolute left-1/2 top-1/2 inline-flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-indigo-200/70 bg-[#f6f1e7]/95 text-indigo-600 shadow-[0_3px_8px_rgba(15,23,42,0.16)] transition-[opacity,transform,box-shadow] duration-200 ${
               isActive
-                ? 'scale-100 opacity-100'
-                : 'scale-90 opacity-0 group-hover/slot:scale-100 group-hover/slot:opacity-100 group-focus-visible/slot:scale-100 group-focus-visible/slot:opacity-100'
+                ? 'scale-100 opacity-100 shadow-[0_4px_12px_rgba(79,70,229,0.28)]'
+                : 'scale-90 opacity-0 group-hover/slot:scale-100 group-hover/slot:opacity-100 group-hover/slot:shadow-[0_4px_12px_rgba(79,70,229,0.2)] group-focus-visible/slot:scale-100 group-focus-visible/slot:opacity-100'
             }`}
           >
             <PlusCircle className="h-3.5 w-3.5" />
           </span>
         </button>
         {isActive && insertComposer && (
-          <div className="absolute left-1/2 top-[calc(100%+0.4rem)] z-30 w-[min(26rem,calc(100vw-3rem))] -translate-x-1/2">
+          <div className="absolute left-1/2 top-[calc(100%+0.45rem)] z-30 w-[min(27rem,calc(100vw-3rem))] -translate-x-1/2 transition-[opacity,transform] duration-150 ease-out">
             {insertComposer}
           </div>
         )}
@@ -603,14 +603,14 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
               const isSelectedBlock = selectedBlockTarget?.sceneId === scene.id && selectedBlockId === block.id;
               const isError = blockStatuses[block.id] === 'error';
-              const blockWrapperClasses = `group relative rounded transition-colors ${
+              const blockWrapperClasses = `group relative rounded-md transition-[background-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
                 isInsertTarget ? 'ring-1 ring-indigo-500/50 bg-indigo-100/30' : ''
               } ${
                 isRewriteTarget ? 'ring-2 ring-sky-400/60 bg-sky-100/40' : ''
               } ${
-                isSelectedBlock ? 'bg-slate-900/[0.08]' : ''
+                isSelectedBlock ? 'bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)]' : ''
               } ${
-                !isInsertMode ? 'cursor-pointer hover:bg-slate-900/[0.045]' : ''
+                !isInsertMode ? 'cursor-pointer hover:bg-slate-900/[0.045] hover:shadow-[0_6px_16px_rgba(15,23,42,0.07)]' : ''
               } ${
                 isRewriteMode ? 'hover:bg-sky-100/20' : ''
               }`;
@@ -699,7 +699,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       <div
                         id={`block-inline-actions-${block.id}`}
                         data-testid={`selected-block-actions-${block.id}`}
-                        className="script-export-chrome absolute right-10 top-1 z-20 flex items-center gap-1 rounded-full border border-gray-300/80 bg-[#f6f1e7]/95 px-1.5 py-1 shadow-sm"
+                        className="script-export-chrome absolute right-10 top-1 z-20 flex items-center gap-1 rounded-full border border-gray-300/85 bg-[#f6f1e7]/98 px-1.5 py-1 shadow-[0_8px_18px_rgba(15,23,42,0.16)] backdrop-blur-[1px] transition-[opacity,transform] duration-150 ease-out"
                       >
                         <button
                           type="button"
@@ -709,7 +709,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                             onRewriteBlock({ sceneId: scene.id, blockId: block.id });
                           }}
                           disabled={rewriteDisabled}
-                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700 transition-[background-color,color] duration-150 ease-out hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
                           title={block.locked ? 'Locked blocks cannot be rewritten' : 'Rewrite selected block'}
                           aria-label="Rewrite selected block"
                         >
@@ -723,7 +723,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                             onDeleteBlock({ sceneId: scene.id, blockId: block.id });
                           }}
                           disabled={deleteDisabled}
-                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-red-700 transition-[background-color,color] duration-150 ease-out hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
                           title={deleteDisabled ? 'Delete flow is not wired yet' : 'Delete selected block'}
                           aria-label="Delete selected block"
                         >
@@ -733,7 +733,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     )}
                     {!isInsertMode && (
                       <div
-                        className={`script-export-chrome absolute right-0 top-1 transition-opacity ${
+                        className={`script-export-chrome absolute right-0 top-1 transition-opacity duration-150 ease-out ${
                           block.locked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                         }`}
                       >
@@ -742,7 +742,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                             event.stopPropagation();
                             onToggleLock(scene.id, block.id);
                           }}
-                          className={`p-1.5 bg-white border rounded-full shadow-sm hover:shadow transition-all ${
+                          className={`p-1.5 rounded-full border bg-white shadow-sm transition-[color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-[1px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
                             block.locked
                               ? 'border-indigo-300 text-indigo-700 hover:text-indigo-800'
                               : 'border-gray-200 text-gray-500 hover:text-indigo-600'
@@ -760,7 +760,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     )}
                     {content}
                     {!isInsertMode && activeRewriteBlockId === block.id && rewriteComposer && (
-                      <div className="script-export-chrome absolute left-1/2 top-[calc(100%+0.4rem)] z-30 w-[min(28rem,calc(100vw-3rem))] -translate-x-1/2">
+                      <div className="script-export-chrome absolute left-1/2 top-[calc(100%+0.45rem)] z-30 w-[min(29rem,calc(100vw-3rem))] -translate-x-1/2 transition-[opacity,transform] duration-150 ease-out">
                         {rewriteComposer}
                       </div>
                     )}

@@ -311,4 +311,116 @@ describe('LLM orchestration receipt gating', () => {
     expect(outcome.kind).toBe('dropped');
     expect(commit).not.toHaveBeenCalled();
   });
+
+  it('keeps block-anchor insert freshness when unrelated blocks are added', async () => {
+    const orchestrator = new GenerationOrchestrator();
+    const execution = deferred<string>();
+    const commit = vi.fn();
+    let context: StoryContext = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A tense conspiracy.',
+      characters: ['Alex'],
+      scenes: [{
+        id: 'scene-1',
+        heading: 'INT. OFFICE - NIGHT',
+        summary: 'Initial scene',
+        blocks: [{
+          id: 'block-anchor',
+          type: BlockType.ACTION,
+          text: 'An anchor line.',
+          blockRevision: 1
+        }]
+      }]
+    };
+
+    const snapshot = captureInsertAnchorSnapshot(context, {
+      sceneId: 'scene-1',
+      blockId: 'block-anchor'
+    });
+
+    const run = orchestrator.run<string>({
+      opType: 'insertSurpriseText',
+      scopeKey: `script:s1:insert:${snapshot.anchorIdOrIndex}`,
+      execute: async () => execution.promise,
+      isFresh: () => doesInsertAnchorResolve(snapshot, context),
+      commit
+    });
+
+    context = {
+      ...context,
+      scenes: [{
+        ...context.scenes[0],
+        blocks: [
+          {
+            id: 'block-new',
+            type: BlockType.ACTION,
+            text: 'A new line appears above the anchor.',
+            blockRevision: 1
+          },
+          ...context.scenes[0].blocks
+        ]
+      }]
+    };
+    execution.resolve('Surprise text');
+
+    const outcome = await run;
+    expect(outcome.kind).toBe('committed');
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops index-based insert freshness when block count changes', async () => {
+    const orchestrator = new GenerationOrchestrator();
+    const execution = deferred<string>();
+    const commit = vi.fn();
+    let context: StoryContext = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A tense conspiracy.',
+      characters: ['Alex'],
+      scenes: [{
+        id: 'scene-1',
+        heading: 'INT. OFFICE - NIGHT',
+        summary: 'Initial scene',
+        blocks: [{
+          id: 'block-1',
+          type: BlockType.ACTION,
+          text: 'An opening line.',
+          blockRevision: 1
+        }]
+      }]
+    };
+
+    const snapshot = captureInsertAnchorSnapshot(context, null);
+    expect(snapshot.kind).toBe('index');
+
+    const run = orchestrator.run<string>({
+      opType: 'insertSurpriseText',
+      scopeKey: `script:s1:insert:${snapshot.anchorIdOrIndex}`,
+      execute: async () => execution.promise,
+      isFresh: () => doesInsertAnchorResolve(snapshot, context),
+      commit
+    });
+
+    context = {
+      ...context,
+      scenes: [{
+        ...context.scenes[0],
+        blocks: [
+          ...context.scenes[0].blocks,
+          {
+            id: 'block-2',
+            type: BlockType.ACTION,
+            text: 'A second line shifts the insertion index.',
+            blockRevision: 1
+          }
+        ]
+      }]
+    };
+    execution.resolve('Surprise text');
+
+    const outcome = await run;
+    expect(outcome.kind).toBe('dropped');
+    expect(commit).not.toHaveBeenCalled();
+  });
 });

@@ -43,14 +43,14 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
       aria-label="Rewrite Block"
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
-      className="rounded-xl border border-gray-300/80 bg-[#f6f1e7]/95 p-3 shadow-[0_16px_38px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-200 ease-out"
+      className="rounded-xl border border-gray-300/85 bg-[#f6f1e7]/97 p-3.5 shadow-[0_18px_42px_rgba(0,0,0,0.2)] backdrop-blur-[1px] transition-[opacity,transform,box-shadow] duration-200 ease-out"
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-700">Rewrite Block</h3>
         {isGenerating && <span className="text-[10px] text-gray-500">Generating...</span>}
       </div>
 
-      <div className="mt-2 rounded-lg border border-gray-300 bg-white/85 px-2.5 py-2">
+      <div className="mt-2.5 rounded-lg border border-gray-300 bg-white/85 px-2.5 py-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
           {BLOCK_LABELS[blockType]}
         </p>
@@ -59,7 +59,7 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
         </p>
       </div>
 
-      <div className="mt-2 space-y-1">
+      <div className="mt-2.5 space-y-1">
         <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
           Rewrite Instructions
         </label>
@@ -67,13 +67,13 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
           value={instructions}
           onChange={(event) => onInstructionsChange(event.target.value)}
           placeholder="Make it funnier, Shorten, More suspense..."
-          className="h-24 w-full resize-none rounded-lg border border-gray-300 bg-white/95 p-2 text-sm text-gray-800 shadow-inner outline-none transition-[opacity,transform] duration-150 ease-out placeholder:text-gray-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          className="h-24 w-full resize-none rounded-lg border border-gray-300 bg-white/95 p-2 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
           disabled={isGenerating}
         />
       </div>
 
       {hasCandidate && (
-        <div className="mt-2 space-y-1">
+        <div className="mt-2.5 space-y-1">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
             Proposed Rewrite
           </p>
@@ -87,7 +87,7 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
         <p className="mt-2 text-xs text-red-700" role="alert">{errorMessage}</p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5">
+      <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
         <Button
           type="button"
           variant="ghost"
