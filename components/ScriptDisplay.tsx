@@ -1,7 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Scene, BlockType, ScriptAnchor, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  BlockType,
+  INSERT_BOTTOM_ID,
+  INSERT_TOP_ID,
+  Scene,
+  ScriptAnchor,
+  ScriptBlock,
+  ScriptSelectionTarget
+} from '../types';
 import { Lock, Unlock, PlusCircle } from 'lucide-react';
 import { createAfterBlockAnchor, createSceneTopAnchor } from '../services/scriptController';
+import { AnchoredPopover } from './AnchoredPopover';
 
 export interface ScriptDisplayProps {
   scenes: Scene[];
@@ -26,11 +35,16 @@ export interface ScriptDisplayProps {
   scrollable?: boolean;
   insertScrollTargetId?: string | null;
   insertScrollToken?: number;
+  selectedTarget?: ScriptSelectionTarget | null;
   selectedBlockTarget?: { sceneId: string; blockId: string } | null;
   onSelectBlockTarget?: (target: { sceneId: string; blockId: string }) => void;
+  onSelectSceneHeading?: (sceneId: string) => void;
   onClearBlockTarget?: () => void;
   onRewriteBlock?: (target: { sceneId: string; blockId: string }) => void;
+  onOpenInsertFromSelection?: (target: ScriptSelectionTarget) => void;
+  onEditSceneHeading?: (sceneId: string, heading: string) => void;
   onDeleteBlock?: (target: { sceneId: string; blockId: string }) => void;
+  activeInsertAnchor?: ScriptAnchor;
   activeInsertIndex?: number | null;
   onRequestInsert?: (anchor: ScriptAnchor) => void;
   insertComposer?: React.ReactNode;
@@ -38,9 +52,11 @@ export interface ScriptDisplayProps {
   activeRewriteBlockId?: string | null;
   rewriteComposer?: React.ReactNode;
   onCloseRewriteComposer?: () => void;
+  activeHeadingSceneId?: string | null;
+  headingEditor?: React.ReactNode;
 }
 
-const ACTIVE_CLASSES = 'ring-2 ring-yellow-400/40 bg-yellow-100/70';
+const ACTIVE_CLASSES = 'ring-2 ring-emerald-500/65 bg-emerald-100/55';
 const ERROR_CLASSES = 'border border-red-300/70 bg-red-50/60';
 const INSERT_HIGHLIGHT_CLASSES = 'ring-2 ring-emerald-400/60 bg-emerald-100/40';
 export const SCRIPT_EXPORT_ROOT_SELECTOR = '[data-script-export-root="true"]';
@@ -254,20 +270,31 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   scrollable = false,
   insertScrollTargetId,
   insertScrollToken,
+  selectedTarget = null,
   selectedBlockTarget = null,
   onSelectBlockTarget,
+  onSelectSceneHeading,
   onClearBlockTarget,
   onRewriteBlock,
+  onOpenInsertFromSelection,
+  onEditSceneHeading,
   onDeleteBlock,
+  activeInsertAnchor,
   activeInsertIndex = null,
   onRequestInsert,
   insertComposer,
   onCloseInsertComposer,
   activeRewriteBlockId = null,
   rewriteComposer,
-  onCloseRewriteComposer
+  onCloseRewriteComposer,
+  activeHeadingSceneId = null,
+  headingEditor
 }) => {
   const insertHighlightTimeoutRef = useRef<number | null>(null);
+  const [selectedAnchorElement, setSelectedAnchorElement] = useState<HTMLElement | null>(null);
+  const [rewriteAnchorElement, setRewriteAnchorElement] = useState<HTMLElement | null>(null);
+  const [insertAnchorElement, setInsertAnchorElement] = useState<HTMLElement | null>(null);
+  const [headingEditorAnchorElement, setHeadingEditorAnchorElement] = useState<HTMLElement | null>(null);
   const playableBlockIds = useMemo(() => {
     const ids: string[] = [];
     scenes.forEach(scene => {
@@ -281,12 +308,14 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     currentBlockIndex >= 0 && currentBlockIndex < playableBlockIds.length
       ? playableBlockIds[currentBlockIndex]
       : currentBlockId;
-  const selectedBlockId = selectedBlockTarget?.blockId ?? null;
+  const selectedBlockId = selectedTarget?.kind === 'block'
+    ? selectedTarget.blockId
+    : selectedBlockTarget?.blockId ?? null;
   const isRewriteComposerOpen = Boolean(activeRewriteBlockId && rewriteComposer);
-  const totalScriptBlocks = playableBlockIds.length;
   const isInsertMode = insertModeActive;
   const isRewriteMode = rewriteModeActive && !isInsertMode;
   const hasPendingPreview = Boolean(pendingInsertBlock && insertTarget);
+  const isInlineInsertComposerOpen = Boolean(activeInsertAnchor && insertComposer);
   const blockOrderIndexById = useMemo(() => {
     const indexMap = new Map<string, number>();
     playableBlockIds.forEach((blockId, index) => {
@@ -294,18 +323,88 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     });
     return indexMap;
   }, [playableBlockIds]);
+  const sceneStartIndexById = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    let offset = 0;
+    scenes.forEach((scene) => {
+      indexMap.set(scene.id, offset);
+      offset += scene.blocks.length;
+    });
+    return indexMap;
+  }, [scenes]);
   const getDisplayCharacter = useCallback((name?: string) => {
     if (!name) return '';
     const normalized = normalizeCharacterName(name);
     const matched = characters.find(char => normalizeCharacterName(char) === normalized);
     return matched ?? name;
   }, [characters]);
+  const resolveBlockElement = useCallback((blockId: string) => {
+    if (typeof document === 'undefined') return null;
+    return document.getElementById(`block-${blockId}`);
+  }, []);
+  const resolveSceneHeadingElement = useCallback((sceneId: string) => {
+    if (typeof document === 'undefined') return null;
+    return document.getElementById(`scene-heading-${sceneId}`);
+  }, []);
+  const resolveInsertSlotElement = useCallback((anchorId: string) => {
+    if (typeof document === 'undefined') return null;
+    const node = document.querySelector(`[data-anchor-id="${anchorId}"]`);
+    return node instanceof HTMLElement ? node : null;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!selectedTarget) {
+      setSelectedAnchorElement(null);
+      return;
+    }
+
+    setSelectedAnchorElement(
+      selectedTarget.kind === 'block'
+        ? resolveBlockElement(selectedTarget.blockId)
+        : resolveSceneHeadingElement(selectedTarget.sceneId)
+    );
+  }, [resolveBlockElement, resolveSceneHeadingElement, scenes, selectedTarget]);
+
+  useLayoutEffect(() => {
+    setRewriteAnchorElement(activeRewriteBlockId ? resolveBlockElement(activeRewriteBlockId) : null);
+  }, [activeRewriteBlockId, resolveBlockElement, scenes]);
+
+  useLayoutEffect(() => {
+    if (!activeInsertAnchor) {
+      setInsertAnchorElement(null);
+      return;
+    }
+
+    const slotElement = resolveInsertSlotElement(activeInsertAnchor.id);
+    if (slotElement) {
+      setInsertAnchorElement(slotElement);
+      return;
+    }
+
+    if (activeInsertAnchor.kind === 'block') {
+      setInsertAnchorElement(resolveBlockElement(activeInsertAnchor.blockId));
+      return;
+    }
+
+    if (activeInsertAnchor.kind === 'scene') {
+      setInsertAnchorElement(resolveSceneHeadingElement(activeInsertAnchor.sceneId));
+      return;
+    }
+
+    setInsertAnchorElement(null);
+  }, [activeInsertAnchor, resolveBlockElement, resolveInsertSlotElement, resolveSceneHeadingElement, scenes]);
+
+  useLayoutEffect(() => {
+    setHeadingEditorAnchorElement(
+      activeHeadingSceneId ? resolveSceneHeadingElement(activeHeadingSceneId) : null
+    );
+  }, [activeHeadingSceneId, resolveSceneHeadingElement, scenes]);
 
   useEffect(() => {
     if (autoScroll && activeBlockId) {
       const el = document.getElementById(`block-${activeBlockId}`);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
   }, [activeBlockId, autoScroll]);
@@ -327,7 +426,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     const el = document.getElementById(`block-${insertScrollTargetId}`);
     requestAnimationFrame(() => {
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
         if (scrollContainer) {
@@ -347,19 +446,23 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   }, [insertScrollTargetId, insertScrollToken]);
 
   useEffect(() => {
-    if (isInsertMode || !selectedBlockTarget || !onClearBlockTarget) return;
-    const blockElementId = `block-${selectedBlockTarget.blockId}`;
-    const actionsElementId = `block-inline-actions-${selectedBlockTarget.blockId}`;
+    if (isInsertMode || !selectedTarget || !onClearBlockTarget) return;
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const targetNode = event.target as Node | null;
       if (!targetNode) return;
-      const selectedBlockElement = document.getElementById(blockElementId);
-      const inlineActionsElement = document.getElementById(actionsElementId);
+      const selectedElement = selectedTarget.kind === 'block'
+        ? document.getElementById(`block-${selectedTarget.blockId}`)
+        : document.getElementById(`scene-heading-${selectedTarget.sceneId}`);
+      const inlineActionsElement = document.querySelector('[data-selected-actions="true"]');
       const rewriteComposerNode = document.querySelector('[data-rewrite-composer="true"]');
-      if (selectedBlockElement?.contains(targetNode) || inlineActionsElement?.contains(targetNode)) {
+      const headingEditorNode = document.querySelector('[aria-label="Edit Scene Heading"]');
+      if (selectedElement?.contains(targetNode) || inlineActionsElement?.contains(targetNode)) {
         return;
       }
       if (rewriteComposerNode?.contains(targetNode)) {
+        return;
+      }
+      if (headingEditorNode?.contains(targetNode)) {
         return;
       }
       if (isRewriteComposerOpen && onCloseRewriteComposer) {
@@ -374,10 +477,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       document.removeEventListener('mousedown', handlePointerDown, true);
       document.removeEventListener('touchstart', handlePointerDown, true);
     };
-  }, [isInsertMode, isRewriteComposerOpen, onClearBlockTarget, onCloseRewriteComposer, selectedBlockTarget]);
+  }, [isInsertMode, isRewriteComposerOpen, onClearBlockTarget, onCloseRewriteComposer, selectedTarget]);
 
   useEffect(() => {
-    if (isInsertMode || activeInsertIndex === null || !onCloseInsertComposer) return;
+    if (isInsertMode || !isInlineInsertComposerOpen || !onCloseInsertComposer) return;
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const targetNode = event.target as Node | null;
       if (!targetNode) return;
@@ -393,20 +496,20 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       document.removeEventListener('mousedown', handlePointerDown, true);
       document.removeEventListener('touchstart', handlePointerDown, true);
     };
-  }, [activeInsertIndex, isInsertMode, onCloseInsertComposer]);
+  }, [isInlineInsertComposerOpen, isInsertMode, onCloseInsertComposer]);
 
   useEffect(() => {
-    if (isInsertMode || activeInsertIndex === null || !onCloseInsertComposer) return;
+    if (isInsertMode || !isInlineInsertComposerOpen || !onCloseInsertComposer) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       onCloseInsertComposer();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeInsertIndex, isInsertMode, onCloseInsertComposer]);
+  }, [isInlineInsertComposerOpen, isInsertMode, onCloseInsertComposer]);
 
   useEffect(() => {
-    if (isInsertMode || !selectedBlockTarget || !onClearBlockTarget) return;
+    if (isInsertMode || !selectedTarget || !onClearBlockTarget) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (isRewriteComposerOpen && onCloseRewriteComposer) {
@@ -417,7 +520,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isInsertMode, isRewriteComposerOpen, onClearBlockTarget, onCloseRewriteComposer, selectedBlockTarget]);
+  }, [isInsertMode, isRewriteComposerOpen, onClearBlockTarget, onCloseRewriteComposer, selectedTarget]);
 
   const renderPreviewBlock = (block: ScriptBlock) => {
     const baseClasses = 'script-block script-export-chrome relative rounded border border-dashed border-indigo-400/60 bg-indigo-50/60 px-4 py-3 shadow-sm';
@@ -532,11 +635,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     [insertTarget, onCancelInsertMode, onConfirmInsertMode, onSelectInsertTarget, pendingInsertBlock]
   );
   const renderInlineInsertSlot = useCallback((insertIndex: number, anchor: ScriptAnchor | null) => {
-    const isActive = activeInsertIndex === insertIndex;
+    const isActive = activeInsertAnchor?.id === anchor?.id || activeInsertIndex === insertIndex;
     return (
       <div className="script-export-chrome relative h-6" data-insert-slot-wrapper="true">
         <button
           type="button"
+          data-anchor-id={anchor?.id}
           data-testid={`insert-slot-${insertIndex}`}
           data-active={isActive ? 'true' : 'false'}
           aria-label={`Insert at slot ${insertIndex}`}
@@ -559,36 +663,48 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         >
           <span
             className={`pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors duration-200 ${
-              isActive ? 'bg-indigo-400/85' : 'bg-indigo-300/70 group-hover/slot:bg-indigo-400/75'
+              isActive ? 'bg-indigo-500/90' : 'bg-blue-300/75 group-hover/slot:bg-blue-500/80'
             }`}
           />
           <span
-            className={`pointer-events-none absolute left-1/2 top-1/2 inline-flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-indigo-200/70 bg-[#f6f1e7]/95 text-indigo-600 shadow-[0_3px_8px_rgba(15,23,42,0.16)] transition-[opacity,transform,box-shadow] duration-200 ${
+            className={`pointer-events-none absolute left-1/2 top-1/2 inline-flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-blue-200/70 bg-[#f6f1e7] text-blue-700 shadow-[0_3px_8px_rgba(15,23,42,0.16)] transition-[opacity,transform,box-shadow] duration-200 ${
               isActive
                 ? 'scale-100 opacity-100 shadow-[0_4px_12px_rgba(79,70,229,0.28)]'
-                : 'scale-90 opacity-0 group-hover/slot:scale-100 group-hover/slot:opacity-100 group-hover/slot:shadow-[0_4px_12px_rgba(79,70,229,0.2)] group-focus-visible/slot:scale-100 group-focus-visible/slot:opacity-100'
+                : 'scale-90 opacity-0 group-hover/slot:scale-100 group-hover/slot:opacity-100 group-hover/slot:shadow-[0_4px_12px_rgba(59,130,246,0.22)] group-focus-visible/slot:scale-100 group-focus-visible/slot:opacity-100'
             }`}
           >
             <PlusCircle className="h-3.5 w-3.5" />
           </span>
         </button>
-        {isActive && insertComposer && (
-          <div className="absolute left-1/2 top-[calc(100%+0.45rem)] z-30 w-[min(27rem,calc(100vw-3rem))] -translate-x-1/2 transition-[opacity,transform] duration-150 ease-out">
-            {insertComposer}
-          </div>
-        )}
       </div>
     );
-  }, [activeInsertIndex, insertComposer, onRequestInsert]);
+  }, [activeInsertAnchor, activeInsertIndex, onRequestInsert]);
 
   const renderedScenes = scenes.length === 0 ? null : scenes.map((scene, sceneIndex) => {
       const blocks = scene.blocks;
       const isFirstScene = sceneIndex === 0;
       const isLastScene = sceneIndex === scenes.length - 1;
+      const isSelectedHeading = selectedTarget?.kind === 'scene-heading' && selectedTarget.sceneId === scene.id;
 
       return (
         <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-8">
-          <div className="script-scene-heading font-bold uppercase mb-4 text-lg border-b border-gray-300 pb-2">
+          <div
+            id={`scene-heading-${scene.id}`}
+            className={`script-scene-heading rounded-lg border-b pb-2 transition-[background-color,box-shadow,border-color] duration-150 ${
+              isSelectedHeading && !activeInsertAnchor
+                ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)]'
+                : 'border-gray-300 hover:border-blue-300 hover:bg-blue-50/45'
+            }`}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isSelectedHeading}
+            onClick={() => onSelectSceneHeading?.(scene.id)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              onSelectSceneHeading?.(scene.id);
+            }}
+          >
             {scene.heading}
           </div>
 
@@ -601,24 +717,22 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             {blocks.map((block, index) => {
               const isInsertTarget = insertTarget?.blockId === block.id;
               const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
-              const isSelectedBlock = selectedBlockTarget?.sceneId === scene.id && selectedBlockId === block.id;
+              const isSelectedBlock = selectedTarget?.kind === 'block' && selectedTarget.sceneId === scene.id && selectedBlockId === block.id;
               const isError = blockStatuses[block.id] === 'error';
               const blockWrapperClasses = `group relative rounded-md transition-[background-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
                 isInsertTarget ? 'ring-1 ring-indigo-500/50 bg-indigo-100/30' : ''
               } ${
                 isRewriteTarget ? 'ring-2 ring-sky-400/60 bg-sky-100/40' : ''
               } ${
-                isSelectedBlock ? 'bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)]' : ''
+                isSelectedBlock && !activeInsertAnchor ? 'bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)]' : ''
               } ${
-                !isInsertMode ? 'cursor-pointer hover:bg-slate-900/[0.045] hover:shadow-[0_6px_16px_rgba(15,23,42,0.07)]' : ''
+                !isInsertMode ? 'cursor-pointer hover:bg-blue-50/45 hover:ring-1 hover:ring-blue-300/70 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)]' : ''
               } ${
                 isRewriteMode ? 'hover:bg-sky-100/20' : ''
               }`;
               const blockStatusClasses = isError ? ERROR_CLASSES : '';
               const isLastBlock = index === blocks.length - 1;
               const showBottomLabel = isLastScene && isLastBlock;
-              const rewriteDisabled = Boolean(block.locked) || !onRewriteBlock;
-              const deleteDisabled = !onDeleteBlock;
               const globalBlockOrder = blockOrderIndexById.get(block.id);
               const nextInsertIndex = typeof globalBlockOrder === 'number' ? globalBlockOrder + 1 : null;
               const nextInsertAnchor = typeof nextInsertIndex === 'number'
@@ -695,42 +809,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                         Audio error
                       </span>
                     )}
-                    {!isInsertMode && isSelectedBlock && (
-                      <div
-                        id={`block-inline-actions-${block.id}`}
-                        data-testid={`selected-block-actions-${block.id}`}
-                        className="script-export-chrome absolute right-10 top-1 z-20 flex items-center gap-1 rounded-full border border-gray-300/85 bg-[#f6f1e7]/98 px-1.5 py-1 shadow-[0_8px_18px_rgba(15,23,42,0.16)] backdrop-blur-[1px] transition-[opacity,transform] duration-150 ease-out"
-                      >
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (rewriteDisabled) return;
-                            onRewriteBlock({ sceneId: scene.id, blockId: block.id });
-                          }}
-                          disabled={rewriteDisabled}
-                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700 transition-[background-color,color] duration-150 ease-out hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
-                          title={block.locked ? 'Locked blocks cannot be rewritten' : 'Rewrite selected block'}
-                          aria-label="Rewrite selected block"
-                        >
-                          Rewrite
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (deleteDisabled) return;
-                            onDeleteBlock({ sceneId: scene.id, blockId: block.id });
-                          }}
-                          disabled={deleteDisabled}
-                          className="rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-red-700 transition-[background-color,color] duration-150 ease-out hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
-                          title={deleteDisabled ? 'Delete flow is not wired yet' : 'Delete selected block'}
-                          aria-label="Delete selected block"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
                     {!isInsertMode && (
                       <div
                         className={`script-export-chrome absolute right-0 top-1 transition-opacity duration-150 ease-out ${
@@ -759,18 +837,13 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       </div>
                     )}
                     {content}
-                    {!isInsertMode && activeRewriteBlockId === block.id && rewriteComposer && (
-                      <div className="script-export-chrome absolute left-1/2 top-[calc(100%+0.45rem)] z-30 w-[min(29rem,calc(100vw-3rem))] -translate-x-1/2 transition-[opacity,transform] duration-150 ease-out">
-                        {rewriteComposer}
-                      </div>
-                    )}
                   </div>
 
                   {isInsertMode && renderInsertTarget(
                     { sceneId: scene.id, blockId: block.id },
                     showBottomLabel ? 'Insert at bottom' : undefined
                   )}
-                  {!isInsertMode && !isLastBlock && typeof nextInsertIndex === 'number' && renderInlineInsertSlot(nextInsertIndex, nextInsertAnchor)}
+                  {!isInsertMode && typeof nextInsertIndex === 'number' && renderInlineInsertSlot(nextInsertIndex, nextInsertAnchor)}
                   {isInsertMode && hasPendingPreview && insertTarget?.sceneId === scene.id && insertTarget?.blockId === block.id && pendingInsertBlock && (
                     renderPreviewBlock(pendingInsertBlock)
                   )}
@@ -778,6 +851,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               );
             })}
 
+            {!isInsertMode && blocks.length === 0 && renderInlineInsertSlot(
+              sceneStartIndexById.get(scene.id) ?? 0,
+              createSceneTopAnchor(scene.id)
+            )}
             {isInsertMode && blocks.length === 0 && isLastScene && renderInsertTarget({ sceneId: scene.id, blockId: INSERT_BOTTOM_ID }, 'Insert at bottom')}
             {isInsertMode && blocks.length === 0 && isLastScene && hasPendingPreview && insertTarget?.sceneId === scene.id && insertTarget?.blockId === INSERT_BOTTOM_ID && pendingInsertBlock && (
               renderPreviewBlock(pendingInsertBlock)
@@ -788,15 +865,20 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     });
 
   if (scenes.length === 0) return null;
-  const endInsertAnchor = totalScriptBlocks > 0
-    ? createAfterBlockAnchor(playableBlockIds[totalScriptBlocks - 1])
-    : createSceneTopAnchor(scenes[0].id);
+  const selectedScene = selectedTarget
+    ? scenes.find((scene) => scene.id === selectedTarget.sceneId) ?? null
+    : null;
+  const selectedBlock = selectedTarget?.kind === 'block'
+    ? selectedScene?.blocks.find((block) => block.id === selectedTarget.blockId) ?? null
+    : null;
+  const selectedBlockRewriteDisabled = Boolean(selectedBlock?.locked) || !onRewriteBlock;
+  const selectedBlockDeleteDisabled = !onDeleteBlock;
 
   const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-4 md:p-8 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
   } ${className}`.trim();
   const contentClasses = scrollable
-    ? 'script-export-content relative z-10 h-full overflow-y-auto pr-3 space-y-6'
+    ? 'script-export-content relative z-10 h-full overflow-y-auto pr-3 pt-2 pb-12 space-y-8'
     : 'script-export-content relative z-10 space-y-6';
 
   return (
@@ -811,8 +893,110 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         tabIndex={-1}
       >
         {renderedScenes}
-        {!isInsertMode && renderInlineInsertSlot(totalScriptBlocks, endInsertAnchor)}
       </div>
+      {!isInsertMode && !activeInsertAnchor && selectedTarget && selectedAnchorElement && (
+        <AnchoredPopover
+          open
+          anchor={selectedAnchorElement}
+          className="script-export-chrome"
+          preferredPlacement="bottom"
+        >
+          <div
+            data-selected-actions="true"
+            data-testid={selectedTarget.kind === 'block' ? `selected-block-actions-${selectedTarget.blockId}` : `selected-heading-actions-${selectedTarget.sceneId}`}
+            className="flex items-center gap-1.5 rounded-full border border-[#d6cdbd] bg-[#f6f1e7] px-2 py-1.5 shadow-[0_14px_28px_rgba(15,23,42,0.18)]"
+          >
+            {selectedTarget.kind === 'block' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedScene || !selectedBlock || selectedBlockRewriteDisabled) return;
+                    onRewriteBlock?.({ sceneId: selectedScene.id, blockId: selectedBlock.id });
+                  }}
+                  disabled={selectedBlockRewriteDisabled}
+                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition-colors hover:bg-indigo-100 disabled:text-gray-400"
+                  aria-label="Rewrite selected block"
+                >
+                  Rewrite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenInsertFromSelection?.(selectedTarget)}
+                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition-colors hover:bg-emerald-100"
+                  aria-label="Insert near selected block"
+                >
+                  Insert
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedScene || !selectedBlock || selectedBlockDeleteDisabled) return;
+                    onDeleteBlock?.({ sceneId: selectedScene.id, blockId: selectedBlock.id });
+                  }}
+                  disabled={selectedBlockDeleteDisabled}
+                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-100 disabled:text-gray-400"
+                  aria-label="Delete selected block"
+                >
+                  Delete
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedScene) return;
+                    onEditSceneHeading?.(selectedScene.id, selectedScene.heading);
+                  }}
+                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition-colors hover:bg-indigo-100"
+                  aria-label="Edit selected scene heading"
+                >
+                  Edit Heading
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenInsertFromSelection?.(selectedTarget)}
+                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition-colors hover:bg-emerald-100"
+                  aria-label="Insert after scene heading"
+                >
+                  Insert After
+                </button>
+              </>
+            )}
+          </div>
+        </AnchoredPopover>
+      )}
+      {!isInsertMode && Boolean(insertComposer && insertAnchorElement) && (
+        <AnchoredPopover
+          open
+          anchor={insertAnchorElement}
+          className="script-export-chrome"
+          preferredPlacement="bottom"
+        >
+          {insertComposer}
+        </AnchoredPopover>
+      )}
+      {!isInsertMode && Boolean(rewriteComposer && rewriteAnchorElement) && (
+        <AnchoredPopover
+          open
+          anchor={rewriteAnchorElement}
+          className="script-export-chrome"
+          preferredPlacement="bottom"
+        >
+          {rewriteComposer}
+        </AnchoredPopover>
+      )}
+      {!isInsertMode && Boolean(headingEditor && headingEditorAnchorElement) && (
+        <AnchoredPopover
+          open
+          anchor={headingEditorAnchorElement}
+          className="script-export-chrome"
+          preferredPlacement="bottom"
+        >
+          {headingEditor}
+        </AnchoredPopover>
+      )}
     </div>
   );
 };

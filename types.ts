@@ -27,11 +27,17 @@ export interface ScriptBlock {
   meta?: ScriptBlockMeta;
 }
 
+export interface SceneMeta {
+  source?: 'ai' | 'user';
+  placeholder?: boolean;
+}
+
 export interface Scene {
   id: string;
   heading: string;
   blocks: ScriptBlock[];
   summary: string;
+  meta?: SceneMeta;
 }
 
 export type SceneLengthOption = 'Short' | 'Medium' | 'Long';
@@ -74,6 +80,17 @@ export type ScriptAnchor =
       kind: 'index';
       index: number;
       id: string;
+    };
+
+export type ScriptSelectionTarget =
+  | {
+      kind: 'block';
+      sceneId: string;
+      blockId: string;
+    }
+  | {
+      kind: 'scene-heading';
+      sceneId: string;
     };
 
 export interface TtsVoice {

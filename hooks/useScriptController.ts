@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBlock } from '../domain/blocks';
-import { BlockType, ScriptAnchor, ScriptBlock, StoryContext } from '../types';
+import { BlockType, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
 import {
   resolveInsertIndexFromAnchor,
   ScriptBlockPatch,
@@ -47,8 +47,10 @@ export interface UseScriptControllerResult extends ScriptController {
   rewriteTarget: ScriptBlockTarget | null;
   rewriteOptions: RewriteOption[];
   setRewriteTarget: (target: ScriptBlockTarget | null) => void;
+  selectedTarget: ScriptSelectionTarget | null;
   selectedBlockTarget: ScriptBlockTarget | null;
   selectBlockTarget: (target: ScriptBlockTarget) => void;
+  selectSceneHeading: (sceneId: string) => void;
   clearBlockTarget: () => void;
   activeInsertAnchor?: ScriptAnchor;
   activeInsertIndex: number | null;
@@ -104,7 +106,7 @@ export const useScriptController = ({
   onApplyRewritePreview
 }: UseScriptControllerParams): UseScriptControllerResult => {
   const [rewriteTarget, setRewriteTargetState] = useState<ScriptBlockTarget | null>(null);
-  const [selectedBlockTarget, setSelectedBlockTarget] = useState<ScriptBlockTarget | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<ScriptSelectionTarget | null>(null);
   const [rewriteComposerTarget, setRewriteComposerTarget] = useState<ScriptBlockTarget | null>(null);
   const [rewriteInstructions, setRewriteInstructionsState] = useState('');
   const [rewriteCandidateText, setRewriteCandidateText] = useState('');
@@ -124,6 +126,9 @@ export const useScriptController = ({
     return resolveInsertIndexFromAnchor(context, activeInsertAnchor);
   }, [activeInsertAnchor, context]);
   const activeRewriteBlockId = rewriteComposerTarget?.blockId;
+  const selectedBlockTarget = selectedTarget?.kind === 'block'
+    ? { sceneId: selectedTarget.sceneId, blockId: selectedTarget.blockId }
+    : null;
   const selectedBlockId = selectedBlockTarget?.blockId;
 
   const rewriteOptions = useMemo<RewriteOption[]>(() => {
@@ -178,12 +183,19 @@ export const useScriptController = ({
   }, [closeInsertComposer, closeRewriteComposer]);
 
   const selectBlockTarget = useCallback((target: ScriptBlockTarget) => {
-    setSelectedBlockTarget(target);
+    setSelectedTarget({ kind: 'block', sceneId: target.sceneId, blockId: target.blockId });
     setRewriteTargetState(target);
   }, []);
 
+  const selectSceneHeading = useCallback((sceneId: string) => {
+    setSelectedTarget({ kind: 'scene-heading', sceneId });
+    setActiveInsertAnchor(null);
+    setComposerError(null);
+    clearRewriteComposerFields();
+  }, [clearRewriteComposerFields]);
+
   const clearBlockTarget = useCallback(() => {
-    setSelectedBlockTarget(null);
+    setSelectedTarget(null);
   }, []);
 
   const openInsert = useCallback((anchor: ScriptAnchor) => {
@@ -195,13 +207,17 @@ export const useScriptController = ({
   }, [clearRewriteComposerFields, isComposerGenerating, onRequestInsert]);
 
   const requestInsert = useCallback((anchor: ScriptAnchor) => {
+    if (activeInsertAnchor?.id === anchor.id) {
+      closeInsertComposer();
+      return;
+    }
     openInsert(anchor);
-  }, [openInsert]);
+  }, [activeInsertAnchor, closeInsertComposer, openInsert]);
 
   const openRewrite = useCallback((target: ScriptBlockTarget) => {
     if (isComposerGenerating) return;
     setRewriteTargetState(target);
-    setSelectedBlockTarget(target);
+    setSelectedTarget({ kind: 'block', sceneId: target.sceneId, blockId: target.blockId });
     setActiveInsertAnchor(null);
     setComposerError(null);
     setRewriteComposerTarget(target);
@@ -349,7 +365,7 @@ export const useScriptController = ({
       return;
     }
     setRewriteTargetState(target);
-    setSelectedBlockTarget(target);
+    setSelectedTarget({ kind: 'block', sceneId: target.sceneId, blockId: target.blockId });
     setRewriteComposerTarget(target);
     setRewriteInstructionsState(prompt);
     await runRewritePreview(target, prompt);
@@ -372,7 +388,7 @@ export const useScriptController = ({
   const deleteBlock = useCallback((target: ScriptBlockTarget) => {
     if (!onDeleteBlock) return;
     onDeleteBlock(target.sceneId, target.blockId);
-    setSelectedBlockTarget(null);
+    setSelectedTarget(null);
     setRewriteComposerTarget((current) => (
       current?.sceneId === target.sceneId && current?.blockId === target.blockId ? null : current
     ));
@@ -413,7 +429,7 @@ export const useScriptController = ({
 
   useEffect(() => {
     if (!insertModeActive) return;
-    setSelectedBlockTarget(null);
+    setSelectedTarget(null);
     setActiveInsertAnchor(null);
     setComposerError(null);
     setIsComposerGenerating(false);
@@ -444,7 +460,7 @@ export const useScriptController = ({
   useEffect(() => {
     if (rewriteOptions.length === 0) {
       setRewriteTargetState(null);
-      setSelectedBlockTarget(null);
+      setSelectedTarget(null);
       return;
     }
     if (!rewriteAutoSelectEnabled) {
@@ -459,14 +475,14 @@ export const useScriptController = ({
   }, [rewriteAutoSelectEnabled, rewriteOptions, rewriteTarget]);
 
   useEffect(() => {
-    if (!selectedBlockTarget) return;
+    if (selectedTarget?.kind !== 'block') return;
     const targetStillExists = rewriteOptions.some((option) => (
-      option.sceneId === selectedBlockTarget.sceneId && option.blockId === selectedBlockTarget.blockId
+      option.sceneId === selectedTarget.sceneId && option.blockId === selectedTarget.blockId
     ));
     if (!targetStillExists) {
-      setSelectedBlockTarget(null);
+      setSelectedTarget(null);
     }
-  }, [rewriteOptions, selectedBlockTarget]);
+  }, [rewriteOptions, selectedTarget]);
 
   useEffect(() => {
     if (!rewriteComposerTarget) return;
@@ -486,6 +502,7 @@ export const useScriptController = ({
   return {
     script,
     selectedBlockId,
+    selectedTarget,
     selectedBlockTarget,
     activeInsertAnchor: activeInsertAnchor ?? undefined,
     activeRewriteBlockId,
@@ -493,6 +510,7 @@ export const useScriptController = ({
     rewriteOptions,
     setRewriteTarget,
     selectBlockTarget,
+    selectSceneHeading,
     clearBlockTarget,
     requestInsert,
     activeInsertIndex,

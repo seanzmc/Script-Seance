@@ -59,9 +59,9 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
   onError,
   disabled
 }) => {
-  const labelClass = 'text-[10px] uppercase font-bold text-gray-400 tracking-widest';
-  const selectClass = 'h-9 bg-gray-950 border border-gray-700 text-gray-200 text-xs rounded-lg px-2.5 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
-  const textareaClass = 'w-full min-h-[104px] bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-600 shadow-inner';
+  const labelClass = 'text-[11px] uppercase font-bold text-gray-300 tracking-[0.18em]';
+  const selectClass = 'h-11 bg-gray-950 border border-gray-700 text-gray-100 text-sm rounded-xl px-3 focus:ring-1 focus:ring-indigo-500 w-full outline-none appearance-none';
+  const textareaClass = 'w-full min-h-[116px] bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none resize-none placeholder:text-gray-500 shadow-inner';
   const [elementType, setElementType] = useState<BlockType>(BlockType.ACTION);
   const [selectedChar, setSelectedChar] = useState(characters[0] || 'Unknown');
   const [content, setContent] = useState('');
@@ -179,16 +179,16 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
           variant="secondary"
           loading={isGenerating}
           className="w-full lg:w-auto whitespace-nowrap lg:self-end"
-          title="Generate and insert at the end of your script"
+          title="Generate and insert one block at the end of your script"
         >
-          Surprise
+          Generate and Insert
         </Button>
       </div>
 
       <div className="grid gap-1">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
           <label className={labelClass}>Content</label>
-          <p className="text-[10px] leading-snug text-gray-500 italic sm:text-right sm:max-w-[55%]">{HINTS[elementType]}</p>
+          <p className="text-xs leading-snug text-gray-400 italic sm:text-right sm:max-w-[55%]">{HINTS[elementType]}</p>
         </div>
         <textarea
           value={content}
@@ -196,6 +196,9 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
           placeholder="Type your block content here..."
           className={textareaClass}
         />
+        <p className="text-xs text-gray-500">
+          “Surprise” generates one block and inserts it directly into the script.
+        </p>
       </div>
 
       <div className="flex flex-col gap-1 shrink-0">
@@ -212,12 +215,12 @@ export const InsertBlock: React.FC<InsertBlockProps> = ({
               Add to End
             </Button>
           </div>
-          <p className="text-[10px] leading-snug text-gray-500 sm:self-center">
+          <p className="text-xs leading-snug text-gray-500 sm:self-center">
             Use inline <span className="font-semibold text-gray-400">+</span> slots in the script to insert at specific points.
           </p>
         </div>
         {tooltip && (
-          <span className="text-[10px] text-amber-300">{tooltip}</span>
+          <span className="text-xs text-amber-300">{tooltip}</span>
         )}
       </div>
     </div>

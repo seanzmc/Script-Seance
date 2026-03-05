@@ -43,48 +43,48 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
       aria-label="Rewrite Block"
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
-      className="rounded-xl border border-gray-300/85 bg-[#f6f1e7]/97 p-3.5 shadow-[0_18px_42px_rgba(0,0,0,0.2)] backdrop-blur-[1px] transition-[opacity,transform,box-shadow] duration-200 ease-out"
+      className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)] transition-[opacity,transform,box-shadow] duration-200 ease-out"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-700">Rewrite Block</h3>
-        {isGenerating && <span className="text-[10px] text-gray-500">Generating...</span>}
+        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Rewrite Block</h3>
+        {isGenerating && <span className="text-xs text-gray-600">Generating...</span>}
       </div>
 
-      <div className="mt-2.5 rounded-lg border border-gray-300 bg-white/85 px-2.5 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+      <div className="mt-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
           {BLOCK_LABELS[blockType]}
         </p>
-        <p className="mt-1 text-xs text-gray-700 truncate">
+        <p className="mt-1 text-sm text-gray-700 truncate">
           {snippet}
         </p>
       </div>
 
       <div className="mt-2.5 space-y-1">
-        <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+        <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
           Rewrite Instructions
         </label>
         <textarea
           value={instructions}
           onChange={(event) => onInstructionsChange(event.target.value)}
           placeholder="Make it funnier, Shorten, More suspense..."
-          className="h-24 w-full resize-none rounded-lg border border-gray-300 bg-white/95 p-2 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          className="h-28 w-full resize-none rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
           disabled={isGenerating}
         />
       </div>
 
       {hasCandidate && (
         <div className="mt-2.5 space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
             Proposed Rewrite
           </p>
-          <div className="max-h-28 overflow-y-auto rounded-lg border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-2 text-sm text-indigo-950 whitespace-pre-wrap">
+          <div className="max-h-32 overflow-y-auto rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-950 whitespace-pre-wrap">
             {candidateText}
           </div>
         </div>
       )}
 
       {errorMessage && (
-        <p className="mt-2 text-xs text-red-700" role="alert">{errorMessage}</p>
+        <p className="mt-2 text-sm text-red-700" role="alert">{errorMessage}</p>
       )}
 
       <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">

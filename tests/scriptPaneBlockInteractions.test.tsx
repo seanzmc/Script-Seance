@@ -48,6 +48,23 @@ const contextWithoutCharacters: StoryContext = {
   characters: []
 };
 
+const contextWithEmptySecondScene: StoryContext = {
+  ...contextFixture,
+  scenes: [
+    contextFixture.scenes[0],
+    {
+      id: 'scene-2',
+      heading: 'EXT. WATERFRONT - DAWN',
+      summary: 'A quiet shoreline waits for the next beat.',
+      blocks: [],
+      meta: {
+        placeholder: true,
+        source: 'user'
+      }
+    }
+  ]
+};
+
 const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps => ({
   context: contextFixture,
   titleInputRef: createRef<HTMLInputElement>(),
@@ -141,7 +158,7 @@ describe('ScriptPane block interactions', () => {
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'A deliberate action beat.' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Insert' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
 
     expect(onInsertAtAnchor).toHaveBeenCalledTimes(1);
     expect(onInsertAtAnchor).toHaveBeenCalledWith(
@@ -179,8 +196,8 @@ describe('ScriptPane block interactions', () => {
     fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
 
     expect(within(composer).getByText('Add a character first')).toBeTruthy();
-    expect((within(composer).getByRole('button', { name: 'Generate' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((within(composer).getByRole('button', { name: 'Insert' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(composer).getByRole('button', { name: 'Generate and Insert' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(composer).getByRole('button', { name: 'Insert Typed Block' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('dialogue generate request includes selected speaker', () => {
@@ -191,7 +208,7 @@ describe('ScriptPane block interactions', () => {
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
     fireEvent.change(within(composer).getByLabelText('Character'), { target: { value: 'Sam' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Generate' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Generate and Insert' }));
 
     expect(onGenerateInsertAtAnchor).toHaveBeenCalledWith(
       expect.objectContaining({ type: BlockType.DIALOGUE, character: 'Sam' })
@@ -206,7 +223,7 @@ describe('ScriptPane block interactions', () => {
 
     fireEvent.click(screen.getByTestId('insert-slot-2'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Generate' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Generate and Insert' }));
 
     expect(screen.getByText('Generating...')).toBeTruthy();
     await waitFor(() => {
@@ -252,7 +269,7 @@ describe('ScriptPane block interactions', () => {
     expect(endSlot.getAttribute('data-active')).toBe('true');
   });
 
-  it('supports keyboard activation for inline insert slots', () => {
+  it('toggles inline insert slots closed when the same slot is activated again from the keyboard', async () => {
     const onRequestInsert = vi.fn();
     render(<ScriptPane {...createProps({ onRequestInsert })} />);
 
@@ -260,20 +277,20 @@ describe('ScriptPane block interactions', () => {
     betweenSlot.focus();
 
     fireEvent.keyDown(betweenSlot, { key: 'Enter' });
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+
     fireEvent.keyDown(betweenSlot, { key: ' ' });
 
-    expect(onRequestInsert).toHaveBeenNthCalledWith(1, expect.objectContaining<ScriptAnchor>({
+    expect(onRequestInsert).toHaveBeenCalledTimes(1);
+    expect(onRequestInsert).toHaveBeenCalledWith(expect.objectContaining<ScriptAnchor>({
       kind: 'block',
       blockId: 'block-1',
       position: 'after',
       id: 'block:block-1:after'
     }));
-    expect(onRequestInsert).toHaveBeenNthCalledWith(2, expect.objectContaining<ScriptAnchor>({
-      kind: 'block',
-      blockId: 'block-1',
-      position: 'after',
-      id: 'block:block-1:after'
-    }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
   });
 
   it('shows Generate Next Scene only on the end insert slot and routes to append scene', async () => {
@@ -295,7 +312,7 @@ describe('ScriptPane block interactions', () => {
 
   it('disables end-slot Generate Next Scene while playback or generation is active', () => {
     const onGenerateNext = vi.fn();
-    const { rerender } = render(
+    const { unmount } = render(
       <ScriptPane {...createProps({ onGenerateNext, isPlaying: true })} />
     );
 
@@ -305,7 +322,8 @@ describe('ScriptPane block interactions', () => {
     fireEvent.click(playingDisabledButton);
     expect(onGenerateNext).toHaveBeenCalledTimes(0);
 
-    rerender(<ScriptPane {...createProps({ onGenerateNext, isGenerating: true })} />);
+    unmount();
+    render(<ScriptPane {...createProps({ onGenerateNext, isGenerating: true })} />);
     fireEvent.click(screen.getByTestId('insert-slot-2'));
     const generatingDisabledButton = screen.getByRole('button', { name: 'Generate Next Scene' }) as HTMLButtonElement;
     expect(generatingDisabledButton.disabled).toBe(true);
@@ -341,7 +359,7 @@ describe('ScriptPane block interactions', () => {
 
     const block = container.querySelector('#block-block-1') as HTMLElement;
     expect(block).toBeTruthy();
-    expect(block.className).toContain('hover:bg-slate-900/[0.045]');
+    expect(block.className).toContain('hover:bg-blue-50/45');
 
     fireEvent.click(block);
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
@@ -381,6 +399,121 @@ describe('ScriptPane block interactions', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Rewrite Block' })).toBeNull();
     });
+  });
+
+  it('opens insert actions from a selected block and supports before/after placement', () => {
+    const onInsertAtAnchor = vi.fn();
+    const { container } = render(
+      <ScriptPane {...createProps({ onInsertAtAnchor })} />
+    );
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Insert near selected block' }));
+
+    let composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    expect(within(composer).getByRole('button', { name: 'Insert Before' })).toBeTruthy();
+    expect(within(composer).getByRole('button', { name: 'Insert After' })).toBeTruthy();
+
+    fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An extra beat lands after the action.' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+
+    expect(onInsertAtAnchor).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining<ScriptAnchor>({
+        kind: 'block',
+        blockId: 'block-1',
+        position: 'after',
+        id: 'block:block-1:after'
+      }),
+      expect.objectContaining({
+        text: 'An extra beat lands after the action.'
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insert near selected block' }));
+    composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Before' }));
+    fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'A setup beat lands first.' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+
+    expect(onInsertAtAnchor).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining<ScriptAnchor>({
+        kind: 'block',
+        blockId: 'block-1',
+        position: 'before',
+        id: 'block:block-1:before'
+      }),
+      expect.objectContaining({
+        text: 'A setup beat lands first.'
+      })
+    );
+  });
+
+  it('clears selected block actions when an inline insert slot becomes active', async () => {
+    const { container } = render(<ScriptPane {...createProps()} />);
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('insert-slot-1'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
+    });
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+  });
+
+  it('selects and edits a scene heading through the shared heading actions', async () => {
+    const onUpdateSceneHeading = vi.fn();
+    render(<ScriptPane {...createProps({ onUpdateSceneHeading })} />);
+
+    fireEvent.click(screen.getByText('INT. ARCHIVE - NIGHT'));
+    expect(screen.getByTestId('selected-heading-actions-scene-1')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit selected scene heading' }));
+    const editor = screen.getByRole('dialog', { name: 'Edit Scene Heading' });
+    const input = within(editor).getByPlaceholderText('INT. LOCATION - DAY');
+    fireEvent.change(input, { target: { value: 'INT. ARCHIVE STACKS - NIGHT' } });
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save Heading' }));
+
+    expect(onUpdateSceneHeading).toHaveBeenCalledWith('scene-1', 'INT. ARCHIVE STACKS - NIGHT');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit Scene Heading' })).toBeNull();
+    });
+  });
+
+  it('supports inserting directly below an empty scene heading', () => {
+    const onInsertAtAnchor = vi.fn();
+    render(
+      <ScriptPane
+        {...createProps({
+          context: contextWithEmptySecondScene,
+          onInsertAtAnchor
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByText('EXT. WATERFRONT - DAWN'));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert after scene heading' }));
+
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'The shoreline wakes before anyone speaks.' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+
+    expect(onInsertAtAnchor).toHaveBeenCalledWith(
+      expect.objectContaining<ScriptAnchor>({
+        kind: 'scene',
+        sceneId: 'scene-2',
+        position: 'top',
+        id: 'scene:scene-2:top'
+      }),
+      expect.objectContaining({
+        text: 'The shoreline wakes before anyone speaks.'
+      })
+    );
   });
 
   it('rewrite composer generates preview and applies content for selected block', async () => {

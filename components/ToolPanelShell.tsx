@@ -53,8 +53,8 @@ export const ToolPanelShell: React.FC<ToolPanelShellProps> = ({
   children
 }) => {
   const shellClassName = variant === 'mobile-sheet'
-    ? 'w-full rounded-t-2xl border border-gray-800 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.45)]'
-    : 'w-full rounded-2xl border border-gray-800 bg-gray-950 shadow-[0_20px_60px_rgba(0,0,0,0.4)]';
+    ? 'w-full rounded-t-2xl border border-gray-700 bg-gray-950 shadow-[0_22px_56px_rgba(0,0,0,0.52)]'
+    : 'w-full rounded-2xl border border-gray-700 bg-gray-950 shadow-[0_24px_64px_rgba(0,0,0,0.48)]';
 
   return (
     <div
@@ -62,8 +62,8 @@ export const ToolPanelShell: React.FC<ToolPanelShellProps> = ({
       style={{ maxHeight }}
       data-testid={shellTestId}
     >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 py-2.5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-gray-400">{title}</p>
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-300">{title}</p>
         {onClose && (
           <button
             type="button"

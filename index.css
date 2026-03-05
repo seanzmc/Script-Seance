@@ -14,16 +14,16 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: #e7dece;
 }
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
+  background: #b8ab95;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #9e9078;
 }

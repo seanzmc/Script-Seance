@@ -1,5 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from './Button';
+import { STYLE_CATEGORIES, stylesLibrary } from '../stylesLibrary';
+import { StyleLibraryDialog, resolveSelectedLibraryStyle } from './StyleLibraryDialog';
+import { StyleSelectionCard } from './StyleSelectionCard';
 
 export interface StyleEditModalProps {
   isOpen: boolean;
@@ -18,7 +21,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
   onSave,
   onClose
 }) => {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -31,65 +34,97 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }, [isOpen]);
+  const selectedStyle = useMemo(() => resolveSelectedLibraryStyle(null, value), [value]);
+  const selectedStyleCategoryLabel = useMemo(() => {
+    if (!selectedStyle) return null;
+    return STYLE_CATEGORIES.find((category) => category.id === selectedStyle.category)?.label ?? null;
+  }, [selectedStyle]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Edit style"
-      >
-        <div className="border-b border-gray-800 px-5 py-4">
-          <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500">Style</p>
-          <h2 className="text-lg font-semibold text-white">Edit writing style</h2>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          <div className="flex flex-wrap gap-1.5">
-            {presets.map((preset) => {
-              const isSelected = value.trim().toLowerCase() === preset.toLowerCase();
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => onChange(preset)}
-                  className={`text-[10px] px-2.5 py-1.5 rounded-full ring-1 transition-colors ${
-                    isSelected
-                      ? 'text-indigo-100 bg-indigo-500/35 ring-indigo-100/55'
-                      : 'text-indigo-100/90 bg-indigo-500/15 ring-indigo-200/30 hover:bg-indigo-500/24 hover:ring-indigo-100/45'
-                  }`}
-                  title={`Use style: ${preset}`}
-                >
-                  {preset}
-                </button>
-              );
-            })}
+    <>
+      <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+        <div className="absolute inset-0 bg-black/72" onClick={onClose} />
+        <div
+          className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/12 bg-slate-950 shadow-[0_28px_80px_rgba(2,6,23,0.78)]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit style"
+        >
+          <div className="border-b border-white/10 px-5 py-4 space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Style</p>
+            <h2 className="text-xl font-semibold text-white">Edit writing style</h2>
+            <p className="text-sm text-slate-300">Use the same tone module available in setup.</p>
           </div>
-          <textarea
-            ref={textareaRef}
-            rows={4}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="e.g., Witty noir with clipped banter and escalating absurdity."
-            className="w-full rounded-lg p-2.5 text-white placeholder-slate-400 bg-slate-900/80 ring-1 ring-white/15 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm resize-y min-h-[110px]"
-          />
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Close
-            </Button>
-            <Button size="sm" onClick={onSave}>
-              Save
-            </Button>
+          <div className="px-5 py-4 space-y-4">
+            {presets.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {presets.map((preset) => {
+                  const isSelected = value.trim().toLowerCase() === preset.toLowerCase();
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => onChange(preset)}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                        isSelected
+                          ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
+                          : 'border-white/10 bg-white/[0.03] text-slate-200 hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <StyleSelectionCard
+              selectedStyle={selectedStyle}
+              fallbackLabel={value.trim() || 'None (default style)'}
+              categoryLabel={selectedStyleCategoryLabel}
+              onBrowse={() => setIsLibraryOpen(true)}
+              onClear={() => onChange('')}
+              onShuffle={() => {
+                const randomStyle = stylesLibrary[Math.floor(Math.random() * stylesLibrary.length)];
+                if (randomStyle) onChange(randomStyle.title);
+              }}
+              browseLabel="Browse library"
+            />
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                Custom override
+              </label>
+              <textarea
+                rows={4}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                placeholder="e.g., Witty noir with clipped banter and escalating absurdity."
+                className="min-h-[120px] w-full rounded-xl border border-white/10 bg-slate-900 p-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Close
+              </Button>
+              <Button size="sm" onClick={onSave}>
+                Save
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <StyleLibraryDialog
+        isOpen={isLibraryOpen}
+        selectedStyleTitle={value}
+        onClose={() => setIsLibraryOpen(false)}
+        onSelect={({ style }) => {
+          onChange(style);
+          setIsLibraryOpen(false);
+        }}
+        title="Style Library"
+        subtitle="Pick a tone, then save it back to the draft."
+      />
+    </>
   );
 };

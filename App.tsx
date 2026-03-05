@@ -1036,12 +1036,12 @@ export default function App() {
           !contextRef.current,
         commit: (firstScene) => {
           const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
-          const initialLastBlockId = normalizedFirstScene.blocks[normalizedFirstScene.blocks.length - 1]?.id;
+          const initialFirstBlockId = normalizedFirstScene.blocks[0]?.id ?? null;
           applyContextMutation({
             ...initialContext,
             scenes: [normalizedFirstScene]
           });
-          setInsertScrollTargetId(initialLastBlockId ?? 'bottom');
+          setInsertScrollTargetId(initialFirstBlockId);
           setInsertScrollToken(token => token + 1);
         }
       });
@@ -1132,6 +1132,14 @@ export default function App() {
     text: string;
   }) => {
     scriptMutationController.applyRewritePreview(params);
+  }, [scriptMutationController]);
+
+  const handleUpdateSceneHeading = useCallback((sceneId: string, heading: string) => {
+    scriptMutationController.updateSceneHeading({
+      sceneId,
+      heading,
+      clearRedo: true
+    });
   }, [scriptMutationController]);
 
   const handleUndo = () => {
@@ -1586,6 +1594,7 @@ export default function App() {
         onDeleteBlock={handleDeleteBlock}
         onInsertAtAnchor={handleInsertAtAnchor}
         onGenerateInsertAtAnchor={handleGenerateInsertAtAnchor}
+        onUpdateSceneHeading={handleUpdateSceneHeading}
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
         isPlaying={isPlaying}

@@ -219,17 +219,17 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
     }
     onPlay();
   };
-  const controlButtonClass = 'flex items-center justify-center h-8 w-8 rounded-md border border-gray-700 bg-gray-900/50 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed';
+  const controlButtonClass = 'flex items-center justify-center h-9 w-9 rounded-lg border border-gray-700 bg-gray-900/60 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed';
   const toggleTrackClass = 'ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors';
 
   return (
     // ToolPanelShell owns scrolling; keep tool roots overflow-free unless absolutely required.
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+        <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300">
           Transport
         </h4>
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[11px] text-gray-400">
           Speaking: <span className="text-gray-300">{currentSpeaker}</span>
         </span>
       </div>
@@ -281,21 +281,21 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
 
             <div className="min-w-0 sm:min-w-[160px] flex-1 flex items-center gap-3 justify-start sm:justify-end">
               <div className="text-right">
-                <p className="text-[11px] font-semibold text-white">{statusHeadline}</p>
-                <p className="text-[10px] text-gray-400">{statusDetail}</p>
+                <p className="text-sm font-semibold text-white">{statusHeadline}</p>
+                <p className="text-[11px] text-gray-400">{statusDetail}</p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[11px] text-gray-400">
               Audio generation: {progressCount}/{totalCount || 0}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 onClick={onRefreshAudio}
                 disabled={totalCount === 0}
-                className="flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex min-h-[42px] items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Regenerate all script audio using current voice casting"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -304,14 +304,14 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
               <button
                 onClick={onPurgeAudio}
                 disabled={!hasAudio}
-                className="flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex min-h-[42px] items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Clear generated playback blocks and cached audio"
               >
                 <Trash2 className="w-3 h-3" />
                 Purge
               </button>
-              <span className="text-[10px] text-gray-500 uppercase tracking-widest">Speed</span>
-              <span className="text-[11px] text-indigo-300 font-semibold">{playbackSpeed.toFixed(1)}x</span>
+              <span className="text-[11px] text-gray-500 uppercase tracking-[0.18em]">Speed</span>
+              <span className="text-sm text-indigo-300 font-semibold">{playbackSpeed.toFixed(1)}x</span>
               <input
                 type="range"
                 min="0.5"
@@ -332,7 +332,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
             />
           </div>
           {isLoadingAudio && (
-            <div className="flex items-center gap-2 text-[10px] text-emerald-400">
+          <div className="flex items-center gap-2 text-[11px] text-emerald-400">
               <Loader2 className="w-3 h-3 animate-spin" />
               Waiting for current block audio.
             </div>
@@ -360,7 +360,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
             </div>
           )}
           {errorCount > 0 && currentStatus !== 'error' && (
-            <div className="text-[10px] text-amber-300">
+            <div className="text-[11px] text-amber-300">
               {errorCount} block{errorCount === 1 ? '' : 's'} need attention. Jump back to retry or skip.
             </div>
           )}
@@ -371,7 +371,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
         <button
           onClick={onToggleAutoScroll}
           aria-pressed={autoScroll}
-          className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
+          className="flex min-h-[42px] items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/40 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-300 hover:border-gray-500"
           title="Auto-scroll script with playback"
         >
           <ScrollText className={`w-3.5 h-3.5 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
@@ -383,7 +383,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
         <button
           onClick={onToggleHighlights}
           aria-pressed={showHighlights}
-          className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
+          className="flex min-h-[42px] items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/40 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-300 hover:border-gray-500"
           title="Highlight the active line during playback"
         >
           <HighlightIcon className={`w-3.5 h-3.5 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />

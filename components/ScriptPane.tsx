@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BlockType, ScriptAnchor, StoryContext, ScriptBlock } from '../types';
+import { BlockType, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
 import { RewriteComposerPopover } from './RewriteComposerPopover';
@@ -17,7 +17,11 @@ import { ToolPanelShell, getToolPanelBodyMaxHeight, getToolPanelMaxHeight } from
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
 import { useScriptController } from '../hooks/useScriptController';
-import { createAfterBlockAnchor, createSceneTopAnchor } from '../services/scriptController';
+import {
+  createAfterBlockAnchor,
+  createBeforeBlockAnchor,
+  createSceneTopAnchor
+} from '../services/scriptController';
 import { AlertCircle, Download, FileDown, Loader2, Sparkles, PlusCircle, X, Pencil, Undo2, Redo2 } from 'lucide-react';
 
 export interface ScriptPaneProps {
@@ -62,6 +66,7 @@ export interface ScriptPaneProps {
     content: string;
     character?: string;
   }) => Promise<void>;
+  onUpdateSceneHeading?: (sceneId: string, heading: string) => void;
   onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
   isPlaying: boolean;
@@ -183,6 +188,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onRequestInsert,
   onInsertAtAnchor,
   onGenerateInsertAtAnchor,
+  onUpdateSceneHeading,
   onToggleLock,
   isGenerating,
   isPlaying,
@@ -223,9 +229,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [titleDraft, setTitleDraft] = useState('');
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
   const [styleDraft, setStyleDraft] = useState('');
+  const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
+  const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);
+  const [headingDraft, setHeadingDraft] = useState('');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [rewriteGuidance, setRewriteGuidance] = useState('');
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
+  const [isPlaybackMinimized, setIsPlaybackMinimized] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const rewriteAutoSelectEnabled = !(isNarrowViewport && currentTool === 'rewrite' && rewriteMode === 'select');
   const scriptController = useScriptController({
@@ -248,13 +258,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const styleLabel = context?.style?.trim() || '';
-  const toolLabelClass = 'text-[10px] font-bold uppercase tracking-widest text-gray-400';
+  const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
-  const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-600 shadow-inner';
+  const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
   const generationIndicator = isGenerating ? (
     <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
       <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-      <span className="text-sm font-medium">Running writers room simulation...</span>
+      <span className="text-base font-medium">Running writers room simulation...</span>
       <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
         Cancel
       </Button>
@@ -282,9 +292,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="relative space-y-5">
         <div className="space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.6em] text-gray-500">Start Screen</p>
+          <p className="text-xs uppercase tracking-[0.34em] text-gray-500">Start Screen</p>
           <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white">SCRIPT SEANCE</h1>
-          <p className="text-sm md:text-base text-gray-400">
+          <p className="text-base md:text-lg text-gray-300">
             Summon a writers room to draft cinematic scenes, one beat at a time.
           </p>
         </div>
@@ -305,8 +315,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <div className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]">
       <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto" />
       <div className="space-y-2">
-        <p className="text-lg font-semibold text-white">Generating your opening scene...</p>
-        <p className="text-sm text-indigo-100/70">Gathering the writers room and shaping the first beat.</p>
+        <p className="text-xl font-semibold text-white">Generating your opening scene...</p>
+        <p className="text-base text-indigo-100/80">Gathering the writers room and shaping the first beat.</p>
       </div>
       <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
         Cancel
@@ -381,12 +391,56 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const handleSelectBlockTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     scriptController.selectBlockTarget(target);
   }, [scriptController]);
+  const handleSelectSceneHeading = useCallback((sceneId: string) => {
+    scriptController.selectSceneHeading(sceneId);
+  }, [scriptController]);
   const handleLegacyInsertTargetSelection = useCallback(() => {
     // Legacy insert mode is deprecated; inline anchor composer is the primary path.
   }, []);
   const handleClearSelectedBlock = useCallback(() => {
+    setEditingHeadingSceneId(null);
     scriptController.clearBlockTarget();
   }, [scriptController]);
+  const handleRequestInsertFromSlot = useCallback((anchor: ScriptAnchor) => {
+    setInsertPlacementTarget(null);
+    scriptController.requestInsert(anchor);
+  }, [scriptController]);
+  const handleOpenInsertFromSelection = useCallback((target: ScriptSelectionTarget) => {
+    setInsertPlacementTarget(target);
+    if (target.kind === 'scene-heading') {
+      scriptController.requestInsert(createSceneTopAnchor(target.sceneId));
+      return;
+    }
+    scriptController.requestInsert(createAfterBlockAnchor(target.blockId));
+  }, [scriptController]);
+  const handleCloseInsertComposer = useCallback(() => {
+    setInsertPlacementTarget(null);
+    scriptController.closeInsertComposer();
+  }, [scriptController]);
+  const handleInsertPlacementChange = useCallback((next: 'before' | 'after') => {
+    if (!insertPlacementTarget || insertPlacementTarget.kind !== 'block') return;
+    scriptController.requestInsert(
+      next === 'before'
+        ? createBeforeBlockAnchor(insertPlacementTarget.blockId)
+        : createAfterBlockAnchor(insertPlacementTarget.blockId)
+    );
+  }, [insertPlacementTarget, scriptController]);
+  const handleStartHeadingEdit = useCallback((sceneId: string, heading: string) => {
+    scriptController.selectSceneHeading(sceneId);
+    setHeadingDraft(heading);
+    setEditingHeadingSceneId(sceneId);
+    setInsertPlacementTarget(null);
+  }, [scriptController]);
+  const handleCancelHeadingEdit = useCallback(() => {
+    setEditingHeadingSceneId(null);
+  }, []);
+  const handleSaveHeadingEdit = useCallback(() => {
+    if (!editingHeadingSceneId) return;
+    const nextHeading = headingDraft.trim();
+    if (!nextHeading) return;
+    onUpdateSceneHeading?.(editingHeadingSceneId, nextHeading);
+    setEditingHeadingSceneId(null);
+  }, [editingHeadingSceneId, headingDraft, onUpdateSceneHeading]);
   const composerCharacters = context?.characters ?? [];
   const totalScriptBlocks = useMemo(
     () => context?.scenes.reduce((count, scene) => count + scene.blocks.length, 0) ?? 0,
@@ -395,7 +449,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const dialogueCharacterUnavailable = scriptController.composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
   const isBottomInsertSlotActive =
     scriptController.activeInsertIndex !== null && scriptController.activeInsertIndex === totalScriptBlocks;
-  const insertComposerNode = scriptController.activeInsertIndex !== null ? (
+  const insertComposerNode = scriptController.activeInsertAnchor ? (
     <InsertComposerPopover
       blockType={scriptController.composerBlockType}
       onBlockTypeChange={scriptController.setComposerBlockType}
@@ -408,9 +462,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         void scriptController.generateInsertAtActiveAnchor();
       }}
       onInsert={scriptController.insertAtActiveAnchor}
-      onCancel={scriptController.closeInsertComposer}
+      onCancel={handleCloseInsertComposer}
       onGenerateNextScene={() => {
-        scriptController.closeInsertComposer();
+        handleCloseInsertComposer();
         void scriptController.generateNextScene();
       }}
       isGenerating={scriptController.isComposerGenerating}
@@ -419,6 +473,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       generateNextSceneDisabled={isPlaying || isGenerating}
       actionsDisabled={dialogueCharacterUnavailable}
       errorMessage={scriptController.composerError}
+      showPlacementControls={insertPlacementTarget?.kind === 'block'}
+      placement={scriptController.activeInsertAnchor?.kind === 'block' && scriptController.activeInsertAnchor.position === 'before' ? 'before' : 'after'}
+      onPlacementChange={insertPlacementTarget?.kind === 'block' ? handleInsertPlacementChange : undefined}
     />
   ) : null;
   const rewriteComposerBlock = useMemo(() => {
@@ -443,6 +500,37 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       errorMessage={scriptController.rewriteComposerError}
     />
   ) : null;
+  const editingHeading = editingHeadingSceneId && context
+    ? context.scenes.find((scene) => scene.id === editingHeadingSceneId) ?? null
+    : null;
+  const headingEditorNode = editingHeading ? (
+    <div
+      role="dialog"
+      aria-label="Edit Scene Heading"
+      className="w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)]"
+    >
+      <div className="space-y-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">Scene Heading</p>
+          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-gray-800">Edit Scene Heading</h3>
+        </div>
+        <input
+          value={headingDraft}
+          onChange={(event) => setHeadingDraft(event.target.value)}
+          className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          placeholder="INT. LOCATION - DAY"
+        />
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={handleCancelHeadingEdit}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleSaveHeadingEdit}>
+            Save Heading
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null;
   const previewSection = context ? (
     <ScriptDisplay
       scenes={context.scenes}
@@ -458,18 +546,25 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       rewriteTarget={scriptController.rewriteTarget}
       rewriteModeActive={currentTool === 'rewrite' && (!isNarrowViewport || rewriteMode === 'select')}
       onSelectRewriteTarget={handleSelectRewriteTarget}
+      selectedTarget={scriptController.selectedTarget}
       selectedBlockTarget={scriptController.selectedBlockTarget}
       onSelectBlockTarget={handleSelectBlockTarget}
+      onSelectSceneHeading={handleSelectSceneHeading}
       onClearBlockTarget={handleClearSelectedBlock}
       onRewriteBlock={scriptController.openRewrite}
+      onOpenInsertFromSelection={handleOpenInsertFromSelection}
+      onEditSceneHeading={handleStartHeadingEdit}
       onDeleteBlock={onDeleteBlock ? scriptController.deleteBlock : undefined}
       activeInsertIndex={scriptController.activeInsertIndex}
-      onRequestInsert={scriptController.requestInsert}
+      activeInsertAnchor={scriptController.activeInsertAnchor}
+      onRequestInsert={handleRequestInsertFromSlot}
       insertComposer={insertComposerNode}
-      onCloseInsertComposer={scriptController.closeInsertComposer}
+      onCloseInsertComposer={handleCloseInsertComposer}
       activeRewriteBlockId={scriptController.activeRewriteBlockId ?? null}
       rewriteComposer={rewriteComposerNode}
       onCloseRewriteComposer={scriptController.closeRewriteComposer}
+      activeHeadingSceneId={editingHeadingSceneId}
+      headingEditor={headingEditorNode}
       className={previewClassName}
       scrollable
       insertScrollTargetId={insertScrollTargetId}
@@ -536,7 +631,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     lastInsertCompleteTokenRef.current = insertCompleteToken;
   }, [currentTool, insertCompleteToken, isNarrowViewport]);
 
-  const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-2 h-full min-h-0 flex flex-col gap-2';
+  useEffect(() => {
+    if (scriptController.activeInsertAnchor) return;
+    setInsertPlacementTarget(null);
+  }, [scriptController.activeInsertAnchor]);
+
+  useEffect(() => {
+    if (!editingHeadingSceneId || !context?.scenes.some((scene) => scene.id === editingHeadingSceneId)) {
+      setEditingHeadingSceneId(null);
+    }
+  }, [context, editingHeadingSceneId]);
+
+  const contentWrapperClassName = 'max-w-7xl mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-3 h-full min-h-0 flex flex-col gap-3';
   const mobileSheetEnabled = isNarrowViewport && Boolean(context);
   const isMenuSheetOpen = mobileSheetEnabled && toolsSheet === 'menu';
   const isLegacyToolSelected = Boolean(currentTool && LEGACY_TOOL_ORDER.includes(currentTool));
@@ -770,13 +876,26 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
   );
+  const shouldCollapsePlaybackForOverlap = Boolean(
+    currentTool ||
+    scriptController.activeInsertAnchor ||
+    scriptController.activeRewriteBlockId ||
+    editingHeadingSceneId
+  );
+
+  useEffect(() => {
+    if (!playbackProps) return;
+    if (!shouldCollapsePlaybackForOverlap) return;
+    setIsPlaybackExpanded(false);
+    setIsPlaybackMinimized(true);
+  }, [playbackProps, shouldCollapsePlaybackForOverlap]);
 
   const mobilePlaybackTargetHeight = isMobileFloatingPlaybackVisible
-    ? (isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_MAX : `${MOBILE_PLAYBACK_SHEET_COLLAPSED_PX}px`)
+    ? (isPlaybackMinimized ? '0px' : isPlaybackExpanded ? MOBILE_PLAYBACK_SHEET_EXPANDED_MAX : `${MOBILE_PLAYBACK_SHEET_COLLAPSED_PX}px`)
     : '0px';
   const isDesktopFloatingPlaybackVisible = Boolean(context && playbackProps && !mobileSheetEnabled);
   const desktopPlaybackTargetHeight = isDesktopFloatingPlaybackVisible
-    ? (isPlaybackExpanded ? DESKTOP_PLAYBACK_SHEET_EXPANDED_MAX : `${DESKTOP_PLAYBACK_SHEET_COLLAPSED_PX}px`)
+    ? (isPlaybackMinimized ? '0px' : isPlaybackExpanded ? DESKTOP_PLAYBACK_SHEET_EXPANDED_MAX : `${DESKTOP_PLAYBACK_SHEET_COLLAPSED_PX}px`)
     : '0px';
   const mobileStandardToolSheetMaxHeight = currentTool === 'generate'
     ? MOBILE_GENERATE_SHEET_MAX_HEIGHT
@@ -798,6 +917,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     ? `calc(${MOBILE_TOOLS_DOCK_PADDING} + ${mobileOverlayHeight})`
     : undefined;
   const handleTogglePlaybackExpanded = () => setIsPlaybackExpanded(prev => !prev);
+  const handleRestorePlayback = () => setIsPlaybackMinimized(false);
 
   return (
     <section
@@ -812,7 +932,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <div className="grid grid-cols-1 gap-3 max-[900px]:gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
               <div className="space-y-1 min-w-0">
                 <h1 className="text-xl md:text-2xl font-semibold tracking-[0.22em] text-white">SCRIPT SEANCE</h1>
-                <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-300">
                   <span>{genreLabel}</span>
                   <span className="text-gray-600">•</span>
                   <span>{sceneCountLabel}</span>
@@ -826,13 +946,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Style</span>
+                  <span className="text-[11px] uppercase font-semibold tracking-[0.2em] text-gray-500">Style</span>
                   <span className="text-sm font-medium text-gray-200">{styleLabel || 'No style set'}</span>
                   {onSaveStyle && (
                     <button
                       type="button"
                       onClick={handleOpenStyleModal}
-                      className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300"
+                      className="inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.2em] text-indigo-400 hover:text-indigo-300"
                       title="Edit style"
                     >
                       <Pencil className="h-3 w-3" />
@@ -842,7 +962,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 </div>
               </div>
               <div className="flex flex-col items-center justify-center gap-1 text-center min-w-0">
-                <span className="text-[10px] uppercase font-semibold tracking-[0.24em] text-gray-500">Draft Title</span>
+                <span className="text-[11px] uppercase font-semibold tracking-[0.2em] text-gray-500">Draft Title</span>
                 <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
                   <span className="text-base font-semibold text-white break-words">
                     {context?.title?.trim() ? context.title : 'Untitled Screenplay'}
@@ -850,7 +970,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   <button
                     type="button"
                     onClick={handleOpenTitleModal}
-                    className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300"
+                    className="inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.2em] text-indigo-400 hover:text-indigo-300"
                   >
                     <Pencil className="h-3 w-3" />
                     Edit
@@ -1034,7 +1154,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           {mobileStandardToolSheetContent}
         </MobileBottomSheet>
       )}
-      {isMobileFloatingPlaybackVisible && playbackProps && (
+      {isMobileFloatingPlaybackVisible && playbackProps && !isPlaybackMinimized && (
         <div
           className={`fixed inset-x-0 ${MOBILE_TOOLS_DOCK_OFFSET_CLASS} z-[75] px-2.5 transition-[height] duration-200 ease-out`}
           style={{
@@ -1051,7 +1171,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           />
         </div>
       )}
-      {isDesktopFloatingPlaybackVisible && playbackProps && (
+      {isDesktopFloatingPlaybackVisible && playbackProps && !isPlaybackMinimized && (
         <div
           className="fixed bottom-3 right-3 z-[75] w-[min(30rem,calc(100vw-1.25rem))] transition-[height] duration-200 ease-out"
           style={{
@@ -1067,6 +1187,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             showCloseButton={false}
           />
         </div>
+      )}
+      {Boolean(playbackProps && isPlaybackMinimized) && (
+        <button
+          type="button"
+          onClick={handleRestorePlayback}
+          className={`fixed z-[75] rounded-l-xl border border-gray-700 bg-gray-950/95 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 shadow-[0_12px_28px_rgba(0,0,0,0.35)] ${
+            mobileSheetEnabled ? 'right-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))]' : 'right-0 bottom-6'
+          }`}
+          aria-label="Restore playback controls"
+          title="Restore playback controls"
+        >
+          Playback
+        </button>
       )}
       {mobileSheetEnabled && (
         <div className="fixed inset-x-0 bottom-0 z-[74] pb-[max(0.5rem,env(safe-area-inset-bottom))]">

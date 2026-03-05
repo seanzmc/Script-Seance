@@ -20,6 +20,9 @@ export interface InsertComposerPopoverProps {
   generateNextSceneDisabled?: boolean;
   actionsDisabled?: boolean;
   errorMessage: string | null;
+  showPlacementControls?: boolean;
+  placement?: 'before' | 'after';
+  onPlacementChange?: (next: 'before' | 'after') => void;
 }
 
 const BLOCK_TYPE_OPTIONS: Array<{ type: BlockType; label: string }> = [
@@ -46,7 +49,10 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
   showGenerateNextSceneAction = false,
   generateNextSceneDisabled = false,
   actionsDisabled = false,
-  errorMessage
+  errorMessage,
+  showPlacementControls = false,
+  placement = 'after',
+  onPlacementChange
 }) => {
   const isDialogueType = blockType === BlockType.DIALOGUE;
   const hasCharacters = characters.length > 0;
@@ -59,12 +65,43 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       data-insert-composer="true"
       role="dialog"
       aria-label="Insert Block"
-      className="rounded-xl border border-gray-300/85 bg-[#f6f1e7]/97 p-3.5 shadow-[0_18px_42px_rgba(0,0,0,0.2)] backdrop-blur-[1px] transition-[opacity,transform,box-shadow] duration-200 ease-out"
+      className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)] transition-[opacity,transform,box-shadow] duration-200 ease-out"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-700">Insert Block</h3>
-        {isGenerating && <span className="text-[10px] text-gray-500">Generating...</span>}
+        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Insert Block</h3>
+        {isGenerating && <span className="text-xs text-gray-600">Generating...</span>}
       </div>
+
+      <p className="mt-2 text-sm leading-relaxed text-gray-700">
+        Generated content is inserted directly into the script. Only rewrite shows a preview first.
+      </p>
+
+      {showPlacementControls && onPlacementChange && (
+        <div className="mt-3 space-y-1">
+          <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">
+            Placement
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(['before', 'after'] as const).map((option) => {
+              const isSelected = placement === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => onPlacementChange(option)}
+                  className={`min-h-[42px] rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                    isSelected
+                      ? 'border-indigo-500 bg-indigo-500 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-300 hover:text-indigo-700'
+                  }`}
+                >
+                  Insert {option === 'before' ? 'Before' : 'After'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="mt-2.5 grid grid-cols-2 gap-1.5" role="tablist" aria-label="Block type">
         {BLOCK_TYPE_OPTIONS.map((option) => {
@@ -77,10 +114,10 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
               aria-selected={isSelected}
               onClick={() => onBlockTypeChange(option.type)}
               disabled={isGenerating}
-              className={`min-h-[31px] rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
+              className={`min-h-[42px] rounded-xl border px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
                 isSelected
                   ? 'border-indigo-500 bg-indigo-500 text-white shadow-[0_5px_14px_rgba(79,70,229,0.32)]'
-                  : 'border-gray-300/80 bg-white/85 text-gray-600 hover:border-indigo-300 hover:text-indigo-700 hover:shadow-sm'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-300 hover:text-indigo-700 hover:shadow-sm'
               }`}
             >
               {option.label}
@@ -91,14 +128,14 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
 
       {isDialogueType && (
         <div className="mt-2.5 space-y-1">
-          <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+          <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
             Character
           </label>
           {hasCharacters ? (
             <select
               value={selectedCharacter}
               onChange={(event) => onCharacterChange(event.target.value)}
-              className="h-9 w-full rounded-lg border border-gray-300 bg-white/95 px-2.5 text-sm text-gray-800 outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
               disabled={isGenerating}
               aria-label="Character"
             >
@@ -107,7 +144,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
               ))}
             </select>
           ) : (
-            <p className="rounded-lg border border-amber-300/70 bg-amber-50/85 px-2.5 py-2 text-xs text-amber-800">
+            <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Add a character first
             </p>
           )}
@@ -115,20 +152,20 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       )}
 
       <div className="mt-2.5 space-y-1">
-        <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+        <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
           Content (Optional)
         </label>
         <textarea
           value={content}
           onChange={(event) => onContentChange(event.target.value)}
-          placeholder="Leave blank and use Generate, or type your own block content..."
-          className="h-24 w-full resize-none rounded-lg border border-gray-300 bg-white/95 p-2 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-400 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          placeholder="Leave blank and use Generate and Insert, or type the block you want inserted."
+          className="h-28 w-full resize-none rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
           disabled={isGenerating}
         />
       </div>
 
       {errorMessage && (
-        <p className="mt-2 text-xs text-red-700" role="alert">{errorMessage}</p>
+        <p className="mt-2 text-sm text-red-700" role="alert">{errorMessage}</p>
       )}
 
       <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
@@ -148,7 +185,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
           onClick={onInsert}
           disabled={disableActions}
         >
-          Insert
+          Insert Typed Block
         </Button>
         <Button
           type="button"
@@ -158,7 +195,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
           disabled={disableActions}
           loading={isGenerating}
         >
-          Generate
+          Generate and Insert
         </Button>
         {showGenerateNextSceneAction && (
           <Button

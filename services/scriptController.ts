@@ -6,6 +6,7 @@ import {
   INSERT_BOTTOM_ID,
   INSERT_TOP_ID,
   Scene,
+  SceneMeta,
   ScriptAnchor,
   ScriptBlock,
   StoryContext
@@ -51,7 +52,8 @@ export type InsertableBlockRef = {
 
 export type ScriptMutationAction =
   | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
-  | { type: 'scene'; scene: Scene; index: number };
+  | { type: 'scene'; scene: Scene; index: number }
+  | { type: 'scene-heading'; sceneId: string; previousHeading: string; nextHeading: string };
 
 type UndoAction = ScriptMutationAction;
 
@@ -87,6 +89,20 @@ const serializeBlockForInsertPrompt = (block: ScriptBlock) => {
     return `${label} ${character}${parenthetical}: ${truncatePromptText(block.text, 240)}`;
   }
   return `${label}: ${truncatePromptText(block.text, 240)}`;
+};
+
+const isPlaceholderScene = (scene: Scene | null | undefined) => Boolean(scene?.meta?.placeholder);
+
+const clearPlaceholderMeta = (scene: Scene, source: SceneMeta['source'] = scene.meta?.source ?? 'user'): Scene => {
+  if (!isPlaceholderScene(scene)) return scene;
+  return {
+    ...scene,
+    meta: {
+      ...(scene.meta ?? {}),
+      source,
+      placeholder: false
+    }
+  };
 };
 
 export const collectInsertableBlocks = (storyContext: StoryContext): InsertableBlockRef[] => (
@@ -249,6 +265,11 @@ export interface ScriptMutationController {
     sceneId?: string;
     clearRedo?: boolean;
   }) => boolean;
+  updateSceneHeading: (params: {
+    sceneId: string;
+    heading: string;
+    clearRedo?: boolean;
+  }) => boolean;
   toggleBlockLock: (sceneId: string, blockId: string) => void;
   changeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   deleteBlock: (sceneId: string, blockId: string) => void;
@@ -292,6 +313,15 @@ export const createScriptMutationController = (
   }) => {
     const { context, action, mode } = params;
     if (mode === 'undo') {
+      if (action.type === 'scene-heading') {
+        const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
+        if (sceneIndex === -1) {
+          return { nextContext: context, applied: false };
+        }
+        const nextScenes = [...context.scenes];
+        nextScenes[sceneIndex] = { ...nextScenes[sceneIndex], heading: action.previousHeading };
+        return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+      }
       if (action.type === 'scene') {
         const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.scene.id);
         if (sceneIndex === -1) {
@@ -315,6 +345,16 @@ export const createScriptMutationController = (
       nextBlocks.splice(blockIndex, 1);
       const nextScenes = [...context.scenes];
       nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+      return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+    }
+
+    if (action.type === 'scene-heading') {
+      const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
+      if (sceneIndex === -1) {
+        return { nextContext: context, applied: false };
+      }
+      const nextScenes = [...context.scenes];
+      nextScenes[sceneIndex] = { ...nextScenes[sceneIndex], heading: action.nextHeading };
       return { nextContext: { ...context, scenes: nextScenes }, applied: true };
     }
 
@@ -364,7 +404,8 @@ export const createScriptMutationController = (
           id: crypto.randomUUID(),
           heading: normalizedBlock.text.toUpperCase(),
           summary: 'New user created scene',
-          blocks: []
+          blocks: [],
+          meta: { source: 'user', placeholder: true }
         };
         nextScenes.push(nextScene);
         deps.pushUndoAction({ type: 'scene', scene: nextScene, index: nextScenes.length - 1 });
@@ -374,7 +415,7 @@ export const createScriptMutationController = (
       if (nextScenes.length > 0) {
         const lastSceneIndex = nextScenes.length - 1;
         const updatedScene = {
-          ...nextScenes[lastSceneIndex],
+          ...clearPlaceholderMeta(nextScenes[lastSceneIndex], 'user'),
           blocks: [...nextScenes[lastSceneIndex].blocks, normalizedBlock]
         };
         nextScenes[lastSceneIndex] = updatedScene;
@@ -391,7 +432,8 @@ export const createScriptMutationController = (
         id: crypto.randomUUID(),
         heading: 'EXT. UNKNOWN - DAY',
         summary: 'Start',
-        blocks: [normalizedBlock]
+        blocks: [normalizedBlock],
+        meta: { source: 'user', placeholder: false }
       };
       nextScenes.push(nextScene);
       deps.pushUndoAction({ type: 'scene', scene: nextScene, index: nextScenes.length - 1 });
@@ -421,7 +463,8 @@ export const createScriptMutationController = (
           id: crypto.randomUUID(),
           heading: normalizedBlock.text.toUpperCase(),
           summary: 'New user created scene',
-          blocks: []
+          blocks: [],
+          meta: { source: 'user', placeholder: true }
         };
         const insertIndex = target.blockId === INSERT_TOP_ID ? sceneIndex : sceneIndex + 1;
         nextScenes.splice(insertIndex, 0, nextScene);
@@ -438,7 +481,7 @@ export const createScriptMutationController = (
           : blockIndex + 1;
       const updatedBlocks = [...scene.blocks];
       updatedBlocks.splice(insertIndex, 0, normalizedBlock);
-      nextScenes[sceneIndex] = { ...scene, blocks: updatedBlocks };
+      nextScenes[sceneIndex] = { ...clearPlaceholderMeta(scene, 'user'), blocks: updatedBlocks };
       deps.pushUndoAction({ type: 'block', sceneId: scene.id, block: normalizedBlock, index: insertIndex });
       return { ...previous, scenes: nextScenes };
     });
@@ -529,6 +572,40 @@ export const createScriptMutationController = (
       return { ...previous, scenes: nextScenes };
     });
     return applied;
+  };
+
+  const updateSceneHeading = (params: {
+    sceneId: string;
+    heading: string;
+    clearRedo?: boolean;
+  }) => {
+    const nextHeading = params.heading.trim().toUpperCase();
+    if (!nextHeading) return false;
+    if (params.clearRedo ?? false) {
+      deps.clearRedo();
+    }
+    let previousHeading: string | null = null;
+    const didMutate = deps.applyContextMutation((previous) => {
+      if (!previous) return null;
+      const sceneIndex = previous.scenes.findIndex((scene) => scene.id === params.sceneId);
+      if (sceneIndex === -1) return previous;
+      const scene = previous.scenes[sceneIndex];
+      if (scene.heading === nextHeading) return previous;
+      previousHeading = scene.heading;
+      const nextScenes = [...previous.scenes];
+      nextScenes[sceneIndex] = { ...scene, heading: nextHeading };
+      return { ...previous, scenes: nextScenes };
+    }, { bumpPromptRevision: true });
+    if (!didMutate || previousHeading === null) {
+      return false;
+    }
+    deps.pushUndoAction({
+      type: 'scene-heading',
+      sceneId: params.sceneId,
+      previousHeading,
+      nextHeading
+    });
+    return true;
   };
 
   const toggleBlockLock = (sceneId: string, blockId: string) => {
@@ -882,10 +959,27 @@ export const createScriptMutationController = (
         ),
         isFresh: () => deps.promptContextRevisionRef.current === startedPromptContextRevision,
         commit: (nextScene) => {
-          const normalizedScene = deps.normalizeSceneCharacters(nextScene, params.context?.characters ?? []);
+          const normalizedScene = {
+            ...deps.normalizeSceneCharacters(nextScene, params.context?.characters ?? []),
+            meta: { source: 'ai' as const, placeholder: false }
+          };
           const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
           deps.applyContextMutation((previous) => {
             if (!previous) return null;
+            const lastScene = previous.scenes[previous.scenes.length - 1];
+            if (lastScene && isPlaceholderScene(lastScene)) {
+              const nextScenes = [...previous.scenes];
+              nextScenes[nextScenes.length - 1] = {
+                ...lastScene,
+                summary: normalizedScene.summary,
+                blocks: normalizedScene.blocks,
+                meta: { ...(lastScene.meta ?? {}), source: 'user' as const, placeholder: false }
+              };
+              return {
+                ...previous,
+                scenes: nextScenes
+              };
+            }
             return {
               ...previous,
               scenes: [...previous.scenes, normalizedScene]
@@ -923,6 +1017,7 @@ export const createScriptMutationController = (
     generateRewritePreview,
     applyRewritePreview,
     updateBlock,
+    updateSceneHeading,
     toggleBlockLock,
     changeSpeaker,
     deleteBlock,
