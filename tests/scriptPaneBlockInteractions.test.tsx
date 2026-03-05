@@ -71,7 +71,6 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   insertCompleteToken: 0,
   onChangeSpeaker: vi.fn(),
   onInsertError: vi.fn(),
-  onRegenerate: vi.fn(),
   onGenerateRewritePreview: vi.fn(async () => 'A sharper rewrite lands.'),
   onApplyRewritePreview: vi.fn(),
   onDeleteBlock: vi.fn(),
@@ -81,7 +80,6 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
-  isRegenerating: false,
   onCancelGenerate: vi.fn(),
   currentBlockId: null,
   currentBlockIndex: -1,
@@ -385,6 +383,26 @@ describe('ScriptPane block interactions', () => {
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
   });
 
+  it('routes rewrite tool regenerate through composer preview pipeline', async () => {
+    const onGenerateRewritePreview = vi.fn(async () => 'The ledger snaps shut with intent.');
+    render(<ScriptPane {...createProps({ onGenerateRewritePreview })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite' }));
+    fireEvent.change(screen.getByPlaceholderText('Tone, intent, constraints...'), {
+      target: { value: 'Make it sharper.' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+
+    await waitFor(() => {
+      expect(onGenerateRewritePreview).toHaveBeenCalledWith({
+        sceneId: 'scene-1',
+        blockId: 'block-1',
+        instructions: 'Make it sharper.'
+      });
+    });
+    expect(screen.getByRole('dialog', { name: 'Rewrite Block' })).toBeTruthy();
+  });
+
   it('rewrite composer closes on cancel, escape, and outside click while keeping selection', async () => {
     const { container } = render(<ScriptPane {...createProps()} />);
 
@@ -431,9 +449,8 @@ describe('ScriptPane block interactions', () => {
   });
 
   it('disables inline rewrite for locked blocks and stubs delete when handler is missing', () => {
-    const onRegenerate = vi.fn();
     const { container } = render(
-      <ScriptPane {...createProps({ onRegenerate, onDeleteBlock: undefined })} />
+      <ScriptPane {...createProps({ onDeleteBlock: undefined })} />
     );
 
     const lockedBlock = container.querySelector('#block-block-2') as HTMLElement;
@@ -444,6 +461,5 @@ describe('ScriptPane block interactions', () => {
 
     expect(rewriteButton.disabled).toBe(true);
     expect(deleteButton.disabled).toBe(true);
-    expect(onRegenerate).not.toHaveBeenCalled();
   });
 });

@@ -252,13 +252,6 @@ export interface ScriptMutationController {
   toggleBlockLock: (sceneId: string, blockId: string) => void;
   changeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   deleteBlock: (sceneId: string, blockId: string) => void;
-  rewriteBlock: (params: {
-    context: StoryContext | null;
-    isGenerating: boolean;
-    sceneId: string;
-    blockId: string;
-    rewriteGuidance?: string;
-  }) => Promise<void>;
   generateNextScene: (params: {
     context: StoryContext | null;
     isGenerating: boolean;
@@ -863,96 +856,6 @@ export const createScriptMutationController = (
     return previewText;
   };
 
-  const rewriteBlock = async (params: {
-    context: StoryContext | null;
-    isGenerating: boolean;
-    sceneId: string;
-    blockId: string;
-    rewriteGuidance?: string;
-  }) => {
-    if (!params.context || params.isGenerating) return;
-
-    const scene = params.context.scenes.find((entry) => entry.id === params.sceneId);
-    const block = scene?.blocks.find((entry) => entry.id === params.blockId);
-    if (!block || block.locked) return;
-
-    const originalText = block.text;
-    const startedBlockRevision = block.blockRevision;
-    const startedPromptContextRevision = deps.promptContextRevisionRef.current;
-    const scopeKey = scopeKeys.rewriteBlock(deps.scriptIdRef.current, params.blockId);
-
-    try {
-      deps.activeGenerationScopeRef.current = scopeKey;
-      deps.setIsGenerating(true);
-      deps.setError(null);
-
-      const outcome = await deps.orchestratorRef.current.run<string>({
-        opType: 'rewriteBlock',
-        scopeKey,
-        execute: (signal) => executeRewriteBlock(
-          block,
-          params.context.genre,
-          params.context.premise,
-          params.context.style,
-          params.rewriteGuidance,
-          { signal, opType: 'rewriteBlock', scopeKey }
-        ),
-        isFresh: () => isRewriteFresh({
-          context: deps.contextRef.current,
-          sceneId: params.sceneId,
-          blockId: params.blockId,
-          startedBlockRevision,
-          startedPromptContextRevision,
-          currentPromptContextRevision: deps.promptContextRevisionRef.current
-        }),
-        commit: (newText) => {
-          const sanitizedText = sanitizeGeneratedInsertText(
-            block.type,
-            newText,
-            block.character ?? undefined
-          );
-          if (!sanitizedText) {
-            throw new Error('AI returned empty rewrite content.');
-          }
-
-          const applied = updateBlock({
-            sceneId: params.sceneId,
-            blockId: params.blockId,
-            patch: { text: sanitizedText },
-            clearRedo: true
-          });
-          if (!applied) return;
-
-          deps.setInsertScrollTargetId(params.blockId);
-          deps.setInsertScrollToken((token) => token + 1);
-          deps.setToast({
-            message: 'Block regenerated',
-            onUndo: () => {
-              updateBlock({
-                sceneId: params.sceneId,
-                blockId: params.blockId,
-                patch: { text: originalText },
-                clearRedo: false
-              });
-              deps.setToast(null);
-            }
-          });
-        }
-      });
-
-      if (outcome.kind === 'failed') {
-        deps.handleAiError(outcome.error, 'Failed to regenerate block.');
-      }
-    } catch (error) {
-      deps.handleAiError(error, 'Failed to regenerate block.');
-    } finally {
-      if (deps.activeGenerationScopeRef.current === scopeKey) {
-        deps.activeGenerationScopeRef.current = null;
-      }
-      deps.setIsGenerating(false);
-    }
-  };
-
   const generateNextScene = async (params: {
     context: StoryContext | null;
     isGenerating: boolean;
@@ -1023,7 +926,6 @@ export const createScriptMutationController = (
     toggleBlockLock,
     changeSpeaker,
     deleteBlock,
-    rewriteBlock,
     generateNextScene
   };
 };

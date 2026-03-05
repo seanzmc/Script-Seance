@@ -1252,16 +1252,6 @@ export default function App() {
     setIsSuggestingTitle(false);
   }, []);
 
-  const handleRegenerateBlock = useCallback(async (sceneId: string, blockId: string, rewriteGuidance?: string) => {
-    await scriptMutationController.rewriteBlock({
-      context,
-      isGenerating,
-      sceneId,
-      blockId,
-      rewriteGuidance
-    });
-  }, [context, isGenerating, scriptMutationController]);
-
   const handleDeleteBlock = useCallback((sceneId: string, blockId: string) => {
     scriptMutationController.deleteBlock(sceneId, blockId);
   }, [scriptMutationController]);
@@ -1591,7 +1581,6 @@ export default function App() {
         insertCompleteToken={insertCompleteToken}
         onChangeSpeaker={handleChangeSpeaker}
         onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
-        onRegenerate={handleRegenerateBlock}
         onGenerateRewritePreview={handleGenerateRewritePreview}
         onApplyRewritePreview={handleApplyRewritePreview}
         onDeleteBlock={handleDeleteBlock}
@@ -1600,7 +1589,6 @@ export default function App() {
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
         isPlaying={isPlaying}
-        isRegenerating={isGenerating}
         onCancelGenerate={cancelAiRequest}
         currentBlockId={currentBlockId}
         currentBlockIndex={currentBlockIndex}

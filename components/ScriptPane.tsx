@@ -43,7 +43,6 @@ export interface ScriptPaneProps {
   insertCompleteToken: number;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   onInsertError: (error: unknown) => void;
-  onRegenerate: (sceneId: string, blockId: string, rewriteGuidance?: string) => void;
   onGenerateRewritePreview?: (params: {
     sceneId: string;
     blockId: string;
@@ -66,7 +65,6 @@ export interface ScriptPaneProps {
   onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
   isPlaying: boolean;
-  isRegenerating: boolean;
   onCancelGenerate: () => void;
   currentBlockId: string | null;
   currentBlockIndex: number;
@@ -180,7 +178,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertCompleteToken,
   onChangeSpeaker,
   onInsertError,
-  onRegenerate,
   onGenerateRewritePreview,
   onApplyRewritePreview,
   onDeleteBlock,
@@ -190,7 +187,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onToggleLock,
   isGenerating,
   isPlaying,
-  isRegenerating,
   onCancelGenerate,
   currentBlockId,
   currentBlockIndex,
@@ -732,14 +728,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             onClick={() => {
               if (scriptController.rewriteTarget) {
                 const guidance = rewriteGuidance.trim();
-                onRegenerate(
-                  scriptController.rewriteTarget.sceneId,
-                  scriptController.rewriteTarget.blockId,
-                  guidance || undefined
-                );
+                void scriptController.rewriteBlock(scriptController.rewriteTarget.blockId, guidance);
               }
             }}
-            disabled={!scriptController.rewriteTarget || Boolean(selectedRewrite?.locked) || isRegenerating}
+            disabled={
+              !scriptController.rewriteTarget ||
+              Boolean(selectedRewrite?.locked) ||
+              scriptController.isRewriteComposerGenerating
+            }
             size="sm"
             className="shadow-lg shadow-indigo-500/20"
             title="Regenerate the selected block"
