@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Scene, BlockType, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
+import { Scene, BlockType, ScriptAnchor, ScriptBlock, INSERT_TOP_ID, INSERT_BOTTOM_ID } from '../types';
 import { Lock, Unlock, PlusCircle } from 'lucide-react';
+import { createAfterBlockAnchor, createSceneTopAnchor } from '../services/scriptController';
 
 export interface ScriptDisplayProps {
   scenes: Scene[];
@@ -31,7 +32,7 @@ export interface ScriptDisplayProps {
   onRewriteBlock?: (target: { sceneId: string; blockId: string }) => void;
   onDeleteBlock?: (target: { sceneId: string; blockId: string }) => void;
   activeInsertIndex?: number | null;
-  onRequestInsert?: (insertIndex: number) => void;
+  onRequestInsert?: (anchor: ScriptAnchor) => void;
   insertComposer?: React.ReactNode;
   onCloseInsertComposer?: () => void;
   activeRewriteBlockId?: string | null;
@@ -530,7 +531,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     },
     [insertTarget, onCancelInsertMode, onConfirmInsertMode, onSelectInsertTarget, pendingInsertBlock]
   );
-  const renderInlineInsertSlot = useCallback((insertIndex: number) => {
+  const renderInlineInsertSlot = useCallback((insertIndex: number, anchor: ScriptAnchor | null) => {
     const isActive = activeInsertIndex === insertIndex;
     return (
       <div className="script-export-chrome relative h-5" data-insert-slot-wrapper="true">
@@ -542,13 +543,15 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           aria-pressed={isActive}
           onClick={(event) => {
             event.stopPropagation();
-            onRequestInsert?.(insertIndex);
+            if (!anchor) return;
+            onRequestInsert?.(anchor);
           }}
           onKeyDown={(event) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             event.stopPropagation();
-            onRequestInsert?.(insertIndex);
+            if (!anchor) return;
+            onRequestInsert?.(anchor);
           }}
           className={`group/slot absolute inset-x-4 top-1/2 h-5 -translate-y-1/2 rounded-full transition-[opacity,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
             isActive ? 'opacity-100' : 'opacity-0 hover:opacity-100 focus-visible:opacity-100'
@@ -618,6 +621,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               const deleteDisabled = !onDeleteBlock;
               const globalBlockOrder = blockOrderIndexById.get(block.id);
               const nextInsertIndex = typeof globalBlockOrder === 'number' ? globalBlockOrder + 1 : null;
+              const nextInsertAnchor = typeof nextInsertIndex === 'number'
+                ? createAfterBlockAnchor(block.id)
+                : null;
 
               let content = null;
 
@@ -764,7 +770,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     { sceneId: scene.id, blockId: block.id },
                     showBottomLabel ? 'Insert at bottom' : undefined
                   )}
-                  {!isInsertMode && !isLastBlock && typeof nextInsertIndex === 'number' && renderInlineInsertSlot(nextInsertIndex)}
+                  {!isInsertMode && !isLastBlock && typeof nextInsertIndex === 'number' && renderInlineInsertSlot(nextInsertIndex, nextInsertAnchor)}
                   {isInsertMode && hasPendingPreview && insertTarget?.sceneId === scene.id && insertTarget?.blockId === block.id && pendingInsertBlock && (
                     renderPreviewBlock(pendingInsertBlock)
                   )}
@@ -782,6 +788,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     });
 
   if (scenes.length === 0) return null;
+  const endInsertAnchor = totalScriptBlocks > 0
+    ? createAfterBlockAnchor(playableBlockIds[totalScriptBlocks - 1])
+    : createSceneTopAnchor(scenes[0].id);
 
   const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-4 md:p-8 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
@@ -802,7 +811,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         tabIndex={-1}
       >
         {renderedScenes}
-        {!isInsertMode && renderInlineInsertSlot(totalScriptBlocks)}
+        {!isInsertMode && renderInlineInsertSlot(totalScriptBlocks, endInsertAnchor)}
       </div>
     </div>
   );

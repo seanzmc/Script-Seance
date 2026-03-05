@@ -27,6 +27,7 @@ import {
   TtsVoice,
   VoiceCatalogState,
   ScriptBlock,
+  ScriptAnchor,
   BlockType,
   GENRES
 } from './types';
@@ -1152,17 +1153,17 @@ export default function App() {
     setInsertCompleteToken(token => token + 1);
   }, [handleInsertAfter, insertTarget, pendingInsertBlock]);
 
-  const handleInsertAtIndex = useCallback((insertIndex: number, block: ScriptBlock) => {
-    scriptMutationController.insertBlockAtIndex(insertIndex, block);
+  const handleInsertAtAnchor = useCallback((anchor: ScriptAnchor, block: ScriptBlock) => {
+    scriptMutationController.insertBlockAtAnchor(anchor, block);
   }, [scriptMutationController]);
 
-  const handleGenerateInsertAtIndex = useCallback(async (params: {
-    insertIndex: number;
+  const handleGenerateInsertAtAnchor = useCallback(async (params: {
+    anchor: ScriptAnchor;
     type: BlockType;
     content: string;
     character?: string;
   }) => {
-    await scriptMutationController.generateInsertAtIndex(params);
+    await scriptMutationController.generateInsertAtAnchor(params);
   }, [scriptMutationController]);
 
   const handleGenerateRewritePreview = useCallback(async (params: {
@@ -1685,8 +1686,8 @@ export default function App() {
         onGenerateRewritePreview={handleGenerateRewritePreview}
         onApplyRewritePreview={handleApplyRewritePreview}
         onDeleteBlock={handleDeleteBlock}
-        onInsertAtIndex={handleInsertAtIndex}
-        onGenerateInsertAtIndex={handleGenerateInsertAtIndex}
+        onInsertAtAnchor={handleInsertAtAnchor}
+        onGenerateInsertAtAnchor={handleGenerateInsertAtAnchor}
         onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
         isPlaying={isPlaying}

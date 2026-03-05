@@ -6,15 +6,10 @@ import {
   INSERT_BOTTOM_ID,
   INSERT_TOP_ID,
   Scene,
+  ScriptAnchor,
   ScriptBlock,
   StoryContext
 } from '../types';
-
-export interface ScriptAnchor {
-  kind: 'index';
-  index: number;
-  id: string;
-}
 
 export interface ScriptBlockTarget {
   sceneId: string;
@@ -129,6 +124,63 @@ export const resolveInsertTargetFromIndex = (
   return before ? { sceneId: before.sceneId, blockId: before.block.id } : null;
 };
 
+export const resolveInsertIndexFromAnchor = (
+  storyContext: StoryContext,
+  anchor: ScriptAnchor
+): number | null => {
+  const orderedBlocks = collectInsertableBlocks(storyContext);
+  if (anchor.kind === 'index') {
+    return anchor.index >= 0 && anchor.index <= orderedBlocks.length ? anchor.index : null;
+  }
+
+  if (anchor.kind === 'block') {
+    const blockIndex = orderedBlocks.findIndex((entry) => entry.block.id === anchor.blockId);
+    if (blockIndex < 0) return null;
+    return anchor.position === 'before' ? blockIndex : blockIndex + 1;
+  }
+
+  const sceneIndex = storyContext.scenes.findIndex((scene) => scene.id === anchor.sceneId);
+  if (sceneIndex < 0) return null;
+  const sceneOffset = storyContext.scenes
+    .slice(0, sceneIndex)
+    .reduce((count, scene) => count + scene.blocks.length, 0);
+  const targetScene = storyContext.scenes[sceneIndex];
+  return anchor.position === 'top'
+    ? sceneOffset
+    : sceneOffset + targetScene.blocks.length;
+};
+
+export const resolveInsertTargetFromAnchor = (
+  storyContext: StoryContext,
+  anchor: ScriptAnchor
+): ScriptBlockTarget | null => {
+  if (anchor.kind === 'index') {
+    return resolveInsertTargetFromIndex(storyContext, anchor.index);
+  }
+
+  if (anchor.kind === 'scene') {
+    const sceneExists = storyContext.scenes.some((scene) => scene.id === anchor.sceneId);
+    if (!sceneExists) return null;
+    return {
+      sceneId: anchor.sceneId,
+      blockId: anchor.position === 'top' ? INSERT_TOP_ID : INSERT_BOTTOM_ID
+    };
+  }
+
+  for (const scene of storyContext.scenes) {
+    const blockIndex = scene.blocks.findIndex((block) => block.id === anchor.blockId);
+    if (blockIndex < 0) continue;
+    if (anchor.position === 'after') {
+      return { sceneId: scene.id, blockId: anchor.blockId };
+    }
+    if (blockIndex === 0) {
+      return { sceneId: scene.id, blockId: INSERT_TOP_ID };
+    }
+    return { sceneId: scene.id, blockId: scene.blocks[blockIndex - 1].id };
+  }
+  return null;
+};
+
 export const sanitizeGeneratedInsertText = (
   type: BlockType,
   rawText: string,
@@ -159,6 +211,7 @@ export const buildRewritePreviewGuidance = (params: {
 
 export interface ScriptMutationController {
   resolveInsertTargetFromIndex: (context: StoryContext, insertIndex: number) => ScriptBlockTarget | null;
+  resolveAnchor: (context: StoryContext, anchor: ScriptAnchor) => ScriptBlockTarget | null;
   applySnapshot: (params: {
     context: StoryContext;
     action: ScriptMutationAction;
@@ -166,7 +219,14 @@ export interface ScriptMutationController {
   }) => { nextContext: StoryContext; applied: boolean };
   addBlock: (block: ScriptBlock) => void;
   insertBlock: (target: ScriptBlockTarget, block: ScriptBlock) => void;
+  insertBlockAtAnchor: (anchor: ScriptAnchor, block: ScriptBlock) => void;
   insertBlockAtIndex: (insertIndex: number, block: ScriptBlock) => void;
+  generateInsertAtAnchor: (params: {
+    anchor: ScriptAnchor;
+    type: BlockType;
+    content: string;
+    character?: string;
+  }) => Promise<void>;
   generateInsertAtIndex: (params: {
     insertIndex: number;
     type: BlockType;
@@ -387,15 +447,23 @@ export const createScriptMutationController = (
     deps.setInsertTarget(null);
   };
 
-  const insertBlockAtIndex = (insertIndex: number, block: ScriptBlock) => {
+  const resolveAnchor = (context: StoryContext, anchor: ScriptAnchor) => (
+    resolveInsertTargetFromAnchor(context, anchor)
+  );
+
+  const insertBlockAtAnchor = (anchor: ScriptAnchor, block: ScriptBlock) => {
     const latestContext = deps.contextRef.current;
     if (!latestContext) return;
-    const target = resolveInsertTargetFromIndex(latestContext, insertIndex);
+    const target = resolveAnchor(latestContext, anchor);
     if (!target) return;
     deps.setInsertScrollTargetId(block.id);
     deps.setInsertScrollToken((token) => token + 1);
     insertBlock(target, block);
     deps.setInsertCompleteToken((token) => token + 1);
+  };
+
+  const insertBlockAtIndex = (insertIndex: number, block: ScriptBlock) => {
+    insertBlockAtAnchor(createIndexAnchor(insertIndex), block);
   };
 
   const updateBlock = (params: {
@@ -555,8 +623,8 @@ export const createScriptMutationController = (
     deps.setInsertScrollToken((token) => token + 1);
   };
 
-  const generateInsertAtIndex = async (params: {
-    insertIndex: number;
+  const generateInsertAtAnchor = async (params: {
+    anchor: ScriptAnchor;
     type: BlockType;
     content: string;
     character?: string;
@@ -566,14 +634,18 @@ export const createScriptMutationController = (
       throw new Error('Script context unavailable.');
     }
 
-    const initialTarget = resolveInsertTargetFromIndex(latestContext, params.insertIndex);
+    const initialTarget = resolveAnchor(latestContext, params.anchor);
     if (!initialTarget) {
+      throw new Error('Insertion point is no longer available.');
+    }
+    const insertionIndex = resolveInsertIndexFromAnchor(latestContext, params.anchor);
+    if (insertionIndex === null) {
       throw new Error('Insertion point is no longer available.');
     }
 
     const orderedBlocks = collectInsertableBlocks(latestContext);
-    const previousBlock = params.insertIndex > 0 ? orderedBlocks[params.insertIndex - 1]?.block : null;
-    const nextBlock = params.insertIndex < orderedBlocks.length ? orderedBlocks[params.insertIndex]?.block : null;
+    const previousBlock = insertionIndex > 0 ? orderedBlocks[insertionIndex - 1]?.block : null;
+    const nextBlock = insertionIndex < orderedBlocks.length ? orderedBlocks[insertionIndex]?.block : null;
     const selectedCharacter = params.type === BlockType.DIALOGUE
       ? deps.resolveCharacterName(params.character ?? latestContext.characters[0] ?? 'Narrator', latestContext.characters)
       : undefined;
@@ -616,7 +688,7 @@ export const createScriptMutationController = (
     ].filter(Boolean).join('\n');
 
     const startedPromptContextRevision = deps.promptContextRevisionRef.current;
-    const scopeKey = scopeKeys.insertSurpriseText(deps.scriptIdRef.current, params.insertIndex);
+    const scopeKey = scopeKeys.insertSurpriseText(deps.scriptIdRef.current, params.anchor.id);
 
     const outcome = await deps.orchestratorRef.current.run<string>({
       opType: 'insertSurpriseText',
@@ -632,12 +704,12 @@ export const createScriptMutationController = (
         const currentContext = deps.contextRef.current;
         if (!currentContext) return false;
         if (deps.promptContextRevisionRef.current !== startedPromptContextRevision) return false;
-        return Boolean(resolveInsertTargetFromIndex(currentContext, params.insertIndex));
+        return Boolean(resolveAnchor(currentContext, params.anchor));
       },
       commit: (generatedText) => {
         const currentContext = deps.contextRef.current;
         if (!currentContext) return;
-        const target = resolveInsertTargetFromIndex(currentContext, params.insertIndex);
+        const target = resolveAnchor(currentContext, params.anchor);
         if (!target) return;
         const text = sanitizeGeneratedInsertText(params.type, generatedText, selectedCharacter ?? undefined);
         if (!text) {
@@ -662,6 +734,16 @@ export const createScriptMutationController = (
       throw new Error('Insert generation was interrupted.');
     }
   };
+
+  const generateInsertAtIndex = async (params: {
+    insertIndex: number;
+    type: BlockType;
+    content: string;
+    character?: string;
+  }) => generateInsertAtAnchor({
+    ...params,
+    anchor: createIndexAnchor(params.insertIndex)
+  });
 
   const generateRewritePreview = async (params: {
     sceneId: string;
@@ -888,10 +970,13 @@ export const createScriptMutationController = (
 
   return {
     resolveInsertTargetFromIndex,
+    resolveAnchor,
     applySnapshot,
     addBlock,
     insertBlock,
+    insertBlockAtAnchor,
     insertBlockAtIndex,
+    generateInsertAtAnchor,
     generateInsertAtIndex,
     generateRewritePreview,
     applyRewritePreview,
@@ -908,4 +993,32 @@ export const createIndexAnchor = (index: number): ScriptAnchor => ({
   kind: 'index',
   index,
   id: `index:${index}`
+});
+
+export const createBeforeBlockAnchor = (blockId: string): ScriptAnchor => ({
+  kind: 'block',
+  blockId,
+  position: 'before',
+  id: `block:${blockId}:before`
+});
+
+export const createAfterBlockAnchor = (blockId: string): ScriptAnchor => ({
+  kind: 'block',
+  blockId,
+  position: 'after',
+  id: `block:${blockId}:after`
+});
+
+export const createSceneTopAnchor = (sceneId: string): ScriptAnchor => ({
+  kind: 'scene',
+  sceneId,
+  position: 'top',
+  id: `scene:${sceneId}:top`
+});
+
+export const createSceneBottomAnchor = (sceneId: string): ScriptAnchor => ({
+  kind: 'scene',
+  sceneId,
+  position: 'bottom',
+  id: `scene:${sceneId}:bottom`
 });

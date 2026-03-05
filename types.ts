@@ -57,6 +57,25 @@ export interface VoiceConfig {
 export const INSERT_TOP_ID = '__insert-top__';
 export const INSERT_BOTTOM_ID = '__insert-bottom__';
 
+export type ScriptAnchor =
+  | {
+      kind: 'block';
+      blockId: string;
+      position: 'before' | 'after';
+      id: string;
+    }
+  | {
+      kind: 'scene';
+      sceneId: string;
+      position: 'top' | 'bottom';
+      id: string;
+    }
+  | {
+      kind: 'index';
+      index: number;
+      id: string;
+    };
+
 export interface TtsVoice {
   id: string;
   displayName: string;

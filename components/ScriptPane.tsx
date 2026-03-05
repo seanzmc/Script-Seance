@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BlockType, StoryContext, ScriptBlock } from '../types';
+import { BlockType, ScriptAnchor, StoryContext, ScriptBlock } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
 import { RewriteComposerPopover } from './RewriteComposerPopover';
@@ -74,10 +74,10 @@ export interface ScriptPaneProps {
     text: string;
   }) => void;
   onDeleteBlock?: (sceneId: string, blockId: string) => void;
-  onRequestInsert?: (index: number) => void;
-  onInsertAtIndex?: (index: number, block: ScriptBlock) => void;
-  onGenerateInsertAtIndex?: (params: {
-    insertIndex: number;
+  onRequestInsert?: (anchor: ScriptAnchor) => void;
+  onInsertAtAnchor?: (anchor: ScriptAnchor, block: ScriptBlock) => void;
+  onGenerateInsertAtAnchor?: (params: {
+    anchor: ScriptAnchor;
     type: BlockType;
     content: string;
     character?: string;
@@ -214,8 +214,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onApplyRewritePreview,
   onDeleteBlock,
   onRequestInsert,
-  onInsertAtIndex,
-  onGenerateInsertAtIndex,
+  onInsertAtAnchor,
+  onGenerateInsertAtAnchor,
   onToggleLock,
   isGenerating,
   isPlaying,
@@ -268,8 +268,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onGenerateNext,
     onDeleteBlock,
     onRequestInsert,
-    onInsertAtIndex,
-    onGenerateInsertAtIndex,
+    onInsertAtAnchor,
+    onGenerateInsertAtAnchor,
     onGenerateRewritePreview,
     onApplyRewritePreview
   });

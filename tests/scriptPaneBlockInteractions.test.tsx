@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { SetupFormState } from '../components/SetupForm';
-import { BlockType, StoryContext } from '../types';
+import { BlockType, ScriptAnchor, StoryContext } from '../types';
 
 const contextFixture: StoryContext = {
   title: 'Interactive Draft',
@@ -84,8 +84,8 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onApplyRewritePreview: vi.fn(),
   onDeleteBlock: vi.fn(),
   onRequestInsert: vi.fn(),
-  onInsertAtIndex: vi.fn(),
-  onGenerateInsertAtIndex: vi.fn(async () => {}),
+  onInsertAtAnchor: vi.fn(),
+  onGenerateInsertAtAnchor: vi.fn(async () => {}),
   onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
@@ -146,17 +146,22 @@ describe('ScriptPane block interactions', () => {
   });
 
   it('manual composer insert sends one block to the correct insert index', () => {
-    const onInsertAtIndex = vi.fn();
-    render(<ScriptPane {...createProps({ onInsertAtIndex })} />);
+    const onInsertAtAnchor = vi.fn();
+    render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);
 
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'A deliberate action beat.' } });
     fireEvent.click(within(composer).getByRole('button', { name: 'Insert' }));
 
-    expect(onInsertAtIndex).toHaveBeenCalledTimes(1);
-    expect(onInsertAtIndex).toHaveBeenCalledWith(
-      1,
+    expect(onInsertAtAnchor).toHaveBeenCalledTimes(1);
+    expect(onInsertAtAnchor).toHaveBeenCalledWith(
+      expect.objectContaining<ScriptAnchor>({
+        kind: 'block',
+        blockId: 'block-1',
+        position: 'after',
+        id: 'block:block-1:after'
+      }),
       expect.objectContaining({
         type: BlockType.ACTION,
         text: 'A deliberate action beat.',
@@ -190,8 +195,8 @@ describe('ScriptPane block interactions', () => {
   });
 
   it('dialogue generate request includes selected speaker', () => {
-    const onGenerateInsertAtIndex = vi.fn(async () => {});
-    render(<ScriptPane {...createProps({ onGenerateInsertAtIndex })} />);
+    const onGenerateInsertAtAnchor = vi.fn(async () => {});
+    render(<ScriptPane {...createProps({ onGenerateInsertAtAnchor })} />);
 
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
@@ -199,16 +204,16 @@ describe('ScriptPane block interactions', () => {
     fireEvent.change(within(composer).getByLabelText('Character'), { target: { value: 'Sam' } });
     fireEvent.click(within(composer).getByRole('button', { name: 'Generate' }));
 
-    expect(onGenerateInsertAtIndex).toHaveBeenCalledWith(
+    expect(onGenerateInsertAtAnchor).toHaveBeenCalledWith(
       expect.objectContaining({ type: BlockType.DIALOGUE, character: 'Sam' })
     );
   });
 
   it('composer generate shows loading and inline error state on failure', async () => {
-    const onGenerateInsertAtIndex = vi.fn(async () => {
+    const onGenerateInsertAtAnchor = vi.fn(async () => {
       throw new Error('Generation failed');
     });
-    render(<ScriptPane {...createProps({ onGenerateInsertAtIndex })} />);
+    render(<ScriptPane {...createProps({ onGenerateInsertAtAnchor })} />);
 
     fireEvent.click(screen.getByTestId('insert-slot-2'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
@@ -218,8 +223,16 @@ describe('ScriptPane block interactions', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain('Generation failed');
     });
-    expect(onGenerateInsertAtIndex).toHaveBeenCalledWith(
-      expect.objectContaining({ insertIndex: 2, type: BlockType.ACTION })
+    expect(onGenerateInsertAtAnchor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        anchor: expect.objectContaining<ScriptAnchor>({
+          kind: 'block',
+          blockId: 'block-2',
+          position: 'after',
+          id: 'block:block-2:after'
+        }),
+        type: BlockType.ACTION
+      })
     );
   });
 
@@ -231,12 +244,22 @@ describe('ScriptPane block interactions', () => {
     const endSlot = screen.getByTestId('insert-slot-2');
 
     fireEvent.click(betweenSlot);
-    expect(onRequestInsert).toHaveBeenCalledWith(1);
+    expect(onRequestInsert).toHaveBeenCalledWith(expect.objectContaining<ScriptAnchor>({
+      kind: 'block',
+      blockId: 'block-1',
+      position: 'after',
+      id: 'block:block-1:after'
+    }));
     expect(betweenSlot.getAttribute('data-active')).toBe('true');
     expect(endSlot.getAttribute('data-active')).toBe('false');
 
     fireEvent.click(endSlot);
-    expect(onRequestInsert).toHaveBeenCalledWith(2);
+    expect(onRequestInsert).toHaveBeenCalledWith(expect.objectContaining<ScriptAnchor>({
+      kind: 'block',
+      blockId: 'block-2',
+      position: 'after',
+      id: 'block:block-2:after'
+    }));
     expect(endSlot.getAttribute('data-active')).toBe('true');
   });
 
@@ -250,8 +273,18 @@ describe('ScriptPane block interactions', () => {
     fireEvent.keyDown(betweenSlot, { key: 'Enter' });
     fireEvent.keyDown(betweenSlot, { key: ' ' });
 
-    expect(onRequestInsert).toHaveBeenNthCalledWith(1, 1);
-    expect(onRequestInsert).toHaveBeenNthCalledWith(2, 1);
+    expect(onRequestInsert).toHaveBeenNthCalledWith(1, expect.objectContaining<ScriptAnchor>({
+      kind: 'block',
+      blockId: 'block-1',
+      position: 'after',
+      id: 'block:block-1:after'
+    }));
+    expect(onRequestInsert).toHaveBeenNthCalledWith(2, expect.objectContaining<ScriptAnchor>({
+      kind: 'block',
+      blockId: 'block-1',
+      position: 'after',
+      id: 'block:block-1:after'
+    }));
   });
 
   it('selects a block and clears selection on outside click', () => {

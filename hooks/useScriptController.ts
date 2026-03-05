@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBlock } from '../domain/blocks';
-import { BlockType, ScriptBlock, StoryContext } from '../types';
+import { BlockType, ScriptAnchor, ScriptBlock, StoryContext } from '../types';
 import {
-  createIndexAnchor,
-  ScriptAnchor,
+  resolveInsertIndexFromAnchor,
   ScriptBlockPatch,
   ScriptBlockTarget,
   ScriptController
@@ -24,10 +23,10 @@ interface UseScriptControllerParams {
   rewriteAutoSelectEnabled: boolean;
   onGenerateNext?: () => void;
   onDeleteBlock?: (sceneId: string, blockId: string) => void;
-  onRequestInsert?: (index: number) => void;
-  onInsertAtIndex?: (index: number, block: ScriptBlock) => void;
-  onGenerateInsertAtIndex?: (params: {
-    insertIndex: number;
+  onRequestInsert?: (anchor: ScriptAnchor) => void;
+  onInsertAtAnchor?: (anchor: ScriptAnchor, block: ScriptBlock) => void;
+  onGenerateInsertAtAnchor?: (params: {
+    anchor: ScriptAnchor;
     type: BlockType;
     content: string;
     character?: string;
@@ -53,7 +52,7 @@ export interface UseScriptControllerResult extends ScriptController {
   clearBlockTarget: () => void;
   activeInsertAnchor?: ScriptAnchor;
   activeInsertIndex: number | null;
-  requestInsert: (index: number) => void;
+  requestInsert: (anchor: ScriptAnchor) => void;
   closeInsertComposer: () => void;
 
   composerBlockType: BlockType;
@@ -99,8 +98,8 @@ export const useScriptController = ({
   onGenerateNext,
   onDeleteBlock,
   onRequestInsert,
-  onInsertAtIndex,
-  onGenerateInsertAtIndex,
+  onInsertAtAnchor,
+  onGenerateInsertAtAnchor,
   onGenerateRewritePreview,
   onApplyRewritePreview
 }: UseScriptControllerParams): UseScriptControllerResult => {
@@ -120,7 +119,10 @@ export const useScriptController = ({
   const [isComposerGenerating, setIsComposerGenerating] = useState(false);
 
   const script = context?.scenes ?? [];
-  const activeInsertIndex = activeInsertAnchor?.index ?? null;
+  const activeInsertIndex = useMemo(() => {
+    if (!context || !activeInsertAnchor) return null;
+    return resolveInsertIndexFromAnchor(context, activeInsertAnchor);
+  }, [activeInsertAnchor, context]);
   const activeRewriteBlockId = rewriteComposerTarget?.blockId;
   const selectedBlockId = selectedBlockTarget?.blockId;
 
@@ -146,11 +148,6 @@ export const useScriptController = ({
         };
       })
     ));
-  }, [context]);
-
-  const insertableBlockCount = useMemo(() => {
-    if (!context) return 0;
-    return context.scenes.reduce((total, scene) => total + scene.blocks.length, 0);
   }, [context]);
 
   const setRewriteTarget = useCallback((target: ScriptBlockTarget | null) => {
@@ -194,11 +191,11 @@ export const useScriptController = ({
     clearRewriteComposerFields();
     setActiveInsertAnchor(anchor);
     setComposerError(null);
-    onRequestInsert?.(anchor.index);
+    onRequestInsert?.(anchor);
   }, [clearRewriteComposerFields, isComposerGenerating, onRequestInsert]);
 
-  const requestInsert = useCallback((index: number) => {
-    openInsert(createIndexAnchor(index));
+  const requestInsert = useCallback((anchor: ScriptAnchor) => {
+    openInsert(anchor);
   }, [openInsert]);
 
   const openRewrite = useCallback((target: ScriptBlockTarget) => {
@@ -214,15 +211,15 @@ export const useScriptController = ({
   }, [isComposerGenerating]);
 
   const insertBlock = useCallback((anchor: ScriptAnchor, block: ScriptBlock) => {
-    if (!onInsertAtIndex) {
+    if (!onInsertAtAnchor) {
       setComposerError('Insert handler unavailable.');
       return;
     }
-    onInsertAtIndex(anchor.index, block);
+    onInsertAtAnchor(anchor, block);
     setComposerContentState('');
     setComposerError(null);
     setActiveInsertAnchor(null);
-  }, [onInsertAtIndex]);
+  }, [onInsertAtAnchor]);
 
   const insertAtActiveAnchor = useCallback(() => {
     if (!context) {
@@ -253,7 +250,7 @@ export const useScriptController = ({
       return;
     }
     if (activeInsertAnchor === null) return;
-    if (!onGenerateInsertAtIndex) {
+    if (!onGenerateInsertAtAnchor) {
       setComposerError('Generate handler unavailable.');
       return;
     }
@@ -264,8 +261,8 @@ export const useScriptController = ({
     setComposerError(null);
     setIsComposerGenerating(true);
     try {
-      await onGenerateInsertAtIndex({
-        insertIndex: activeInsertAnchor.index,
+      await onGenerateInsertAtAnchor({
+        anchor: activeInsertAnchor,
         type: composerBlockType,
         content: composerContent.trim(),
         character: composerBlockType === BlockType.DIALOGUE
@@ -288,7 +285,7 @@ export const useScriptController = ({
     composerCharacter,
     composerContent,
     context,
-    onGenerateInsertAtIndex
+    onGenerateInsertAtAnchor
   ]);
 
   const runRewritePreview = useCallback(async (target: ScriptBlockTarget, instructions: string) => {
@@ -481,10 +478,10 @@ export const useScriptController = ({
   }, [clearRewriteComposerFields, rewriteComposerTarget, rewriteOptions]);
 
   useEffect(() => {
-    if (activeInsertIndex === null) return;
-    if (activeInsertIndex <= insertableBlockCount) return;
+    if (!activeInsertAnchor || !context) return;
+    if (activeInsertIndex !== null) return;
     setActiveInsertAnchor(null);
-  }, [activeInsertIndex, insertableBlockCount]);
+  }, [activeInsertAnchor, activeInsertIndex, context]);
 
   return {
     script,
