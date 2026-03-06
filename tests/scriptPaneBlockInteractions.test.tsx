@@ -345,13 +345,16 @@ describe('ScriptPane block interactions', () => {
     expect(onGenerateNext).toHaveBeenCalledTimes(0);
   });
 
-  it('routes insert panel Add to End through the same anchor insert callback', () => {
+  it('routes Generate menu insert scene action through the same anchor insert callback', async () => {
     const onInsertAtAnchor = vi.fn();
     render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'An ending beat closes the scene.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add to End' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+    fireEvent.click(screen.getByRole('button', { name: /insert scene \/ new beat/i }));
+
+    const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
+    fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An ending beat closes the scene.' } });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
 
     expect(onInsertAtAnchor).toHaveBeenCalledTimes(1);
     expect(onInsertAtAnchor).toHaveBeenCalledWith(
@@ -570,15 +573,19 @@ describe('ScriptPane block interactions', () => {
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
   });
 
-  it('routes rewrite tool regenerate through composer preview pipeline', async () => {
+  it('routes inline rewrite regenerate through composer preview pipeline', async () => {
     const onGenerateRewritePreview = vi.fn(async () => 'The ledger snaps shut with intent.');
-    render(<ScriptPane {...createProps({ onGenerateRewritePreview })} />);
+    const { container } = render(<ScriptPane {...createProps({ onGenerateRewritePreview })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Rewrite' }));
-    fireEvent.change(screen.getByPlaceholderText('Tone, intent, constraints...'), {
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite selected block' }));
+
+    const composer = screen.getByRole('dialog', { name: 'Rewrite Block' });
+    fireEvent.change(within(composer).getByRole('textbox'), {
       target: { value: 'Make it sharper.' }
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Generate Rewrite' }));
 
     await waitFor(() => {
       expect(onGenerateRewritePreview).toHaveBeenCalledWith({

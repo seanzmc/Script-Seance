@@ -1,96 +1,13 @@
 import React, { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { SetupFormState } from '../components/SetupForm';
 import { PlaybackPanelProps } from '../components/PlaybackPanel';
 import { BlockType, StoryContext } from '../types';
 
-type MatchMediaListener = (event: MediaQueryListEvent) => void;
-type LegacyMatchMediaListener = (this: MediaQueryList, ev: MediaQueryListEvent) => void;
-
-interface MockMediaQueryList extends MediaQueryList {
-  _listeners: Set<MatchMediaListener>;
-  _legacyListeners: Set<LegacyMatchMediaListener>;
-}
-
-const createMatchMediaMock = () => {
-  const originalMatchMedia = window.matchMedia;
-  let currentWidth = 1280;
-  const registry = new Map<string, MockMediaQueryList>();
-
-  const evaluateQuery = (query: string) => {
-    const maxWidthMatch = query.match(/\(max-width:\s*(\d+)px\)/);
-    if (maxWidthMatch) {
-      return currentWidth <= Number(maxWidthMatch[1]);
-    }
-    return false;
-  };
-
-  const notifyListeners = (query: string, mediaQuery: MockMediaQueryList, nextMatches: boolean) => {
-    if (mediaQuery.matches === nextMatches) return;
-    (mediaQuery as unknown as { matches: boolean }).matches = nextMatches;
-    const event = { matches: nextMatches, media: query } as MediaQueryListEvent;
-    mediaQuery.onchange?.call(mediaQuery, event);
-    mediaQuery._listeners.forEach(listener => listener(event));
-    mediaQuery._legacyListeners.forEach(listener => listener.call(mediaQuery, event));
-  };
-
-  const buildMediaQueryList = (query: string): MockMediaQueryList => ({
-    media: query,
-    matches: evaluateQuery(query),
-    onchange: null,
-    _listeners: new Set<MatchMediaListener>(),
-    _legacyListeners: new Set<LegacyMatchMediaListener>(),
-    addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
-      if (type !== 'change' || typeof listener !== 'function') return;
-      const fn = listener as MatchMediaListener;
-      const mediaQuery = registry.get(query);
-      mediaQuery?._listeners.add(fn);
-    },
-    removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
-      if (type !== 'change' || typeof listener !== 'function') return;
-      const fn = listener as MatchMediaListener;
-      const mediaQuery = registry.get(query);
-      mediaQuery?._listeners.delete(fn);
-    },
-    addListener: (listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void) => {
-      const mediaQuery = registry.get(query);
-      mediaQuery?._legacyListeners.add(listener);
-    },
-    removeListener: (listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void) => {
-      const mediaQuery = registry.get(query);
-      mediaQuery?._legacyListeners.delete(listener);
-    },
-    dispatchEvent: () => true
-  } as MockMediaQueryList);
-
-  window.matchMedia = vi.fn((query: string) => {
-    const existing = registry.get(query);
-    if (existing) return existing;
-    const mediaQuery = buildMediaQueryList(query);
-    registry.set(query, mediaQuery);
-    return mediaQuery;
-  });
-
-  const setViewport = (width: number, height: number) => {
-    currentWidth = width;
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
-    registry.forEach((mediaQuery, query) => {
-      notifyListeners(query, mediaQuery, evaluateQuery(query));
-    });
-  };
-
-  const restore = () => {
-    window.matchMedia = originalMatchMedia;
-  };
-
-  return { setViewport, restore };
-};
-
 const contextFixture: StoryContext = {
-  title: 'Mobile Test Draft',
+  title: 'Header Controls Draft',
   genre: 'Noir',
   premise: 'A detective uncovers a conspiracy.',
   characters: ['Alex', 'Sam'],
@@ -205,106 +122,65 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   ...overrides
 });
 
-describe('ScriptPane mobile tools sheet regression coverage', () => {
-  const matchMediaMock = createMatchMediaMock();
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
-  beforeAll(() => {
-    matchMediaMock.setViewport(390, 844);
+describe('ScriptPane header generation and audio drawer', () => {
+  it('opens the header generate dropdown with prompt and generation actions', async () => {
+    const onPlotTwist = vi.fn();
+    render(<ScriptPane {...createProps({ onPlotTwist })} />);
+
+    expect(screen.queryByRole('button', { name: 'Tools' })).toBeNull();
+    expect(screen.queryByTestId('playback-mini-player')).toBeNull();
+    expect(screen.queryByTestId('desktop-floating-playback')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+
+    const generateMenu = await screen.findByRole('dialog', { name: 'Generate menu' });
+    expect(generateMenu).toBeTruthy();
+    expect(screen.getByRole('button', { name: /generate \/ continue writing/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /plot twist/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /insert scene \/ new beat/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /plot twist/i }));
+    expect(onPlotTwist).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Generate menu' })).toBeNull();
+    });
   });
 
-  beforeEach(() => {
-    matchMediaMock.setViewport(390, 844);
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
-
-  afterAll(() => {
-    matchMediaMock.restore();
-  });
-
-  it('390x844: shows only dock initially, opens menu, then opens selected tool panel', async () => {
+  it('opens the inline insert composer from the Generate menu scene action', async () => {
     render(<ScriptPane {...createProps()} />);
 
-    expect(screen.queryByText('View Tools')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    expect(screen.getByTestId('mobile-tools-menu-sheet')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Generate' })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+    fireEvent.click(await screen.findByRole('button', { name: /insert scene \/ new beat/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('mobile-tool-sheet-generate')).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
+      expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
     });
-    expect(screen.getByRole('button', { name: /generate next/i })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Generate menu' })).toBeNull();
   });
 
-  it('390x844: insert tool restores after completion token while inline composer remains primary', async () => {
-    const { rerender } = render(<ScriptPane {...createProps()} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('mobile-tool-sheet-insert')).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    expect(screen.getByTestId('mobile-tools-menu-sheet')).toBeTruthy();
-
-    rerender(<ScriptPane {...createProps({ insertCompleteToken: 1 })} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('mobile-tool-sheet-insert')).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
-    });
-  });
-
-  it('430x932: rewrite opens in selection mode and restores tools after block select', async () => {
-    matchMediaMock.setViewport(430, 932);
-    const { container } = render(<ScriptPane {...createProps()} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Rewrite' }));
-
-    expect(screen.getByText(/select rewrite target/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
-
-    const blockButton = container.querySelector('#block-b1') as HTMLElement;
-    expect(blockButton).toBeTruthy();
-    fireEvent.click(blockButton);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('mobile-tool-sheet-rewrite')).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Close tool panel' })).toBeTruthy();
-    });
-  });
-
-  it('390x844: playback controller is persistent and expands/collapses in place', async () => {
+  it('opens the audio drawer and removes persistent playback chrome', async () => {
     render(<ScriptPane {...createProps()} />);
 
-    expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Close playback mini-player' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Close tool panel' })).toBeNull();
+    expect(screen.queryByTestId('playback-mini-player')).toBeNull();
+    expect(screen.queryByTestId('desktop-floating-playback')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Expand playback details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open audio drawer' }));
 
+    const drawer = await screen.findByTestId('audio-drawer');
+    expect(drawer).toBeTruthy();
+    expect(screen.getByText('Playback and Voice Utility')).toBeTruthy();
+    expect(screen.getByText('Voices panel body')).toBeTruthy();
+    expect(screen.getByText('Transport')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close audio drawer' }));
     await waitFor(() => {
-      expect(screen.getByText('Refresh Audio')).toBeTruthy();
+      expect(screen.queryByTestId('audio-drawer')).toBeNull();
     });
-    expect(screen.getByText('Less')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse playback details' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
-    });
-    expect(screen.queryByText('Refresh Audio')).toBeNull();
-    expect(screen.getByText('More')).toBeTruthy();
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {
@@ -318,7 +194,7 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(onCloseSetup).toHaveBeenCalledTimes(1);
   });
 
-  it('390x844: export opens from header menu and closes cleanly', async () => {
+  it('export opens from the header menu and closes cleanly', async () => {
     const onExportTxt = vi.fn();
     const onExportPdf = vi.fn();
     render(<ScriptPane {...createProps({ onExportTxt, onExportPdf })} />);
@@ -336,24 +212,5 @@ describe('ScriptPane mobile tools sheet regression coverage', () => {
     expect(onExportPdf).toHaveBeenCalledTimes(1);
 
     expect(screen.queryByRole('menu', { name: 'Export options' })).toBeNull();
-  });
-
-  it('1280x800: keeps floating playback and header export while legacy toolbelt excludes playback/export tools', async () => {
-    matchMediaMock.setViewport(1280, 800);
-    const onExportTxt = vi.fn();
-    render(<ScriptPane {...createProps({ onExportTxt })} />);
-
-    expect(screen.getByTestId('desktop-floating-playback')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Generate' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Insert' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Rewrite' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Voices' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Playback' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open export menu' }));
-    expect(await screen.findByRole('menu', { name: 'Export options' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Export Script (.txt)' }));
-    expect(onExportTxt).toHaveBeenCalledTimes(1);
   });
 });

@@ -5,6 +5,7 @@
   "entryPoints": [
     "App.tsx",
     "index.tsx",
+    "stylesLibrary.ts",
     "types.ts",
     "components",
     "hooks",

@@ -1,8 +1,8 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-type AnchoredPopoverPlacement = 'top' | 'bottom';
-type AnchoredPopoverAlign = 'start' | 'center' | 'end';
+export type AnchoredPopoverPlacement = 'top' | 'bottom';
+export type AnchoredPopoverAlign = 'start' | 'center' | 'end';
 
 export interface AnchoredPopoverProps {
   open: boolean;

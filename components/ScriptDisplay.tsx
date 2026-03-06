@@ -902,12 +902,13 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           anchor={selectedAnchorElement}
           className="script-export-chrome"
           preferredPlacement="bottom"
+          offset={18}
           topBoundary={rootElement}
         >
           <div
             data-selected-actions="true"
             data-testid={selectedTarget.kind === 'block' ? `selected-block-actions-${selectedTarget.blockId}` : `selected-heading-actions-${selectedTarget.sceneId}`}
-            className="flex items-center gap-1.5 rounded-full border border-[#d6cdbd] bg-[#f6f1e7] px-2 py-1.5 shadow-[0_14px_28px_rgba(15,23,42,0.18)]"
+            className="flex items-center gap-1.5 rounded-full border border-[#d6cdbd] bg-[#f6f1e7] px-2.5 py-1.5 shadow-[0_16px_32px_rgba(15,23,42,0.18)]"
           >
             {selectedTarget.kind === 'block' ? (
               <>
