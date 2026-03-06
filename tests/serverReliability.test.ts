@@ -336,6 +336,83 @@ describe('server reliability', () => {
     }
   });
 
+  it('resolves generateScene style context from the canonical style library entry', async () => {
+    const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
+    try {
+      process.env.SS_DEBUG_PROMPTS = '1';
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          heading: 'EXT. DOCKSIDE - NIGHT',
+          summary: 'A detective arrives under hard rain.',
+          blocks: [
+            { type: 'action', text: 'Rain needles the dock while the detective scans the dark water.' }
+          ]
+        })
+      });
+
+      const req = {
+        body: {
+          kind: 'generateScene',
+          context: {
+            storyContext: {
+              title: 'Test',
+              genre: 'Noir',
+              premise: 'A mystery unfolds.',
+              characters: ['Alex'],
+              scenes: [],
+              style: 'Client supplied label',
+              styleId: 'noir-1940s-detective'
+            },
+            userInstruction: 'Begin.',
+            isFirstScene: true
+          },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 41,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+
+      const res = {
+        statusCode: 200,
+        body: null as any,
+        headers: {} as Record<string, string>,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload: unknown) {
+          this.body = payload;
+          return this;
+        },
+        set(name: string, value: string) {
+          this.headers[name.toLowerCase()] = value;
+          return this;
+        }
+      } as any;
+
+      await handleAiGenerate(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body?.debug?.previews?.context).toMatchObject({
+        styleId: 'noir-1940s-detective'
+      });
+      expect(String(res.body?.debug?.previews?.context?.styleContext || '')).toContain('1940s Noir Detective');
+      expect(String(res.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
+
+      const prompt = String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '');
+      expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective).');
+      expect(prompt).toContain('Style guidance: Everyone speaks in brooding metaphors, rain is always falling, and there is a heavy reliance on cynical voiceovers.');
+    } finally {
+      if (previousDebugEnv === undefined) {
+        delete process.env.SS_DEBUG_PROMPTS;
+      } else {
+        process.env.SS_DEBUG_PROMPTS = previousDebugEnv;
+      }
+    }
+  });
+
   it('returns request-aborted mapping for canceled upstream execution', async () => {
     const consoleInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});

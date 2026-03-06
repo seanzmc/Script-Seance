@@ -291,6 +291,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   headingEditor
 }) => {
   const insertHighlightTimeoutRef = useRef<number | null>(null);
+  const [rootElement, setRootElement] = useState<HTMLDivElement | null>(null);
   const [selectedAnchorElement, setSelectedAnchorElement] = useState<HTMLElement | null>(null);
   const [rewriteAnchorElement, setRewriteAnchorElement] = useState<HTMLElement | null>(null);
   const [insertAnchorElement, setInsertAnchorElement] = useState<HTMLElement | null>(null);
@@ -637,7 +638,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const renderInlineInsertSlot = useCallback((insertIndex: number, anchor: ScriptAnchor | null) => {
     const isActive = activeInsertAnchor?.id === anchor?.id || activeInsertIndex === insertIndex;
     return (
-      <div className="script-export-chrome relative h-6" data-insert-slot-wrapper="true">
+      <div className="script-export-chrome relative h-10" data-insert-slot-wrapper="true">
         <button
           type="button"
           data-anchor-id={anchor?.id}
@@ -657,7 +658,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             if (!anchor) return;
             onRequestInsert?.(anchor);
           }}
-          className={`group/slot absolute inset-x-3 top-1/2 h-6 -translate-y-1/2 rounded-full transition-[opacity,transform,filter] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+          className={`group/slot absolute inset-x-1 top-1/2 h-10 -translate-y-1/2 rounded-full transition-[opacity,transform,filter] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
             isActive ? 'opacity-100' : 'opacity-0 hover:opacity-100 hover:scale-[1.01] focus-visible:scale-[1.01] focus-visible:opacity-100'
           }`}
         >
@@ -690,10 +691,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-8">
           <div
             id={`scene-heading-${scene.id}`}
-            className={`script-scene-heading rounded-lg border-b pb-2 transition-[background-color,box-shadow,border-color] duration-150 ${
+            className={`script-scene-heading mb-4 rounded-lg border px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
               isSelectedHeading && !activeInsertAnchor
-                ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)]'
-                : 'border-gray-300 hover:border-blue-300 hover:bg-blue-50/45'
+                ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
+                : 'border-gray-300 hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
             }`}
             role="button"
             tabIndex={0}
@@ -719,16 +720,16 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
               const isSelectedBlock = selectedTarget?.kind === 'block' && selectedTarget.sceneId === scene.id && selectedBlockId === block.id;
               const isError = blockStatuses[block.id] === 'error';
-              const blockWrapperClasses = `group relative rounded-md transition-[background-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
-                isInsertTarget ? 'ring-1 ring-indigo-500/50 bg-indigo-100/30' : ''
+              const blockWrapperClasses = `group relative rounded-md border transition-[background-color,box-shadow,transform,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+                isInsertTarget ? 'border-indigo-500/50 bg-indigo-100/30 ring-1 ring-indigo-500/50' : 'border-transparent'
               } ${
-                isRewriteTarget ? 'ring-2 ring-sky-400/60 bg-sky-100/40' : ''
+                isRewriteTarget ? 'border-sky-400/60 ring-2 ring-sky-400/60 bg-sky-100/40' : ''
               } ${
-                isSelectedBlock && !activeInsertAnchor ? 'bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)]' : ''
+                isSelectedBlock && !activeInsertAnchor
+                  ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
+                  : ''
               } ${
-                !isInsertMode ? 'cursor-pointer hover:bg-blue-50/45 hover:ring-1 hover:ring-blue-300/70 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)]' : ''
-              } ${
-                isRewriteMode ? 'hover:bg-sky-100/20' : ''
+                !isInsertMode ? 'cursor-pointer hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)]' : ''
               }`;
               const blockStatusClasses = isError ? ERROR_CLASSES : '';
               const isLastBlock = index === blocks.length - 1;
@@ -883,6 +884,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
   return (
     <div
+      ref={setRootElement}
       className={containerClasses}
       data-script-export-root="true"
     >
@@ -900,6 +902,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           anchor={selectedAnchorElement}
           className="script-export-chrome"
           preferredPlacement="bottom"
+          topBoundary={rootElement}
         >
           <div
             data-selected-actions="true"
@@ -973,6 +976,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           anchor={insertAnchorElement}
           className="script-export-chrome"
           preferredPlacement="bottom"
+          topBoundary={rootElement}
         >
           {insertComposer}
         </AnchoredPopover>
@@ -983,6 +987,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           anchor={rewriteAnchorElement}
           className="script-export-chrome"
           preferredPlacement="bottom"
+          topBoundary={rootElement}
         >
           {rewriteComposer}
         </AnchoredPopover>
@@ -993,6 +998,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           anchor={headingEditorAnchorElement}
           className="script-export-chrome"
           preferredPlacement="bottom"
+          topBoundary={rootElement}
         >
           {headingEditor}
         </AnchoredPopover>

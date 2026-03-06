@@ -29,10 +29,10 @@ describe('promptBuilders style injection', () => {
       scenes: [],
       userInstruction: 'Open with a tense beat.',
       isFirstScene: true,
-      style: 'Dead serious documentary tone',
+      styleContext: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.',
       targetLength: 'Medium'
     });
-    expect(prompt).toContain('Style Theme: Dead serious documentary tone');
+    expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
     expect(prompt).toContain('"type": "action" | "dialogue" | "transition"');
     expect(prompt).toContain('Do NOT emit a heading block inside "blocks".');
   });

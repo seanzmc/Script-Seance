@@ -68,7 +68,8 @@ export const buildGenerateScenePrompt = ({
   scenes,
   userInstruction,
   isFirstScene,
-  style,
+  style = '',
+  styleContext = '',
   targetLength
 }) => {
   const previousScenesSummary = Array.isArray(scenes)
@@ -83,7 +84,7 @@ export const buildGenerateScenePrompt = ({
     : '';
 
   const charactersList = Array.isArray(characters) ? characters.join(', ') : '';
-  const styleTheme = formatStyleBlock(style);
+  const styleTheme = formatStyleBlock(styleContext || style);
   const lengthProfile = getSceneLengthProfile(targetLength, isFirstScene);
 
   const prompt = `

@@ -14,7 +14,12 @@ const traceFixture: PromptDebugTrace = {
   promptContextRevision: 2,
   styleFingerprint: 'abc123',
   durationMs: 184,
-  tokenUsage: null
+  tokenUsage: null,
+  previews: {
+    prompt: 'FULL PROMPT BODY',
+    instruction: 'Write opening scene',
+    context: 'Style: 1940s Noir Detective'
+  }
 };
 
 afterEach(() => {
@@ -32,6 +37,7 @@ describe('PromptInspector overlay behavior', () => {
     const overlayRoot = title.closest('div.fixed');
     expect(overlayRoot).toBeTruthy();
     expect(overlayRoot?.className).toContain('z-[120]');
+    expect(overlayRoot?.className).toContain('max-h-[78vh]');
   });
 
   it('keeps clear button interaction working', () => {
@@ -40,5 +46,11 @@ describe('PromptInspector overlay behavior', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /clear/i }));
     expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows prompt previews expanded by default', () => {
+    render(<PromptInspector traces={[traceFixture]} onClear={vi.fn()} />);
+
+    expect(screen.getByText(/FULL PROMPT BODY/)).toBeTruthy();
   });
 });

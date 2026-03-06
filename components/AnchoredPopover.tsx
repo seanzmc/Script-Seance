@@ -14,6 +14,7 @@ export interface AnchoredPopoverProps {
   offset?: number;
   viewportPadding?: number;
   ensureAnchorVisible?: boolean;
+  topBoundary?: HTMLElement | null;
 }
 
 type PopoverPosition = {
@@ -41,7 +42,8 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
   align = 'center',
   offset = 10,
   viewportPadding = 12,
-  ensureAnchorVisible = true
+  ensureAnchorVisible = true,
+  topBoundary = null
 }) => {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
@@ -76,8 +78,11 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       const rawTop = placement === 'bottom'
         ? anchorRect.bottom + offset
         : anchorRect.top - popoverRect.height - offset;
+      const minTop = topBoundary
+        ? Math.max(viewportPadding, topBoundary.getBoundingClientRect().top + viewportPadding)
+        : viewportPadding;
       const maxTop = viewportHeight - popoverRect.height - viewportPadding;
-      const top = Math.min(Math.max(rawTop, viewportPadding), Math.max(viewportPadding, maxTop));
+      const top = Math.min(Math.max(rawTop, minTop), Math.max(minTop, maxTop));
 
       setPosition({ top, left, placement });
     };
@@ -95,14 +100,18 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       window.removeEventListener('resize', handleScrollOrResize);
       window.removeEventListener('scroll', handleScrollOrResize, true);
     };
-  }, [align, anchor, ensureAnchorVisible, offset, open, preferredPlacement, viewportPadding]);
+  }, [align, anchor, ensureAnchorVisible, offset, open, preferredPlacement, topBoundary, viewportPadding]);
 
   if (!open || !anchor || typeof document === 'undefined') return null;
 
   const anchorRect = anchor.getBoundingClientRect();
-  const fallbackTop = preferredPlacement === 'bottom'
+  const fallbackRawTop = preferredPlacement === 'bottom'
     ? anchorRect.bottom + offset
     : anchorRect.top - offset;
+  const fallbackMinTop = topBoundary
+    ? Math.max(viewportPadding, topBoundary.getBoundingClientRect().top + viewportPadding)
+    : viewportPadding;
+  const fallbackTop = Math.max(fallbackRawTop, fallbackMinTop);
   const fallbackLeft = anchorRect.left;
 
   return createPortal(

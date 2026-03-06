@@ -27,7 +27,7 @@ export const PromptInspector: React.FC<PromptInspectorProps> = ({ traces, onClea
   }
 
   return createPortal(
-    <div className="fixed bottom-4 right-4 z-[120] w-[min(94vw,460px)] rounded-xl border border-emerald-400/35 bg-gray-950/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur">
+    <div className="fixed bottom-4 right-4 z-[120] w-[min(96vw,720px)] max-h-[78vh] overflow-hidden rounded-xl border border-emerald-400/35 bg-gray-950/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-300">
           Prompt Inspector
@@ -44,9 +44,13 @@ export const PromptInspector: React.FC<PromptInspectorProps> = ({ traces, onClea
       {traces.length === 0 ? (
         <p className="text-[11px] text-gray-400">No prompt traces yet. Trigger a generation request.</p>
       ) : (
-        <div className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
+        <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
           {traces.map((trace, index) => (
-            <details key={`${trace.requestId || 'trace'}-${index}`} className="rounded border border-gray-800 bg-gray-900/80 px-2 py-1">
+            <details
+              key={`${trace.requestId || 'trace'}-${index}`}
+              open
+              className="rounded border border-gray-800 bg-gray-900/80 px-2 py-1"
+            >
               <summary className="cursor-pointer select-none text-[11px] text-gray-100">
                 {trace.kind} · {trace.provider}/{trace.model} · {formatNumber(trace.durationMs)}ms
               </summary>

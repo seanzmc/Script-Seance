@@ -364,6 +364,23 @@ const resolveStyleFingerprintForTrace = (explicitStyleFingerprint, styleSource) 
   explicitStyleFingerprint || createStyleFingerprint(styleSource)
 );
 
+const collapseWhitespace = (value) => (
+  typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
+);
+
+const resolveSceneStyleContext = (storyContext) => {
+  const canonicalStyle = resolveLibraryStyleById(storyContext?.styleId);
+  if (canonicalStyle) {
+    return [
+      `Style: ${canonicalStyle.title} (${canonicalStyle.id}).`,
+      `Style guidance: ${canonicalStyle.description}`
+    ].filter(Boolean).join('\n');
+  }
+
+  const fallbackStyle = collapseWhitespace(storyContext?.style);
+  return fallbackStyle ? `Style: ${fallbackStyle}.` : '';
+};
+
 const sanitizeContextPreviewForDebug = (contextPreview) => {
   if (!contextPreview || typeof contextPreview !== 'object' || Array.isArray(contextPreview)) {
     return contextPreview;
@@ -723,6 +740,7 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
 
   if (kind === 'generateScene') {
     const { storyContext, userInstruction, isFirstScene } = context;
+    const styleContext = resolveSceneStyleContext(storyContext);
     const { promptSize } = buildGenerateScenePrompt({
       genre: storyContext?.genre || '',
       premise: storyContext?.premise || '',
@@ -731,6 +749,7 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
       userInstruction: userInstruction || '',
       isFirstScene: Boolean(isFirstScene),
       style: storyContext?.style || '',
+      styleContext,
       targetLength: storyContext?.targetLength || ''
     });
     return promptSize;
@@ -797,6 +816,7 @@ export const generateTextByKind = async ({
 
   if (kind === 'generateScene') {
     const { storyContext, userInstruction, isFirstScene } = context;
+    const styleContext = resolveSceneStyleContext(storyContext);
     const { prompt, lengthProfile } = buildGenerateScenePrompt({
       genre: storyContext.genre,
       premise: storyContext.premise,
@@ -805,6 +825,7 @@ export const generateTextByKind = async ({
       userInstruction,
       isFirstScene,
       style: storyContext.style,
+      styleContext,
       targetLength: storyContext.targetLength
     });
     const sceneMaxOutputTokens = resolveSceneMaxOutputTokens(lengthProfile);
@@ -819,6 +840,8 @@ export const generateTextByKind = async ({
       genre: storyContext.genre,
       premise: storyContext.premise,
       characters: storyContext.characters,
+      styleId: storyContext.styleId || null,
+      styleContext,
       targetLength: storyContext.targetLength || lengthProfile.label,
       previousSceneSummaries: getSceneSummariesPreview(storyContext.scenes)
     };
@@ -830,7 +853,7 @@ export const generateTextByKind = async ({
       timeoutMs,
       upstreamContext,
       maxOutputTokens: sceneMaxOutputTokens,
-      styleSource: storyContext.style,
+      styleSource: styleContext,
       instructionPreview,
       contextPreview
     });
@@ -923,7 +946,7 @@ export const generateTextByKind = async ({
           maxOutputTokens: provider === 'openai'
             ? responsePayload.finalMaxOutputTokens
             : null,
-          styleSource: storyContext.style,
+          styleSource: styleContext,
           instructionPreview,
           contextPreview,
           promptPreview: prompt,

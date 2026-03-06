@@ -293,6 +293,20 @@ describe('ScriptPane block interactions', () => {
     });
   });
 
+  it('toggles inline insert slots closed when the same slot is clicked twice', async () => {
+    render(<ScriptPane {...createProps()} />);
+
+    const betweenSlot = screen.getByTestId('insert-slot-1');
+    fireEvent.click(betweenSlot);
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+
+    fireEvent.click(betweenSlot);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
+  });
+
   it('shows Generate Next Scene only on the end insert slot and routes to append scene', async () => {
     const onGenerateNext = vi.fn();
     render(<ScriptPane {...createProps({ onGenerateNext })} />);
@@ -359,7 +373,7 @@ describe('ScriptPane block interactions', () => {
 
     const block = container.querySelector('#block-block-1') as HTMLElement;
     expect(block).toBeTruthy();
-    expect(block.className).toContain('hover:bg-blue-50/45');
+    expect(block.className).toContain('hover:border-blue-300');
 
     fireEvent.click(block);
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
@@ -414,6 +428,7 @@ describe('ScriptPane block interactions', () => {
     let composer = screen.getByRole('dialog', { name: 'Insert Block' });
     expect(within(composer).getByRole('button', { name: 'Insert Before' })).toBeTruthy();
     expect(within(composer).getByRole('button', { name: 'Insert After' })).toBeTruthy();
+    expect(within(composer).getAllByRole('button').at(-1)?.textContent).toBe('Cancel');
 
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An extra beat lands after the action.' } });
     fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
@@ -470,7 +485,9 @@ describe('ScriptPane block interactions', () => {
     const onUpdateSceneHeading = vi.fn();
     render(<ScriptPane {...createProps({ onUpdateSceneHeading })} />);
 
-    fireEvent.click(screen.getByText('INT. ARCHIVE - NIGHT'));
+    const heading = screen.getByText('INT. ARCHIVE - NIGHT');
+    expect(heading.className).toContain('font-extrabold');
+    fireEvent.click(heading);
     expect(screen.getByTestId('selected-heading-actions-scene-1')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit selected scene heading' }));

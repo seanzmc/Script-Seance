@@ -88,8 +88,10 @@ const isStoryContext = (value: unknown): value is StoryContext => {
   }
   const record = value as Record<string, unknown>;
   const style = record.style;
+  const styleId = record.styleId;
   const targetLength = record.targetLength;
   const styleOk = style === undefined || style === null || typeof style === 'string';
+  const styleIdOk = styleId === undefined || styleId === null || typeof styleId === 'string';
   const targetLengthOk =
     targetLength === undefined ||
     targetLength === null ||
@@ -101,6 +103,7 @@ const isStoryContext = (value: unknown): value is StoryContext => {
     Array.isArray(record.characters) &&
     Array.isArray(record.scenes) &&
     styleOk &&
+    styleIdOk &&
     targetLengthOk
   );
 };
@@ -355,19 +358,24 @@ export default function App() {
   );
   const scriptStyleContext = useMemo(() => {
     const genre = context ? context.genre : setupState.genre;
-    const style = context
-      ? (typeof context.style === 'string' ? context.style.trim() : '')
-      : resolvedSetupStyle.styleName;
+    const resolvedStyle = context
+      ? resolveSetupStyleSelection({
+          style: typeof context.style === 'string' ? context.style : '',
+          styleId: context.styleId ?? null
+        })
+      : resolvedSetupStyle;
+    const style = resolvedStyle.styleName || resolvedStyle.legacyStyle;
     const length = context
       ? (typeof context.targetLength === 'string' ? context.targetLength.trim() : '')
       : setupState.length.trim();
     const parts = [
       genre ? `Genre: ${genre}.` : '',
       style ? `Style: ${style}.` : '',
+      resolvedStyle.styleId ? `Style ID: ${resolvedStyle.styleId}.` : '',
       length ? `Length: ${length}.` : ''
     ].filter(Boolean);
     return parts.join(' ');
-  }, [context, resolvedSetupStyle.styleName, setupState.genre, setupState.length]);
+  }, [context, resolvedSetupStyle, setupState.genre, setupState.length]);
   const promptStyleFingerprint = useMemo(() => (
     buildPromptStyleFingerprint(scriptStyleContext)
   ), [scriptStyleContext]);
@@ -535,19 +543,20 @@ export default function App() {
         style: typeof requestedStyle === 'string' ? requestedStyle : '',
         styleId: typeof requestedStyleId === 'string' ? requestedStyleId : null
       });
-      const normalizedStyle = resolved.styleName ? resolved.styleName : undefined;
+      const normalizedStyle = resolved.styleName || resolved.legacyStyle || undefined;
+      const normalizedStyleId = resolved.styleId ?? undefined;
       const didMutateContext = applyContextMutation((prev) => {
         if (!prev) return prev;
-        if (prev.style === normalizedStyle) {
+        if (prev.style === normalizedStyle && (prev.styleId ?? undefined) === normalizedStyleId) {
           return prev;
         }
-        return { ...prev, style: normalizedStyle };
+        return { ...prev, style: normalizedStyle, styleId: normalizedStyleId };
       });
       applySetupStateMutation((prev) => ({
         ...prev,
         ...next,
         styleId: resolved.styleId,
-        style: resolved.styleName
+        style: resolved.styleName || resolved.legacyStyle
       }), {
         source,
         bumpPromptRevision: !didMutateContext
@@ -727,7 +736,7 @@ export default function App() {
         premise: context.premise,
         characters: context.characters,
         styleId: resolveSetupStyleSelection({
-          styleId: null,
+          styleId: context.styleId ?? null,
           style: typeof context.style === 'string' ? context.style : ''
         }).styleId,
         style: typeof context.style === 'string' ? context.style : '',
@@ -1013,7 +1022,8 @@ export default function App() {
         characters: normalizedCharacters,
         title: DEFAULT_TITLE,
         scenes: [],
-        style: resolvedSetupStyle.styleName || undefined,
+        style: resolvedSetupStyle.styleName || resolvedSetupStyle.legacyStyle || undefined,
+        styleId: resolvedSetupStyle.styleId ?? undefined,
         targetLength: normalizeTargetLength(setupState.length)
       };
       const startedPromptContextRevision = promptContextRevisionRef.current;
@@ -1321,18 +1331,24 @@ export default function App() {
   };
 
   const handleSaveStyle = useCallback((nextStyle: string) => {
-    const normalizedStyle = nextStyle.trim() ? nextStyle.trim() : undefined;
+    const resolvedStyle = resolveSetupStyleSelection({ styleId: null, style: nextStyle });
+    const normalizedStyle = resolvedStyle.styleName || resolvedStyle.legacyStyle || undefined;
+    const normalizedStyleId = resolvedStyle.styleId ?? undefined;
     const didMutateContext = applyContextMutation((prev) => {
       if (!prev) return prev;
-      if (prev.style === normalizedStyle) {
+      if (prev.style === normalizedStyle && (prev.styleId ?? undefined) === normalizedStyleId) {
         return prev;
       }
-      return { ...prev, style: normalizedStyle };
+      return { ...prev, style: normalizedStyle, styleId: normalizedStyleId };
     });
     if (!didMutateContext) {
       return;
     }
-    applySetupStateMutation((prev) => ({ ...prev, styleId: null, style: normalizedStyle ?? '' }), {
+    applySetupStateMutation((prev) => ({
+      ...prev,
+      styleId: resolvedStyle.styleId,
+      style: normalizedStyle ?? ''
+    }), {
       source: 'system',
       bumpPromptRevision: false
     });

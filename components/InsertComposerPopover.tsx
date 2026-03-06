@@ -65,6 +65,8 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       data-insert-composer="true"
       role="dialog"
       aria-label="Insert Block"
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
       className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)] transition-[opacity,transform,box-shadow] duration-200 ease-out"
     >
       <div className="flex items-center justify-between gap-2">
@@ -77,11 +79,11 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       </p>
 
       {showPlacementControls && onPlacementChange && (
-        <div className="mt-3 space-y-1">
+        <div className="mt-3 rounded-xl border border-gray-200 bg-white/70 p-2.5 shadow-inner">
           <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">
             Placement
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             {(['before', 'after'] as const).map((option) => {
               const isSelected = placement === option;
               return (
@@ -89,7 +91,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
                   key={option}
                   type="button"
                   onClick={() => onPlacementChange(option)}
-                  className={`min-h-[42px] rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                  className={`min-h-[40px] rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors ${
                     isSelected
                       ? 'border-indigo-500 bg-indigo-500 text-white'
                       : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-300 hover:text-indigo-700'
@@ -171,15 +173,6 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          disabled={isGenerating}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
           variant="secondary"
           size="sm"
           onClick={onInsert}
@@ -209,6 +202,15 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
             Generate Next Scene
           </Button>
         )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          disabled={isGenerating}
+        >
+          Cancel
+        </Button>
       </div>
     </div>
   );

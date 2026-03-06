@@ -49,6 +49,7 @@ export interface StoryContext {
   characters: string[];
   scenes: Scene[];
   style?: string;
+  styleId?: string | null;
   targetLength?: SceneLengthOption;
 }
 
