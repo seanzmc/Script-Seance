@@ -676,8 +676,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#17181c]">
       {context && (
-        <div className="shrink-0 border-b border-gray-800/70 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(15,23,42,0.38))] backdrop-blur">
-          <div className="max-w-[1240px] mx-auto px-6 max-[900px]:px-4 max-[640px]:px-3 py-4 sm:py-5">
+        <div className="relative z-[95] shrink-0 border-b border-gray-800/70 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(15,23,42,0.38))] backdrop-blur">
+          <div className="relative max-w-[1240px] mx-auto px-6 max-[900px]:px-4 max-[640px]:px-3 py-4 sm:py-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 space-y-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.36em] text-indigo-200/80">Script Seance</p>

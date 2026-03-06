@@ -638,7 +638,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const renderInlineInsertSlot = useCallback((insertIndex: number, anchor: ScriptAnchor | null) => {
     const isActive = activeInsertAnchor?.id === anchor?.id || activeInsertIndex === insertIndex;
     return (
-      <div className="script-export-chrome relative h-10" data-insert-slot-wrapper="true">
+      <div className="script-export-chrome relative h-6" data-insert-slot-wrapper="true">
         <button
           type="button"
           data-anchor-id={anchor?.id}
@@ -658,7 +658,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             if (!anchor) return;
             onRequestInsert?.(anchor);
           }}
-          className={`group/slot absolute inset-x-1 top-1/2 h-10 -translate-y-1/2 rounded-full transition-[opacity,transform,filter] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+          className={`group/slot absolute inset-x-1 top-1/2 h-6 -translate-y-1/2 rounded-full transition-[opacity,transform,filter] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
             isActive ? 'opacity-100' : 'opacity-0 hover:opacity-100 hover:scale-[1.01] focus-visible:scale-[1.01] focus-visible:opacity-100'
           }`}
         >
@@ -709,7 +709,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             {scene.heading}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {isInsertMode && isFirstScene && renderInsertTarget({ sceneId: scene.id, blockId: INSERT_TOP_ID }, 'Insert at top')}
             {isInsertMode && isFirstScene && hasPendingPreview && insertTarget?.sceneId === scene.id && insertTarget?.blockId === INSERT_TOP_ID && pendingInsertBlock && (
               renderPreviewBlock(pendingInsertBlock)
@@ -744,20 +744,20 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
               if (block.type === BlockType.ACTION) {
                 content = (
-                  <div className="script-block-action mb-4 leading-relaxed">
+                  <div className="script-block-action mb-2.5 leading-relaxed">
                     {block.text}
                   </div>
                 );
               } else if (block.type === BlockType.DIALOGUE) {
                 content = (
                   <div className="script-block-dialogue max-w-md mx-auto text-center">
-                    <div className="script-dialogue-character uppercase mt-4 mb-0 font-bold tracking-wider">
+                    <div className="script-dialogue-character uppercase mt-2.5 mb-0 font-bold tracking-wider">
                       {getDisplayCharacter(block.character)}
                     </div>
                     {block.parenthetical && (
                       <div className="script-dialogue-parenthetical text-sm italic lowercase mb-0">{block.parenthetical}</div>
                     )}
-                    <div className="script-dialogue-text mt-0 mb-4 whitespace-pre-wrap">
+                    <div className="script-dialogue-text mt-0 mb-2.5 whitespace-pre-wrap">
                       {block.text}
                     </div>
                   </div>
