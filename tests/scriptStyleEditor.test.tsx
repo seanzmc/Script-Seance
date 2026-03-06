@@ -203,7 +203,7 @@ describe('script view style editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByTestId('prompt-context-revision').textContent).toBe('1');
-    expect(screen.getByText(/Style:\s*Unhinged/i)).toBeTruthy();
+    expect(screen.getByText((_, element) => element?.textContent === 'Style: Unhinged')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger Twist Request' }));
 

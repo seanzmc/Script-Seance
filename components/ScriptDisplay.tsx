@@ -89,7 +89,7 @@ const SCRIPT_EXPORT_STYLES = `
     position: relative;
     max-width: 900px;
     margin: 24px auto;
-    padding: 72px 72px;
+    padding: 0;
     background: #f6f1e7;
     color: #111111;
     border: 1px solid #d6cdbd;
@@ -114,7 +114,7 @@ const SCRIPT_EXPORT_STYLES = `
   }
 
   .script-scene {
-    margin-bottom: 32px;
+    margin-bottom: 16px;
   }
 
   .script-scene-heading {
@@ -124,11 +124,11 @@ const SCRIPT_EXPORT_STYLES = `
     letter-spacing: 0.03em;
     border-bottom: 1px solid #d1d5db;
     padding-bottom: 6px;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
   }
 
   .script-block {
-    margin: 0 0 18px;
+    margin: 0 0 9px;
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -139,7 +139,7 @@ const SCRIPT_EXPORT_STYLES = `
 
   .script-block[data-block-type="dialogue"] {
     max-width: 4.2in;
-    margin: 12px auto 20px;
+    margin: 6px auto 10px;
     text-align: center;
   }
 
@@ -158,7 +158,7 @@ const SCRIPT_EXPORT_STYLES = `
 
   .script-dialogue-text {
     white-space: pre-wrap;
-    margin: 2px 0 14px;
+    margin: 2px 0 7px;
   }
 
   .script-block[data-block-type="transition"] {
@@ -688,10 +688,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       const isSelectedHeading = selectedTarget?.kind === 'scene-heading' && selectedTarget.sceneId === scene.id;
 
       return (
-        <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-8">
+        <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-4">
           <div
             id={`scene-heading-${scene.id}`}
-            className={`script-scene-heading mb-4 border-x-0 border-b border-t-0 px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+            className={`script-scene-heading mb-2 border-x-0 border-b border-t-0 px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
               isSelectedHeading && !activeInsertAnchor
                 ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
                 : 'border-gray-300 hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
@@ -699,17 +699,37 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             role="button"
             tabIndex={0}
             aria-pressed={isSelectedHeading}
-            onClick={() => onSelectSceneHeading?.(scene.id)}
+            onClick={() => {
+              const isInsertComposerAnchoredToScene = activeInsertAnchor?.kind === 'scene'
+                && activeInsertAnchor.sceneId === scene.id;
+              if (isInsertComposerAnchoredToScene) {
+                onCloseInsertComposer?.();
+                if (isSelectedHeading) {
+                  onClearBlockTarget?.();
+                  return;
+                }
+              }
+              onSelectSceneHeading?.(scene.id);
+            }}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
+              const isInsertComposerAnchoredToScene = activeInsertAnchor?.kind === 'scene'
+                && activeInsertAnchor.sceneId === scene.id;
+              if (isInsertComposerAnchoredToScene) {
+                onCloseInsertComposer?.();
+                if (isSelectedHeading) {
+                  onClearBlockTarget?.();
+                  return;
+                }
+              }
               onSelectSceneHeading?.(scene.id);
             }}
           >
             {scene.heading}
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-[5px]">
             {isInsertMode && isFirstScene && renderInsertTarget({ sceneId: scene.id, blockId: INSERT_TOP_ID }, 'Insert at top')}
             {isInsertMode && isFirstScene && hasPendingPreview && insertTarget?.sceneId === scene.id && insertTarget?.blockId === INSERT_TOP_ID && pendingInsertBlock && (
               renderPreviewBlock(pendingInsertBlock)
@@ -745,20 +765,20 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
               if (block.type === BlockType.ACTION) {
                 content = (
-                  <div className="script-block-action mb-2.5 px-4 leading-relaxed">
+                  <div className="script-block-action mb-[5px] px-4 leading-relaxed">
                     {block.text}
                   </div>
                 );
               } else if (block.type === BlockType.DIALOGUE) {
                 content = (
                   <div className="script-block-dialogue max-w-md mx-auto text-center">
-                    <div className="script-dialogue-character uppercase mt-2.5 mb-0 font-bold tracking-wider">
+                    <div className="script-dialogue-character mt-[5px] mb-0 uppercase font-bold tracking-wider">
                       {getDisplayCharacter(block.character)}
                     </div>
                     {block.parenthetical && (
                       <div className="script-dialogue-parenthetical text-sm italic lowercase mb-0">{block.parenthetical}</div>
                     )}
-                    <div className="script-dialogue-text mt-0 mb-2.5 whitespace-pre-wrap">
+                    <div className="script-dialogue-text mt-0 mb-[5px] whitespace-pre-wrap">
                       {block.text}
                     </div>
                   </div>
@@ -782,6 +802,9 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     onClick={() => {
                       if (isInsertMode) return;
                       if (isSelectedBlock) {
+                        if (activeInsertAnchor && onCloseInsertComposer) {
+                          onCloseInsertComposer();
+                        }
                         onClearBlockTarget?.();
                         return;
                       }
@@ -795,12 +818,18 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       if (isInsertMode) return;
                       if (event.key === 'Escape' && isSelectedBlock) {
                         event.preventDefault();
+                        if (activeInsertAnchor && onCloseInsertComposer) {
+                          onCloseInsertComposer();
+                        }
                         onClearBlockTarget?.();
                         return;
                       }
                       if (event.key !== 'Enter' && event.key !== ' ') return;
                       event.preventDefault();
                       if (isSelectedBlock) {
+                        if (activeInsertAnchor && onCloseInsertComposer) {
+                          onCloseInsertComposer();
+                        }
                         onClearBlockTarget?.();
                         return;
                       }
@@ -884,12 +913,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const selectedBlockRewriteDisabled = Boolean(selectedBlock?.locked) || !onRewriteBlock;
   const selectedBlockDeleteDisabled = !onDeleteBlock;
 
-  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-4 md:p-8 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
+  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-0 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
   } ${className}`.trim();
   const contentClasses = scrollable
-    ? 'script-export-content relative z-10 h-full overflow-y-auto pr-3 pt-2 pb-12 space-y-8'
-    : 'script-export-content relative z-10 space-y-6';
+    ? 'script-export-content relative z-10 h-full overflow-y-auto pb-6 space-y-4'
+    : 'script-export-content relative z-10 space-y-4';
 
   return (
     <div

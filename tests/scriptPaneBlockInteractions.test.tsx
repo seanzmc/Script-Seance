@@ -378,9 +378,12 @@ describe('ScriptPane block interactions', () => {
   it('selects a block and clears selection on outside click', () => {
     const { container } = render(<ScriptPane {...createProps()} />);
 
+    const scriptRoot = container.querySelector('[data-script-export-root="true"]') as HTMLElement;
     const block = container.querySelector('#block-block-1') as HTMLElement;
+    expect(scriptRoot.className).toContain('p-0');
     expect(block).toBeTruthy();
     expect(block.className).toContain('hover:border-blue-300');
+    expect(block.querySelector('.script-block-action')?.className).toContain('mb-[5px]');
 
     fireEvent.click(block);
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
@@ -486,6 +489,23 @@ describe('ScriptPane block interactions', () => {
     );
   });
 
+  it('dismisses the insert block modal when clicking the same selected block again', async () => {
+    const { container } = render(<ScriptPane {...createProps()} />);
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Insert near selected block' }));
+
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+
+    fireEvent.click(block);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
+    });
+    expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
+  });
+
   it('clears selected block actions when an inline insert slot becomes active', async () => {
     const { container } = render(<ScriptPane {...createProps()} />);
 
@@ -509,6 +529,7 @@ describe('ScriptPane block interactions', () => {
     expect(heading.className).toContain('font-extrabold');
     expect(heading.className).toContain('border-b');
     expect(heading.className).not.toContain('rounded-lg');
+    expect(heading.className).toContain('mb-2');
     fireEvent.click(heading);
     expect(screen.getByTestId('selected-heading-actions-scene-1')).toBeTruthy();
 

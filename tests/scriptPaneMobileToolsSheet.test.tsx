@@ -140,6 +140,7 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     const generateMenu = await screen.findByRole('dialog', { name: 'Generate menu' });
     expect(generateMenu).toBeTruthy();
+    expect(generateMenu.className).toContain('max-[1100px]:left-0');
     expect(screen.getByRole('button', { name: /generate \/ continue writing/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /plot twist/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /insert scene \/ new beat/i })).toBeTruthy();
@@ -181,6 +182,25 @@ describe('ScriptPane header generation and audio drawer', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('audio-drawer')).toBeNull();
     });
+  });
+
+  it('formats title metadata and uses matching title/style edit link styling', () => {
+    render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
+
+    const editTitleButton = screen.getByRole('button', { name: 'Edit Title' });
+    const editStyleButton = screen.getByRole('button', { name: /Edit Style/i });
+    const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
+    const audioButton = screen.getByRole('button', { name: 'Open audio drawer' });
+
+    expect(editTitleButton.className).toBe(editStyleButton.className);
+    expect(screen.getByText('1 scenes')).toBeTruthy();
+    expect(screen.getByText('Genre:')).toBeTruthy();
+    expect(screen.getByText('Style:')).toBeTruthy();
+    expect(screen.getByText('Draft autosaves locally.')).toBeTruthy();
+    expect(generateButton.className).toContain('h-10');
+    expect(generateButton.className).toContain('max-[640px]:w-10');
+    expect(audioButton.className).toContain('h-10');
+    expect(audioButton.className).toContain('max-[640px]:w-10');
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {

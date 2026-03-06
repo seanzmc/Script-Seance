@@ -191,6 +191,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const styleLabel = context?.style?.trim() || '';
+  const headerMetaLabelClass = 'font-semibold text-gray-100';
+  const headerToolButtonClass = 'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[640px]:w-10 max-[640px]:px-0';
+  const headerToolTextClass = 'max-[640px]:sr-only';
+  const headerPrimaryToolButtonClass = 'inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:px-5 sm:text-sm max-[640px]:w-10 max-[640px]:px-0';
+  const headerAudioButtonClass = 'inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:px-5 sm:text-sm max-[640px]:w-10 max-[640px]:px-0';
+  const headerActionRowsClass = 'flex flex-wrap items-center gap-2 basis-full xl:justify-end max-[1100px]:basis-auto';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
@@ -260,6 +266,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     scriptController.selectBlockTarget(target);
   }, [scriptController]);
   const handleSelectBlockTarget = useCallback((target: { sceneId: string; blockId: string }) => {
+    const isInsertComposerAnchoredToBlock = scriptController.activeInsertAnchor?.kind === 'block'
+      && scriptController.activeInsertAnchor.blockId === target.blockId;
+    const isSameSelectedBlock = scriptController.selectedTarget?.kind === 'block'
+      && scriptController.selectedTarget.sceneId === target.sceneId
+      && scriptController.selectedTarget.blockId === target.blockId;
+    if (isInsertComposerAnchoredToBlock) {
+      setInsertPlacementTarget(null);
+      scriptController.closeInsertComposer();
+      if (isSameSelectedBlock) {
+        scriptController.clearBlockTarget();
+        return;
+      }
+    }
     scriptController.selectBlockTarget(target);
   }, [scriptController]);
   const handleSelectSceneHeading = useCallback((sceneId: string) => {
@@ -689,19 +708,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   <button
                     type="button"
                     onClick={handleOpenTitleModal}
-                    className="inline-flex items-center gap-1 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-200 transition-colors hover:bg-indigo-500/20"
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300 transition-colors hover:text-indigo-200"
                     title="Edit title"
                   >
                     <Pencil className="h-3 w-3" />
-                    Edit
+                    Edit Title
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
-                  <span>{genreLabel}</span>
-                  <span className="text-gray-600">•</span>
                   <span>{sceneCountLabel}</span>
-                  <span className="text-gray-600">•</span>
-                  <span>Style: {styleLabel || 'No style set'}</span>
+                  <span className="text-gray-600">/</span>
+                  <span><span className={headerMetaLabelClass}>Genre:</span> {genreLabel}</span>
+                  <span className="text-gray-600">/</span>
+                  <span>
+                    <span className={headerMetaLabelClass}>Style:</span> {styleLabel || 'No style set'}
+                  </span>
                   {onSaveStyle && (
                     <button
                       type="button"
@@ -713,52 +734,52 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       Edit Style
                     </button>
                   )}
-                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-600">/</span>
                   <span>Draft autosaves locally.</span>
                   {autosaveError && (
                     <>
-                      <span className="text-gray-600">•</span>
+                      <span className="text-gray-600">/</span>
                       <span className="text-amber-400">{autosaveError}</span>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className="flex flex-col items-start gap-2 xl:items-end">
-                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+              <div className="flex flex-wrap items-center gap-2 xl:justify-end max-[1100px]:w-full">
+                <div className={headerActionRowsClass}>
                   <button
                     type="button"
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={headerToolButtonClass}
                     title={canUndo ? 'Undo last script change' : 'No action to undo'}
                   >
                     <Undo2 className="h-3.5 w-3.5" />
-                    Undo
+                    <span className={headerToolTextClass}>Undo</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onRedo?.()}
                     disabled={!canRedo || !onRedo}
-                    className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={headerToolButtonClass}
                     title={canRedo ? 'Redo last undone script change' : 'No action to redo'}
                   >
                     <Redo2 className="h-3.5 w-3.5" />
-                    Redo
+                    <span className={headerToolTextClass}>Redo</span>
                   </button>
                   <div className="relative" ref={exportMenuRef}>
                     <button
                       type="button"
                       onClick={() => setIsExportMenuOpen((previous) => !previous)}
                       disabled={!canExport}
-                      className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className={headerToolButtonClass}
                       title="Open export menu"
                       aria-haspopup="menu"
                       aria-expanded={isExportMenuOpen}
                       aria-label="Open export menu"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      Export
+                      <span className={headerToolTextClass}>Export</span>
                     </button>
                     {isExportMenuOpen && (
                       <div
@@ -805,32 +826,32 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     type="button"
                     onClick={onClearDraft}
                     disabled={!context}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-red-200 transition-colors hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={`${headerToolButtonClass} border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 disabled:opacity-60`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Clear Draft
+                    <span className={headerToolTextClass}>Clear Draft</span>
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+                <div className={headerActionRowsClass}>
                   <div className="relative" ref={generateMenuRef}>
                     <button
                       type="button"
                       onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
                       disabled={isPlaying}
-                      className="inline-flex min-h-[3.75rem] items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className={headerPrimaryToolButtonClass}
                       aria-haspopup="dialog"
                       aria-expanded={isGenerateMenuOpen}
                       aria-label="Open generate menu"
                     >
-                      <Sparkles className="h-5 w-5" />
-                      <span>GENERATE NEXT SCENE</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
+                      <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className={headerToolTextClass}>GENERATE NEXT SCENE</span>
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[640px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isGenerateMenuOpen && (
                       <div
                         role="dialog"
                         aria-label="Generate menu"
-                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-700 bg-gray-950 p-4 shadow-[0_24px_48px_rgba(0,0,0,0.42)]"
+                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-700 bg-gray-950 p-4 shadow-[0_24px_48px_rgba(0,0,0,0.42)] max-[1100px]:left-0 max-[1100px]:right-auto"
                       >
                         {generatePanelContent}
                       </div>
@@ -839,13 +860,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsAudioDrawerOpen(true)}
-                    className="inline-flex min-h-[3.75rem] items-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-200 transition-colors hover:bg-gray-800"
+                    className={headerAudioButtonClass}
                     aria-haspopup="dialog"
                     aria-expanded={isAudioDrawerOpen}
                     aria-label="Open audio drawer"
                   >
                     <Speech className="h-4 w-4" />
-                    Audio
+                    <span className={headerToolTextClass}>Audio</span>
                   </button>
                 </div>
                 {isGenerating && (
