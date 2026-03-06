@@ -489,6 +489,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       if (composerNode?.contains(targetNode)) {
         return;
       }
+      const insertSlotNode = targetNode instanceof Element
+        ? targetNode.closest('[data-insert-slot-wrapper="true"]')
+        : null;
+      if (insertSlotNode) {
+        return;
+      }
       onCloseInsertComposer();
     };
     document.addEventListener('mousedown', handlePointerDown, true);
@@ -700,29 +706,11 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             tabIndex={0}
             aria-pressed={isSelectedHeading}
             onClick={() => {
-              const isInsertComposerAnchoredToScene = activeInsertAnchor?.kind === 'scene'
-                && activeInsertAnchor.sceneId === scene.id;
-              if (isInsertComposerAnchoredToScene) {
-                onCloseInsertComposer?.();
-                if (isSelectedHeading) {
-                  onClearBlockTarget?.();
-                  return;
-                }
-              }
               onSelectSceneHeading?.(scene.id);
             }}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
-              const isInsertComposerAnchoredToScene = activeInsertAnchor?.kind === 'scene'
-                && activeInsertAnchor.sceneId === scene.id;
-              if (isInsertComposerAnchoredToScene) {
-                onCloseInsertComposer?.();
-                if (isSelectedHeading) {
-                  onClearBlockTarget?.();
-                  return;
-                }
-              }
               onSelectSceneHeading?.(scene.id);
             }}
           >
@@ -738,13 +726,14 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             {blocks.map((block, index) => {
               const isInsertTarget = insertTarget?.blockId === block.id;
               const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
+              const isRewriteHighlighted = isRewriteTarget && (isRewriteMode || activeRewriteBlockId === block.id);
               const isSelectedBlock = selectedTarget?.kind === 'block' && selectedTarget.sceneId === scene.id && selectedBlockId === block.id;
               const isSelectedBlockFocused = isSelectedBlock && !activeInsertAnchor && selectedAnchorElement?.id === `block-${block.id}`;
               const isError = blockStatuses[block.id] === 'error';
               const blockWrapperClasses = `group relative rounded-md border transition-[background-color,box-shadow,transform,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
                 isInsertTarget ? 'border-indigo-500/50 bg-indigo-100/30 ring-1 ring-indigo-500/50' : 'border-transparent'
               } ${
-                isRewriteTarget ? 'border-sky-400/60 ring-2 ring-sky-400/60 bg-sky-100/40' : ''
+                isRewriteHighlighted ? 'border-sky-400/60 ring-2 ring-sky-400/60 bg-sky-100/40' : ''
               } ${
                 isSelectedBlock && !activeInsertAnchor
                   ? `${isSelectedBlockFocused ? 'bg-sky-100/40' : 'bg-slate-900/[0.08]'} border-slate-400 shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]`
@@ -913,7 +902,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const selectedBlockRewriteDisabled = Boolean(selectedBlock?.locked) || !onRewriteBlock;
   const selectedBlockDeleteDisabled = !onDeleteBlock;
 
-  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black p-0 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
+  const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black px-2 py-0 sm:px-3 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
     scrollable ? 'h-full min-h-0 overflow-hidden' : 'min-h-[600px] overflow-visible'
   } ${className}`.trim();
   const contentClasses = scrollable

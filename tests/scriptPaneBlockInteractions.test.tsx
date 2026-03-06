@@ -380,7 +380,8 @@ describe('ScriptPane block interactions', () => {
 
     const scriptRoot = container.querySelector('[data-script-export-root="true"]') as HTMLElement;
     const block = container.querySelector('#block-block-1') as HTMLElement;
-    expect(scriptRoot.className).toContain('p-0');
+    expect(scriptRoot.className).toContain('px-2');
+    expect(scriptRoot.className).toContain('sm:px-3');
     expect(block).toBeTruthy();
     expect(block.className).toContain('hover:border-blue-300');
     expect(block.querySelector('.script-block-action')?.className).toContain('mb-[5px]');
@@ -512,12 +513,14 @@ describe('ScriptPane block interactions', () => {
     const block = container.querySelector('#block-block-1') as HTMLElement;
     fireEvent.click(block);
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+    expect(block.className).toContain('bg-sky-100/40');
 
     fireEvent.click(screen.getByTestId('insert-slot-1'));
 
     await waitFor(() => {
       expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
     });
+    expect(block.className).not.toContain('bg-sky-100/40');
     expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
   });
 
@@ -543,6 +546,18 @@ describe('ScriptPane block interactions', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Edit Scene Heading' })).toBeNull();
     });
+  });
+
+  it('toggles a selected scene heading closed when clicked again', () => {
+    render(<ScriptPane {...createProps()} />);
+
+    const heading = screen.getByText('INT. ARCHIVE - NIGHT');
+    fireEvent.click(heading);
+    expect(screen.getByTestId('selected-heading-actions-scene-1')).toBeTruthy();
+
+    fireEvent.click(heading);
+
+    expect(screen.queryByTestId('selected-heading-actions-scene-1')).toBeNull();
   });
 
   it('supports inserting directly below an empty scene heading', () => {

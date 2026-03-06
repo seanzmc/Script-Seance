@@ -185,22 +185,29 @@ describe('ScriptPane header generation and audio drawer', () => {
   });
 
   it('formats title metadata and uses matching title/style edit link styling', () => {
-    render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
+    const { container } = render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
     const editTitleButton = screen.getByRole('button', { name: 'Edit Title' });
     const editStyleButton = screen.getByRole('button', { name: /Edit Style/i });
     const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
     const audioButton = screen.getByRole('button', { name: 'Open audio drawer' });
+    const undoButton = screen.getByRole('button', { name: 'Undo' });
+    const metadataRow = screen.getByText('Draft autosaves locally.').closest('div') as HTMLElement;
 
     expect(editTitleButton.className).toBe(editStyleButton.className);
     expect(screen.getByText('1 scenes')).toBeTruthy();
     expect(screen.getByText('Genre:')).toBeTruthy();
     expect(screen.getByText('Style:')).toBeTruthy();
     expect(screen.getByText('Draft autosaves locally.')).toBeTruthy();
-    expect(generateButton.className).toContain('h-10');
+    expect(metadataRow.textContent).toContain('•');
+    expect(metadataRow.textContent).not.toContain('/');
+    expect(generateButton.className).toContain('sm:h-12');
     expect(generateButton.className).toContain('max-[640px]:w-10');
-    expect(audioButton.className).toContain('h-10');
+    expect(audioButton.className).toContain('sm:h-12');
     expect(audioButton.className).toContain('max-[640px]:w-10');
+    expect(undoButton.className).toContain('h-9');
+    expect(undoButton.className).toContain('max-[640px]:h-10');
+    expect(container.textContent).toContain('•');
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {

@@ -192,10 +192,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
   const styleLabel = context?.style?.trim() || '';
   const headerMetaLabelClass = 'font-semibold text-gray-100';
-  const headerToolButtonClass = 'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[640px]:w-10 max-[640px]:px-0';
+  const headerMetaItemClass = 'inline-flex items-center gap-2 whitespace-nowrap';
+  const headerMetaBulletClass = 'text-gray-500';
+  const headerToolButtonClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
   const headerToolTextClass = 'max-[640px]:sr-only';
-  const headerPrimaryToolButtonClass = 'inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:px-5 sm:text-sm max-[640px]:w-10 max-[640px]:px-0';
-  const headerAudioButtonClass = 'inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:px-5 sm:text-sm max-[640px]:w-10 max-[640px]:px-0';
+  const headerPrimaryToolButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
+  const headerAudioButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
   const headerActionRowsClass = 'flex flex-wrap items-center gap-2 basis-full xl:justify-end max-[1100px]:basis-auto';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
@@ -282,6 +284,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     scriptController.selectBlockTarget(target);
   }, [scriptController]);
   const handleSelectSceneHeading = useCallback((sceneId: string) => {
+    const isSameSelectedHeading = scriptController.selectedTarget?.kind === 'scene-heading'
+      && scriptController.selectedTarget.sceneId === sceneId;
+    const isInsertComposerAnchoredToScene = scriptController.activeInsertAnchor?.kind === 'scene'
+      && scriptController.activeInsertAnchor.sceneId === sceneId;
+    if (isInsertComposerAnchoredToScene) {
+      setInsertPlacementTarget(null);
+      scriptController.closeInsertComposer();
+    }
+    if (isSameSelectedHeading) {
+      setEditingHeadingSceneId(null);
+      scriptController.clearBlockTarget();
+      return;
+    }
     scriptController.selectSceneHeading(sceneId);
   }, [scriptController]);
   const handleLegacyInsertTargetSelection = useCallback(() => {
@@ -293,6 +308,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [scriptController]);
   const handleRequestInsertFromSlot = useCallback((anchor: ScriptAnchor) => {
     setInsertPlacementTarget(null);
+    setEditingHeadingSceneId(null);
+    scriptController.clearBlockTarget();
     scriptController.requestInsert(anchor);
   }, [scriptController]);
   const handleOpenInsertFromSelection = useCallback((target: ScriptSelectionTarget) => {
@@ -716,31 +733,37 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
-                  <span>{sceneCountLabel}</span>
-                  <span className="text-gray-600">/</span>
-                  <span><span className={headerMetaLabelClass}>Genre:</span> {genreLabel}</span>
-                  <span className="text-gray-600">/</span>
-                  <span>
-                    <span className={headerMetaLabelClass}>Style:</span> {styleLabel || 'No style set'}
+                  <span className={headerMetaItemClass}>{sceneCountLabel}</span>
+                  <span className={headerMetaItemClass}>
+                    <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
+                    <span><span className={headerMetaLabelClass}>Genre:</span> {genreLabel}</span>
                   </span>
-                  {onSaveStyle && (
-                    <button
-                      type="button"
-                      onClick={handleOpenStyleModal}
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300 transition-colors hover:text-indigo-200"
-                      title="Edit style"
-                    >
-                      <Pencil className="h-3 w-3" />
-                      Edit Style
-                    </button>
-                  )}
-                  <span className="text-gray-600">/</span>
-                  <span>Draft autosaves locally.</span>
+                  <span className={headerMetaItemClass}>
+                    <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span><span className={headerMetaLabelClass}>Style:</span> {styleLabel || 'No style set'}</span>
+                      {onSaveStyle && (
+                        <button
+                          type="button"
+                          onClick={handleOpenStyleModal}
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300 transition-colors hover:text-indigo-200"
+                          title="Edit style"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit Style
+                        </button>
+                      )}
+                    </span>
+                  </span>
+                  <span className={headerMetaItemClass}>
+                    <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
+                    <span>Draft autosaves locally.</span>
+                  </span>
                   {autosaveError && (
-                    <>
-                      <span className="text-gray-600">/</span>
+                    <span className={headerMetaItemClass}>
+                      <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
                       <span className="text-amber-400">{autosaveError}</span>
-                    </>
+                    </span>
                   )}
                 </div>
               </div>
