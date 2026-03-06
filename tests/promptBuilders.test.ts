@@ -38,8 +38,11 @@ describe('promptBuilders style injection', () => {
   });
 
   it('injects style into suggestPlotTwist prompt', () => {
-    const prompt = buildPlotTwistPrompt('Noir', 'Unhinged');
-    expect(prompt).toContain('Style Theme: Unhinged');
+    const prompt = buildPlotTwistPrompt(
+      'Noir',
+      'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.'
+    );
+    expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
   });
 
   it('injects style into generateScriptElement prompt', () => {
@@ -59,10 +62,10 @@ describe('promptBuilders style injection', () => {
       genre: 'Noir',
       premise: 'A detective unravels a conspiracy.',
       text: 'I know.',
-      style: 'Transatlantic dialogue',
+      style: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.',
       rewriteGuidance: 'Sharpen it.'
     });
-    expect(dialoguePrompt).toContain('Style Theme: Transatlantic dialogue');
+    expect(dialoguePrompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
 
     const actionPrompt = buildRegenerateBlockPrompt({
       type: 'action',
@@ -70,10 +73,10 @@ describe('promptBuilders style injection', () => {
       genre: 'Noir',
       premise: 'A detective unravels a conspiracy.',
       text: 'He stares at the board.',
-      style: 'Dead serious documentary tone',
+      style: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.',
       rewriteGuidance: 'Make it vivid.'
     });
-    expect(actionPrompt).toContain('Style Theme: Dead serious documentary tone');
+    expect(actionPrompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
   });
 
   it('injects style into generateSurpriseSetup prompt', () => {

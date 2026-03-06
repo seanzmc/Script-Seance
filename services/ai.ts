@@ -88,6 +88,12 @@ export type RequestOptions = AiExecuteOptions & {
   scopeKey?: string;
 };
 
+export type PromptStyleContext = {
+  styleId?: string;
+  styleName?: string;
+  style?: string;
+};
+
 export type CancellableRequest<T> = {
   promise: Promise<T>;
   cancel: () => void;
@@ -163,6 +169,40 @@ const buildPromptTracePayload = () => {
     promptContextRevision,
     styleFingerprint
   };
+};
+
+const isPromptStyleContext = (value: unknown): value is PromptStyleContext => (
+  typeof value === 'object' &&
+  value !== null &&
+  (
+    Object.prototype.hasOwnProperty.call(value, 'styleId') ||
+    Object.prototype.hasOwnProperty.call(value, 'styleName') ||
+    Object.prototype.hasOwnProperty.call(value, 'style')
+  )
+);
+
+const normalizePromptStyleContext = (
+  value: string | PromptStyleContext | undefined
+): PromptStyleContext | undefined => {
+  if (typeof value === 'string') {
+    return value.trim() ? { style: value } : undefined;
+  }
+  if (!isPromptStyleContext(value)) {
+    return undefined;
+  }
+  const styleId = typeof value.styleId === 'string' && value.styleId.trim()
+    ? value.styleId.trim()
+    : undefined;
+  const styleName = typeof value.styleName === 'string' && value.styleName.trim()
+    ? value.styleName.trim()
+    : undefined;
+  const style = typeof value.style === 'string' && value.style.trim()
+    ? value.style.trim()
+    : undefined;
+  if (!styleId && !styleName && !style) {
+    return undefined;
+  }
+  return { styleId, styleName, style };
 };
 
 type GenerateSpeechContext = {
@@ -503,12 +543,22 @@ export const executeGenerateScene = async (
 
 export const executeSuggestPlotTwist = async (
   genre: string,
-  styleOrOptions?: string | RequestOptions,
+  styleOrOptions?: string | PromptStyleContext | RequestOptions,
   maybeOptions?: RequestOptions
 ): Promise<string> => {
-  const style = typeof styleOrOptions === 'string' ? styleOrOptions : undefined;
-  const options = typeof styleOrOptions === 'string' ? maybeOptions : styleOrOptions;
-  const request = createAiRequest<{ text: string }>(AI_KINDS.suggestPlotTwist, { genre, style }, options);
+  const styleContext = normalizePromptStyleContext(
+    typeof styleOrOptions === 'string' || isPromptStyleContext(styleOrOptions)
+      ? styleOrOptions
+      : undefined
+  );
+  const options = styleOrOptions && !isPromptStyleContext(styleOrOptions) && typeof styleOrOptions !== 'string'
+    ? styleOrOptions
+    : maybeOptions;
+  const request = createAiRequest<{ text: string }>(
+    AI_KINDS.suggestPlotTwist,
+    { genre, ...(styleContext ?? {}) },
+    options
+  );
   const data = await request.promise;
   return data.text || 'Suddenly, everything changes.';
 };
@@ -518,13 +568,21 @@ export const executeGenerateScriptElement = async (
   character: string | undefined,
   instruction: string,
   styleContext: string,
-  options?: RequestOptions
+  styleContextOrOptions?: PromptStyleContext | RequestOptions,
+  maybeOptions?: RequestOptions
 ): Promise<string> => {
+  const promptStyleContext = normalizePromptStyleContext(
+    isPromptStyleContext(styleContextOrOptions) ? styleContextOrOptions : undefined
+  );
+  const options = isPromptStyleContext(styleContextOrOptions)
+    ? maybeOptions
+    : styleContextOrOptions;
   const request = createAiRequest<{ text: string }>(AI_KINDS.generateScriptElement, {
     type,
     character,
     instruction,
-    styleContext
+    styleContext,
+    ...(promptStyleContext ?? {})
   }, options);
   const data = await request.promise;
   return data.text?.trim() || '';
@@ -534,13 +592,14 @@ export const executeRewriteBlock = async (
   block: ScriptBlock,
   genre: string,
   premise: string,
-  style?: string,
+  styleOrContext?: string | PromptStyleContext,
   rewriteGuidance?: string,
   options?: RequestOptions
 ): Promise<string> => {
+  const promptStyleContext = normalizePromptStyleContext(styleOrContext);
   const request = createAiRequest<{ text: string }>(
     AI_KINDS.regenerateScriptBlock,
-    { block, genre, premise, style, rewriteGuidance },
+    { block, genre, premise, rewriteGuidance, ...(promptStyleContext ?? {}) },
     options
   );
   const data = await request.promise;
@@ -581,10 +640,10 @@ export const generateScene = async (
 
 export const suggestPlotTwist = async (
   genre: string,
-  style?: string,
+  styleOrContext?: string | PromptStyleContext,
   options?: RequestOptions
 ): Promise<string> => {
-  return executeSuggestPlotTwist(genre, style, options);
+  return executeSuggestPlotTwist(genre, styleOrContext, options);
 };
 
 export const generateScriptElement = async (
@@ -592,20 +651,28 @@ export const generateScriptElement = async (
   character: string | undefined,
   instruction: string,
   styleContext: string,
-  options?: RequestOptions
+  styleContextOrOptions?: PromptStyleContext | RequestOptions,
+  maybeOptions?: RequestOptions
 ): Promise<string> => {
-  return executeGenerateScriptElement(type, character, instruction, styleContext, options);
+  return executeGenerateScriptElement(
+    type,
+    character,
+    instruction,
+    styleContext,
+    styleContextOrOptions,
+    maybeOptions
+  );
 };
 
 export const regenerateScriptBlock = async (
   block: ScriptBlock,
   genre: string,
   premise: string,
-  style?: string,
+  styleOrContext?: string | PromptStyleContext,
   rewriteGuidance?: string,
   options?: RequestOptions
 ): Promise<string> => {
-  return executeRewriteBlock(block, genre, premise, style, rewriteGuidance, options);
+  return executeRewriteBlock(block, genre, premise, styleOrContext, rewriteGuidance, options);
 };
 
 export const generateSurpriseSetup = async (

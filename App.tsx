@@ -1092,7 +1092,11 @@ export default function App() {
         scopeKey,
         execute: (signal) => executeSuggestPlotTwist(
           context.genre,
-          context.style,
+          {
+            styleId: context.styleId,
+            styleName: context.style,
+            style: context.style
+          },
           { signal, opType: 'suggestPlotTwist', scopeKey }
         ),
         isFresh: () =>

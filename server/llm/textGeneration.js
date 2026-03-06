@@ -368,18 +368,32 @@ const collapseWhitespace = (value) => (
   typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
 );
 
-const resolveSceneStyleContext = (storyContext) => {
-  const canonicalStyle = resolveLibraryStyleById(storyContext?.styleId);
-  if (canonicalStyle) {
-    return [
-      `Style: ${canonicalStyle.title} (${canonicalStyle.id}).`,
-      `Style guidance: ${canonicalStyle.description}`
-    ].filter(Boolean).join('\n');
-  }
+const buildCanonicalStyleContext = (canonicalStyle) => (
+  canonicalStyle
+    ? [
+        `Style: ${canonicalStyle.title} (${canonicalStyle.id}).`,
+        `Style guidance: ${canonicalStyle.description}`
+      ].filter(Boolean).join('\n')
+    : ''
+);
 
-  const fallbackStyle = collapseWhitespace(storyContext?.style);
-  return fallbackStyle ? `Style: ${fallbackStyle}.` : '';
+const resolvePromptStyleContext = (styleSource, baseStyleContext = '') => {
+  const canonicalStyle = resolveLibraryStyleById(styleSource?.styleId);
+  const styleId = canonicalStyle?.id || null;
+  const styleName = canonicalStyle?.title || collapseWhitespace(styleSource?.styleName) || null;
+  const legacyStyle = collapseWhitespace(styleSource?.style);
+  const normalizedBaseStyleContext = typeof baseStyleContext === 'string' ? baseStyleContext.trim() : '';
+  const resolvedStyleContext = buildCanonicalStyleContext(canonicalStyle) || (legacyStyle ? `Style: ${legacyStyle}.` : '');
+
+  return {
+    styleId,
+    styleName,
+    legacyStyle,
+    styleContext: [normalizedBaseStyleContext, resolvedStyleContext].filter(Boolean).join('\n')
+  };
 };
+
+const resolveSceneStyleContext = (storyContext) => resolvePromptStyleContext(storyContext).styleContext;
 
 const sanitizeContextPreviewForDebug = (contextPreview) => {
   if (!contextPreview || typeof contextPreview !== 'object' || Array.isArray(contextPreview)) {
@@ -756,26 +770,29 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
   }
 
   if (kind === 'suggestPlotTwist') {
-    return buildPlotTwistPrompt(context.genre || '', context.style || '').length;
+    const resolvedStyle = resolvePromptStyleContext(context);
+    return buildPlotTwistPrompt(context.genre || '', resolvedStyle.styleContext).length;
   }
 
   if (kind === 'generateScriptElement') {
+    const resolvedStyle = resolvePromptStyleContext(context, context.styleContext || '');
     return buildScriptElementPrompt({
       type: context.type,
       character: context.character,
       instruction: context.instruction || '',
-      styleContext: context.styleContext || ''
+      styleContext: resolvedStyle.styleContext
     }).length;
   }
 
   if (kind === 'regenerateScriptBlock') {
+    const resolvedStyle = resolvePromptStyleContext(context);
     return buildRegenerateBlockPrompt({
       type: context.block?.type,
       character: context.block?.character,
       genre: context.genre || '',
       premise: context.premise || '',
       text: context.block?.text || '',
-      style: context.style || '',
+      style: resolvedStyle.styleContext,
       rewriteGuidance: context.rewriteGuidance
     }).length;
   }
@@ -957,14 +974,18 @@ export const generateTextByKind = async ({
   }
 
   if (kind === 'suggestPlotTwist') {
-    const prompt = buildPlotTwistPrompt(context.genre, context.style);
+    const resolvedStyle = resolvePromptStyleContext(context);
+    const prompt = buildPlotTwistPrompt(context.genre, resolvedStyle.styleContext);
     const twistModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
       task: 'Give one shocking, single-sentence plot twist'
     };
     const contextPreview = {
       genre: context.genre,
-      style: context.style || ''
+      styleId: resolvedStyle.styleId,
+      styleName: resolvedStyle.styleName,
+      styleContext: resolvedStyle.styleContext,
+      ...(resolvedStyle.styleId ? {} : { style: resolvedStyle.legacyStyle })
     };
     emitKindPromptTrace({
       traceMeta,
@@ -974,7 +995,7 @@ export const generateTextByKind = async ({
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 90,
-      styleSource: context.style || '',
+      styleSource: resolvedStyle.styleContext,
       instructionPreview,
       contextPreview
     });
@@ -1013,7 +1034,7 @@ export const generateTextByKind = async ({
           timeoutMs,
           upstreamContext,
           maxOutputTokens: provider === 'openai' ? responsePayload.finalMaxOutputTokens : null,
-          styleSource: context.style || '',
+          styleSource: resolvedStyle.styleContext,
           instructionPreview,
           contextPreview,
           promptPreview: prompt,
@@ -1025,7 +1046,13 @@ export const generateTextByKind = async ({
 
   if (kind === 'generateScriptElement') {
     const { type, character, instruction, styleContext } = context;
-    const prompt = buildScriptElementPrompt({ type, character, instruction, styleContext });
+    const resolvedStyle = resolvePromptStyleContext(context, styleContext);
+    const prompt = buildScriptElementPrompt({
+      type,
+      character,
+      instruction,
+      styleContext: resolvedStyle.styleContext
+    });
     const scriptElementModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
       task: 'Generate one script element block',
@@ -1034,7 +1061,10 @@ export const generateTextByKind = async ({
     const contextPreview = {
       type,
       character,
-      styleContext
+      styleId: resolvedStyle.styleId,
+      styleName: resolvedStyle.styleName,
+      styleContext: resolvedStyle.styleContext,
+      ...(resolvedStyle.styleId ? {} : { style: resolvedStyle.legacyStyle })
     };
     emitKindPromptTrace({
       traceMeta,
@@ -1044,7 +1074,7 @@ export const generateTextByKind = async ({
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 100,
-      styleSource: styleContext,
+      styleSource: resolvedStyle.styleContext,
       instructionPreview,
       contextPreview
     });
@@ -1092,7 +1122,7 @@ export const generateTextByKind = async ({
           maxOutputTokens: provider === 'openai'
             ? responsePayload.finalMaxOutputTokens
             : 100,
-          styleSource: styleContext,
+          styleSource: resolvedStyle.styleContext,
           instructionPreview,
           contextPreview,
           promptPreview: `${SCRIPT_ELEMENT_SYSTEM_INSTRUCTION}\n${prompt}`,
@@ -1103,14 +1133,15 @@ export const generateTextByKind = async ({
   }
 
   if (kind === 'regenerateScriptBlock') {
-    const { block, genre, premise, style, rewriteGuidance } = context;
+    const { block, genre, premise, rewriteGuidance } = context;
+    const resolvedStyle = resolvePromptStyleContext(context);
     const prompt = buildRegenerateBlockPrompt({
       type: block.type,
       character: block.character,
       genre,
       premise,
       text: block.text,
-      style,
+      style: resolvedStyle.styleContext,
       rewriteGuidance
     });
     const rewriteModel = provider === 'openai' ? models.openai : models.gemini;
@@ -1121,7 +1152,10 @@ export const generateTextByKind = async ({
     const contextPreview = {
       genre,
       premise,
-      style: style || '',
+      styleId: resolvedStyle.styleId,
+      styleName: resolvedStyle.styleName,
+      styleContext: resolvedStyle.styleContext,
+      ...(resolvedStyle.styleId ? {} : { style: resolvedStyle.legacyStyle }),
       blockType: block.type,
       character: block.character || null,
       originalText: block.text
@@ -1134,7 +1168,7 @@ export const generateTextByKind = async ({
       timeoutMs,
       upstreamContext,
       maxOutputTokens: 150,
-      styleSource: style || '',
+      styleSource: resolvedStyle.styleContext,
       instructionPreview,
       contextPreview
     });
@@ -1180,7 +1214,7 @@ export const generateTextByKind = async ({
           maxOutputTokens: provider === 'openai'
             ? responsePayload.finalMaxOutputTokens
             : 150,
-          styleSource: style || '',
+          styleSource: resolvedStyle.styleContext,
           instructionPreview,
           contextPreview,
           promptPreview: prompt,

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BlockType } from '../types';
+import { createBlock } from '../domain/blocks';
 import {
   createGenerateSpeechRequest,
+  executeGenerateScriptElement,
+  executeRewriteBlock,
   executeGenerateSurpriseSetup,
   executeSuggestPlotTwist,
   generateScriptElement
@@ -148,6 +151,72 @@ describe('AI API wrapper', () => {
     const requestWithoutTrace = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
     expect(requestWithoutTrace.promptTrace).toBeUndefined();
     expect((fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)?.['X-SS-Debug-Prompts']).toBeUndefined();
+  });
+
+  it('sends canonical style metadata for twist, insert, and rewrite requests', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createMockResponse(200, {
+        data: {
+          text: 'Styled response.'
+        }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await executeSuggestPlotTwist('Noir', {
+      styleId: 'noir-1940s-detective',
+      styleName: '1940s Noir Detective',
+      style: 'Client fallback label'
+    });
+    await executeGenerateScriptElement(
+      BlockType.ACTION,
+      undefined,
+      'Set mood quickly.',
+      'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+      {
+        styleId: 'noir-1940s-detective',
+        styleName: '1940s Noir Detective',
+        style: 'Client fallback label'
+      }
+    );
+    await executeRewriteBlock(
+      createBlock({ type: BlockType.ACTION, text: 'He stares at the board.' }),
+      'Noir',
+      'A detective unravels a conspiracy.',
+      {
+        styleId: 'noir-1940s-detective',
+        styleName: '1940s Noir Detective',
+        style: 'Client fallback label'
+      },
+      'Make it sharper.'
+    );
+
+    const twistRequest = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
+    expect(twistRequest.context).toMatchObject({
+      genre: 'Noir',
+      styleId: 'noir-1940s-detective',
+      styleName: '1940s Noir Detective',
+      style: 'Client fallback label'
+    });
+
+    const insertRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body || '{}'));
+    expect(insertRequest.context).toMatchObject({
+      type: 'action',
+      styleContext: 'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+      styleId: 'noir-1940s-detective',
+      styleName: '1940s Noir Detective',
+      style: 'Client fallback label'
+    });
+
+    const rewriteRequest = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body || '{}'));
+    expect(rewriteRequest.context).toMatchObject({
+      genre: 'Noir',
+      premise: 'A detective unravels a conspiracy.',
+      styleId: 'noir-1940s-detective',
+      styleName: '1940s Noir Detective',
+      style: 'Client fallback label',
+      rewriteGuidance: 'Make it sharper.'
+    });
   });
 
   it('sends surprise setup style contract with styleId/styleName only', async () => {

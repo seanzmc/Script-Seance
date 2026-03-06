@@ -793,7 +793,6 @@ export const createScriptMutationController = (
     const styleContext = [
       `Genre: ${latestContext.genre}.`,
       `Premise: ${truncatePromptText(latestContext.premise, 520)}`,
-      latestContext.style ? `Style: ${truncatePromptText(latestContext.style, 260)}.` : '',
       latestContext.characters.length ? `Characters: ${latestContext.characters.join(', ')}.` : ''
     ].filter(Boolean).join('\n');
 
@@ -808,6 +807,11 @@ export const createScriptMutationController = (
         selectedCharacter ?? undefined,
         instruction,
         styleContext,
+        {
+          styleId: latestContext.styleId,
+          styleName: latestContext.style,
+          style: latestContext.style
+        },
         { signal, opType: 'insertSurpriseText', scopeKey }
       ),
       isFresh: () => {
@@ -898,7 +902,11 @@ export const createScriptMutationController = (
         targetBlock,
         latestContext.genre,
         latestContext.premise,
-        latestContext.style,
+        {
+          styleId: latestContext.styleId,
+          styleName: latestContext.style,
+          style: latestContext.style
+        },
         rewriteGuidance,
         { signal, opType: 'rewriteBlock', scopeKey }
       ),

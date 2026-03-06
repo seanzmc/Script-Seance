@@ -274,6 +274,131 @@ describe('server reliability', () => {
     }
   });
 
+  it('resolves canonical style guidance for twist, script element, and rewrite prompts', async () => {
+    const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
+    const createRes = () => ({
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    });
+    try {
+      process.env.SS_DEBUG_PROMPTS = '1';
+      mockGenerateContent
+        .mockResolvedValueOnce({ text: 'A witness is the detective.' })
+        .mockResolvedValueOnce({ text: 'Rain needles the alley.' })
+        .mockResolvedValueOnce({ text: 'The board stares back.' });
+
+      const twistReq = {
+        body: {
+          kind: 'suggestPlotTwist',
+          context: {
+            genre: 'Noir',
+            styleId: 'noir-1940s-detective',
+            styleName: 'Client supplied label',
+            style: 'Hardboiled fallback'
+          },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 52,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+      const twistRes = createRes() as any;
+      await handleAiGenerate(twistReq, twistRes);
+
+      expect(twistRes.statusCode).toBe(200);
+      expect(twistRes.body?.debug?.previews?.context).toMatchObject({
+        genre: 'Noir',
+        styleId: 'noir-1940s-detective',
+        styleName: '1940s Noir Detective'
+      });
+      expect(String(twistRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
+      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+
+      const elementReq = {
+        body: {
+          kind: 'generateScriptElement',
+          context: {
+            type: 'action',
+            instruction: 'Set mood quickly.',
+            styleContext: 'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+            styleId: 'noir-1940s-detective',
+            styleName: 'Client supplied label',
+            style: 'Hardboiled fallback',
+            character: null
+          },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 53,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+      const elementRes = createRes() as any;
+      await handleAiGenerate(elementReq, elementRes);
+
+      expect(elementRes.statusCode).toBe(200);
+      expect(elementRes.body?.debug?.previews?.context).toMatchObject({
+        type: 'action',
+        styleId: 'noir-1940s-detective',
+        styleName: '1940s Noir Detective'
+      });
+      expect(String(elementRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Genre: Noir.');
+      expect(String(elementRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
+      expect(String(mockGenerateContent.mock.calls[1]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+
+      const rewriteReq = {
+        body: {
+          kind: 'regenerateScriptBlock',
+          context: {
+            block: { type: 'dialogue', text: 'I know.', character: 'Mara' },
+            genre: 'Noir',
+            premise: 'A vanished witness sends clues from impossible places.',
+            styleId: 'noir-1940s-detective',
+            styleName: 'Client supplied label',
+            style: 'Hardboiled fallback',
+            rewriteGuidance: 'Make it sharper and more ominous.'
+          },
+          promptTrace: {
+            enabled: true,
+            promptContextRevision: 54,
+            styleFingerprint: 'abc123ff'
+          }
+        }
+      } as any;
+      const rewriteRes = createRes() as any;
+      await handleAiGenerate(rewriteReq, rewriteRes);
+
+      expect(rewriteRes.statusCode).toBe(200);
+      expect(rewriteRes.body?.debug?.previews?.context).toMatchObject({
+        genre: 'Noir',
+        styleId: 'noir-1940s-detective',
+        styleName: '1940s Noir Detective'
+      });
+      expect(String(rewriteRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
+      expect(String(mockGenerateContent.mock.calls[2]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+    } finally {
+      if (previousDebugEnv === undefined) {
+        delete process.env.SS_DEBUG_PROMPTS;
+      } else {
+        process.env.SS_DEBUG_PROMPTS = previousDebugEnv;
+      }
+    }
+  });
+
   it('keeps legacy style in surprise setup debug preview when styleId is absent', async () => {
     const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
     try {

@@ -1103,12 +1103,21 @@ const handleAiGenerate = async (req, res) => {
             return sendError(res, 400, 'Invalid target length.', 'INVALID_REQUEST');
           }
         } else if (kind === 'suggestPlotTwist') {
-          const { genre } = context;
+          const { genre, styleId, styleName, style } = context;
           if (!isNonEmptyString(genre, 120)) {
             return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
           }
+          if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist style id.', 'INVALID_REQUEST');
+          }
+          if (styleName !== undefined && styleName !== null && !isNonEmptyString(styleName, 200)) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist style name.', 'INVALID_REQUEST');
+          }
+          if (style !== undefined && style !== null && !isNonEmptyString(style, 400)) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist style.', 'INVALID_REQUEST');
+          }
         } else if (kind === 'generateScriptElement') {
-          const { type, character, instruction, styleContext } = context;
+          const { type, character, instruction, styleContext, styleId, styleName, style } = context;
           if (
             !isNonEmptyString(type, 24) ||
             !VALID_BLOCK_TYPES.has(type) ||
@@ -1125,8 +1134,17 @@ const handleAiGenerate = async (req, res) => {
           ) {
             return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
           }
+          if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
+            return sendError(res, 400, 'Invalid script element style id.', 'INVALID_REQUEST');
+          }
+          if (styleName !== undefined && styleName !== null && !isNonEmptyString(styleName, 200)) {
+            return sendError(res, 400, 'Invalid script element style name.', 'INVALID_REQUEST');
+          }
+          if (style !== undefined && style !== null && !isNonEmptyString(style, 400)) {
+            return sendError(res, 400, 'Invalid script element style.', 'INVALID_REQUEST');
+          }
         } else if (kind === 'regenerateScriptBlock') {
-          const { block, genre, premise, rewriteGuidance } = context;
+          const { block, genre, premise, rewriteGuidance, styleId, styleName, style } = context;
           if (!isObject(block) || !isNonEmptyString(genre, 120) || !isNonEmptyString(premise, 4000)) {
             return sendError(res, 400, 'Invalid regenerateScriptBlock context.', 'INVALID_REQUEST');
           }
@@ -1153,6 +1171,15 @@ const handleAiGenerate = async (req, res) => {
             (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
           ) {
             return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+          }
+          if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
+            return sendError(res, 400, 'Invalid rewrite style id.', 'INVALID_REQUEST');
+          }
+          if (styleName !== undefined && styleName !== null && !isNonEmptyString(styleName, 200)) {
+            return sendError(res, 400, 'Invalid rewrite style name.', 'INVALID_REQUEST');
+          }
+          if (style !== undefined && style !== null && !isNonEmptyString(style, 400)) {
+            return sendError(res, 400, 'Invalid rewrite style.', 'INVALID_REQUEST');
           }
         } else if (kind === 'generateSurpriseSetup') {
           const { targetGenre, styleId, styleName, style } = context;
