@@ -28,9 +28,10 @@ import {
   Pencil,
   PlusCircle,
   Sparkles,
+  Speech,
+  Trash2,
   Undo2,
   Redo2,
-  Volume2,
   X
 } from 'lucide-react';
 
@@ -723,125 +724,130 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
-                <button
-                  type="button"
-                  onClick={onUndo}
-                  disabled={!canUndo}
-                  className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={canUndo ? 'Undo last script change' : 'No action to undo'}
-                >
-                  <Undo2 className="h-3.5 w-3.5" />
-                  Undo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRedo?.()}
-                  disabled={!canRedo || !onRedo}
-                  className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={canRedo ? 'Redo last undone script change' : 'No action to redo'}
-                >
-                  <Redo2 className="h-3.5 w-3.5" />
-                  Redo
-                </button>
-                <div className="relative" ref={generateMenuRef}>
+              <div className="flex flex-col items-start gap-2 xl:items-end">
+                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
                   <button
                     type="button"
-                    onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
-                    disabled={isPlaying}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/40 bg-indigo-500/15 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
-                    aria-haspopup="dialog"
-                    aria-expanded={isGenerateMenuOpen}
-                    aria-label="Open generate menu"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Generate
-                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {isGenerateMenuOpen && (
-                    <div
-                      role="dialog"
-                      aria-label="Generate menu"
-                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-700 bg-gray-950/96 p-4 shadow-[0_24px_48px_rgba(0,0,0,0.42)] backdrop-blur"
-                    >
-                      {generatePanelContent}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAudioDrawerOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-200 transition-colors hover:bg-gray-800"
-                  aria-haspopup="dialog"
-                  aria-expanded={isAudioDrawerOpen}
-                  aria-label="Open audio drawer"
-                >
-                  <Volume2 className="h-3.5 w-3.5" />
-                  Audio
-                </button>
-                <div className="relative" ref={exportMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsExportMenuOpen((previous) => !previous)}
-                    disabled={!canExport}
+                    onClick={onUndo}
+                    disabled={!canUndo}
                     className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Open export menu"
-                    aria-haspopup="menu"
-                    aria-expanded={isExportMenuOpen}
-                    aria-label="Open export menu"
+                    title={canUndo ? 'Undo last script change' : 'No action to undo'}
                   >
-                    <Download className="h-3.5 w-3.5" />
-                    Export
+                    <Undo2 className="h-3.5 w-3.5" />
+                    Undo
                   </button>
-                  {isExportMenuOpen && (
-                    <div
-                      role="menu"
-                      aria-label="Export options"
-                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] min-w-[12rem] rounded-xl border border-gray-700 bg-gray-950/96 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)] backdrop-blur"
+                  <button
+                    type="button"
+                    onClick={() => onRedo?.()}
+                    disabled={!canRedo || !onRedo}
+                    className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={canRedo ? 'Redo last undone script change' : 'No action to redo'}
+                  >
+                    <Redo2 className="h-3.5 w-3.5" />
+                    Redo
+                  </button>
+                  <div className="relative" ref={exportMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsExportMenuOpen((previous) => !previous)}
+                      disabled={!canExport}
+                      className="inline-flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-900/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Open export menu"
+                      aria-haspopup="menu"
+                      aria-expanded={isExportMenuOpen}
+                      aria-label="Open export menu"
                     >
-                      <div className="space-y-1">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            onExportTxt();
-                            setIsExportMenuOpen(false);
-                          }}
-                          disabled={!canExport}
-                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                          title="Export script as a .txt file"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Export Script (.txt)
-                        </button>
-                        {onExportPdf && (
+                      <Download className="h-3.5 w-3.5" />
+                      Export
+                    </button>
+                    {isExportMenuOpen && (
+                      <div
+                        role="menu"
+                        aria-label="Export options"
+                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] min-w-[12rem] rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
+                      >
+                        <div className="space-y-1">
                           <button
                             type="button"
                             role="menuitem"
                             onClick={() => {
-                              onExportPdf();
+                              onExportTxt();
                               setIsExportMenuOpen(false);
                             }}
                             disabled={!canExport}
                             className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Export script as a PDF via print dialog"
+                            title="Export script as a .txt file"
                           >
-                            <FileDown className="h-3.5 w-3.5" />
-                            Export PDF
+                            <Download className="h-3.5 w-3.5" />
+                            Export Script (.txt)
                           </button>
-                        )}
+                          {onExportPdf && (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                onExportPdf();
+                                setIsExportMenuOpen(false);
+                              }}
+                              disabled={!canExport}
+                              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title="Export script as a PDF via print dialog"
+                            >
+                              <FileDown className="h-3.5 w-3.5" />
+                              Export PDF
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClearDraft}
+                    disabled={!context}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-red-200 transition-colors hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear Draft
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onClearDraft}
-                  disabled={!context}
-                  className="inline-flex items-center gap-1 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-red-200 transition-colors hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  Clear Draft
-                </button>
+                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+                  <div className="relative" ref={generateMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
+                      disabled={isPlaying}
+                      className="inline-flex min-h-[3.75rem] items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-haspopup="dialog"
+                      aria-expanded={isGenerateMenuOpen}
+                      aria-label="Open generate menu"
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      <span>GENERATE NEXT SCENE</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isGenerateMenuOpen && (
+                      <div
+                        role="dialog"
+                        aria-label="Generate menu"
+                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-700 bg-gray-950 p-4 shadow-[0_24px_48px_rgba(0,0,0,0.42)]"
+                      >
+                        {generatePanelContent}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAudioDrawerOpen(true)}
+                    className="inline-flex min-h-[3.75rem] items-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-200 transition-colors hover:bg-gray-800"
+                    aria-haspopup="dialog"
+                    aria-expanded={isAudioDrawerOpen}
+                    aria-label="Open audio drawer"
+                  >
+                    <Speech className="h-4 w-4" />
+                    Audio
+                  </button>
+                </div>
                 {isGenerating && (
                   <div className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-100">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -886,7 +892,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       {context && isAudioDrawerOpen && (
         <>
           <div
-            className="fixed inset-0 z-[79] bg-black/55 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[96] bg-black/55 backdrop-blur-[2px]"
             onClick={() => {
               setIsAudioDrawerOpen(false);
               focusScriptScroll();
@@ -897,7 +903,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             role="dialog"
             aria-label="Audio drawer"
             data-testid="audio-drawer"
-            className="fixed inset-y-0 right-0 z-[80] flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
+            className="fixed inset-y-0 right-0 z-[97] flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
           >
             <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-4 sm:px-5">
               <div className="space-y-1">

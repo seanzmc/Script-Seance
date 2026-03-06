@@ -349,7 +349,11 @@ describe('ScriptPane block interactions', () => {
     const onInsertAtAnchor = vi.fn();
     render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);
 
+    expect(screen.getByText('GENERATE NEXT SCENE')).toBeTruthy();
+
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+    const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
+    expect(generateMenu.className).toContain('bg-gray-950');
     fireEvent.click(screen.getByRole('button', { name: /insert scene \/ new beat/i }));
 
     const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
@@ -380,8 +384,21 @@ describe('ScriptPane block interactions', () => {
 
     fireEvent.click(block);
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+    expect(block.className).toContain('bg-sky-100/40');
 
     fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
+  });
+
+  it('toggles a selected block closed when clicked again', () => {
+    const { container } = render(<ScriptPane {...createProps()} />);
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+
+    fireEvent.click(block);
+
     expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
   });
 
@@ -490,6 +507,8 @@ describe('ScriptPane block interactions', () => {
 
     const heading = screen.getByText('INT. ARCHIVE - NIGHT');
     expect(heading.className).toContain('font-extrabold');
+    expect(heading.className).toContain('border-b');
+    expect(heading.className).not.toContain('rounded-lg');
     fireEvent.click(heading);
     expect(screen.getByTestId('selected-heading-actions-scene-1')).toBeTruthy();
 

@@ -537,7 +537,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
     let content = null;
     if (block.type === BlockType.ACTION) {
-      content = <div className="script-block-action leading-relaxed">{block.text}</div>;
+      content = <div className="script-block-action px-4 leading-relaxed">{block.text}</div>;
     } else if (block.type === BlockType.DIALOGUE) {
       content = (
         <div className="script-block-dialogue max-w-md mx-auto text-center">
@@ -691,7 +691,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-8">
           <div
             id={`scene-heading-${scene.id}`}
-            className={`script-scene-heading mb-4 rounded-lg border px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+            className={`script-scene-heading mb-4 border-x-0 border-b border-t-0 px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
               isSelectedHeading && !activeInsertAnchor
                 ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
                 : 'border-gray-300 hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
@@ -719,6 +719,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
               const isInsertTarget = insertTarget?.blockId === block.id;
               const isRewriteTarget = rewriteTarget?.sceneId === scene.id && rewriteTarget?.blockId === block.id;
               const isSelectedBlock = selectedTarget?.kind === 'block' && selectedTarget.sceneId === scene.id && selectedBlockId === block.id;
+              const isSelectedBlockFocused = isSelectedBlock && !activeInsertAnchor && selectedAnchorElement?.id === `block-${block.id}`;
               const isError = blockStatuses[block.id] === 'error';
               const blockWrapperClasses = `group relative rounded-md border transition-[background-color,box-shadow,transform,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
                 isInsertTarget ? 'border-indigo-500/50 bg-indigo-100/30 ring-1 ring-indigo-500/50' : 'border-transparent'
@@ -726,7 +727,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                 isRewriteTarget ? 'border-sky-400/60 ring-2 ring-sky-400/60 bg-sky-100/40' : ''
               } ${
                 isSelectedBlock && !activeInsertAnchor
-                  ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
+                  ? `${isSelectedBlockFocused ? 'bg-sky-100/40' : 'bg-slate-900/[0.08]'} border-slate-400 shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]`
                   : ''
               } ${
                 !isInsertMode ? 'cursor-pointer hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)]' : ''
@@ -744,7 +745,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
               if (block.type === BlockType.ACTION) {
                 content = (
-                  <div className="script-block-action mb-2.5 leading-relaxed">
+                  <div className="script-block-action mb-2.5 px-4 leading-relaxed">
                     {block.text}
                   </div>
                 );
@@ -780,6 +781,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                     data-block-type={block.type}
                     onClick={() => {
                       if (isInsertMode) return;
+                      if (isSelectedBlock) {
+                        onClearBlockTarget?.();
+                        return;
+                      }
                       const target = { sceneId: scene.id, blockId: block.id };
                       onSelectBlockTarget?.(target);
                       if (isRewriteMode && onSelectRewriteTarget) {
@@ -795,6 +800,10 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       }
                       if (event.key !== 'Enter' && event.key !== ' ') return;
                       event.preventDefault();
+                      if (isSelectedBlock) {
+                        onClearBlockTarget?.();
+                        return;
+                      }
                       const target = { sceneId: scene.id, blockId: block.id };
                       onSelectBlockTarget?.(target);
                       if (isRewriteMode && onSelectRewriteTarget) {
