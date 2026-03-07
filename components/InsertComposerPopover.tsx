@@ -1,6 +1,16 @@
 import React from 'react';
 import { BlockType } from '../types';
 import { Button } from './Button';
+import {
+  paperPopoverActionsClassName,
+  paperPopoverAnimatedFieldClassName,
+  paperPopoverAnimatedShellClassName,
+  paperPopoverErrorClassName,
+  paperPopoverLabelClassName,
+  paperPopoverStatusTextClassName,
+  paperPopoverTextAreaClassName,
+  paperPopoverTitleClassName
+} from './paperPopoverStyles';
 
 export interface InsertComposerPopoverProps {
   blockType: BlockType;
@@ -67,11 +77,11 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       aria-label="Insert Block"
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
-      className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)] transition-[opacity,transform,box-shadow] duration-200 ease-out"
+      className={`w-[min(30rem,calc(100vw-2rem))] ${paperPopoverAnimatedShellClassName}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Insert Block</h3>
-        {isGenerating && <span className="text-xs text-gray-600">Generating...</span>}
+        <h3 className={paperPopoverTitleClassName}>Insert Block</h3>
+        {isGenerating && <span className={paperPopoverStatusTextClassName}>Generating...</span>}
       </div>
 
       <p className="mt-2 text-sm leading-relaxed text-gray-700">
@@ -130,14 +140,14 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
 
       {isDialogueType && (
         <div className="mt-2.5 space-y-1">
-          <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+          <label className={paperPopoverLabelClassName}>
             Character
           </label>
           {hasCharacters ? (
             <select
               value={selectedCharacter}
               onChange={(event) => onCharacterChange(event.target.value)}
-              className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              className={paperPopoverAnimatedFieldClassName}
               disabled={isGenerating}
               aria-label="Character"
             >
@@ -154,23 +164,23 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
       )}
 
       <div className="mt-2.5 space-y-1">
-        <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+        <label className={paperPopoverLabelClassName}>
           Content (Optional)
         </label>
         <textarea
           value={content}
           onChange={(event) => onContentChange(event.target.value)}
           placeholder="Leave blank and use Generate and Insert, or type the block you want inserted."
-          className="h-28 w-full resize-none rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          className={paperPopoverTextAreaClassName}
           disabled={isGenerating}
         />
       </div>
 
       {errorMessage && (
-        <p className="mt-2 text-sm text-red-700" role="alert">{errorMessage}</p>
+        <p className={paperPopoverErrorClassName} role="alert">{errorMessage}</p>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
+      <div className={paperPopoverActionsClassName}>
         <Button
           type="button"
           variant="secondary"

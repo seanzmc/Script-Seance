@@ -1,8 +1,6 @@
 import React, { useMemo } from 'react';
 import {
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   Pause,
   Play,
@@ -11,8 +9,7 @@ import {
   SkipBack,
   SkipForward,
   Square,
-  Trash2,
-  X
+  Trash2
 } from 'lucide-react';
 
 export interface PlaybackPanelProps {
@@ -41,13 +38,6 @@ export interface PlaybackPanelProps {
   onToggleHighlights: () => void;
   autoScroll: boolean;
   onToggleAutoScroll: () => void;
-}
-
-export interface PlaybackMiniPlayerProps extends PlaybackPanelProps {
-  isExpanded: boolean;
-  onToggleExpanded: () => void;
-  onClose: () => void;
-  showCloseButton?: boolean;
 }
 
 type PlaybackState = 'idle' | 'generating' | 'ready' | 'playing' | 'paused' | 'error';
@@ -392,250 +382,6 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
           </span>
         </button>
       </div>
-    </div>
-  );
-};
-
-export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
-  isPlaying,
-  isPaused,
-  isLoadingAudio,
-  currentBlockId,
-  currentBlockIndex,
-  blockStatuses,
-  onPlay,
-  onPause,
-  onResume,
-  onStop,
-  onPrev,
-  onNext,
-  onRetry,
-  onSkip,
-  onRefreshAudio,
-  onPurgeAudio,
-  bufferedCount,
-  totalCount,
-  currentSpeaker,
-  playbackSpeed,
-  onPlaybackSpeedChange,
-  showHighlights,
-  onToggleHighlights,
-  autoScroll,
-  onToggleAutoScroll,
-  isExpanded,
-  onToggleExpanded,
-  onClose,
-  showCloseButton = true
-}) => {
-  const {
-    currentStatus,
-    progressCount,
-    canNavigate,
-    atStart,
-    atEnd,
-    statusDetail
-  } = useMemo(
-    () =>
-      buildPlaybackViewModel({
-        isPlaying,
-        isPaused,
-        isLoadingAudio,
-        currentBlockId,
-        currentBlockIndex,
-        blockStatuses,
-        bufferedCount,
-        totalCount
-      }),
-    [isPlaying, isPaused, isLoadingAudio, currentBlockId, currentBlockIndex, blockStatuses, bufferedCount, totalCount]
-  );
-
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      onPause();
-      return;
-    }
-    if (isPaused) {
-      onResume();
-      return;
-    }
-    onPlay();
-  };
-
-  const controlButtonClass = 'flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:border-gray-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
-  const toggleTrackClass = 'ml-1 w-8 h-4 rounded-full flex items-center px-0.5 transition-colors';
-  const speakerLabel = currentSpeaker?.trim() || 'None';
-
-  return (
-    <div className="flex h-full min-h-0 flex-col rounded-t-2xl border border-gray-800 border-b-0 bg-gray-950/95 px-3 py-2 shadow-[0_-18px_38px_rgba(0,0,0,0.45)] backdrop-blur">
-      <div className="shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onPrev}
-              disabled={!canNavigate || atStart}
-              className={controlButtonClass}
-              title="Previous block"
-            >
-              <SkipBack className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handlePlayPause}
-              aria-pressed={isPlaying}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${
-                isPlaying
-                  ? 'border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-500'
-                  : 'border-indigo-400 bg-indigo-500/90 text-white hover:bg-indigo-500'
-              }`}
-              title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play script'}
-            >
-              {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
-            </button>
-            <button
-              type="button"
-              onClick={onStop}
-              className={controlButtonClass}
-              title="Stop playback"
-            >
-              <Square className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onNext}
-              disabled={!canNavigate || atEnd}
-              className={controlButtonClass}
-              title="Next block"
-            >
-              <SkipForward className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
-            Speaking: <span className="text-gray-200">{speakerLabel}</span>
-          </p>
-          <button
-            type="button"
-            onClick={onToggleExpanded}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-gray-700 bg-gray-900/55 px-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-200 transition-colors hover:bg-gray-800"
-            aria-label={isExpanded ? 'Collapse playback details' : 'Expand playback details'}
-            title={isExpanded ? 'Collapse playback details' : 'Expand playback details'}
-          >
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-            {isExpanded ? 'Less' : 'More'}
-          </button>
-          {showCloseButton && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-              aria-label="Close playback mini-player"
-              title="Close playback mini-player"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[11px] text-gray-300">{statusDetail}</p>
-          <span className="shrink-0 text-[10px] text-gray-500">
-            Audio generation: {progressCount}/{totalCount || 0}
-          </span>
-        </div>
-      </div>
-      {isExpanded && (
-        <div className="mt-1 flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800 pt-1">
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={onRefreshAudio}
-                disabled={totalCount === 0}
-                className="flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
-                title="Regenerate all script audio using current voice casting"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Refresh Audio
-              </button>
-              <button
-                onClick={onPurgeAudio}
-                disabled={totalCount === 0}
-                className="flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
-                title="Clear generated playback blocks and cached audio"
-              >
-                <Trash2 className="h-3 w-3" />
-                Purge
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500">Speed</span>
-              <span className="text-[11px] font-semibold text-indigo-300">{playbackSpeed.toFixed(1)}x</span>
-              <input
-                type="range"
-                min="0.5"
-                max="1.5"
-                step="0.1"
-                value={playbackSpeed}
-                onChange={(e) => onPlaybackSpeedChange(parseFloat(e.target.value))}
-                className="h-1 w-28 cursor-pointer appearance-none rounded-lg bg-gray-700 accent-indigo-500"
-                title="Playback speed"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={onToggleAutoScroll}
-                aria-pressed={autoScroll}
-                className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
-                title="Auto-scroll script with playback"
-              >
-                <ScrollText className={`h-3.5 w-3.5 ${autoScroll ? 'text-indigo-400' : 'text-gray-500'}`} />
-                Auto-scroll
-                <span className={`${toggleTrackClass} ${autoScroll ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-                  <span className={`h-3.5 w-3.5 rounded-full bg-white transition-transform ${autoScroll ? 'translate-x-4' : ''}`} />
-                </span>
-              </button>
-              <button
-                onClick={onToggleHighlights}
-                aria-pressed={showHighlights}
-                className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/40 px-3 py-1 text-[10px] uppercase tracking-widest text-gray-300 hover:border-gray-500"
-                title="Highlight the active line during playback"
-              >
-                <HighlightIcon className={`h-3.5 w-3.5 ${showHighlights ? 'text-indigo-400' : 'text-gray-500'}`} />
-                Highlight
-                <span className={`${toggleTrackClass} ${showHighlights ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-                  <span className={`h-3.5 w-3.5 rounded-full bg-white transition-transform ${showHighlights ? 'translate-x-4' : ''}`} />
-                </span>
-              </button>
-            </div>
-            {isLoadingAudio && (
-              <div className="flex items-center gap-2 text-[10px] text-emerald-400">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Waiting for current block audio.
-              </div>
-            )}
-            {currentStatus === 'error' && (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-300">
-                <div className="flex items-center gap-2 text-amber-300">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Audio failed for this block.
-                </div>
-                <button
-                  onClick={onRetry}
-                  className="flex items-center gap-1.5 rounded-md border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Retry block
-                </button>
-                <button
-                  onClick={onSkip}
-                  className="flex items-center gap-1.5 rounded-md border border-amber-400/50 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-200 hover:border-amber-300 hover:text-amber-100"
-                >
-                  <SkipForward className="h-3 w-3" />
-                  Skip block
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

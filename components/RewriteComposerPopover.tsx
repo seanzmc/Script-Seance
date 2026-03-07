@@ -1,6 +1,15 @@
 import React from 'react';
 import { BlockType } from '../types';
 import { Button } from './Button';
+import {
+  paperPopoverActionsClassName,
+  paperPopoverAnimatedShellClassName,
+  paperPopoverErrorClassName,
+  paperPopoverLabelClassName,
+  paperPopoverStatusTextClassName,
+  paperPopoverTextAreaClassName,
+  paperPopoverTitleClassName
+} from './paperPopoverStyles';
 
 export interface RewriteComposerPopoverProps {
   blockType: BlockType;
@@ -43,15 +52,15 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
       aria-label="Rewrite Block"
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
-      className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)] transition-[opacity,transform,box-shadow] duration-200 ease-out"
+      className={`w-[min(30rem,calc(100vw-2rem))] ${paperPopoverAnimatedShellClassName}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Rewrite Block</h3>
-        {isGenerating && <span className="text-xs text-gray-600">Generating...</span>}
+        <h3 className={paperPopoverTitleClassName}>Rewrite Block</h3>
+        {isGenerating && <span className={paperPopoverStatusTextClassName}>Generating...</span>}
       </div>
 
       <div className="mt-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+        <p className={paperPopoverLabelClassName}>
           {BLOCK_LABELS[blockType]}
         </p>
         <p className="mt-1 text-sm text-gray-700 truncate">
@@ -60,21 +69,21 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
       </div>
 
       <div className="mt-2.5 space-y-1">
-        <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+        <label className={paperPopoverLabelClassName}>
           Rewrite Instructions
         </label>
         <textarea
           value={instructions}
           onChange={(event) => onInstructionsChange(event.target.value)}
           placeholder="Make it funnier, Shorten, More suspense..."
-          className="h-28 w-full resize-none rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-800 shadow-inner outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          className={paperPopoverTextAreaClassName}
           disabled={isGenerating}
         />
       </div>
 
       {hasCandidate && (
         <div className="mt-2.5 space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
+          <p className={paperPopoverLabelClassName}>
             Proposed Rewrite
           </p>
           <div className="max-h-32 overflow-y-auto rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-950 whitespace-pre-wrap">
@@ -84,10 +93,10 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
       )}
 
       {errorMessage && (
-        <p className="mt-2 text-sm text-red-700" role="alert">{errorMessage}</p>
+        <p className={paperPopoverErrorClassName} role="alert">{errorMessage}</p>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
+      <div className={paperPopoverActionsClassName}>
         <Button
           type="button"
           variant="ghost"

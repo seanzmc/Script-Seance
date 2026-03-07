@@ -5,6 +5,10 @@ import { InsertComposerPopover } from './InsertComposerPopover';
 import { RewriteComposerPopover } from './RewriteComposerPopover';
 import { Button } from './Button';
 import {
+  paperPopoverFieldClassName,
+  paperPopoverShellClassName
+} from './paperPopoverStyles';
+import {
   SetupForm,
   SetupFormState,
   SETUP_UI_TOKENS,
@@ -414,7 +418,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     <div
       role="dialog"
       aria-label="Edit Scene Heading"
-      className="w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)]"
+      className={`w-[min(24rem,calc(100vw-2rem))] ${paperPopoverShellClassName}`}
     >
       <div className="space-y-2">
         <div>
@@ -424,7 +428,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <input
           value={headingDraft}
           onChange={(event) => setHeadingDraft(event.target.value)}
-          className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          className={paperPopoverFieldClassName}
           placeholder="INT. LOCATION - DAY"
         />
         <div className="flex items-center justify-end gap-2">
