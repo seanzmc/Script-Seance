@@ -15,6 +15,7 @@ import {
   STYLE_PRESETS
 } from './SetupForm';
 import { PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
+import { PlaybackMiniPlayer } from './PlaybackMiniPlayer';
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
 import { useScriptController } from '../hooks/useScriptController';
@@ -574,6 +575,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
   );
+  const showPlaybackMiniPlayer = Boolean(
+    context
+    && playbackProps
+    && !isAudioDrawerOpen
+    && playbackProps.totalCount > 0
+    && (playbackProps.isPlaying || playbackProps.isPaused)
+  );
   const contentWrapperClassName = 'max-w-[1240px] mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-5 h-full min-h-0 flex flex-col gap-4';
   const handleGenerateNext = useCallback(() => {
     setIsGenerateMenuOpen(false);
@@ -752,6 +760,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusScriptScroll, isAudioDrawerOpen]);
+
+  useEffect(() => {
+    if (!isPlaying || !isAudioDrawerOpen) return;
+    setIsAudioDrawerOpen(false);
+    focusScriptScroll();
+  }, [focusScriptScroll, isAudioDrawerOpen, isPlaying]);
 
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#17181c]">
@@ -989,6 +1003,22 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </>
         )}
       </div>
+      {showPlaybackMiniPlayer && playbackProps && (
+        <PlaybackMiniPlayer
+          isPlaying={playbackProps.isPlaying}
+          isPaused={playbackProps.isPaused}
+          currentBlockIndex={playbackProps.currentBlockIndex}
+          totalCount={playbackProps.totalCount}
+          currentSpeaker={playbackProps.currentSpeaker}
+          onPlay={playbackProps.onPlay}
+          onPause={playbackProps.onPause}
+          onResume={playbackProps.onResume}
+          onStop={playbackProps.onStop}
+          onPrev={playbackProps.onPrev}
+          onNext={playbackProps.onNext}
+          onOpenAudioDrawer={() => setIsAudioDrawerOpen(true)}
+        />
+      )}
       {context && isAudioDrawerOpen && (
         <>
           <div

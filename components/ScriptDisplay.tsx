@@ -251,7 +251,6 @@ export const openScriptExportWindow = (scriptMarkup: string, title: string) => {
 export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   scenes,
   currentBlockId,
-  currentBlockIndex,
   blockStatuses,
   showHighlights,
   autoScroll,
@@ -291,24 +290,14 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   headingEditor
 }) => {
   const insertHighlightTimeoutRef = useRef<number | null>(null);
+  const playbackScrollFrameRef = useRef<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [rootElement, setRootElement] = useState<HTMLDivElement | null>(null);
   const [selectedAnchorElement, setSelectedAnchorElement] = useState<HTMLElement | null>(null);
   const [rewriteAnchorElement, setRewriteAnchorElement] = useState<HTMLElement | null>(null);
   const [insertAnchorElement, setInsertAnchorElement] = useState<HTMLElement | null>(null);
   const [headingEditorAnchorElement, setHeadingEditorAnchorElement] = useState<HTMLElement | null>(null);
-  const playableBlockIds = useMemo(() => {
-    const ids: string[] = [];
-    scenes.forEach(scene => {
-      scene.blocks.forEach(block => {
-        ids.push(block.id);
-      });
-    });
-    return ids;
-  }, [scenes]);
-  const activeBlockId =
-    currentBlockIndex >= 0 && currentBlockIndex < playableBlockIds.length
-      ? playableBlockIds[currentBlockIndex]
-      : currentBlockId;
+  const activeBlockId = currentBlockId;
   const selectedBlockId = selectedTarget?.kind === 'block'
     ? selectedTarget.blockId
     : selectedBlockTarget?.blockId ?? null;
@@ -319,11 +308,12 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const isInlineInsertComposerOpen = Boolean(activeInsertAnchor && insertComposer);
   const blockOrderIndexById = useMemo(() => {
     const indexMap = new Map<string, number>();
-    playableBlockIds.forEach((blockId, index) => {
+    scenes.flatMap((scene) => scene.blocks).forEach((block, index) => {
+      const blockId = block.id;
       indexMap.set(blockId, index);
     });
     return indexMap;
-  }, [playableBlockIds]);
+  }, [scenes]);
   const sceneStartIndexById = useMemo(() => {
     const indexMap = new Map<string, number>();
     let offset = 0;
@@ -402,13 +392,51 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   }, [activeHeadingSceneId, resolveSceneHeadingElement, scenes]);
 
   useEffect(() => {
-    if (autoScroll && activeBlockId) {
-      const el = document.getElementById(`block-${activeBlockId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!autoScroll || !activeBlockId) return;
+    const scrollContainer = scrollContainerRef.current;
+    const el = resolveBlockElement(activeBlockId);
+    if (!scrollContainer || !el) return;
+
+    playbackScrollFrameRef.current = window.requestAnimationFrame(() => {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const blockRect = el.getBoundingClientRect();
+      const viewportHeight = scrollContainer.clientHeight;
+
+      if (viewportHeight <= 0) return;
+
+      const blockCenter = (
+        scrollContainer.scrollTop
+        + (blockRect.top - containerRect.top)
+        + (blockRect.height / 2)
+      );
+      const viewportCenter = scrollContainer.scrollTop + (viewportHeight / 2);
+      const deadZone = Math.min(Math.max(viewportHeight * 0.12, 56), 120);
+
+      if (Math.abs(blockCenter - viewportCenter) <= deadZone) {
+        return;
       }
-    }
-  }, [activeBlockId, autoScroll]);
+
+      const nextTop = Math.max(
+        0,
+        Math.min(
+          blockCenter - (viewportHeight / 2),
+          scrollContainer.scrollHeight - viewportHeight
+        )
+      );
+
+      scrollContainer.scrollTo({
+        top: nextTop,
+        behavior: 'smooth'
+      });
+    });
+
+    return () => {
+      if (playbackScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(playbackScrollFrameRef.current);
+        playbackScrollFrameRef.current = null;
+      }
+    };
+  }, [activeBlockId, autoScroll, resolveBlockElement]);
 
   useEffect(() => {
     const activeClasses = ACTIVE_CLASSES.split(' ');
@@ -917,6 +945,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     >
       <div className="script-export-texture absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03] bg-repeat bg-[url('/textures/cream-paper.svg')]" />
       <div
+        ref={scrollContainerRef}
         className={contentClasses}
         data-script-scroll="true"
         tabIndex={-1}

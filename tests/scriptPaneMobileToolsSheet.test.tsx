@@ -182,6 +182,58 @@ describe('ScriptPane header generation and audio drawer', () => {
     });
   });
 
+  it('shows the mini player for an active paused session and hides it when the full audio drawer opens', async () => {
+    render(
+      <ScriptPane
+        {...createProps({
+          playbackProps: createPlaybackProps({
+            isPaused: true,
+            currentBlockIndex: 1,
+            totalCount: 3,
+            currentSpeaker: 'Alex'
+          })
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
+    expect(screen.getByText('Paused on block 2/3')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open full audio drawer' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('audio-drawer')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('playback-mini-player')).toBeNull();
+  });
+
+  it('closes the audio drawer when playback starts', async () => {
+    const initialProps = createProps();
+    const { rerender } = render(<ScriptPane {...initialProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open audio drawer' }));
+    expect(await screen.findByTestId('audio-drawer')).toBeTruthy();
+
+    rerender(
+      <ScriptPane
+        {...createProps({
+          isPlaying: true,
+          playbackProps: createPlaybackProps({
+            isPlaying: true,
+            currentBlockIndex: 0,
+            totalCount: 2,
+            currentSpeaker: 'Alex'
+          })
+        })}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('audio-drawer')).toBeNull();
+    });
+    expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
+  });
+
   it('formats title metadata and uses matching title/style edit link styling', () => {
     const { container } = render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
