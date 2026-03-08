@@ -383,8 +383,10 @@ describe('ScriptPane block interactions', () => {
     expect(scriptRoot.className).toContain('px-2');
     expect(scriptRoot.className).toContain('sm:px-3');
     expect(block).toBeTruthy();
+    expect(block.className).not.toContain('cursor-pointer');
     expect(block.className).toContain('hover:border-blue-300');
     expect(block.querySelector('.script-block-action')?.className).toContain('mb-[5px]');
+    expect(block.querySelector('.script-block-action')?.className).toContain('cursor-text');
 
     fireEvent.click(block);
     expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
@@ -505,6 +507,44 @@ describe('ScriptPane block interactions', () => {
       expect(screen.queryByRole('dialog', { name: 'Insert Block' })).toBeNull();
     });
     expect(screen.queryByTestId('selected-block-actions-block-1')).toBeNull();
+  });
+
+  it('keeps the insert composer open when clicking the already-active placement button', () => {
+    const onInsertAtAnchor = vi.fn();
+    const { container } = render(
+      <ScriptPane {...createProps({ onInsertAtAnchor })} />
+    );
+
+    const block = container.querySelector('#block-block-1') as HTMLElement;
+    fireEvent.click(block);
+    fireEvent.click(screen.getByRole('button', { name: 'Insert near selected block' }));
+
+    const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert After' }));
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Before' }));
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert Block' })).getByRole('button', { name: 'Insert Before' }));
+    expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
+
+    fireEvent.change(within(screen.getByRole('dialog', { name: 'Insert Block' })).getByRole('textbox'), {
+      target: { value: 'A setup beat still lands first.' }
+    });
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert Block' })).getByRole('button', { name: 'Insert Typed Block' }));
+
+    expect(onInsertAtAnchor).toHaveBeenCalledWith(
+      expect.objectContaining<ScriptAnchor>({
+        kind: 'block',
+        blockId: 'block-1',
+        position: 'before',
+        id: 'block:block-1:before'
+      }),
+      expect.objectContaining({
+        text: 'A setup beat still lands first.'
+      })
+    );
   });
 
   it('clears selected block actions when an inline insert slot becomes active', async () => {

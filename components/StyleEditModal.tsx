@@ -44,10 +44,10 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+      <div className="fixed inset-x-0 bottom-0 top-24 z-[110] flex items-start justify-center overflow-y-auto px-4 py-4 sm:top-28 sm:py-6">
         <div className="absolute inset-0 bg-black/72" onClick={onClose} />
         <div
-          className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/12 bg-slate-950 shadow-[0_28px_80px_rgba(2,6,23,0.78)]"
+          className="relative w-full max-w-2xl max-h-[calc(100vh-8rem)] overflow-y-auto rounded-2xl border border-white/12 bg-slate-950 shadow-[0_28px_80px_rgba(2,6,23,0.78)] sm:max-h-[calc(100vh-10rem)]"
           role="dialog"
           aria-modal="true"
           aria-label="Edit style"

@@ -123,7 +123,8 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
         top: position?.top ?? fallbackTop,
         left: position?.left ?? fallbackLeft,
         zIndex: 90,
-        visibility: 'visible'
+        opacity: position ? 1 : 0,
+        pointerEvents: position ? 'auto' : 'none'
       }}
       data-placement={position?.placement ?? preferredPlacement}
     >

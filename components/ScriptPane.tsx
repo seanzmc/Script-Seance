@@ -202,7 +202,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerToolTextClass = 'max-[640px]:sr-only';
   const headerPrimaryToolButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
   const headerAudioButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
-  const headerActionRowsClass = 'flex flex-wrap items-center gap-2 basis-full xl:justify-end max-[1100px]:basis-auto';
+  const headerActionRowsClass = 'flex flex-wrap items-center gap-2';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
@@ -330,6 +330,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [scriptController]);
   const handleInsertPlacementChange = useCallback((next: 'before' | 'after') => {
     if (!insertPlacementTarget || insertPlacementTarget.kind !== 'block') return;
+    const currentPlacement = scriptController.activeInsertAnchor?.kind === 'block'
+      && scriptController.activeInsertAnchor.blockId === insertPlacementTarget.blockId
+      ? scriptController.activeInsertAnchor.position
+      : null;
+    if (currentPlacement === next) {
+      return;
+    }
     scriptController.requestInsert(
       next === 'before'
         ? createBeforeBlockAnchor(insertPlacementTarget.blockId)
@@ -500,6 +507,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     });
   }, []);
   const handleOpenTitleModal = () => {
+    if (isTitleModalOpen) {
+      setIsTitleModalOpen(false);
+      return;
+    }
     setTitleDraft(context?.title ?? '');
     setIsTitleModalOpen(true);
   };
@@ -507,6 +518,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     setIsTitleModalOpen(false);
   };
   const handleOpenStyleModal = () => {
+    if (isStyleModalOpen) {
+      setIsStyleModalOpen(false);
+      return;
+    }
     setStyleDraft(context?.style ?? '');
     setIsStyleModalOpen(true);
   };
@@ -541,7 +556,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     void scriptController.generateNextScene();
   }, [scriptController]);
   const handleGeneratePlotTwist = useCallback(() => {
-    setIsGenerateMenuOpen(false);
     onPlotTwist();
   }, [onPlotTwist]);
   const handleInsertSceneBeat = useCallback(() => {
@@ -772,7 +786,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 xl:justify-end max-[1100px]:w-full">
+              <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
                 <div className={headerActionRowsClass}>
                   <button
                     type="button"

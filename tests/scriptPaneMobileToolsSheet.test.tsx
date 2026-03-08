@@ -147,9 +147,7 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /plot twist/i }));
     expect(onPlotTwist).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Generate menu' })).toBeNull();
-    });
+    expect(screen.getByRole('dialog', { name: 'Generate menu' })).toBeTruthy();
   });
 
   it('opens the inline insert composer from the Generate menu scene action', async () => {
@@ -207,7 +205,41 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(audioButton.className).toContain('max-[640px]:w-10');
     expect(undoButton.className).toContain('h-9');
     expect(undoButton.className).toContain('max-[640px]:h-10');
+    expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('w-full');
     expect(container.textContent).toContain('•');
+  });
+
+  it('toggles title and style editors closed when their active triggers are clicked again', async () => {
+    render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
+
+    const editTitleButton = screen.getByRole('button', { name: 'Edit Title' });
+    fireEvent.click(editTitleButton);
+    expect(screen.getByRole('dialog', { name: 'Edit title' })).toBeTruthy();
+    fireEvent.click(editTitleButton);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit title' })).toBeNull();
+    });
+
+    const editStyleButton = screen.getByRole('button', { name: 'Edit Style' });
+    fireEvent.click(editStyleButton);
+    expect(screen.getByRole('dialog', { name: 'Edit style' })).toBeTruthy();
+    fireEvent.click(editStyleButton);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit style' })).toBeNull();
+    });
+  });
+
+  it('positions the style editor within the viewport shell above the header band', () => {
+    render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Style' }));
+    const dialog = screen.getByRole('dialog', { name: 'Edit style' });
+    const overlay = dialog.parentElement as HTMLElement;
+
+    expect(overlay.className).toContain('z-[110]');
+    expect(overlay.className).toContain('top-24');
+    expect(overlay.className).toContain('overflow-y-auto');
+    expect(dialog.className).toContain('max-h-[calc(100vh-8rem)]');
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {

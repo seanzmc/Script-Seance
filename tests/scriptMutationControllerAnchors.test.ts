@@ -43,6 +43,7 @@ const buildContext = (): StoryContext => ({
 
 const createControllerHarness = (context = buildContext()) => {
   const contextRef = { current: context as StoryContext | null };
+  const pushUndoAction = vi.fn();
 
   const controller = createScriptMutationController({
     applyContextMutation: (mutation) => {
@@ -57,7 +58,7 @@ const createControllerHarness = (context = buildContext()) => {
       return true;
     },
     clearRedo: vi.fn(),
-    pushUndoAction: vi.fn(),
+    pushUndoAction,
     resolveCharacterName: (value) => value,
     normalizeSceneCharacters: (scene) => scene,
     handleAiError: vi.fn(),
@@ -77,7 +78,8 @@ const createControllerHarness = (context = buildContext()) => {
 
   return {
     controller,
-    contextRef
+    contextRef,
+    pushUndoAction
   };
 };
 
@@ -114,5 +116,37 @@ describe('script mutation controller anchors', () => {
 
     const sceneOneBlocks = (contextRef.current as StoryContext).scenes[0].blocks.map((block) => block.id);
     expect(sceneOneBlocks).toEqual(['block-1', 'block-2', 'block-legacy']);
+  });
+
+  it('records block deletion as a normal undoable history action', () => {
+    const { controller, contextRef, pushUndoAction } = createControllerHarness();
+    controller.deleteBlock('scene-1', 'block-2');
+
+    const currentContext = contextRef.current as StoryContext;
+    expect(currentContext.scenes[0].blocks.map((block) => block.id)).toEqual(['block-1']);
+
+    const deleteAction = pushUndoAction.mock.calls[0]?.[0];
+    expect(deleteAction).toMatchObject({
+      type: 'block-delete',
+      sceneId: 'scene-1',
+      index: 1,
+      block: expect.objectContaining({ id: 'block-2' })
+    });
+
+    const undoResult = controller.applySnapshot({
+      context: currentContext,
+      action: deleteAction,
+      mode: 'undo'
+    });
+    expect(undoResult.applied).toBe(true);
+    expect(undoResult.nextContext.scenes[0].blocks.map((block) => block.id)).toEqual(['block-1', 'block-2']);
+
+    const redoResult = controller.applySnapshot({
+      context: undoResult.nextContext,
+      action: deleteAction,
+      mode: 'redo'
+    });
+    expect(redoResult.applied).toBe(true);
+    expect(redoResult.nextContext.scenes[0].blocks.map((block) => block.id)).toEqual(['block-1']);
   });
 });

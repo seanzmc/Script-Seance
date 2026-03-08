@@ -39,6 +39,31 @@ afterEach(() => {
 });
 
 describe('AnchoredPopover', () => {
+  it('stays visually suppressed until positioned coordinates are ready', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+    stubRect(anchor, createRect({ top: 220, left: 180, width: 40, height: 20 }));
+
+    render(
+      <AnchoredPopover open anchor={anchor}>
+        <div>Hidden until anchored</div>
+      </AnchoredPopover>
+    );
+
+    const wrapper = screen.getByText('Hidden until anchored').parentElement as HTMLElement;
+    expect(wrapper.style.opacity).toBe('0');
+
+    stubRect(wrapper, createRect({ top: 0, left: 0, width: 180, height: 120 }));
+    window.dispatchEvent(new Event('resize'));
+
+    await waitFor(() => {
+      expect(wrapper.style.opacity).toBe('1');
+    });
+  });
+
   it('clamps popovers below the provided top boundary', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });

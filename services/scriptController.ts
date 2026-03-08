@@ -52,6 +52,7 @@ export type InsertableBlockRef = {
 
 export type ScriptMutationAction =
   | { type: 'block'; sceneId: string; block: ScriptBlock; index: number }
+  | { type: 'block-delete'; sceneId: string; block: ScriptBlock; index: number }
   | { type: 'scene'; scene: Scene; index: number }
   | { type: 'scene-heading'; sceneId: string; previousHeading: string; nextHeading: string };
 
@@ -331,6 +332,23 @@ export const createScriptMutationController = (
         nextScenes.splice(sceneIndex, 1);
         return { nextContext: { ...context, scenes: nextScenes }, applied: true };
       }
+      if (action.type === 'block-delete') {
+        const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
+        if (sceneIndex === -1) {
+          return { nextContext: context, applied: false };
+        }
+        const scene = context.scenes[sceneIndex];
+        const alreadyExists = scene.blocks.some((block) => block.id === action.block.id);
+        if (alreadyExists) {
+          return { nextContext: context, applied: false };
+        }
+        const nextBlocks = [...scene.blocks];
+        const insertIndex = Math.min(action.index, nextBlocks.length);
+        nextBlocks.splice(insertIndex, 0, action.block);
+        const nextScenes = [...context.scenes];
+        nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
+        return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+      }
 
       const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
       if (sceneIndex === -1) {
@@ -366,6 +384,22 @@ export const createScriptMutationController = (
       const nextScenes = [...context.scenes];
       const insertIndex = Math.min(action.index, nextScenes.length);
       nextScenes.splice(insertIndex, 0, action.scene);
+      return { nextContext: { ...context, scenes: nextScenes }, applied: true };
+    }
+    if (action.type === 'block-delete') {
+      const sceneIndex = context.scenes.findIndex((scene) => scene.id === action.sceneId);
+      if (sceneIndex === -1) {
+        return { nextContext: context, applied: false };
+      }
+      const scene = context.scenes[sceneIndex];
+      const blockIndex = scene.blocks.findIndex((block) => block.id === action.block.id);
+      if (blockIndex === -1) {
+        return { nextContext: context, applied: false };
+      }
+      const nextBlocks = [...scene.blocks];
+      nextBlocks.splice(blockIndex, 1);
+      const nextScenes = [...context.scenes];
+      nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
       return { nextContext: { ...context, scenes: nextScenes }, applied: true };
     }
 
@@ -684,34 +718,11 @@ export const createScriptMutationController = (
     if (!didMutate || deletedBlock === null || deletedIndex < 0) {
       return;
     }
-    const restoredBlock = deletedBlock;
-    const restoredIndex = deletedIndex;
-
-    deps.setToast({
-      message: 'Block deleted',
-      onUndo: () => {
-        deps.clearRedo();
-        deps.applyContextMutation((previous) => {
-          if (!previous) return previous;
-          const sceneIndex = previous.scenes.findIndex((scene) => scene.id === sceneId);
-          if (sceneIndex === -1) return previous;
-
-          const scene = previous.scenes[sceneIndex];
-          if (scene.blocks.some((block) => block.id === restoredBlock.id)) {
-            return previous;
-          }
-
-          const nextBlocks = [...scene.blocks];
-          const insertIndex = Math.min(restoredIndex, nextBlocks.length);
-          nextBlocks.splice(insertIndex, 0, restoredBlock);
-          const nextScenes = [...previous.scenes];
-          nextScenes[sceneIndex] = { ...scene, blocks: nextBlocks };
-          return { ...previous, scenes: nextScenes };
-        });
-        deps.setInsertScrollTargetId(restoredBlock.id);
-        deps.setInsertScrollToken((token) => token + 1);
-        deps.setToast(null);
-      }
+    deps.pushUndoAction({
+      type: 'block-delete',
+      sceneId,
+      block: deletedBlock,
+      index: deletedIndex
     });
   };
 

@@ -697,7 +697,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         <div key={scene.id} id={`scene-${scene.id}`} className="script-scene mb-4">
           <div
             id={`scene-heading-${scene.id}`}
-            className={`script-scene-heading mb-2 border-x-0 border-b border-t-0 px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
+            className={`script-scene-heading mb-2 cursor-text select-text border-x-0 border-b border-t-0 px-4 py-3 font-extrabold uppercase tracking-[0.03em] text-[17px] transition-[background-color,box-shadow,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f1e7] ${
               isSelectedHeading && !activeInsertAnchor
                 ? 'border-slate-400 bg-slate-900/[0.08] shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
                 : 'border-gray-300 hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]'
@@ -739,7 +739,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                   ? `${isSelectedBlockFocused ? 'bg-sky-100/40' : 'bg-slate-900/[0.08]'} border-slate-400 shadow-[0_7px_18px_rgba(15,23,42,0.08)] focus-visible:border-blue-300 focus-visible:bg-blue-50/45 focus-visible:ring-1 focus-visible:ring-blue-300/70 focus-visible:shadow-[0_6px_16px_rgba(37,99,235,0.08)]`
                   : ''
               } ${
-                !isInsertMode ? 'cursor-pointer hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)]' : ''
+                !isInsertMode ? 'hover:border-blue-300 hover:shadow-[0_6px_16px_rgba(37,99,235,0.08)]' : ''
               }`;
               const blockStatusClasses = isError ? ERROR_CLASSES : '';
               const isLastBlock = index === blocks.length - 1;
@@ -754,13 +754,13 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
 
               if (block.type === BlockType.ACTION) {
                 content = (
-                  <div className="script-block-action mb-[5px] px-4 leading-relaxed">
+                  <div className="script-block-action mb-[5px] cursor-text select-text px-4 leading-relaxed">
                     {block.text}
                   </div>
                 );
               } else if (block.type === BlockType.DIALOGUE) {
                 content = (
-                  <div className="script-block-dialogue max-w-md mx-auto text-center">
+                  <div className="script-block-dialogue mx-auto max-w-md cursor-text select-text text-center">
                     <div className="script-dialogue-character mt-[5px] mb-0 uppercase font-bold tracking-wider">
                       {getDisplayCharacter(block.character)}
                     </div>
@@ -774,7 +774,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                 );
               } else if (block.type === BlockType.TRANSITION) {
                 content = (
-                  <div className="script-block-transition text-right uppercase font-bold pr-4">
+                  <div className="script-block-transition cursor-text select-text pr-4 text-right font-bold uppercase">
                     {block.text}
                   </div>
                 );
