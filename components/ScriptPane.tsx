@@ -31,6 +31,7 @@ import {
   Loader2,
   Pencil,
   PlusCircle,
+  ShieldCheck,
   Sparkles,
   Speech,
   Trash2,
@@ -198,11 +199,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerMetaLabelClass = 'font-semibold text-gray-100';
   const headerMetaItemClass = 'inline-flex items-center gap-2 whitespace-nowrap';
   const headerMetaBulletClass = 'text-gray-500';
-  const headerToolButtonClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[639px]:h-10 max-[639px]:w-10 max-[639px]:px-0';
-  const headerToolTextClass = 'max-[639px]:sr-only';
-  const headerPrimaryToolButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[639px]:h-10 max-[639px]:w-10 max-[639px]:px-0';
-  const headerAudioButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[639px]:h-10 max-[639px]:w-10 max-[639px]:px-0';
-  const headerActionRowsClass = 'flex flex-wrap items-center gap-2 max-[940px]:contents';
+  const headerToolButtonClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[940px]:h-10 max-[940px]:w-10 max-[940px]:px-0';
+  const headerToolTextClass = 'max-[940px]:sr-only';
+  const headerPrimaryToolButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[940px]:h-10 max-[940px]:w-10 max-[940px]:px-0';
+  const headerAudioButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[940px]:h-10 max-[940px]:w-10 max-[940px]:px-0';
+  const headerActionRowsClass = 'flex items-center gap-2 max-[940px]:contents';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
@@ -780,7 +781,20 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </span>
                   <span className={headerMetaItemClass}>
                     <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
-                    <span>Draft autosaves locally.</span>
+                    <span
+                      role="img"
+                      aria-label="Draft saves locally"
+                      tabIndex={0}
+                      className="group relative inline-flex items-center text-emerald-200/90 outline-none"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-[6] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                      >
+                        Draft saves locally
+                      </span>
+                    </span>
                   </span>
                   {autosaveError && (
                     <span className={headerMetaItemClass}>
@@ -791,7 +805,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                 </div>
               </div>
 
-              <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+              <div className="relative flex w-full items-center justify-end gap-2 max-[940px]:justify-center xl:w-auto xl:flex-col xl:items-end xl:justify-start">
                 <div className={headerActionRowsClass}>
                   <button
                     type="button"
@@ -891,7 +905,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     >
                       <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span className={headerToolTextClass}>GENERATE NEXT SCENE</span>
-                      <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[639px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[940px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isGenerateMenuOpen && (
                       <div
@@ -916,16 +930,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </button>
                 </div>
                 {isGenerating && (
-                  <div className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-100">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Writing
-                    <button
-                      type="button"
-                      onClick={onCancelGenerate}
-                      className="rounded-full border border-indigo-300/30 px-2 py-0.5 text-[9px] tracking-[0.16em] text-indigo-100 transition-colors hover:bg-indigo-400/10"
+                  <div className="pointer-events-none absolute right-0 top-full z-[6] mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2">
+                    <div
+                      aria-live="polite"
+                      className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-100 shadow-[0_14px_28px_rgba(15,23,42,0.24)]"
                     >
-                      Cancel
-                    </button>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Writing
+                      <button
+                        type="button"
+                        onClick={onCancelGenerate}
+                        className="rounded-full border border-indigo-300/30 px-2 py-0.5 text-[9px] tracking-[0.16em] text-indigo-100 transition-colors hover:bg-indigo-400/10"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

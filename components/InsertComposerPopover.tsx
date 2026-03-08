@@ -84,10 +84,6 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
         {isGenerating && <span className={paperPopoverStatusTextClassName}>Generating...</span>}
       </div>
 
-      <p className="mt-2 text-sm leading-relaxed text-gray-700">
-        Generated content is inserted directly into the script. Only rewrite shows a preview first.
-      </p>
-
       {showPlacementControls && onPlacementChange && (
         <div className="mt-3 rounded-xl border border-gray-200 bg-white/70 p-2.5 shadow-inner">
           <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">

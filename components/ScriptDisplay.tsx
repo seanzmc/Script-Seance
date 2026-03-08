@@ -935,7 +935,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
           <div
             data-selected-actions="true"
             data-testid={selectedTarget.kind === 'block' ? `selected-block-actions-${selectedTarget.blockId}` : `selected-heading-actions-${selectedTarget.sceneId}`}
-            className="flex items-center gap-1.5 rounded-full border border-[#d6cdbd] bg-[#f6f1e7] px-2.5 py-1.5 shadow-[0_16px_32px_rgba(15,23,42,0.18)]"
+            className="flex items-center gap-1.5 rounded-full border border-[#cdbc9f] bg-[#fbf7ef] px-2.5 py-1.5 shadow-[0_18px_36px_rgba(15,23,42,0.22)] ring-1 ring-[#e8dcc9]"
           >
             {selectedTarget.kind === 'block' ? (
               <>

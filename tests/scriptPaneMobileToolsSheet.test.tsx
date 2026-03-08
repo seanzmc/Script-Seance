@@ -190,24 +190,41 @@ describe('ScriptPane header generation and audio drawer', () => {
     const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
     const audioButton = screen.getByRole('button', { name: 'Open audio drawer' });
     const undoButton = screen.getByRole('button', { name: 'Undo' });
-    const metadataRow = screen.getByText('Draft autosaves locally.').closest('div') as HTMLElement;
+    const autosaveIndicator = screen.getByLabelText('Draft saves locally');
+    const metadataRow = autosaveIndicator.closest('div') as HTMLElement;
 
     expect(editTitleButton.className).toBe(editStyleButton.className);
     expect(screen.getByText('1 scenes')).toBeTruthy();
     expect(screen.getByText('Genre:')).toBeTruthy();
     expect(screen.getByText('Style:')).toBeTruthy();
-    expect(screen.getByText('Draft autosaves locally.')).toBeTruthy();
+    expect(screen.queryByText('Draft autosaves locally.')).toBeNull();
+    expect(screen.getByText('Draft saves locally')).toBeTruthy();
     expect(metadataRow.textContent).toContain('•');
     expect(metadataRow.textContent).not.toContain('/');
     expect(generateButton.className).toContain('sm:h-12');
-    expect(generateButton.className).toContain('max-[639px]:w-10');
+    expect(generateButton.className).toContain('max-[940px]:w-10');
     expect(audioButton.className).toContain('sm:h-12');
-    expect(audioButton.className).toContain('max-[639px]:w-10');
+    expect(audioButton.className).toContain('max-[940px]:w-10');
     expect(undoButton.className).toContain('h-9');
-    expect(undoButton.className).toContain('max-[639px]:h-10');
+    expect(undoButton.className).toContain('max-[940px]:h-10');
     expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('w-full');
+    expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('xl:flex-col');
+    expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('xl:items-end');
     expect(generateButton.parentElement?.parentElement?.className).toContain('max-[940px]:contents');
+    expect(generateButton.parentElement?.parentElement?.className).not.toContain('flex-wrap');
+    expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('max-[940px]:justify-center');
     expect(container.textContent).toContain('•');
+  });
+
+  it('anchors the header writing pill outside the action-row flex flow', () => {
+    render(<ScriptPane {...createProps({ isGenerating: true })} />);
+
+    const writingLabel = screen.getByText('Writing');
+    const writingPill = writingLabel.closest('[aria-live="polite"]') as HTMLElement;
+    expect(writingPill.className).toContain('pointer-events-auto');
+    expect(writingPill.parentElement?.className).toContain('absolute');
+    expect(writingPill.parentElement?.className).toContain('top-full');
+    expect(writingPill.parentElement?.className).toContain('max-[940px]:left-1/2');
   });
 
   it('toggles title and style editors closed when their active triggers are clicked again', async () => {

@@ -182,6 +182,7 @@ describe('ScriptPane block interactions', () => {
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     expect(within(composer).getAllByRole('tab')[0]?.textContent).toBe('Action');
+    expect(within(composer).queryByText('Only rewrite shows a preview first.')).toBeNull();
     expect(within(composer).queryByLabelText('Character')).toBeNull();
 
     fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
@@ -390,7 +391,10 @@ describe('ScriptPane block interactions', () => {
     expect(block.querySelector('.script-block-action')?.className).toContain('cursor-text');
 
     fireEvent.click(block);
-    expect(screen.getByTestId('selected-block-actions-block-1')).toBeTruthy();
+    const selectedActions = screen.getByTestId('selected-block-actions-block-1');
+    expect(selectedActions).toBeTruthy();
+    expect(selectedActions.className).toContain('ring-1');
+    expect(selectedActions.className).toContain('bg-[#fbf7ef]');
     expect(block.className).toContain('bg-sky-100/40');
 
     fireEvent.mouseDown(document.body);
