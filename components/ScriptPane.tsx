@@ -198,23 +198,29 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerMetaLabelClass = 'font-semibold text-gray-100';
   const headerMetaItemClass = 'inline-flex items-center gap-2 whitespace-nowrap';
   const headerMetaBulletClass = 'text-gray-500';
-  const headerToolButtonClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
-  const headerToolTextClass = 'max-[640px]:sr-only';
-  const headerPrimaryToolButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
-  const headerAudioButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[640px]:h-10 max-[640px]:w-10 max-[640px]:px-0';
-  const headerActionRowsClass = 'flex flex-wrap items-center gap-2';
+  const headerToolButtonClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 max-[639px]:h-10 max-[639px]:w-10 max-[639px]:px-0';
+  const headerToolTextClass = 'max-[639px]:sr-only';
+  const headerPrimaryToolButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[639px]:h-10 max-[639px]:w-10 max-[639px]:px-0';
+  const headerAudioButtonClass = 'inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm max-[639px]:h-10 max-[639px]:w-10 max-[639px]:px-0';
+  const headerActionRowsClass = 'flex flex-wrap items-center gap-2 max-[940px]:contents';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
-  const generationIndicator = isGenerating ? (
-    <div className="text-center text-gray-400 animate-pulse flex flex-col items-center gap-2">
-      <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-      <span className="text-base font-medium">Running writers room simulation...</span>
-      <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
-        Cancel
-      </Button>
+  const generationIndicator = (
+    <div className="min-h-[2.5rem]">
+      {isGenerating ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-400/20 bg-indigo-500/5 px-3 py-2 text-[11px] text-indigo-100">
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+            <span className="font-medium">Working on your request...</span>
+          </span>
+          <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
+            Cancel
+          </Button>
+        </div>
+      ) : null}
     </div>
-  ) : null;
+  );
   const showStartScreen = !context && !isGenerating;
   const showInitialGeneration = !context && isGenerating;
   const errorBanner = error ? (
@@ -597,8 +603,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <div className="grid gap-2">
         <Button
           onClick={handleGenerateNext}
-          loading={isGenerating}
-          disabled={isPlaying}
+          disabled={isPlaying || isGenerating}
           className="justify-start shadow-lg shadow-indigo-500/20"
           title="Generate the next section of the screenplay"
         >
@@ -886,7 +891,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     >
                       <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span className={headerToolTextClass}>GENERATE NEXT SCENE</span>
-                      <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[640px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[639px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isGenerateMenuOpen && (
                       <div

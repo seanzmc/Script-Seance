@@ -36,8 +36,8 @@ export interface InsertComposerPopoverProps {
 }
 
 const BLOCK_TYPE_OPTIONS: Array<{ type: BlockType; label: string }> = [
-  { type: BlockType.HEADING, label: 'Scene Heading' },
   { type: BlockType.ACTION, label: 'Action' },
+  { type: BlockType.HEADING, label: 'Scene Heading' },
   { type: BlockType.DIALOGUE, label: 'Dialogue' },
   { type: BlockType.TRANSITION, label: 'Transition' }
 ];

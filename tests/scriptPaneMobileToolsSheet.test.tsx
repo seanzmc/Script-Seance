@@ -200,12 +200,13 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(metadataRow.textContent).toContain('•');
     expect(metadataRow.textContent).not.toContain('/');
     expect(generateButton.className).toContain('sm:h-12');
-    expect(generateButton.className).toContain('max-[640px]:w-10');
+    expect(generateButton.className).toContain('max-[639px]:w-10');
     expect(audioButton.className).toContain('sm:h-12');
-    expect(audioButton.className).toContain('max-[640px]:w-10');
+    expect(audioButton.className).toContain('max-[639px]:w-10');
     expect(undoButton.className).toContain('h-9');
-    expect(undoButton.className).toContain('max-[640px]:h-10');
+    expect(undoButton.className).toContain('max-[639px]:h-10');
     expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('w-full');
+    expect(generateButton.parentElement?.parentElement?.className).toContain('max-[940px]:contents');
     expect(container.textContent).toContain('•');
   });
 
@@ -240,6 +241,26 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(overlay.className).toContain('top-24');
     expect(overlay.className).toContain('overflow-y-auto');
     expect(dialog.className).toContain('max-h-[calc(100vh-8rem)]');
+  });
+
+  it('surfaces the style library above the style editor when browsing', () => {
+    render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Style' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse library' }));
+
+    const libraryDialog = screen.getByRole('dialog', { name: 'Style Library' });
+    const libraryOverlay = libraryDialog.parentElement as HTMLElement;
+    expect(libraryOverlay.className).toContain('z-[120]');
+  });
+
+  it('shows plot twist progress without shifting the generate button into loading mode', () => {
+    render(<ScriptPane {...createProps({ isGenerating: true })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+
+    expect(screen.getByText('Working on your request...')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /generate \/ continue writing/i }).getAttribute('aria-busy')).toBeNull();
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {

@@ -120,14 +120,14 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto px-4 py-4 sm:py-6">
       <div
         className="absolute inset-0 bg-black/72"
         onClick={onClose}
       />
       <div
         ref={modalRef}
-        className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border border-white/12 bg-slate-950 shadow-[0_26px_70px_rgba(2,6,23,0.72)]"
+        className="relative w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl border border-white/12 bg-slate-950 shadow-[0_26px_70px_rgba(2,6,23,0.72)] sm:max-h-[88vh]"
         role="dialog"
         aria-modal="true"
         aria-label={title}

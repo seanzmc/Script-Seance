@@ -181,6 +181,7 @@ describe('ScriptPane block interactions', () => {
 
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
+    expect(within(composer).getAllByRole('tab')[0]?.textContent).toBe('Action');
     expect(within(composer).queryByLabelText('Character')).toBeNull();
 
     fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));

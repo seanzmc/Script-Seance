@@ -252,4 +252,37 @@ describe('script view style editor', () => {
     expect(onPlotTwist).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog', { name: 'Generate menu' })).toBeTruthy();
   });
+
+  it('opens the style library as the active top layer from style editing', () => {
+    const context: StoryContext = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A detective uncovers a conspiracy.',
+      characters: ['Alex', 'Sam'],
+      style: 'Unhinged',
+      scenes: [
+        {
+          id: 'scene-1',
+          heading: 'INT. OFFICE - NIGHT',
+          summary: 'Alex studies evidence.',
+          blocks: [
+            {
+              id: 'block-1',
+              type: BlockType.ACTION,
+              text: 'Alex studies the evidence board.',
+              blockRevision: 1
+            }
+          ]
+        }
+      ]
+    };
+
+    render(<ScriptPane {...createPaneProps(context, vi.fn())} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /edit style/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse library' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Style Library' });
+    expect(dialog.parentElement?.className).toContain('z-[120]');
+  });
 });

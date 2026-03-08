@@ -47,10 +47,13 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
 }) => {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
+  const settleFrameRef = useRef<number | null>(null);
+  const lastMeasuredPositionRef = useRef<PopoverPosition | null>(null);
 
   useLayoutEffect(() => {
     if (!open || !anchor || typeof window === 'undefined') {
       setPosition(null);
+      lastMeasuredPositionRef.current = null;
       return;
     }
 
@@ -58,10 +61,10 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       anchor.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
 
-    const updatePosition = () => {
+    const measurePosition = (): PopoverPosition | null => {
       const anchorRect = anchor.getBoundingClientRect();
       const popoverNode = popoverRef.current;
-      if (!popoverNode) return;
+      if (!popoverNode) return null;
       const popoverRect = popoverNode.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
@@ -84,19 +87,45 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       const maxTop = viewportHeight - popoverRect.height - viewportPadding;
       const top = Math.min(Math.max(rawTop, minTop), Math.max(minTop, maxTop));
 
-      setPosition({ top, left, placement });
+      return { top, left, placement };
     };
 
-    const rafId = window.requestAnimationFrame(updatePosition);
+    const settleInitialPosition = () => {
+      const nextPosition = measurePosition();
+      if (!nextPosition) return;
+      const previousMeasured = lastMeasuredPositionRef.current;
+      const isStable = previousMeasured
+        && previousMeasured.top === nextPosition.top
+        && previousMeasured.left === nextPosition.left
+        && previousMeasured.placement === nextPosition.placement;
+      lastMeasuredPositionRef.current = nextPosition;
+      if (isStable) {
+        setPosition(nextPosition);
+        settleFrameRef.current = null;
+        return;
+      }
+      settleFrameRef.current = window.requestAnimationFrame(settleInitialPosition);
+    };
+
+    lastMeasuredPositionRef.current = null;
+    settleFrameRef.current = window.requestAnimationFrame(settleInitialPosition);
     const handleScrollOrResize = () => {
-      window.requestAnimationFrame(updatePosition);
+      window.requestAnimationFrame(() => {
+        const nextPosition = measurePosition();
+        if (!nextPosition) return;
+        lastMeasuredPositionRef.current = nextPosition;
+        setPosition(nextPosition);
+      });
     };
 
     window.addEventListener('resize', handleScrollOrResize);
     window.addEventListener('scroll', handleScrollOrResize, true);
 
     return () => {
-      window.cancelAnimationFrame(rafId);
+      if (settleFrameRef.current !== null) {
+        window.cancelAnimationFrame(settleFrameRef.current);
+        settleFrameRef.current = null;
+      }
       window.removeEventListener('resize', handleScrollOrResize);
       window.removeEventListener('scroll', handleScrollOrResize, true);
     };
