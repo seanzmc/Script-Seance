@@ -207,6 +207,22 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
+  const draftSaveIndicator = (
+    <span
+      role="img"
+      aria-label="Draft saves locally"
+      tabIndex={0}
+      className="group relative inline-flex items-center text-emerald-200/90 outline-none"
+    >
+      <ShieldCheck className="h-3.5 w-3.5" />
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-[6] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+      >
+        Draft saves locally
+      </span>
+    </span>
+  );
   const generationIndicator = (
     <div className="min-h-[2.5rem]">
       {isGenerating ? (
@@ -587,8 +603,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           placeholder="Suggest an action, beat, or tonal adjustment..."
           className={`${toolInputClass} h-24 resize-none`}
         />
-        <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-          <p className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>Keep prompts concise.</span>
             <button
               type="button"
@@ -597,8 +613,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             >
               Privacy
             </button>
-          </p>
-          {promptWarning && <span>Trim prompts.</span>}
+            <span className="whitespace-nowrap">{sceneCountLabel}</span>
+            {draftSaveIndicator}
+          </div>
+          {promptWarning && <span className="whitespace-nowrap">Trim prompts.</span>}
         </div>
       </div>
       <div className="grid gap-2">
@@ -757,9 +775,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
-                  <span className={headerMetaItemClass}>{sceneCountLabel}</span>
                   <span className={headerMetaItemClass}>
-                    <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
                     <span><span className={headerMetaLabelClass}>Genre:</span> {genreLabel}</span>
                   </span>
                   <span className={headerMetaItemClass}>
@@ -777,23 +793,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                           Edit Style
                         </button>
                       )}
-                    </span>
-                  </span>
-                  <span className={headerMetaItemClass}>
-                    <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
-                    <span
-                      role="img"
-                      aria-label="Draft saves locally"
-                      tabIndex={0}
-                      className="group relative inline-flex items-center text-emerald-200/90 outline-none"
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      <span
-                        role="tooltip"
-                        className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-[6] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                      >
-                        Draft saves locally
-                      </span>
                     </span>
                   </span>
                   {autosaveError && (

@@ -1,5 +1,5 @@
 import React, { createRef } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { SetupFormState } from '../components/SetupForm';
@@ -190,17 +190,17 @@ describe('ScriptPane header generation and audio drawer', () => {
     const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
     const audioButton = screen.getByRole('button', { name: 'Open audio drawer' });
     const undoButton = screen.getByRole('button', { name: 'Undo' });
-    const autosaveIndicator = screen.getByLabelText('Draft saves locally');
-    const metadataRow = autosaveIndicator.closest('div') as HTMLElement;
+    const metadataRow = screen.getByText('Genre:').closest('div') as HTMLElement;
 
     expect(editTitleButton.className).toBe(editStyleButton.className);
-    expect(screen.getByText('1 scenes')).toBeTruthy();
+    expect(screen.queryByText('1 scenes')).toBeNull();
     expect(screen.getByText('Genre:')).toBeTruthy();
     expect(screen.getByText('Style:')).toBeTruthy();
     expect(screen.queryByText('Draft autosaves locally.')).toBeNull();
-    expect(screen.getByText('Draft saves locally')).toBeTruthy();
-    expect(metadataRow.textContent).toContain('•');
-    expect(metadataRow.textContent).not.toContain('/');
+    expect(screen.queryByLabelText('Draft saves locally')).toBeNull();
+    expect(metadataRow.textContent).toContain('Genre:');
+    expect(metadataRow.textContent).toContain('Style:');
+    expect(metadataRow.textContent).not.toContain('1 scenes');
     expect(generateButton.className).toContain('sm:h-12');
     expect(generateButton.className).toContain('max-[940px]:w-10');
     expect(audioButton.className).toContain('sm:h-12');
@@ -214,6 +214,14 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(generateButton.parentElement?.parentElement?.className).not.toContain('flex-wrap');
     expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('max-[940px]:justify-center');
     expect(container.textContent).toContain('•');
+
+    fireEvent.click(generateButton);
+    const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
+
+    expect(within(generateMenu).getByText('1 scenes')).toBeTruthy();
+    expect(within(generateMenu).getByLabelText('Draft saves locally')).toBeTruthy();
+    expect(within(generateMenu).getByText('Draft saves locally')).toBeTruthy();
+    expect(within(generateMenu).getByRole('button', { name: 'Privacy' })).toBeTruthy();
   });
 
   it('anchors the header writing pill outside the action-row flex flow', () => {
