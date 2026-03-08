@@ -200,10 +200,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerMetaItemClass = 'inline-flex items-center gap-2 whitespace-nowrap';
   const headerMetaBulletClass = 'text-gray-500';
   const headerActionSlotClass = 'min-w-0 flex-1 xl:min-w-fit xl:flex-none';
-  const headerToolButtonClass = 'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 xl:w-auto max-[940px]:h-10 max-[940px]:px-0';
-  const headerToolTextClass = 'max-[940px]:sr-only';
-  const headerPrimaryToolButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[940px]:h-10 max-[940px]:px-0';
-  const headerAudioButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[940px]:h-10 max-[940px]:px-0';
+  const headerToolButtonClass = 'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 xl:w-auto max-[1279px]:px-2.5 max-[820px]:h-10 max-[820px]:px-0';
+  const headerToolTextClass = 'max-[820px]:sr-only';
+  const headerPrimaryToolButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
+  const headerAudioButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
   const headerActionRowsClass = 'flex w-full items-stretch gap-2 xl:w-auto xl:items-center';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
@@ -813,7 +813,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       onClick={onUndo}
                       disabled={!canUndo}
                       className={headerToolButtonClass}
-                      title={canUndo ? 'Undo last script change' : 'No action to undo'}
+                      title="Undo"
+                      aria-label="Undo"
                     >
                       <Undo2 className="h-3.5 w-3.5" />
                       <span className={headerToolTextClass}>Undo</span>
@@ -825,7 +826,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       onClick={() => onRedo?.()}
                       disabled={!canRedo || !onRedo}
                       className={headerToolButtonClass}
-                      title={canRedo ? 'Redo last undone script change' : 'No action to redo'}
+                      title="Redo"
+                      aria-label="Redo"
                     >
                       <Redo2 className="h-3.5 w-3.5" />
                       <span className={headerToolTextClass}>Redo</span>
@@ -837,7 +839,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       onClick={() => setIsExportMenuOpen((previous) => !previous)}
                       disabled={!canExport}
                       className={headerToolButtonClass}
-                      title="Open export menu"
+                      title="Export"
                       aria-haspopup="menu"
                       aria-expanded={isExportMenuOpen}
                       aria-label="Open export menu"
@@ -892,6 +894,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       onClick={onClearDraft}
                       disabled={!context}
                       className={`${headerToolButtonClass} border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 disabled:opacity-60`}
+                      title="Clear Draft"
+                      aria-label="Clear Draft"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       <span className={headerToolTextClass}>Clear Draft</span>
@@ -905,6 +909,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
                       disabled={isPlaying}
                       className={headerPrimaryToolButtonClass}
+                      title="Generate Next Scene"
                       aria-haspopup="dialog"
                       aria-expanded={isGenerateMenuOpen}
                       aria-label="Open generate menu"
@@ -928,6 +933,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       type="button"
                       onClick={() => setIsAudioDrawerOpen(true)}
                       className={headerAudioButtonClass}
+                      title="Audio"
                       aria-haspopup="dialog"
                       aria-expanded={isAudioDrawerOpen}
                       aria-label="Open audio drawer"

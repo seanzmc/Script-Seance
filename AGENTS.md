@@ -98,6 +98,10 @@ pnpm build
 - For UI/layout changes, include a short manual verification checklist when browser-visible behavior matters.
 - Do not claim a visual fix based only on unit/component tests if manual verification is still pending.
 - When a task names specific breakpoints, states, or interaction paths, validate those exact conditions.
+- For UI tasks involving breakpoints, overlays, or regression-prone interaction surfaces, add focused Playwright coverage when feasible.
+- Playwright does not replace manual verification for visual quality.
+- A task with browser-visible changes is not fully cleared until manual verification is either completed or explicitly marked pending.
+
 
 ## Code Quality Rules
 

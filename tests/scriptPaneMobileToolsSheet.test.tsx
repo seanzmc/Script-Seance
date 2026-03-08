@@ -190,6 +190,9 @@ describe('ScriptPane header generation and audio drawer', () => {
     const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
     const audioButton = screen.getByRole('button', { name: 'Open audio drawer' });
     const undoButton = screen.getByRole('button', { name: 'Undo' });
+    const exportButton = screen.getByRole('button', { name: 'Open export menu' });
+    const clearDraftButton = screen.getByRole('button', { name: 'Clear Draft' });
+    const redoButton = screen.getByRole('button', { name: 'Redo' });
     const metadataRow = screen.getByText('Genre:').closest('div') as HTMLElement;
 
     expect(editTitleButton.className).toBe(editStyleButton.className);
@@ -201,14 +204,23 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(metadataRow.textContent).toContain('Genre:');
     expect(metadataRow.textContent).toContain('Style:');
     expect(metadataRow.textContent).not.toContain('1 scenes');
+    expect(undoButton.getAttribute('title')).toBe('Undo');
+    expect(redoButton.getAttribute('title')).toBe('Redo');
+    expect(exportButton.getAttribute('title')).toBe('Export');
+    expect(clearDraftButton.getAttribute('title')).toBe('Clear Draft');
+    expect(generateButton.getAttribute('title')).toBe('Generate Next Scene');
+    expect(audioButton.getAttribute('title')).toBe('Audio');
     expect(generateButton.className).toContain('sm:h-12');
+    expect(generateButton.className).toContain('max-[1279px]:px-3');
     expect(generateButton.className).toContain('w-full');
     expect(generateButton.className).toContain('xl:w-auto');
     expect(audioButton.className).toContain('sm:h-12');
+    expect(audioButton.className).toContain('max-[1279px]:px-3');
     expect(audioButton.className).toContain('w-full');
     expect(audioButton.className).toContain('xl:w-auto');
     expect(undoButton.className).toContain('h-9');
-    expect(undoButton.className).toContain('max-[940px]:h-10');
+    expect(undoButton.className).toContain('max-[1279px]:px-2.5');
+    expect(undoButton.className).toContain('max-[820px]:h-10');
     expect(undoButton.className).toContain('w-full');
     expect(undoButton.className).toContain('xl:w-auto');
     expect(generateButton.parentElement?.parentElement?.parentElement?.className).toContain('w-full');
