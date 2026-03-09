@@ -105,6 +105,7 @@ export interface TtsVoice {
   gender?: string;
   category?: string;
   description?: string;
+  autoAssignable?: boolean;
 }
 
 export type VoiceCatalogState = 'idle' | 'loading' | 'ready' | 'error';

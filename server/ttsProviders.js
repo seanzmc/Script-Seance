@@ -1,21 +1,15 @@
 const AUDIO_FIELD_KEYS = ['audioBase64', 'audio_base64', 'audioContent', 'audio_content', 'audio'];
 const DISALLOWED_INWORLD_TAGS = new Set(['unknown', 'general']);
+const DISALLOWED_INWORLD_VOICE_KEYS = new Set(['hades']);
 const CURATED_INWORLD_VOICES = [
-  {
-    key: 'hades',
-    displayName: 'Hades',
-    gender: 'Masculine',
-    category: 'Deep',
-    description: 'Commanding and gruff male voice, think an omniscient narrator or castle guard',
-    tags: ['commanding', 'gruff']
-  },
   {
     key: 'mark',
     displayName: 'Mark',
     gender: 'Masculine',
     category: 'High Energy',
     description: 'Energetic, expressive man with a rapid-fire delivery',
-    tags: ['articulate', 'engaging']
+    tags: ['articulate', 'engaging', 'narrator', 'professional'],
+    autoAssignable: true
   },
   {
     key: 'olivia',
@@ -23,7 +17,8 @@ const CURATED_INWORLD_VOICES = [
     gender: 'Feminine',
     category: 'High Energy',
     description: 'Young, British female with an upbeat, friendly tone',
-    tags: ['cute', 'upbeat', 'british']
+    tags: ['cute', 'upbeat', 'british'],
+    autoAssignable: true
   },
   {
     key: 'theodore',
@@ -31,7 +26,8 @@ const CURATED_INWORLD_VOICES = [
     gender: 'Masculine',
     category: 'Deep',
     description: 'Gravelly male voice, with a time-worn quality',
-    tags: ['elderly', 'wise']
+    tags: ['elderly', 'wise'],
+    autoAssignable: true
   },
   {
     key: 'hana',
@@ -39,7 +35,8 @@ const CURATED_INWORLD_VOICES = [
     gender: 'Feminine',
     category: 'High Energy',
     description: 'Bright, expressive young female voice, perfect for storytelling, gaming, and playful dialogue',
-    tags: ['bright', 'playful']
+    tags: ['bright', 'playful'],
+    autoAssignable: true
   },
   {
     key: 'clive',
@@ -47,7 +44,8 @@ const CURATED_INWORLD_VOICES = [
     gender: 'Masculine',
     category: 'Calm',
     description: 'British-accented English-language male voice with a calm, cordial quality',
-    tags: ['calm', 'friendly', 'british']
+    tags: ['calm', 'friendly', 'british'],
+    autoAssignable: true
   },
   {
     key: 'blake',
@@ -55,7 +53,8 @@ const CURATED_INWORLD_VOICES = [
     gender: 'Masculine',
     category: 'Calm',
     description: 'Rich, intimate male voice, perfect for audiobooks, romantic content, and reassuring narration',
-    tags: ['intimate', 'romantic']
+    tags: ['intimate', 'romantic'],
+    autoAssignable: true
   },
   {
     key: 'luna',
@@ -63,7 +62,35 @@ const CURATED_INWORLD_VOICES = [
     gender: 'Feminine',
     category: 'Calm',
     description: 'Calm, relaxing female voice, perfect for meditations, sleep stories, and mindful content',
-    tags: ['calm', 'relaxing']
+    tags: ['calm', 'relaxing'],
+    autoAssignable: true
+  },
+  {
+    key: 'alex',
+    displayName: 'Alex',
+    gender: 'Masculine',
+    category: 'High Energy',
+    description: 'Energetic and expressive mid-range male voice, with a mildly nasal quality',
+    tags: ['energetic', 'expressive', 'mid-range'],
+    autoAssignable: true
+  },
+  {
+    key: 'ashley',
+    displayName: 'Ashley',
+    gender: 'Feminine',
+    category: 'Calm',
+    description: 'A warm, natural female voice',
+    tags: ['warm', 'natural'],
+    autoAssignable: true
+  },
+  {
+    key: 'dennis',
+    displayName: 'Dennis',
+    gender: 'Masculine',
+    category: 'Calm',
+    description: 'Middle-aged man with a smooth, calm and friendly voice',
+    tags: ['middle-aged', 'smooth', 'calm', 'friendly'],
+    autoAssignable: true
   }
 ];
 const CURATED_INWORLD_VOICE_BY_KEY = new Map(
@@ -74,6 +101,22 @@ const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const normalizeVoiceLookupKey = (value) =>
   normalizeString(value).toLowerCase().replace(/[^a-z0-9]+/g, '');
+const isDisallowedInworldVoice = (voice) => {
+  if (!voice || typeof voice !== 'object') {
+    return false;
+  }
+
+  const candidates = [
+    voice.id,
+    voice.voiceId,
+    voice.displayName,
+    voice.name,
+    voice.voiceName,
+    voice.key
+  ].map(normalizeVoiceLookupKey).filter(Boolean);
+
+  return candidates.some((candidate) => DISALLOWED_INWORLD_VOICE_KEYS.has(candidate));
+};
 const normalizeLanguageCode = (value) => normalizeString(value).toLowerCase();
 const isEnglishLanguageCode = (value) => {
   const code = normalizeLanguageCode(value);
@@ -356,7 +399,8 @@ const applyCuratedInworldMeta = (voice, spec) => {
     category: spec.category,
     description: spec.description,
     tags,
-    labels
+    labels,
+    autoAssignable: spec.autoAssignable === true
   };
 };
 
@@ -364,7 +408,9 @@ const limitInworldVoices = (voices, maxCount = 20) => {
   const normalizedMax = Number.isFinite(maxCount) && maxCount > 0
     ? Math.floor(maxCount)
     : 20;
-  const englishVoices = voices.filter((voice) => isEnglishVoice(voice));
+  const englishVoices = voices.filter((voice) => (
+    isEnglishVoice(voice) && !isDisallowedInworldVoice(voice)
+  ));
   const curated = [];
   const usedIds = new Set();
 
@@ -392,6 +438,9 @@ const normalizeInworldVoice = (voice, source, isCustom) => {
     return null;
   }
   const record = voice;
+  if (isDisallowedInworldVoice(record)) {
+    return null;
+  }
   const id = normalizeString(
     record.id ||
     record.voiceId ||
@@ -437,7 +486,8 @@ const normalizeInworldVoice = (voice, source, isCustom) => {
     isCustom,
     gender: gender || undefined,
     category: category || undefined,
-    description: description || undefined
+    description: description || undefined,
+    autoAssignable: undefined
   };
 };
 

@@ -1,6 +1,6 @@
 const NARRATOR_FRIENDLY_LABELS = new Set(['narrator', 'calm', 'neutral', 'professional']);
 
-export const DEFAULT_NARRATOR_VOICE_KEY = 'hades';
+export const DEFAULT_NARRATOR_VOICE_KEY = 'mark';
 
 export const DEFAULT_VOICE_CONFIG = Object.freeze({
   speed: 1,

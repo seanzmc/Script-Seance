@@ -6,6 +6,7 @@ import {
   normalizeInworldVoice,
   dedupeVoices
 } from '../server/ttsProviders.js';
+import { resolveDefaultNarratorVoiceId } from '../shared/voiceDefaults.js';
 
 describe('ttsProviders', () => {
   it('extracts nested audio payload fragments', () => {
@@ -134,7 +135,7 @@ describe('ttsProviders', () => {
     expect(voiceA?.labels).toEqual(['expressive']);
   });
 
-  it('curates Inworld voice catalog to the supported eight voices with metadata', () => {
+  it('curates Inworld voice catalog to the supported selectable voices with metadata', () => {
     const sampleVoices = [
       normalizeInworldVoice({ id: 'v-1', displayName: 'Alex', language: 'en-US' }, 'inworld-premade', false),
       normalizeInworldVoice({ id: 'v-2', displayName: 'Hades', language: 'en-US' }, 'inworld-premade', false),
@@ -144,25 +145,51 @@ describe('ttsProviders', () => {
       normalizeInworldVoice({ id: 'v-6', displayName: 'Theodore', language: 'en-US' }, 'inworld-premade', false),
       normalizeInworldVoice({ id: 'v-7', displayName: 'Hana', language: 'en-US' }, 'inworld-premade', false),
       normalizeInworldVoice({ id: 'v-8', displayName: 'Clive', language: 'en-US' }, 'inworld-premade', false),
-      normalizeInworldVoice({ id: 'v-9', displayName: 'Blake', language: 'en-US' }, 'inworld-premade', false)
+      normalizeInworldVoice({ id: 'v-9', displayName: 'Blake', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-10', displayName: 'Ashley', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-11', displayName: 'Dennis', language: 'en-US' }, 'inworld-premade', false)
     ].filter(Boolean);
 
-    const limited = limitInworldVoices(sampleVoices, 8);
+    const limited = limitInworldVoices(sampleVoices, 10);
     expect(limited.map((voice) => voice.displayName)).toEqual([
-      'Hades',
       'Mark',
       'Olivia',
       'Theodore',
       'Hana',
       'Clive',
       'Blake',
-      'Luna'
+      'Luna',
+      'Alex',
+      'Ashley',
+      'Dennis'
     ]);
 
-    const hades = limited[0];
-    expect(hades.gender).toBe('Masculine');
-    expect(hades.category).toBe('Deep');
-    expect(hades.tags).toEqual(expect.arrayContaining(['commanding', 'gruff']));
-    expect(hades.labels).toEqual(expect.arrayContaining(['commanding', 'gruff']));
+    const mark = limited[0];
+    expect(mark.gender).toBe('Masculine');
+    expect(mark.category).toBe('High Energy');
+    expect(mark.autoAssignable).toBe(true);
+    expect(mark.tags).toEqual(expect.arrayContaining(['articulate', 'engaging', 'narrator', 'professional']));
+    expect(mark.labels).toEqual(expect.arrayContaining(['narrator', 'professional']));
+  });
+
+  it('drops disallowed Hades voices before curation so they cannot re-enter the usable catalog', () => {
+    const sampleVoices = [
+      normalizeInworldVoice({ id: 'v-1', displayName: 'Mark', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'v-2', displayName: 'Hades', language: 'en-US' }, 'inworld-premade', false),
+      normalizeInworldVoice({ id: 'Hades', language: 'en-US' }, 'inworld-premade', false)
+    ].filter(Boolean);
+
+    const limited = limitInworldVoices(sampleVoices, 10);
+    expect(limited.map((voice) => voice.displayName)).toEqual(['Mark']);
+  });
+
+  it('resolves Mark as the default narrator voice', () => {
+    const voices = [
+      { id: 'voice-1', displayName: 'Olivia', labels: ['feminine'], source: 'inworld-premade', isCustom: false },
+      { id: 'voice-2', displayName: 'Mark', labels: ['narrator', 'professional'], source: 'inworld-premade', isCustom: false },
+      { id: 'voice-3', displayName: 'Dennis', labels: ['calm'], source: 'inworld-premade', isCustom: false }
+    ];
+
+    expect(resolveDefaultNarratorVoiceId(voices)).toBe('voice-2');
   });
 });
