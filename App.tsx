@@ -333,7 +333,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [suggestedTitle, setSuggestedTitle] = useState<string | null>(null);
-  const [isSuggestingTitle, setIsSuggestingTitle] = useState(false);
+  const [, setIsSuggestingTitle] = useState(false);
   const [suggestedTitleDismissed, setSuggestedTitleDismissed] = useState(false);
   const [promptDebugTraces, setPromptDebugTraces] = useState<PromptDebugTrace[]>([]);
   const [isPromptDebugEnabled, setIsPromptDebugEnabled] = useState(false);
@@ -351,7 +351,7 @@ export default function App() {
   const hasManualTitleRef = useRef(false);
 
   const [setupState, setSetupState] = useState<SetupFormState>(DEFAULT_SETUP_STATE);
-  const [insertCompleteToken, setInsertCompleteToken] = useState(0);
+  const [, setInsertCompleteToken] = useState(0);
   const [insertScrollToken, setInsertScrollToken] = useState(0);
   const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('setup');
@@ -1512,16 +1512,6 @@ export default function App() {
     });
   }, [applyContextMutation, applySetupStateMutation]);
 
-  const handleUseSuggestedTitle = useCallback(() => {
-    if (!suggestedTitle) return;
-    applyTitle(suggestedTitle, 'user');
-    setSuggestedTitleDismissed(true);
-  }, [applyTitle, suggestedTitle]);
-
-  const handleDismissSuggestedTitle = useCallback(() => {
-    setSuggestedTitleDismissed(true);
-  }, []);
-
   const handlePlay = () => {
     if (!context || allBlocks.length === 0) return;
     playScript(allBlocks);
@@ -1790,12 +1780,6 @@ export default function App() {
           context={context}
           titleInputRef={titleInputRef}
           onTitleChange={handleTitleChange}
-          suggestedTitle={suggestedTitle}
-          isSuggestingTitle={isSuggestingTitle}
-          suggestedTitleDismissed={suggestedTitleDismissed}
-          onUseSuggestedTitle={handleUseSuggestedTitle}
-          onDismissSuggestedTitle={handleDismissSuggestedTitle}
-          onClearDraft={handleClearDraft}
           autosaveError={autosaveError}
           error={error}
           userInstruction={userInstruction}
@@ -1806,9 +1790,7 @@ export default function App() {
           onRedo={handleRedo}
           canUndo={canUndo}
           canRedo={canRedo}
-          insertCompleteToken={insertCompleteToken}
           onChangeSpeaker={handleChangeSpeaker}
-          onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
           onGenerateRewritePreview={handleGenerateRewritePreview}
           onApplyRewritePreview={handleApplyRewritePreview}
           onDeleteBlock={handleDeleteBlock}
@@ -1824,11 +1806,7 @@ export default function App() {
           blockStatuses={blockStatuses}
           showHighlights={showHighlights}
           autoScroll={autoScroll}
-          onOpenPrivacy={openPrivacy}
           onSaveStyle={handleSaveStyle}
-          onExportTxt={handleDownload}
-          onExportPdf={handleExportPdf}
-          canExport={Boolean(context)}
           insertScrollTargetId={insertScrollTargetId}
           insertScrollToken={insertScrollToken}
         />

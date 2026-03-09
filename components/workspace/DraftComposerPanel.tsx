@@ -13,7 +13,6 @@ export interface DraftComposerPanelProps {
   isGenerating: boolean;
   isPlaying: boolean;
   onCancelGenerate: () => void;
-  sceneCount: number;
   error: string | null;
   insertSceneBeatDisabled: boolean;
 }
@@ -27,7 +26,6 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
   isGenerating,
   isPlaying,
   onCancelGenerate,
-  sceneCount,
   error,
   insertSceneBeatDisabled
 }) => {
@@ -45,12 +43,9 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
               Keep the prompt short and directional, then continue writing or branch with a twist.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-400">
-            <span className="whitespace-nowrap">{sceneCount} {sceneCount === 1 ? 'scene' : 'scenes'}</span>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-emerald-200/85">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Draft saves locally
-            </span>
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-emerald-200/85">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Draft saves locally
           </div>
         </div>
 
@@ -72,16 +67,16 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
             className="h-24 w-full resize-none rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-gray-100 shadow-inner outline-none placeholder:text-gray-500 focus:ring-1 focus:ring-indigo-500"
           />
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500">
-            <span>Visible drafting controls now replace the hidden generate menu.</span>
+            <span>Visible drafting controls replace the old hidden menu.</span>
             {promptWarning && <span>Trim prompts to keep generation focused.</span>}
           </div>
         </div>
 
-        <div className="grid gap-2 lg:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           <Button
             onClick={onGenerateNext}
             disabled={isPlaying || isGenerating}
-            className="justify-start shadow-lg shadow-indigo-500/20"
+            className="justify-start shadow-lg shadow-indigo-500/20 sm:col-span-2 xl:col-span-1"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
             Continue Writing

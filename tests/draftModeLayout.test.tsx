@@ -1,8 +1,7 @@
 import React, { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DraftMode } from '../components/workspace/DraftMode';
-import type { ScriptPaneProps } from '../components/ScriptPane';
+import { DraftMode, type DraftModeProps } from '../components/workspace/DraftMode';
 import { BlockType, StoryContext } from '../types';
 
 const contextFixture: StoryContext = {
@@ -42,16 +41,10 @@ const contextFixture: StoryContext = {
   ]
 };
 
-const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps => ({
+const createProps = (overrides: Partial<DraftModeProps> = {}): DraftModeProps => ({
   context: contextFixture,
   titleInputRef: createRef<HTMLInputElement>(),
   onTitleChange: vi.fn(),
-  suggestedTitle: null,
-  isSuggestingTitle: false,
-  suggestedTitleDismissed: false,
-  onUseSuggestedTitle: vi.fn(),
-  onDismissSuggestedTitle: vi.fn(),
-  onClearDraft: vi.fn(),
   autosaveError: null,
   error: null,
   userInstruction: 'Lean harder into dread.',
@@ -62,9 +55,7 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onRedo: vi.fn(),
   canUndo: true,
   canRedo: true,
-  insertCompleteToken: 0,
   onChangeSpeaker: vi.fn(),
-  onInsertError: vi.fn(),
   onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
@@ -74,10 +65,7 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   blockStatuses: {},
   showHighlights: true,
   autoScroll: false,
-  onOpenPrivacy: vi.fn(),
-  onExportTxt: vi.fn(),
-  onExportPdf: vi.fn(),
-  canExport: true,
+  onSaveStyle: vi.fn(),
   insertScrollTargetId: null,
   insertScrollToken: 0,
   ...overrides
@@ -124,6 +112,11 @@ describe('DraftMode layout', () => {
     const onInstructionChange = vi.fn();
     render(<DraftMode {...createProps({ onGenerateNext, onInstructionChange })} />);
 
+    expect(screen.getByText('Draft Workspace')).toBeTruthy();
+    expect(screen.getByText('Current')).toBeTruthy();
+    expect(screen.getAllByText('EXT. PIER - DAWN').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeTruthy();
     expect(screen.getByText('Draft Composer')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Draft prompt'), {
       target: { value: 'Push into the next confrontation.' }

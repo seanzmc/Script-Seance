@@ -1,7 +1,7 @@
-import React, { createRef } from 'react';
+import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
+import { ScriptPane, type DraftCanvasChromeBridge, type ScriptPaneProps } from '../components/ScriptPane';
 import { BlockType, ScriptAnchor, StoryContext } from '../types';
 
 const contextFixture: StoryContext = {
@@ -58,27 +58,9 @@ const contextWithEmptySecondScene: StoryContext = {
 
 const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps => ({
   context: contextFixture,
-  titleInputRef: createRef<HTMLInputElement>(),
-  onTitleChange: vi.fn(),
-  suggestedTitle: null,
-  isSuggestingTitle: false,
-  suggestedTitleDismissed: false,
-  onUseSuggestedTitle: vi.fn(),
-  onDismissSuggestedTitle: vi.fn(),
-  onClearDraft: vi.fn(),
-  autosaveError: null,
   error: null,
-  userInstruction: '',
-  onInstructionChange: vi.fn(),
   onGenerateNext: vi.fn(),
-  onPlotTwist: vi.fn(),
-  onUndo: vi.fn(),
-  onRedo: vi.fn(),
-  canUndo: true,
-  canRedo: true,
-  insertCompleteToken: 0,
   onChangeSpeaker: vi.fn(),
-  onInsertError: vi.fn(),
   onGenerateRewritePreview: vi.fn(async () => 'A sharper rewrite lands.'),
   onApplyRewritePreview: vi.fn(),
   onDeleteBlock: vi.fn(),
@@ -94,10 +76,6 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   blockStatuses: {},
   showHighlights: true,
   autoScroll: false,
-  onOpenPrivacy: vi.fn(),
-  onExportTxt: vi.fn(),
-  onExportPdf: vi.fn(),
-  canExport: true,
   insertScrollTargetId: null,
   insertScrollToken: 0,
   ...overrides
@@ -332,9 +310,19 @@ describe('ScriptPane block interactions', () => {
 
   it('routes visible composer insert scene action through the same anchor insert callback', async () => {
     const onInsertAtAnchor = vi.fn();
-    render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);
+    let registeredBridge: DraftCanvasChromeBridge | null = null;
+    render(
+      <ScriptPane
+        {...createProps({
+          onInsertAtAnchor,
+          onChromeBridgeChange: (bridge) => {
+            registeredBridge = bridge;
+          }
+        })}
+      />
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: /insert scene \/ new beat/i }));
+    registeredBridge?.openInsertSceneBeat();
 
     const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An ending beat closes the scene.' } });

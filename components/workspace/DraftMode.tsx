@@ -1,10 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { List } from 'lucide-react';
-import { ScriptPane, ScriptPaneProps } from '../ScriptPane';
+import { STYLE_PRESETS } from '../SetupForm';
+import { ScriptPane, type DraftCanvasChromeBridge, type ScriptPaneProps } from '../ScriptPane';
+import { StyleEditModal } from '../StyleEditModal';
+import { TitleEditModal } from '../TitleEditModal';
+import { DraftComposerPanel } from './DraftComposerPanel';
+import { DraftMetaStrip } from './DraftMetaStrip';
 import { DraftOutlinePanel } from './DraftOutlinePanel';
 import type { Scene } from '../../types';
 
-export type DraftModeProps = ScriptPaneProps;
+export interface DraftModeProps extends ScriptPaneProps {
+  titleInputRef: React.RefObject<HTMLInputElement>;
+  onTitleChange: (title: string) => void;
+  onSaveStyle?: (style: string) => void;
+  autosaveError: string | null;
+  userInstruction: string;
+  onInstructionChange: (value: string) => void;
+  onPlotTwist: () => void;
+  onUndo: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+}
 
 const findSceneIdForBlock = (scenes: Scene[], blockId: string | null) => {
   if (!blockId) return null;
@@ -13,9 +30,34 @@ const findSceneIdForBlock = (scenes: Scene[], blockId: string | null) => {
 };
 
 export const DraftMode: React.FC<DraftModeProps> = (props) => {
-  const { context, currentBlockId, insertScrollTargetId } = props;
+  const {
+    context,
+    currentBlockId,
+    insertScrollTargetId,
+    titleInputRef,
+    onTitleChange,
+    onSaveStyle,
+    userInstruction,
+    onInstructionChange,
+    onGenerateNext,
+    onPlotTwist,
+    onUndo,
+    onRedo,
+    canUndo,
+    canRedo,
+    autosaveError,
+    error,
+    isGenerating,
+    isPlaying,
+    onCancelGenerate
+  } = props;
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [lastNavigatedSceneId, setLastNavigatedSceneId] = useState<string | null>(null);
+  const [canvasChromeBridge, setCanvasChromeBridge] = useState<DraftCanvasChromeBridge | null>(null);
+  const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
+  const [styleDraft, setStyleDraft] = useState('');
   const scenes = useMemo(() => context?.scenes ?? [], [context]);
   const sceneIds = useMemo(() => scenes.map((scene) => scene.id), [scenes]);
   const currentBlockSceneId = useMemo(
@@ -27,12 +69,28 @@ export const DraftMode: React.FC<DraftModeProps> = (props) => {
     [insertScrollTargetId, scenes]
   );
   const activeSceneId = currentBlockSceneId ?? insertTargetSceneId ?? lastNavigatedSceneId ?? sceneIds[0] ?? null;
+  const activeSceneHeading = useMemo(
+    () => scenes.find((scene) => scene.id === activeSceneId)?.heading ?? null,
+    [activeSceneId, scenes]
+  );
+  const sceneCount = scenes.length;
+  const titleLabel = context?.title?.trim() ? context.title : 'Untitled Screenplay';
+  const styleLabel = context?.style?.trim() || 'No style set';
 
   useEffect(() => {
     if (!lastNavigatedSceneId) return;
     if (sceneIds.includes(lastNavigatedSceneId)) return;
     setLastNavigatedSceneId(sceneIds[0] ?? null);
   }, [lastNavigatedSceneId, sceneIds]);
+
+  useEffect(() => {
+    if (isTitleModalOpen && !context) {
+      setIsTitleModalOpen(false);
+    }
+    if (isStyleModalOpen && !context) {
+      setIsStyleModalOpen(false);
+    }
+  }, [context, isStyleModalOpen, isTitleModalOpen]);
 
   const handleSelectScene = useCallback((sceneId: string) => {
     setLastNavigatedSceneId(sceneId);
@@ -46,6 +104,35 @@ export const DraftMode: React.FC<DraftModeProps> = (props) => {
       scrollContainer.focus({ preventScroll: true });
     }
   }, []);
+
+  const handleOpenTitleModal = useCallback(() => {
+    if (isTitleModalOpen) {
+      setIsTitleModalOpen(false);
+      return;
+    }
+    setTitleDraft(context?.title ?? '');
+    setIsTitleModalOpen(true);
+  }, [context, isTitleModalOpen]);
+
+  const handleOpenStyleModal = useCallback(() => {
+    if (isStyleModalOpen) {
+      setIsStyleModalOpen(false);
+      return;
+    }
+    setStyleDraft(context?.style ?? '');
+    setIsStyleModalOpen(true);
+  }, [context, isStyleModalOpen]);
+
+  const handleSaveTitle = useCallback(() => {
+    const nextTitle = titleDraft.trim() || 'Untitled Screenplay';
+    onTitleChange(nextTitle);
+    setIsTitleModalOpen(false);
+  }, [onTitleChange, titleDraft]);
+
+  const handleSaveStyle = useCallback(() => {
+    onSaveStyle?.(styleDraft);
+    setIsStyleModalOpen(false);
+  }, [onSaveStyle, styleDraft]);
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#17181c]">
@@ -62,7 +149,7 @@ export const DraftMode: React.FC<DraftModeProps> = (props) => {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           {context && (
-            <div className="lg:hidden">
+            <div className="flex flex-wrap items-center gap-2 lg:hidden">
               <button
                 type="button"
                 onClick={() => setIsOutlineOpen(true)}
@@ -71,10 +158,69 @@ export const DraftMode: React.FC<DraftModeProps> = (props) => {
                 <List className="h-4 w-4" />
                 Scene Outline
               </button>
+              {activeSceneHeading && (
+                <span className="inline-flex min-h-[42px] max-w-full items-center rounded-xl border border-gray-800 bg-gray-950/45 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-300">
+                  <span className="truncate">{activeSceneHeading}</span>
+                </span>
+              )}
             </div>
           )}
+          {context && (
+            <DraftMetaStrip
+              title={titleLabel}
+              genreLabel={context.genre}
+              styleLabel={styleLabel}
+              sceneCount={sceneCount}
+              autosaveError={autosaveError}
+              activeSceneHeading={activeSceneHeading}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={onUndo}
+              onRedo={onRedo}
+              onEditTitle={handleOpenTitleModal}
+              onEditStyle={onSaveStyle ? handleOpenStyleModal : undefined}
+            />
+          )}
+          {context && (
+            <DraftComposerPanel
+              userInstruction={userInstruction}
+              onInstructionChange={onInstructionChange}
+              onGenerateNext={onGenerateNext}
+              onPlotTwist={onPlotTwist}
+              onInsertSceneBeat={() => canvasChromeBridge?.openInsertSceneBeat()}
+              isGenerating={isGenerating}
+              isPlaying={isPlaying}
+              onCancelGenerate={onCancelGenerate}
+              error={error}
+              insertSceneBeatDisabled={!canvasChromeBridge?.canInsertSceneBeat}
+            />
+          )}
           <div className="flex-1 min-h-0 min-w-0 overflow-hidden rounded-[1.5rem] border border-gray-900/60 bg-black/10">
-            <ScriptPane {...props} />
+            <ScriptPane
+              context={context}
+              error={error}
+              onGenerateNext={onGenerateNext}
+              onChangeSpeaker={props.onChangeSpeaker}
+              onGenerateRewritePreview={props.onGenerateRewritePreview}
+              onApplyRewritePreview={props.onApplyRewritePreview}
+              onDeleteBlock={props.onDeleteBlock}
+              onRequestInsert={props.onRequestInsert}
+              onInsertAtAnchor={props.onInsertAtAnchor}
+              onGenerateInsertAtAnchor={props.onGenerateInsertAtAnchor}
+              onUpdateSceneHeading={props.onUpdateSceneHeading}
+              onToggleLock={props.onToggleLock}
+              isGenerating={isGenerating}
+              isPlaying={isPlaying}
+              onCancelGenerate={onCancelGenerate}
+              currentBlockId={currentBlockId}
+              currentBlockIndex={props.currentBlockIndex}
+              blockStatuses={props.blockStatuses}
+              showHighlights={props.showHighlights}
+              autoScroll={props.autoScroll}
+              insertScrollTargetId={insertScrollTargetId}
+              insertScrollToken={props.insertScrollToken}
+              onChromeBridgeChange={setCanvasChromeBridge}
+            />
           </div>
         </div>
       </div>
@@ -110,6 +256,22 @@ export const DraftMode: React.FC<DraftModeProps> = (props) => {
           </div>
         </>
       )}
+      <TitleEditModal
+        isOpen={isTitleModalOpen}
+        value={titleDraft}
+        onChange={setTitleDraft}
+        onSave={handleSaveTitle}
+        onClose={() => setIsTitleModalOpen(false)}
+        inputRef={titleInputRef}
+      />
+      <StyleEditModal
+        isOpen={isStyleModalOpen}
+        value={styleDraft}
+        presets={STYLE_PRESETS}
+        onChange={setStyleDraft}
+        onSave={handleSaveStyle}
+        onClose={() => setIsStyleModalOpen(false)}
+      />
     </section>
   );
 };

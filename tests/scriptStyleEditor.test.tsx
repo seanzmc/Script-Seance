@@ -1,7 +1,7 @@
 import React, { createRef } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
+import { DraftMode, type DraftModeProps } from '../components/workspace/DraftMode';
 import { BlockType, StoryContext } from '../types';
 import { executeSuggestPlotTwist } from '../services/ai';
 
@@ -22,16 +22,10 @@ const createMockResponse = (status: number, body: unknown): MockResponse => ({
 const createPaneProps = (
   context: StoryContext,
   onSaveStyle: (style: string) => void
-): ScriptPaneProps => ({
+): DraftModeProps => ({
   context,
   titleInputRef: createRef<HTMLInputElement>(),
   onTitleChange: vi.fn(),
-  suggestedTitle: null,
-  isSuggestingTitle: false,
-  suggestedTitleDismissed: false,
-  onUseSuggestedTitle: vi.fn(),
-  onDismissSuggestedTitle: vi.fn(),
-  onClearDraft: vi.fn(),
   autosaveError: null,
   error: null,
   userInstruction: '',
@@ -42,9 +36,7 @@ const createPaneProps = (
   onRedo: vi.fn(),
   canUndo: true,
   canRedo: true,
-  insertCompleteToken: 0,
   onChangeSpeaker: vi.fn(),
-  onInsertError: vi.fn(),
   onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
@@ -54,11 +46,7 @@ const createPaneProps = (
   blockStatuses: {},
   showHighlights: true,
   autoScroll: false,
-  onOpenPrivacy: vi.fn(),
   onSaveStyle,
-  onExportTxt: vi.fn(),
-  onExportPdf: vi.fn(),
-  canExport: true,
   insertScrollTargetId: null,
   insertScrollToken: 0
 });
@@ -141,7 +129,7 @@ describe('script view style editor', () => {
           <button type="button" onClick={triggerTwist}>
             Trigger Twist Request
           </button>
-          <ScriptPane {...createPaneProps(context, handleSaveStyle)} />
+          <DraftMode {...createPaneProps(context, handleSaveStyle)} />
         </div>
       );
     };
@@ -155,7 +143,12 @@ describe('script view style editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByTestId('prompt-context-revision').textContent).toBe('1');
-    expect(screen.getByText((_, element) => element?.textContent === 'Style: Unhinged')).toBeTruthy();
+    const draftMetaStrip = screen.getByText('Draft Workspace').closest('section');
+    expect(draftMetaStrip).toBeTruthy();
+    const editStyleButton = within(draftMetaStrip as HTMLElement).getByRole('button', { name: /edit style/i });
+    const styleChip = editStyleButton.closest('span');
+    expect(styleChip).toBeTruthy();
+    expect(within(styleChip as HTMLElement).getByText('Unhinged')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger Twist Request' }));
 
@@ -196,7 +189,7 @@ describe('script view style editor', () => {
       ]
     };
 
-    render(<ScriptPane {...createPaneProps(context, vi.fn())} onPlotTwist={onPlotTwist} />);
+    render(<DraftMode {...createPaneProps(context, vi.fn())} onPlotTwist={onPlotTwist} />);
 
     fireEvent.click(screen.getByRole('button', { name: /plot twist/i }));
 
@@ -229,7 +222,7 @@ describe('script view style editor', () => {
       ]
     };
 
-    render(<ScriptPane {...createPaneProps(context, vi.fn())} />);
+    render(<DraftMode {...createPaneProps(context, vi.fn())} />);
 
     fireEvent.click(screen.getByRole('button', { name: /edit style/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Browse library' }));
