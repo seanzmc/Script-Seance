@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, FileDown, ShieldCheck, Trash2 } from 'lucide-react';
+import { Download, FileDown, MoreHorizontal, ShieldCheck, Trash2 } from 'lucide-react';
 
 export type WorkspaceMode = 'setup' | 'draft' | 'cast' | 'play';
 
@@ -35,20 +35,20 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   onOpenPrivacy,
   children
 }) => {
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
+  const projectMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!isExportMenuOpen) return;
+    if (!isProjectMenuOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
       const targetNode = event.target as Node | null;
       if (!targetNode) return;
-      if (exportMenuRef.current?.contains(targetNode)) return;
-      setIsExportMenuOpen(false);
+      if (projectMenuRef.current?.contains(targetNode)) return;
+      setIsProjectMenuOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsExportMenuOpen(false);
+        setIsProjectMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handlePointerDown, true);
@@ -57,7 +57,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       document.removeEventListener('mousedown', handlePointerDown, true);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isExportMenuOpen]);
+  }, [isProjectMenuOpen]);
+
+  useEffect(() => {
+    setIsProjectMenuOpen(false);
+  }, [currentMode, hasDraft, title]);
 
   return (
     <div className="h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden relative">
@@ -71,75 +75,92 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenPrivacy}
-                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/55 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-gray-800"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Privacy
-              </button>
-              <div className="relative" ref={exportMenuRef}>
+              <div className="relative" ref={projectMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setIsExportMenuOpen((previous) => !previous)}
-                  disabled={!canExport}
+                  onClick={() => setIsProjectMenuOpen((previous) => !previous)}
                   className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/55 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-haspopup="menu"
-                  aria-expanded={isExportMenuOpen}
-                  aria-label="Open workspace export menu"
+                  aria-expanded={isProjectMenuOpen}
+                  aria-label="Open project actions menu"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  Export
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  Project
                 </button>
-                {isExportMenuOpen && (
+                {isProjectMenuOpen && (
                   <div
                     role="menu"
-                    aria-label="Workspace export options"
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] min-w-[12rem] rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
+                    aria-label="Project actions"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-[min(19rem,calc(100vw-2rem))] rounded-2xl border border-gray-700 bg-gray-950/98 p-3 shadow-[0_18px_38px_rgba(0,0,0,0.42)] backdrop-blur"
                   >
-                    <div className="space-y-1">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          onExportTxt();
-                          setIsExportMenuOpen(false);
-                        }}
-                        disabled={!canExport}
-                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Export Script (.txt)
-                      </button>
-                      {onExportPdf && (
+                    <div className="border-b border-gray-800/80 pb-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Project Actions</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-white">{title}</p>
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        {hasDraft ? 'Manage exports, privacy, and draft utilities.' : 'Privacy is available now. Export and clear unlock once a draft exists.'}
+                      </p>
+                    </div>
+                    <div className="space-y-3 pt-3">
+                      <div className="space-y-1">
+                        <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">Export</p>
                         <button
                           type="button"
                           role="menuitem"
                           onClick={() => {
-                            onExportPdf();
-                            setIsExportMenuOpen(false);
+                            onExportTxt();
+                            setIsProjectMenuOpen(false);
                           }}
                           disabled={!canExport}
-                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <FileDown className="h-3.5 w-3.5" />
-                          Export PDF
+                          <Download className="h-3.5 w-3.5" />
+                          Export Script (.txt)
                         </button>
-                      )}
+                        {onExportPdf && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              onExportPdf();
+                              setIsProjectMenuOpen(false);
+                            }}
+                            disabled={!canExport}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                            Export PDF
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          onOpenPrivacy();
+                          setIsProjectMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Privacy
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          onClearDraft();
+                          setIsProjectMenuOpen(false);
+                        }}
+                        disabled={!hasDraft}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] text-red-200 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Clear Draft
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={onClearDraft}
-                disabled={!hasDraft}
-                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Clear Draft
-              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
