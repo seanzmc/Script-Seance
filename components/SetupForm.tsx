@@ -7,13 +7,20 @@ import React, {
 } from "react";
 import { GENRES } from "../types";
 import { Button } from "./Button";
-import { Users, Plus, Search, Trash2, X } from "lucide-react";
+import { Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
+
+export type VoicePreference = "male" | "female" | "random";
+
+export const DEFAULT_CHARACTER_VOICE_PREFERENCE: VoicePreference = "random";
+export const DEFAULT_NARRATOR_VOICE_PREFERENCE: VoicePreference = "male";
 
 export type SetupFormState = {
   genre: string;
   premise: string;
   characters: string[];
+  characterVoicePreferences?: VoicePreference[];
+  narratorVoicePreference?: VoicePreference;
   styleId?: string | null;
   style: string;
   length: string;
@@ -61,6 +68,44 @@ export const STYLE_PRESETS = [
 ];
 
 const normalizeStyleValue = (value: string) => value.trim().toLowerCase();
+const isVoicePreference = (value: unknown): value is VoicePreference =>
+  value === "male" || value === "female" || value === "random";
+const normalizeVoicePreference = (
+  value: unknown,
+  fallback: VoicePreference,
+): VoicePreference => (isVoicePreference(value) ? value : fallback);
+export const synchronizeSetupVoicePreferences = (
+  value: Pick<
+    SetupFormState,
+    "characters" | "characterVoicePreferences" | "narratorVoicePreference"
+  >,
+) => ({
+  characterVoicePreferences: value.characters.map((_, index) =>
+    normalizeVoicePreference(
+      value.characterVoicePreferences?.[index],
+      DEFAULT_CHARACTER_VOICE_PREFERENCE,
+    ),
+  ),
+  narratorVoicePreference: normalizeVoicePreference(
+    value.narratorVoicePreference,
+    DEFAULT_NARRATOR_VOICE_PREFERENCE,
+  ),
+});
+const getNextVoicePreference = (
+  value: VoicePreference,
+): VoicePreference =>
+  value === "male" ? "female" : value === "female" ? "random" : "male";
+const VOICE_PREFERENCE_META: Record<
+  VoicePreference,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+  }
+> = {
+  male: { icon: Mars, label: "Male" },
+  female: { icon: Venus, label: "Female" },
+  random: { icon: Shuffle, label: "Random" },
+};
 
 export const SETUP_UI_TOKENS = {
   title: "text-xl sm:text-2xl md:text-[26px] font-semibold tracking-tight text-white",
@@ -236,6 +281,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   autoSurprise = false,
 }) => {
   const { genre, premise, characters, style, styleId, length } = value;
+  const {
+    characterVoicePreferences = [],
+    narratorVoicePreference = DEFAULT_NARRATOR_VOICE_PREFERENCE,
+  } = value;
   const [isSurprising, setIsSurprising] = useState(false);
   const [justSurprised, setJustSurprised] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -287,6 +336,19 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   const removeCharacter = (index: number) =>
     updateValue({ characters: characters.filter((_, i) => i !== index) });
+  const cycleCharacterVoicePreference = (index: number) => {
+    const nextPreferences = synchronizeSetupVoicePreferences({
+      characters,
+      characterVoicePreferences,
+      narratorVoicePreference,
+    }).characterVoicePreferences;
+    nextPreferences[index] = getNextVoicePreference(nextPreferences[index]);
+    updateValue({ characterVoicePreferences: nextPreferences });
+  };
+  const cycleNarratorVoicePreference = () =>
+    updateValue({
+      narratorVoicePreference: getNextVoicePreference(narratorVoicePreference),
+    });
 
   const confirmSetupOverwrite = useCallback(() => {
     if (
@@ -619,6 +681,30 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
+  const renderVoicePreferenceButton = (
+    preference: VoicePreference,
+    onClick: () => void,
+    options?: { testId?: string; narrator?: boolean },
+  ) => {
+    const meta = VOICE_PREFERENCE_META[preference];
+    const Icon = meta.icon;
+    const targetLabel = options?.narrator ? "Narrator" : "Character";
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isLocked}
+        aria-label={`${targetLabel} voice preference: ${meta.label}. Click to cycle.`}
+        title={`${targetLabel} voice preference: ${meta.label}`}
+        data-testid={options?.testId}
+        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-900/70 text-slate-200 transition-[opacity,color,border-color,background-color,box-shadow] duration-[220ms] ease-out hover:border-indigo-300/55 hover:bg-indigo-500/18 hover:text-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+          isLocked ? "opacity-60 cursor-not-allowed" : ""
+        } ${options?.narrator ? "border-indigo-300/25 bg-indigo-500/10" : ""}`}
+      >
+        <Icon className="h-4 w-4" />
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -1000,8 +1086,28 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                     </label>
                     <div className="space-y-2 flex-1 min-h-0">
+                      <div className="flex items-center gap-2">
+                        <div className="flex min-h-[44px] flex-1 items-center justify-between rounded-xl border border-indigo-300/20 bg-indigo-500/10 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm sm:text-base font-medium text-white">
+                              Narrator
+                            </p>
+                            <p className="text-[10px] uppercase tracking-[0.22em] text-indigo-100/70">
+                              Built in
+                            </p>
+                          </div>
+                        </div>
+                        {renderVoicePreferenceButton(
+                          narratorVoicePreference,
+                          cycleNarratorVoicePreference,
+                          {
+                            testId: "setup-narrator-preference",
+                            narrator: true,
+                          },
+                        )}
+                      </div>
                       {characters.map((char, idx) => (
-                        <div key={idx} className="relative group">
+                        <div key={idx} className="flex items-center gap-2">
                           <input
                             ref={(el) => {
                               characterInputs.current[idx] = el;
@@ -1010,7 +1116,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             onChange={(e) =>
                               handleCharacterChange(idx, e.target.value)
                             }
-                            className={`w-full rounded-xl border px-3 py-3 pr-8 text-white text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-[background-color,border-color,box-shadow] duration-[220ms] ease-out ${
+                            className={`w-full rounded-xl border px-3 py-3 text-white text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-500 transition-[background-color,border-color,box-shadow] duration-[220ms] ease-out ${
                               justSurprised
                                 ? "bg-indigo-900/25 border-indigo-400/45"
                                 : "bg-slate-900/70 border-white/10"
@@ -1018,11 +1124,23 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             placeholder={`Character ${idx + 1}`}
                             disabled={isLocked}
                           />
+                          {renderVoicePreferenceButton(
+                            synchronizeSetupVoicePreferences({
+                              characters,
+                              characterVoicePreferences,
+                              narratorVoicePreference,
+                            }).characterVoicePreferences[idx] ??
+                              DEFAULT_CHARACTER_VOICE_PREFERENCE,
+                            () => cycleCharacterVoicePreference(idx),
+                            {
+                              testId: `setup-character-preference-${idx}`,
+                            },
+                          )}
                           {characters.length > 1 && !isLocked && (
                             <button
+                              type="button"
                               onClick={() => removeCharacter(idx)}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                              tabIndex={-1}
+                              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-[opacity,color,border-color,background-color] duration-200 hover:border-red-300/35 hover:bg-red-500/10 hover:text-red-300"
                               aria-label="Remove character"
                               title="Remove character"
                             >

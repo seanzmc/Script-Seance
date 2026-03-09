@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { SetupFormState } from './components/SetupForm';
+import {
+  SetupFormState,
+  synchronizeSetupVoicePreferences,
+  DEFAULT_CHARACTER_VOICE_PREFERENCE,
+  DEFAULT_NARRATOR_VOICE_PREFERENCE
+} from './components/SetupForm';
 import { stylesLibrary } from './stylesLibrary';
 import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
@@ -70,6 +75,11 @@ const DEFAULT_SETUP_STATE: SetupFormState = {
   genre: GENRES[0],
   premise: '',
   characters: ['Hero', 'Villain'],
+  characterVoicePreferences: [
+    DEFAULT_CHARACTER_VOICE_PREFERENCE,
+    DEFAULT_CHARACTER_VOICE_PREFERENCE
+  ],
+  narratorVoicePreference: DEFAULT_NARRATOR_VOICE_PREFERENCE,
   styleId: null,
   style: '',
   length: 'Medium'
@@ -81,6 +91,10 @@ const normalizeTargetLength = (value: unknown): SceneLengthOption => (
     ? value as SceneLengthOption
     : 'Medium'
 );
+const normalizeSetupState = (value: SetupFormState): SetupFormState => ({
+  ...value,
+  ...synchronizeSetupVoicePreferences(value)
+});
 
 const isStoryContext = (value: unknown): value is StoryContext => {
   if (!value || typeof value !== 'object') {
@@ -447,9 +461,10 @@ export default function App() {
     options?: { source?: 'user' | 'system'; bumpPromptRevision?: boolean }
   ) => {
     const previous = setupStateRef.current;
-    const next = typeof mutation === 'function'
+    const rawNext = typeof mutation === 'function'
       ? (mutation as (previous: SetupFormState) => SetupFormState)(previous)
       : mutation;
+    const next = normalizeSetupState(rawNext);
     if (next === previous) {
       return false;
     }

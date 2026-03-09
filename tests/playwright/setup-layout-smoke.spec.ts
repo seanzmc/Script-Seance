@@ -40,6 +40,8 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
   const charactersPanel = page.getByTestId('setup-characters-panel');
   await expect(premisePanel).toBeVisible();
   await expect(charactersPanel).toBeVisible();
+  await expect(page.getByText('Narrator')).toBeVisible();
+  await expect(page.getByTestId('setup-narrator-preference')).toBeVisible();
 
   const [premiseBox, charactersBox] = await Promise.all([
     premisePanel.boundingBox(),

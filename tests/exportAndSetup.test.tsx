@@ -12,7 +12,11 @@ import {
   normalizeSceneCharacters,
   sanitizeGeneratedInsertText,
 } from "../App";
-import { SetupForm, SetupFormState } from "../components/SetupForm";
+import {
+  SetupForm,
+  SetupFormState,
+  synchronizeSetupVoicePreferences,
+} from "../components/SetupForm";
 import { stylesLibrary } from "../stylesLibrary";
 import { BlockType, Scene, StoryContext } from "../types";
 
@@ -260,6 +264,8 @@ describe("SetupForm submit validation", () => {
     genre: "Noir",
     premise: "A detective uncovers a conspiracy.",
     characters: ["Hero", "Villain"],
+    characterVoicePreferences: ["random", "random"],
+    narratorVoicePreference: "male",
     style: "",
     length: "Medium",
   };
@@ -353,6 +359,55 @@ describe("SetupForm submit validation", () => {
     await waitFor(() => {
       expect(lengthValue.textContent).toBe("Medium");
     });
+  });
+
+  it("renders a built-in narrator row that is non-editable and non-deletable", () => {
+    render(
+      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /write my own premise/i }),
+    );
+
+    expect(screen.getByText("Narrator")).toBeTruthy();
+    expect(screen.getByText("Built in")).toBeTruthy();
+    expect(screen.queryByDisplayValue("Narrator")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /remove character/i })).toHaveLength(2);
+  });
+
+  it("cycles narrator preference male -> female -> random", () => {
+    const NarratorPreferenceHarness: React.FC = () => {
+      const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
+      const handleSetupChange = React.useCallback(
+        (next: Partial<SetupFormState>) => {
+          setSetupState((previous) => ({ ...previous, ...next }));
+        },
+        [],
+      );
+
+      return (
+        <SetupForm
+          value={setupState}
+          onChange={handleSetupChange}
+          isLoading={false}
+        />
+      );
+    };
+
+    render(<NarratorPreferenceHarness />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /write my own premise/i }),
+    );
+
+    const preferenceButton = screen.getByTestId("setup-narrator-preference");
+    expect(preferenceButton.getAttribute("aria-label")).toContain("Male");
+
+    fireEvent.click(preferenceButton);
+    expect(preferenceButton.getAttribute("aria-label")).toContain("Female");
+
+    fireEvent.click(preferenceButton);
+    expect(preferenceButton.getAttribute("aria-label")).toContain("Random");
   });
 
   it("style library selection updates shared context style and bumps prompt revision synchronously", () => {
@@ -610,11 +665,67 @@ describe("SetupForm submit validation", () => {
   });
 });
 
+describe("setup voice preference synchronization", () => {
+  it("adds default character preferences for newly added characters", () => {
+    expect(
+      synchronizeSetupVoicePreferences({
+        characters: ["Hero", "Villain", "Witness"],
+        characterVoicePreferences: ["female", "male"],
+        narratorVoicePreference: "male",
+      }),
+    ).toEqual({
+      characterVoicePreferences: ["female", "male", "random"],
+      narratorVoicePreference: "male",
+    });
+  });
+
+  it("keeps character preferences aligned when a character is removed", () => {
+    expect(
+      synchronizeSetupVoicePreferences({
+        characters: ["Hero"],
+        characterVoicePreferences: ["female", "male"],
+        narratorVoicePreference: "male",
+      }),
+    ).toEqual({
+      characterVoicePreferences: ["female"],
+      narratorVoicePreference: "male",
+    });
+  });
+
+  it("restores default setup preferences when missing during reset", () => {
+    expect(
+      synchronizeSetupVoicePreferences({
+        characters: ["Hero", "Villain"],
+        characterVoicePreferences: undefined,
+        narratorVoicePreference: undefined,
+      }),
+    ).toEqual({
+      characterVoicePreferences: ["random", "random"],
+      narratorVoicePreference: "male",
+    });
+  });
+
+  it("realigns character preferences after AI replaces the cast", () => {
+    expect(
+      synchronizeSetupVoicePreferences({
+        characters: ["Courier", "Fixer"],
+        characterVoicePreferences: ["female", "random", "male"],
+        narratorVoicePreference: "female",
+      }),
+    ).toEqual({
+      characterVoicePreferences: ["female", "random"],
+      narratorVoicePreference: "female",
+    });
+  });
+});
+
 describe("SetupForm detail reveal timing", () => {
   const blankBaseValue: SetupFormState = {
     genre: "Noir",
     premise: "",
     characters: ["Hero", "Villain"],
+    characterVoicePreferences: ["random", "random"],
+    narratorVoicePreference: "male",
     style: "",
     length: "Medium",
   };
