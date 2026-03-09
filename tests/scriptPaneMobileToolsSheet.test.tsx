@@ -2,8 +2,6 @@ import React, { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
-import { SetupFormState } from '../components/SetupForm';
-import { PlaybackPanelProps } from '../components/PlaybackPanel';
 import { BlockType, StoryContext } from '../types';
 
 const contextFixture: StoryContext = {
@@ -34,43 +32,6 @@ const contextFixture: StoryContext = {
     }
   ]
 };
-
-const setupStateFixture: SetupFormState = {
-  genre: 'Noir',
-  premise: 'A detective uncovers a conspiracy.',
-  characters: ['Alex', 'Sam'],
-  style: '',
-  length: 'Medium'
-};
-
-const createPlaybackProps = (overrides: Partial<PlaybackPanelProps> = {}): PlaybackPanelProps => ({
-  isPlaying: false,
-  isPaused: false,
-  isLoadingAudio: false,
-  currentBlockId: null,
-  currentBlockIndex: -1,
-  blockStatuses: {},
-  onPlay: vi.fn(),
-  onPause: vi.fn(),
-  onResume: vi.fn(),
-  onStop: vi.fn(),
-  onPrev: vi.fn(),
-  onNext: vi.fn(),
-  onRetry: vi.fn(),
-  onSkip: vi.fn(),
-  onRefreshAudio: vi.fn(),
-  onPurgeAudio: vi.fn(),
-  bufferedCount: 0,
-  totalCount: 0,
-  currentSpeaker: 'None',
-  playbackSpeed: 1,
-  onPlaybackSpeedChange: vi.fn(),
-  showHighlights: true,
-  onToggleHighlights: vi.fn(),
-  autoScroll: false,
-  onToggleAutoScroll: vi.fn(),
-  ...overrides
-});
 
 const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps => ({
   context: contextFixture,
@@ -105,18 +66,9 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   showHighlights: true,
   autoScroll: false,
   onOpenPrivacy: vi.fn(),
-  onOpenSetup: vi.fn(),
-  isSetupOpen: false,
-  onCloseSetup: vi.fn(),
-  setupState: setupStateFixture,
-  onSetupChange: vi.fn(),
-  onStartSetup: vi.fn(),
-  setupAutoSurprise: false,
   onExportTxt: vi.fn(),
   onExportPdf: vi.fn(),
   canExport: true,
-  playbackProps: createPlaybackProps(),
-  voicesContent: <div>Voices panel body</div>,
   insertScrollTargetId: null,
   insertScrollToken: 0,
   ...overrides
@@ -127,15 +79,12 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('ScriptPane header generation and audio drawer', () => {
+describe('ScriptPane header generation controls', () => {
   it('opens the header generate dropdown with prompt and generation actions', async () => {
     const onPlotTwist = vi.fn();
     render(<ScriptPane {...createProps({ onPlotTwist })} />);
 
     expect(screen.queryByRole('button', { name: 'Tools' })).toBeNull();
-    expect(screen.queryByTestId('playback-mini-player')).toBeNull();
-    expect(screen.queryByTestId('desktop-floating-playback')).toBeNull();
-
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
 
     const generateMenu = await screen.findByRole('dialog', { name: 'Generate menu' });
@@ -162,85 +111,12 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(screen.queryByRole('dialog', { name: 'Generate menu' })).toBeNull();
   });
 
-  it('opens the audio drawer and removes persistent playback chrome', async () => {
-    render(<ScriptPane {...createProps()} />);
-
-    expect(screen.queryByTestId('playback-mini-player')).toBeNull();
-    expect(screen.queryByTestId('desktop-floating-playback')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open audio drawer' }));
-
-    const drawer = await screen.findByTestId('audio-drawer');
-    expect(drawer).toBeTruthy();
-    expect(screen.getByText('Playback and Voice Utility')).toBeTruthy();
-    expect(screen.getByText('Voices panel body')).toBeTruthy();
-    expect(screen.getByText('Transport')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close audio drawer' }));
-    await waitFor(() => {
-      expect(screen.queryByTestId('audio-drawer')).toBeNull();
-    });
-  });
-
-  it('shows the mini player for an active paused session and hides it when the full audio drawer opens', async () => {
-    render(
-      <ScriptPane
-        {...createProps({
-          playbackProps: createPlaybackProps({
-            isPaused: true,
-            currentBlockIndex: 1,
-            totalCount: 3,
-            currentSpeaker: 'Alex'
-          })
-        })}
-      />
-    );
-
-    expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
-    expect(screen.getByText('Paused on block 2/3')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open full audio drawer' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('audio-drawer')).toBeTruthy();
-    });
-    expect(screen.queryByTestId('playback-mini-player')).toBeNull();
-  });
-
-  it('closes the audio drawer when playback starts', async () => {
-    const initialProps = createProps();
-    const { rerender } = render(<ScriptPane {...initialProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open audio drawer' }));
-    expect(await screen.findByTestId('audio-drawer')).toBeTruthy();
-
-    rerender(
-      <ScriptPane
-        {...createProps({
-          isPlaying: true,
-          playbackProps: createPlaybackProps({
-            isPlaying: true,
-            currentBlockIndex: 0,
-            totalCount: 2,
-            currentSpeaker: 'Alex'
-          })
-        })}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('audio-drawer')).toBeNull();
-    });
-    expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
-  });
-
   it('formats title metadata and uses matching title/style edit link styling', () => {
     const { container } = render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
     const editTitleButton = screen.getByRole('button', { name: 'Edit Title' });
     const editStyleButton = screen.getByRole('button', { name: /Edit Style/i });
     const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
-    const audioButton = screen.getByRole('button', { name: 'Open audio drawer' });
     const undoButton = screen.getByRole('button', { name: 'Undo' });
     const exportButton = screen.getByRole('button', { name: 'Open export menu' });
     const clearDraftButton = screen.getByRole('button', { name: 'Clear Draft' });
@@ -261,21 +137,15 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(exportButton.getAttribute('title')).toBeNull();
     expect(clearDraftButton.getAttribute('title')).toBeNull();
     expect(generateButton.getAttribute('title')).toBeNull();
-    expect(audioButton.getAttribute('title')).toBeNull();
     expect(screen.getAllByText('Undo').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Redo').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Export').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Clear Draft').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Generate Next Scene').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Audio').length).toBeGreaterThan(0);
     expect(generateButton.className).toContain('sm:h-12');
     expect(generateButton.className).toContain('max-[1279px]:px-3');
     expect(generateButton.className).toContain('w-full');
     expect(generateButton.className).toContain('xl:w-auto');
-    expect(audioButton.className).toContain('sm:h-12');
-    expect(audioButton.className).toContain('max-[1279px]:px-3');
-    expect(audioButton.className).toContain('w-full');
-    expect(audioButton.className).toContain('xl:w-auto');
     expect(undoButton.className).toContain('h-9');
     expect(undoButton.className).toContain('max-[1279px]:px-2.5');
     expect(undoButton.className).toContain('max-[820px]:h-10');
@@ -286,7 +156,6 @@ describe('ScriptPane header generation and audio drawer', () => {
     const generateButtonRow = generateButtonSlot.parentElement as HTMLElement;
     const headerActionContainer = generateButtonRow.parentElement as HTMLElement;
     const undoTooltipWrapper = undoButton.parentElement as HTMLElement;
-    const audioTooltipWrapper = audioButton.parentElement as HTMLElement;
 
     expect(headerActionContainer.className).toContain('w-full');
     expect(headerActionContainer.className).toContain('flex-col');
@@ -303,8 +172,6 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(generateTooltipWrapper.className).toContain('xl:w-auto');
     expect(undoTooltipWrapper.parentElement?.className).toContain('min-w-0 flex-1');
     expect(undoTooltipWrapper.parentElement?.className).toContain('xl:flex-none');
-    expect(audioTooltipWrapper.parentElement?.className).toContain('min-w-0 flex-1');
-    expect(audioTooltipWrapper.parentElement?.className).toContain('xl:flex-none');
     expect(container.textContent).toContain('•');
 
     fireEvent.click(generateButton);
@@ -381,17 +248,6 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     expect(screen.getByText('Working on your request...')).toBeTruthy();
     expect(screen.getByRole('button', { name: /generate \/ continue writing/i }).getAttribute('aria-busy')).toBeNull();
-  });
-
-  it('setup screen ignores background clicks and closes only via explicit close button', () => {
-    const onCloseSetup = vi.fn();
-    render(<ScriptPane {...createProps({ isSetupOpen: true, onCloseSetup })} />);
-
-    fireEvent.click(screen.getByTestId('setup-screen'));
-    expect(onCloseSetup).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close setup' }));
-    expect(onCloseSetup).toHaveBeenCalledTimes(1);
   });
 
   it('export opens from the header menu and closes cleanly', async () => {

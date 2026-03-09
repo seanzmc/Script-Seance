@@ -8,14 +8,7 @@ import {
   paperPopoverFieldClassName,
   paperPopoverShellClassName
 } from './paperPopoverStyles';
-import {
-  SetupForm,
-  SetupFormState,
-  SETUP_UI_TOKENS,
-  STYLE_PRESETS
-} from './SetupForm';
-import { PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
-import { PlaybackMiniPlayer } from './PlaybackMiniPlayer';
+import { STYLE_PRESETS } from './SetupForm';
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
 import { useScriptController } from '../hooks/useScriptController';
@@ -34,11 +27,9 @@ import {
   PlusCircle,
   ShieldCheck,
   Sparkles,
-  Speech,
   Trash2,
   Undo2,
-  Redo2,
-  X
+  Redo2
 } from 'lucide-react';
 
 export interface ScriptPaneProps {
@@ -94,21 +85,10 @@ export interface ScriptPaneProps {
   showHighlights: boolean;
   autoScroll: boolean;
   onOpenPrivacy: () => void;
-  onOpenSetup: () => void;
   onSaveStyle?: (style: string) => void;
-  isSetupOpen: boolean;
-  onCloseSetup: () => void;
-  setupState: SetupFormState;
-  onSetupChange: (next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => void;
-  onSetupSurprise?: (params: { mode: 'manual' | 'auto'; targetGenre: string }) => Promise<boolean>;
-  onStartSetup: () => void;
-  setupAutoSurprise: boolean;
-  onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
   onExportTxt: () => void;
   onExportPdf?: () => void;
   canExport: boolean;
-  playbackProps?: PlaybackPanelProps;
-  voicesContent?: React.ReactNode;
   insertScrollTargetId: string | null;
   insertScrollToken: number;
 }
@@ -166,26 +146,14 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   showHighlights,
   autoScroll,
   onOpenPrivacy,
-  onOpenSetup,
   onSaveStyle,
-  isSetupOpen,
-  onCloseSetup,
-  setupState,
-  onSetupChange,
-  onSetupSurprise,
-  onStartSetup,
-  setupAutoSurprise,
-  onSetupError,
   onExportTxt,
   onExportPdf,
   canExport,
-  playbackProps,
-  voicesContent,
   insertScrollTargetId,
   insertScrollToken
 }) => {
   const [isGenerateMenuOpen, setIsGenerateMenuOpen] = useState(false);
-  const [isAudioDrawerOpen, setIsAudioDrawerOpen] = useState(false);
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
@@ -222,7 +190,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerToolButtonClass = 'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 xl:w-auto max-[1279px]:px-2.5 max-[820px]:h-10 max-[820px]:px-0';
   const headerToolTextClass = 'max-[820px]:sr-only';
   const headerPrimaryToolButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
-  const headerAudioButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
   const headerActionRowsClass = 'flex w-full items-stretch gap-2 xl:w-auto xl:items-center';
   const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
   const toolSectionClass = 'space-y-2';
@@ -249,7 +216,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       ) : null}
     </div>
   );
-  const showStartScreen = !context && !isGenerating;
   const showInitialGeneration = !context && isGenerating;
   const errorBanner = error ? (
     <div className="bg-red-900/40 border border-red-500/60 text-red-200 p-4 rounded-lg flex items-start gap-2">
@@ -262,34 +228,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </div>
     </div>
   ) : null;
-
-  const handleStartSetupClick = () => {
-    onOpenSetup();
-  };
-  const startScreenCard = (
-    <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]">
-      <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
-      <div className="relative space-y-5">
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.34em] text-gray-500">Start Screen</p>
-          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white">SCRIPT SEANCE</h1>
-          <p className="text-base md:text-lg text-gray-300">
-            Summon a writers room to draft cinematic scenes, one beat at a time.
-          </p>
-        </div>
-        <div className="flex flex-col items-center gap-3">
-          <Button
-            onClick={handleStartSetupClick}
-            size="lg"
-            className="w-full sm:w-auto px-8 text-base shadow-[0_0_35px_rgba(79,70,229,0.45)] hover:shadow-[0_0_50px_rgba(79,70,229,0.6)]"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Start a New Script
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
   const startGenerationCard = (
     <div className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]">
       <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto" />
@@ -579,18 +517,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       ? createAfterBlockAnchor(lastBlock.id)
       : createSceneTopAnchor(lastScene.id);
   }, [context]);
-  const playbackContent = context && playbackProps ? (
-    <PlaybackPanel {...playbackProps} />
-  ) : (
-    <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
-  );
-  const showPlaybackMiniPlayer = Boolean(
-    context
-    && playbackProps
-    && !isAudioDrawerOpen
-    && playbackProps.totalCount > 0
-    && (playbackProps.isPlaying || playbackProps.isPaused)
-  );
   const contentWrapperClassName = 'max-w-[1240px] mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-5 h-full min-h-0 flex flex-col gap-4';
   const handleGenerateNext = useCallback(() => {
     setIsGenerateMenuOpen(false);
@@ -676,49 +602,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       {generationIndicator}
     </div>
   );
-  const setupModal = isSetupOpen ? (
-    <div
-      className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
-      role="region"
-      aria-label="Setup"
-      data-testid="setup-screen"
-    >
-      <div className="pointer-events-none absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.24),_transparent_42%)]" />
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
-        <div className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-slate-950/60 shadow-[0_35px_120px_rgba(2,6,23,0.75)] backdrop-blur-md sm:min-h-[calc(100vh-3rem)]">
-          <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
-            <div className="space-y-1">
-              <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-              <h2 className={SETUP_UI_TOKENS.title}>Start a new script</h2>
-              <p className={SETUP_UI_TOKENS.subtitle}>Pick a genre and let AI shape your opening spark.</p>
-            </div>
-            <button
-              type="button"
-              onClick={onCloseSetup}
-              className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label="Close setup"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 sm:pb-6">
-            <SetupForm
-              value={setupState}
-              onChange={onSetupChange}
-              onRequestSurprise={onSetupSurprise}
-              onStart={onStartSetup}
-              isLoading={isGenerating}
-              onError={onSetupError}
-              isLocked={false}
-              showSubmit
-              autoSurprise={setupAutoSurprise}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   useEffect(() => {
     if (!isExportMenuOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
@@ -760,24 +643,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isGenerateMenuOpen]);
-
-  useEffect(() => {
-    if (!isAudioDrawerOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsAudioDrawerOpen(false);
-        focusScriptScroll();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusScriptScroll, isAudioDrawerOpen]);
-
-  useEffect(() => {
-    if (!isPlaying || !isAudioDrawerOpen) return;
-    setIsAudioDrawerOpen(false);
-    focusScriptScroll();
-  }, [focusScriptScroll, isAudioDrawerOpen, isPlaying]);
 
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#17181c]">
@@ -959,21 +824,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       </div>
                     )}
                   </div>
-                  <div className={headerActionSlotClass}>
-                    <InlineTooltip label="Audio" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => setIsAudioDrawerOpen(true)}
-                        className={headerAudioButtonClass}
-                        aria-haspopup="dialog"
-                        aria-expanded={isAudioDrawerOpen}
-                        aria-label="Open audio drawer"
-                      >
-                        <Speech className="h-4 w-4" />
-                        <span className={headerToolTextClass}>Audio</span>
-                      </button>
-                    </InlineTooltip>
-                  </div>
                 </div>
                 {isGenerating && (
                   <div className="pointer-events-none absolute right-0 top-full z-[6] mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2">
@@ -1015,75 +865,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             <div className="flex-1 flex items-center justify-center px-6 py-10">
               <div className="w-full max-w-2xl space-y-6">
                 {errorBanner}
-                {showInitialGeneration ? startGenerationCard : showStartScreen ? startScreenCard : null}
+                {showInitialGeneration ? startGenerationCard : null}
               </div>
             </div>
           </>
         )}
       </div>
-      {showPlaybackMiniPlayer && playbackProps && (
-        <PlaybackMiniPlayer
-          isPlaying={playbackProps.isPlaying}
-          isPaused={playbackProps.isPaused}
-          currentBlockIndex={playbackProps.currentBlockIndex}
-          totalCount={playbackProps.totalCount}
-          currentSpeaker={playbackProps.currentSpeaker}
-          onPlay={playbackProps.onPlay}
-          onPause={playbackProps.onPause}
-          onResume={playbackProps.onResume}
-          onStop={playbackProps.onStop}
-          onPrev={playbackProps.onPrev}
-          onNext={playbackProps.onNext}
-          onOpenAudioDrawer={() => setIsAudioDrawerOpen(true)}
-        />
-      )}
-      {context && isAudioDrawerOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[96] bg-black/55 backdrop-blur-[2px]"
-            onClick={() => {
-              setIsAudioDrawerOpen(false);
-              focusScriptScroll();
-            }}
-            aria-hidden="true"
-          />
-          <aside
-            role="dialog"
-            aria-label="Audio drawer"
-            data-testid="audio-drawer"
-            className="fixed inset-y-0 right-0 z-[97] flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-4 sm:px-5">
-              <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Audio</p>
-                <h2 className="text-lg font-semibold text-white">Playback and Voice Utility</h2>
-                <p className="text-[11px] text-gray-400">Assign voices, control playback, and tune follow-along behavior.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAudioDrawerOpen(false);
-                  focusScriptScroll();
-                }}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-                aria-label="Close audio drawer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-              <div className="space-y-4">
-                <section className="rounded-2xl border border-gray-800 bg-gray-950/40 p-4">
-                  {playbackContent}
-                </section>
-                <section className="rounded-2xl border border-gray-800 bg-gray-950/40 p-4">
-                  {voicesContent ?? <p className="text-[11px] text-gray-500">Voice controls unavailable.</p>}
-                </section>
-              </div>
-            </div>
-          </aside>
-        </>
-      )}
       <TitleEditModal
         isOpen={isTitleModalOpen}
         value={titleDraft}
@@ -1100,7 +887,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onSave={handleSaveStyle}
         onClose={handleCloseStyleModal}
       />
-      {setupModal}
     </section>
   );
 };

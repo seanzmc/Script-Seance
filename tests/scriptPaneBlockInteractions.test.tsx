@@ -2,7 +2,6 @@ import React, { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
-import { SetupFormState } from '../components/SetupForm';
 import { BlockType, ScriptAnchor, StoryContext } from '../types';
 
 const contextFixture: StoryContext = {
@@ -33,14 +32,6 @@ const contextFixture: StoryContext = {
       ]
     }
   ]
-};
-
-const setupStateFixture: SetupFormState = {
-  genre: 'Noir',
-  premise: 'An investigator confronts a hidden cabal.',
-  characters: ['Alex', 'Sam'],
-  style: '',
-  length: 'Medium'
 };
 
 const contextWithoutCharacters: StoryContext = {
@@ -104,17 +95,9 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   showHighlights: true,
   autoScroll: false,
   onOpenPrivacy: vi.fn(),
-  onOpenSetup: vi.fn(),
-  isSetupOpen: false,
-  onCloseSetup: vi.fn(),
-  setupState: setupStateFixture,
-  onSetupChange: vi.fn(),
-  onStartSetup: vi.fn(),
-  setupAutoSurprise: false,
   onExportTxt: vi.fn(),
   onExportPdf: vi.fn(),
   canExport: true,
-  voicesContent: <div>Voices panel body</div>,
   insertScrollTargetId: null,
   insertScrollToken: 0,
   ...overrides

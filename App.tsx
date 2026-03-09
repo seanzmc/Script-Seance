@@ -7,14 +7,19 @@ import {
   DEFAULT_NARRATOR_VOICE_PREFERENCE
 } from './components/SetupForm';
 import { stylesLibrary } from './stylesLibrary';
-import { ScriptPane } from './components/ScriptPane';
 import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from './components/ScriptDisplay';
 import { VoicesPanel } from './components/VoicesPanel';
 import { PromptInspector } from './components/PromptInspector';
-import type { PlaybackPanelProps } from './components/PlaybackPanel';
+import { PlaybackMiniPlayer } from './components/PlaybackMiniPlayer';
+import { PlaybackPanel, type PlaybackPanelProps } from './components/PlaybackPanel';
 import { VoiceCastingModal } from './components/VoiceCastingModal';
 import { LoginModal } from './components/LoginModal';
 import { PrivacyModal } from './components/PrivacyModal';
+import { WorkspaceShell, type WorkspaceMode } from './components/workspace/WorkspaceShell';
+import { SetupMode } from './components/workspace/SetupMode';
+import { DraftMode } from './components/workspace/DraftMode';
+import { CastMode } from './components/workspace/CastMode';
+import { PlayMode } from './components/workspace/PlayMode';
 import {
   executeGenerateScene,
   executeSuggestPlotTwist,
@@ -349,7 +354,7 @@ export default function App() {
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
   const [insertScrollToken, setInsertScrollToken] = useState(0);
   const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
-  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('setup');
   const [setupAutoSurprise, setSetupAutoSurprise] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
@@ -423,6 +428,15 @@ export default function App() {
 
   useEffect(() => {
     contextRef.current = context;
+  }, [context]);
+
+  useEffect(() => {
+    setWorkspaceMode((previous) => {
+      if (!context) {
+        return 'setup';
+      }
+      return previous === 'setup' ? 'draft' : previous;
+    });
   }, [context]);
 
   useEffect(() => {
@@ -550,17 +564,24 @@ export default function App() {
     return action;
   }, []);
 
-  const openManualSetup = () => {
+  const openManualSetup = useCallback(() => {
     setSetupAutoSurprise(false);
     setupSessionIdRef.current = crypto.randomUUID();
     setupManualEditRevisionRef.current = 0;
-    setIsSetupOpen(true);
-  };
+    setWorkspaceMode('setup');
+  }, []);
 
-  const closeSetup = () => {
-    setIsSetupOpen(false);
-    setSetupAutoSurprise(false);
-  };
+  const switchWorkspaceMode = useCallback((nextMode: WorkspaceMode) => {
+    if (nextMode === 'setup') {
+      openManualSetup();
+      return;
+    }
+    if (!contextRef.current) {
+      setWorkspaceMode('setup');
+      return;
+    }
+    setWorkspaceMode(nextMode);
+  }, [openManualSetup]);
 
   const updateSetupState = useCallback((next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => {
     const source = meta?.source ?? 'user';
@@ -1019,7 +1040,7 @@ export default function App() {
     if (!context) return;
     const proceed = window.confirm('Clear the saved draft from this browser?');
     if (!proceed) return;
-    closeSetup();
+    setSetupAutoSurprise(false);
     cancelAiRequest();
     stop({ clearBuffer: true });
     resetTitleSuggestionState();
@@ -1042,6 +1063,7 @@ export default function App() {
     } catch (err) {
       console.warn('Failed to clear draft', err);
     }
+    setWorkspaceMode('setup');
   };
 
   const requestTitleSuggestion = useCallback(async (setup: SetupFormState) => {
@@ -1112,7 +1134,7 @@ export default function App() {
       return;
     }
     try {
-      closeSetup();
+      setSetupAutoSurprise(false);
       resetUndoRedo();
       resetTitleSuggestionState();
       scriptIdRef.current = crypto.randomUUID();
@@ -1154,6 +1176,7 @@ export default function App() {
             ...initialContext,
             scenes: [normalizedFirstScene]
           });
+          setWorkspaceMode('draft');
           setInsertScrollTargetId(initialFirstBlockId);
           setInsertScrollToken(token => token + 1);
         }
@@ -1715,69 +1738,119 @@ export default function App() {
     autoScroll,
     onToggleAutoScroll: () => setAutoScroll(!autoScroll)
   };
+  const playModeContent = context ? (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-gray-800 bg-gray-950/40 p-4">
+        <PlaybackPanel {...playbackProps} />
+      </section>
+    </div>
+  ) : (
+    <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
+  );
+  const showWorkspaceMiniPlayer = (
+    workspaceMode !== 'play'
+    && Boolean(context)
+    && playbackProps.totalCount > 0
+    && (playbackProps.isPlaying || playbackProps.isPaused)
+  );
   const privacyModal = (
     <PrivacyModal isOpen={isPrivacyOpen} onClose={closePrivacy} />
   );
 
   return (
-    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden relative">
-      <ScriptPane
-        context={context}
-        titleInputRef={titleInputRef}
-        onTitleChange={handleTitleChange}
-        suggestedTitle={suggestedTitle}
-        isSuggestingTitle={isSuggestingTitle}
-        suggestedTitleDismissed={suggestedTitleDismissed}
-        onUseSuggestedTitle={handleUseSuggestedTitle}
-        onDismissSuggestedTitle={handleDismissSuggestedTitle}
-        onClearDraft={handleClearDraft}
-        autosaveError={autosaveError}
-        error={error}
-        userInstruction={userInstruction}
-        onInstructionChange={setUserInstruction}
-        onGenerateNext={handleGenerateNext}
-        onPlotTwist={handleTwist}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        insertCompleteToken={insertCompleteToken}
-        onChangeSpeaker={handleChangeSpeaker}
-        onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
-        onGenerateRewritePreview={handleGenerateRewritePreview}
-        onApplyRewritePreview={handleApplyRewritePreview}
-        onDeleteBlock={handleDeleteBlock}
-        onInsertAtAnchor={handleInsertAtAnchor}
-        onGenerateInsertAtAnchor={handleGenerateInsertAtAnchor}
-        onUpdateSceneHeading={handleUpdateSceneHeading}
-        onToggleLock={handleToggleLock}
-        isGenerating={isGenerating}
-        isPlaying={isPlaying}
-        onCancelGenerate={cancelAiRequest}
-        currentBlockId={currentBlockId}
-        currentBlockIndex={currentBlockIndex}
-        blockStatuses={blockStatuses}
-        showHighlights={showHighlights}
-        autoScroll={autoScroll}
-        onOpenPrivacy={openPrivacy}
-        onOpenSetup={openManualSetup}
-        onSaveStyle={handleSaveStyle}
-        isSetupOpen={isSetupOpen}
-        onCloseSetup={closeSetup}
-        setupState={setupState}
-        onSetupChange={updateSetupState}
-        onSetupSurprise={handleSetupSurprise}
-        onStartSetup={handleStart}
-        setupAutoSurprise={setupAutoSurprise}
-        onSetupError={handleAiError}
-        onExportTxt={handleDownload}
-        onExportPdf={handleExportPdf}
-        canExport={Boolean(context)}
-        playbackProps={context ? playbackProps : undefined}
-        voicesContent={voicesContent}
-        insertScrollTargetId={insertScrollTargetId}
-        insertScrollToken={insertScrollToken}
-      />
+    <>
+      <WorkspaceShell
+      currentMode={workspaceMode}
+      onModeChange={switchWorkspaceMode}
+      hasDraft={Boolean(context)}
+      title={context?.title?.trim() || 'Untitled Screenplay'}
+      canExport={Boolean(context)}
+      onExportTxt={handleDownload}
+      onExportPdf={handleExportPdf}
+      onClearDraft={handleClearDraft}
+      onOpenPrivacy={openPrivacy}
+    >
+      {workspaceMode === 'setup' ? (
+        <SetupMode
+          setupState={setupState}
+          onSetupChange={updateSetupState}
+          onSetupSurprise={handleSetupSurprise}
+          onStartSetup={handleStart}
+          setupAutoSurprise={setupAutoSurprise}
+          isGenerating={isGenerating}
+          error={error}
+          onSetupError={handleAiError}
+        />
+      ) : workspaceMode === 'cast' ? (
+        <CastMode hasDraft={Boolean(context)} content={voicesContent} />
+      ) : workspaceMode === 'play' ? (
+        <PlayMode hasDraft={Boolean(context)} content={playModeContent} />
+      ) : (
+        <DraftMode
+          context={context}
+          titleInputRef={titleInputRef}
+          onTitleChange={handleTitleChange}
+          suggestedTitle={suggestedTitle}
+          isSuggestingTitle={isSuggestingTitle}
+          suggestedTitleDismissed={suggestedTitleDismissed}
+          onUseSuggestedTitle={handleUseSuggestedTitle}
+          onDismissSuggestedTitle={handleDismissSuggestedTitle}
+          onClearDraft={handleClearDraft}
+          autosaveError={autosaveError}
+          error={error}
+          userInstruction={userInstruction}
+          onInstructionChange={setUserInstruction}
+          onGenerateNext={handleGenerateNext}
+          onPlotTwist={handleTwist}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          insertCompleteToken={insertCompleteToken}
+          onChangeSpeaker={handleChangeSpeaker}
+          onInsertError={(err) => handleAiError(err, 'Failed to generate block.')}
+          onGenerateRewritePreview={handleGenerateRewritePreview}
+          onApplyRewritePreview={handleApplyRewritePreview}
+          onDeleteBlock={handleDeleteBlock}
+          onInsertAtAnchor={handleInsertAtAnchor}
+          onGenerateInsertAtAnchor={handleGenerateInsertAtAnchor}
+          onUpdateSceneHeading={handleUpdateSceneHeading}
+          onToggleLock={handleToggleLock}
+          isGenerating={isGenerating}
+          isPlaying={isPlaying}
+          onCancelGenerate={cancelAiRequest}
+          currentBlockId={currentBlockId}
+          currentBlockIndex={currentBlockIndex}
+          blockStatuses={blockStatuses}
+          showHighlights={showHighlights}
+          autoScroll={autoScroll}
+          onOpenPrivacy={openPrivacy}
+          onSaveStyle={handleSaveStyle}
+          onExportTxt={handleDownload}
+          onExportPdf={handleExportPdf}
+          canExport={Boolean(context)}
+          insertScrollTargetId={insertScrollTargetId}
+          insertScrollToken={insertScrollToken}
+        />
+      )}
+
+      {showWorkspaceMiniPlayer && (
+        <PlaybackMiniPlayer
+          isPlaying={playbackProps.isPlaying}
+          isPaused={playbackProps.isPaused}
+          currentBlockIndex={playbackProps.currentBlockIndex}
+          totalCount={playbackProps.totalCount}
+          currentSpeaker={playbackProps.currentSpeaker}
+          onPlay={playbackProps.onPlay}
+          onPause={playbackProps.onPause}
+          onResume={playbackProps.onResume}
+          onStop={playbackProps.onStop}
+          onPrev={playbackProps.onPrev}
+          onNext={playbackProps.onNext}
+          onOpenAudioDrawer={() => setWorkspaceMode('play')}
+        />
+      )}
+      </WorkspaceShell>
 
       {isPromptDebugEnabled && (
         <PromptInspector
@@ -1807,6 +1880,6 @@ export default function App() {
         onLogin={handleLogin}
       />
       {privacyModal}
-    </div>
+    </>
   );
 }

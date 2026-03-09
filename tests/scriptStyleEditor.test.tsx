@@ -2,8 +2,6 @@ import React, { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
-import { SetupFormState } from '../components/SetupForm';
-import { PlaybackPanelProps } from '../components/PlaybackPanel';
 import { BlockType, StoryContext } from '../types';
 import { executeSuggestPlotTwist } from '../services/ai';
 
@@ -20,43 +18,6 @@ const createMockResponse = (status: number, body: unknown): MockResponse => ({
   headers: { get: () => null },
   text: vi.fn().mockResolvedValue(JSON.stringify(body))
 });
-
-const createPlaybackProps = (overrides: Partial<PlaybackPanelProps> = {}): PlaybackPanelProps => ({
-  isPlaying: false,
-  isPaused: false,
-  isLoadingAudio: false,
-  currentBlockId: null,
-  currentBlockIndex: -1,
-  blockStatuses: {},
-  onPlay: vi.fn(),
-  onPause: vi.fn(),
-  onResume: vi.fn(),
-  onStop: vi.fn(),
-  onPrev: vi.fn(),
-  onNext: vi.fn(),
-  onRetry: vi.fn(),
-  onSkip: vi.fn(),
-  onRefreshAudio: vi.fn(),
-  onPurgeAudio: vi.fn(),
-  bufferedCount: 0,
-  totalCount: 0,
-  currentSpeaker: 'None',
-  playbackSpeed: 1,
-  onPlaybackSpeedChange: vi.fn(),
-  showHighlights: true,
-  onToggleHighlights: vi.fn(),
-  autoScroll: false,
-  onToggleAutoScroll: vi.fn(),
-  ...overrides
-});
-
-const setupStateFixture: SetupFormState = {
-  genre: 'Noir',
-  premise: 'A detective uncovers a conspiracy.',
-  characters: ['Alex', 'Sam'],
-  style: '',
-  length: 'Medium'
-};
 
 const createPaneProps = (
   context: StoryContext,
@@ -94,19 +55,10 @@ const createPaneProps = (
   showHighlights: true,
   autoScroll: false,
   onOpenPrivacy: vi.fn(),
-  onOpenSetup: vi.fn(),
   onSaveStyle,
-  isSetupOpen: false,
-  onCloseSetup: vi.fn(),
-  setupState: setupStateFixture,
-  onSetupChange: vi.fn(),
-  onStartSetup: vi.fn(),
-  setupAutoSurprise: false,
   onExportTxt: vi.fn(),
   onExportPdf: vi.fn(),
   canExport: true,
-  playbackProps: createPlaybackProps(),
-  voicesContent: <div>Voices panel body</div>,
   insertScrollTargetId: null,
   insertScrollToken: 0
 });
