@@ -2,19 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { List } from 'lucide-react';
 import { ScriptPane, ScriptPaneProps } from '../ScriptPane';
 import { DraftOutlinePanel } from './DraftOutlinePanel';
+import type { Scene } from '../../types';
 
 export type DraftModeProps = ScriptPaneProps;
 
-const findSceneIdForBlock = (
-  scenes: DraftModeProps['context'] extends infer T
-    ? T extends { scenes: infer S }
-      ? S extends Array<infer U>
-        ? U[]
-        : never
-      : never
-    : never,
-  blockId: string | null
-) => {
+const findSceneIdForBlock = (scenes: Scene[], blockId: string | null) => {
   if (!blockId) return null;
   const scene = scenes.find((entry) => entry.blocks.some((block) => block.id === blockId));
   return scene?.id ?? null;
@@ -24,7 +16,7 @@ export const DraftMode: React.FC<DraftModeProps> = (props) => {
   const { context, currentBlockId, insertScrollTargetId } = props;
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [lastNavigatedSceneId, setLastNavigatedSceneId] = useState<string | null>(null);
-  const scenes = context?.scenes ?? [];
+  const scenes = useMemo(() => context?.scenes ?? [], [context]);
   const sceneIds = useMemo(() => scenes.map((scene) => scene.id), [scenes]);
   const currentBlockSceneId = useMemo(
     () => findSceneIdForBlock(scenes, currentBlockId),

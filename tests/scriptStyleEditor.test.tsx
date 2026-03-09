@@ -171,7 +171,7 @@ describe('script view style editor', () => {
     });
   });
 
-  it('keeps the header generate menu open when the plot twist action runs', async () => {
+  it('keeps the visible draft composer available when the plot twist action runs', async () => {
     const onPlotTwist = vi.fn();
     const context: StoryContext = {
       title: 'Draft',
@@ -198,11 +198,11 @@ describe('script view style editor', () => {
 
     render(<ScriptPane {...createPaneProps(context, vi.fn())} onPlotTwist={onPlotTwist} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
     fireEvent.click(screen.getByRole('button', { name: /plot twist/i }));
 
     expect(onPlotTwist).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('dialog', { name: 'Generate menu' })).toBeTruthy();
+    expect(screen.getByText('Draft Composer')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue Writing' })).toBeTruthy();
   });
 
   it('opens the style library as the active top layer from style editing', () => {

@@ -1,5 +1,5 @@
 import React, { createRef } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { BlockType, StoryContext } from '../types';
@@ -79,125 +79,48 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('ScriptPane header generation controls', () => {
-  it('opens the header generate dropdown with prompt and generation actions', async () => {
+describe('ScriptPane draft workspace chrome', () => {
+  it('shows the visible composer and removes the old hidden generate/export header controls', () => {
     const onPlotTwist = vi.fn();
     render(<ScriptPane {...createProps({ onPlotTwist })} />);
 
-    expect(screen.queryByRole('button', { name: 'Tools' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+    expect(screen.getByText('Draft Composer')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue Writing' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Plot Twist' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Insert Scene / New Beat' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Open generate menu' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open export menu' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear Draft' })).toBeNull();
 
-    const generateMenu = await screen.findByRole('dialog', { name: 'Generate menu' });
-    expect(generateMenu).toBeTruthy();
-    expect(generateMenu.className).toContain('max-[1100px]:left-0');
-    expect(screen.getByRole('button', { name: /generate \/ continue writing/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /plot twist/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /insert scene \/ new beat/i })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: /plot twist/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Plot Twist' }));
     expect(onPlotTwist).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('dialog', { name: 'Generate menu' })).toBeTruthy();
   });
 
-  it('opens the inline insert composer from the Generate menu scene action', async () => {
+  it('opens the inline insert composer from the visible draft composer action', async () => {
     render(<ScriptPane {...createProps()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
-    fireEvent.click(await screen.findByRole('button', { name: /insert scene \/ new beat/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Scene / New Beat' }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
     });
-    expect(screen.queryByRole('dialog', { name: 'Generate menu' })).toBeNull();
   });
 
-  it('formats title metadata and uses matching title/style edit link styling', () => {
-    const { container } = render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
+  it('renders a slimmer meta strip with title/style editing and undo redo controls', () => {
+    render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
-    const editTitleButton = screen.getByRole('button', { name: 'Edit Title' });
-    const editStyleButton = screen.getByRole('button', { name: /Edit Style/i });
-    const generateButton = screen.getByRole('button', { name: 'Open generate menu' });
-    const undoButton = screen.getByRole('button', { name: 'Undo' });
-    const exportButton = screen.getByRole('button', { name: 'Open export menu' });
-    const clearDraftButton = screen.getByRole('button', { name: 'Clear Draft' });
-    const redoButton = screen.getByRole('button', { name: 'Redo' });
-    const metadataRow = screen.getByText('Genre:').closest('div') as HTMLElement;
-
-    expect(editTitleButton.className).toBe(editStyleButton.className);
-    expect(screen.queryByText('1 scenes')).toBeNull();
+    expect(screen.getByText('Draft Workspace')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit Title' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit Style' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeTruthy();
     expect(screen.getByText('Genre:')).toBeTruthy();
     expect(screen.getByText('Style:')).toBeTruthy();
-    expect(screen.queryByText('Draft autosaves locally.')).toBeNull();
-    expect(screen.queryByLabelText('Draft saves locally')).toBeNull();
-    expect(metadataRow.textContent).toContain('Genre:');
-    expect(metadataRow.textContent).toContain('Style:');
-    expect(metadataRow.textContent).not.toContain('1 scenes');
-    expect(undoButton.getAttribute('title')).toBeNull();
-    expect(redoButton.getAttribute('title')).toBeNull();
-    expect(exportButton.getAttribute('title')).toBeNull();
-    expect(clearDraftButton.getAttribute('title')).toBeNull();
-    expect(generateButton.getAttribute('title')).toBeNull();
-    expect(screen.getAllByText('Undo').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Redo').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Export').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Clear Draft').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Generate Next Scene').length).toBeGreaterThan(0);
-    expect(generateButton.className).toContain('sm:h-12');
-    expect(generateButton.className).toContain('max-[1279px]:px-3');
-    expect(generateButton.className).toContain('w-full');
-    expect(generateButton.className).toContain('xl:w-auto');
-    expect(undoButton.className).toContain('h-9');
-    expect(undoButton.className).toContain('max-[1279px]:px-2.5');
-    expect(undoButton.className).toContain('max-[820px]:h-10');
-    expect(undoButton.className).toContain('w-full');
-    expect(undoButton.className).toContain('xl:w-auto');
-    const generateTooltipWrapper = generateButton.parentElement as HTMLElement;
-    const generateButtonSlot = generateTooltipWrapper.parentElement as HTMLElement;
-    const generateButtonRow = generateButtonSlot.parentElement as HTMLElement;
-    const headerActionContainer = generateButtonRow.parentElement as HTMLElement;
-    const undoTooltipWrapper = undoButton.parentElement as HTMLElement;
-
-    expect(headerActionContainer.className).toContain('w-full');
-    expect(headerActionContainer.className).toContain('flex-col');
-    expect(headerActionContainer.className).toContain('xl:items-end');
-    expect(headerActionContainer.className).toContain('items-stretch');
-    expect(generateButtonRow.className).not.toContain('flex-wrap');
-    expect(generateButtonSlot.className).toContain('min-w-0');
-    expect(generateButtonSlot.className).toContain('flex-1');
-    expect(generateButtonSlot.className).toContain('xl:flex-none');
-    expect(generateButtonRow.className).toContain('w-full');
-    expect(generateButtonRow.className).toContain('xl:w-auto');
-    expect(generateButtonRow.className).toContain('xl:items-center');
-    expect(generateTooltipWrapper.className).toContain('w-full');
-    expect(generateTooltipWrapper.className).toContain('xl:w-auto');
-    expect(undoTooltipWrapper.parentElement?.className).toContain('min-w-0 flex-1');
-    expect(undoTooltipWrapper.parentElement?.className).toContain('xl:flex-none');
-    expect(container.textContent).toContain('•');
-
-    fireEvent.click(generateButton);
-    const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
-
-    expect(within(generateMenu).getByText('1 scenes')).toBeTruthy();
-    expect(within(generateMenu).getByLabelText('Draft saves locally')).toBeTruthy();
-    expect(within(generateMenu).getByText('Draft saves locally')).toBeTruthy();
-    expect(within(generateMenu).getByText('Generate the next section of the screenplay')).toBeTruthy();
-    expect(within(generateMenu).getByText('Generate a plot twist')).toBeTruthy();
-    expect(within(generateMenu).getByText('Insert a new scene or beat at the current draft edge')).toBeTruthy();
-    expect(within(generateMenu).getByRole('button', { name: 'Privacy' })).toBeTruthy();
+    expect(screen.getAllByText('1 scene')).toHaveLength(2);
+    expect(screen.queryByText('Draft saves locally')).toBeTruthy();
   });
 
-  it('anchors the header writing pill outside the action-row flex flow', () => {
-    render(<ScriptPane {...createProps({ isGenerating: true })} />);
-
-    const writingLabel = screen.getByText('Writing');
-    const writingPill = writingLabel.closest('[aria-live="polite"]') as HTMLElement;
-    expect(writingPill.className).toContain('pointer-events-auto');
-    expect(writingPill.parentElement?.className).toContain('absolute');
-    expect(writingPill.parentElement?.className).toContain('top-full');
-    expect(writingPill.parentElement?.className).toContain('max-[940px]:left-1/2');
-  });
-
-  it('toggles title and style editors closed when their active triggers are clicked again', async () => {
+  it('keeps title and style editors toggleable from the slimmer meta strip', async () => {
     render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
     const editTitleButton = screen.getByRole('button', { name: 'Edit Title' });
@@ -217,7 +140,7 @@ describe('ScriptPane header generation controls', () => {
     });
   });
 
-  it('positions the style editor within the viewport shell above the header band', () => {
+  it('positions the style editor within the viewport shell above the draft surface', () => {
     render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Style' }));
@@ -241,32 +164,11 @@ describe('ScriptPane header generation controls', () => {
     expect(libraryOverlay.className).toContain('z-[120]');
   });
 
-  it('shows plot twist progress without shifting the generate button into loading mode', () => {
+  it('shows composer progress inline while keeping the visible draft actions present', () => {
     render(<ScriptPane {...createProps({ isGenerating: true })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
-
     expect(screen.getByText('Working on your request...')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /generate \/ continue writing/i }).getAttribute('aria-busy')).toBeNull();
-  });
-
-  it('export opens from the header menu and closes cleanly', async () => {
-    const onExportTxt = vi.fn();
-    const onExportPdf = vi.fn();
-    render(<ScriptPane {...createProps({ onExportTxt, onExportPdf })} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open export menu' }));
-
-    const exportMenu = await screen.findByRole('menu', { name: 'Export options' });
-    expect(exportMenu).toBeTruthy();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Export Script (.txt)' }));
-    expect(onExportTxt).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open export menu' }));
-    expect(await screen.findByRole('menu', { name: 'Export options' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Export PDF' }));
-    expect(onExportPdf).toHaveBeenCalledTimes(1);
-
-    expect(screen.queryByRole('menu', { name: 'Export options' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue Writing' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
   });
 });

@@ -141,7 +141,7 @@ describe('App workspace modes', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Open generate menu' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Continue Writing' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Draft' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getAllByText('Workspace Draft')).toHaveLength(2);
   });
@@ -151,7 +151,7 @@ describe('App workspace modes', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Open generate menu' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Continue Writing' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
     expect(await screen.findByText('Voice Casting')).toBeTruthy();
@@ -160,7 +160,7 @@ describe('App workspace modes', () => {
     expect(await screen.findByText('Playback Studio')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }));
-    expect(await screen.findByRole('button', { name: 'Open generate menu' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Continue Writing' })).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     expect(await screen.findByRole('dialog', { name: 'Insert Block' })).toBeTruthy();
@@ -177,7 +177,7 @@ describe('App workspace modes', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Open generate menu' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Continue Writing' })).toBeTruthy();
     expect(screen.getByTestId('playback-mini-player')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cast' }));

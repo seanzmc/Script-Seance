@@ -330,15 +330,10 @@ describe('ScriptPane block interactions', () => {
     expect(onGenerateNext).toHaveBeenCalledTimes(0);
   });
 
-  it('routes Generate menu insert scene action through the same anchor insert callback', async () => {
+  it('routes visible composer insert scene action through the same anchor insert callback', async () => {
     const onInsertAtAnchor = vi.fn();
     render(<ScriptPane {...createProps({ onInsertAtAnchor })} />);
 
-    expect(screen.getByText('GENERATE NEXT SCENE')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
-    const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
-    expect(generateMenu.className).toContain('bg-gray-950');
     fireEvent.click(screen.getByRole('button', { name: /insert scene \/ new beat/i }));
 
     const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
