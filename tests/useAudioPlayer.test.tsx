@@ -2,7 +2,7 @@ import React, { forwardRef, useImperativeHandle } from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import { BlockType, ScriptBlock, VoiceConfig } from '../types';
+import { BlockType, ScriptBlock, VoiceConfig, TtsVoice } from '../types';
 
 type EngineLike = {
   emit: (event: string, payload: unknown) => void;
@@ -97,6 +97,9 @@ type HarnessProps = {
   blocks?: ScriptBlock[];
   scriptId?: string;
   voiceContextRevision?: number;
+  availableVoices?: TtsVoice[];
+  characterVoicePreferences?: Record<string, string>;
+  narratorVoicePreference?: string;
   onError?: (error: unknown, fallbackMessage: string) => void;
   onSkip?: (block: ScriptBlock, error: unknown) => void;
 };
@@ -105,7 +108,10 @@ const Harness = forwardRef((props: HarnessProps, ref) => {
   const player = useAudioPlayer(props.voiceConfigs, props.onError, props.onSkip, {
     blocks: props.blocks,
     scriptId: props.scriptId,
-    voiceContextRevision: props.voiceContextRevision
+    voiceContextRevision: props.voiceContextRevision,
+    availableVoices: props.availableVoices,
+    characterVoicePreferences: props.characterVoicePreferences,
+    narratorVoicePreference: props.narratorVoicePreference
   });
   useImperativeHandle(ref, () => player);
   return null;
@@ -586,5 +592,178 @@ describe('useAudioPlayer', () => {
     );
     const surfacedError = onError.mock.calls[0]?.[0] as { code?: string };
     expect(surfacedError.code).not.toBe('REQUEST_ABORTED');
+  });
+
+  it('sanitizes disallowed narrator preview voices to Mark before generation', async () => {
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'Hades', speed: 1, pitch: 0 }
+    ];
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Masculine'
+      }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={[]}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        availableVoices={availableVoices}
+        narratorVoicePreference="male"
+      />
+    );
+
+    getEngine().generateSingle.mockResolvedValueOnce(new ArrayBuffer(12));
+    await act(async () => {
+      await ref.current.playPreview('Narration', voiceConfigs[0], { scopeId: 'narrator-preview' });
+    });
+
+    expect(getEngine().generateSingle).toHaveBeenCalledWith(
+      'Narration',
+      'mark-voice',
+      expect.any(Object)
+    );
+  });
+
+  it('sanitizes invalid character playback voices using the preference-aware auto pool', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'missing-voice', speed: 1, pitch: 0 }
+    ];
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Masculine'
+      },
+      {
+        id: 'female-auto',
+        displayName: 'Olivia',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Feminine'
+      },
+      {
+        id: 'manual-only',
+        displayName: 'Manual Only',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: false,
+        gender: 'Feminine'
+      }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={blocks}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        availableVoices={availableVoices}
+        characterVoicePreferences={{ a: 'female' }}
+        narratorVoicePreference="male"
+      />
+    );
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    expect(getEngine().start).toHaveBeenCalledWith(
+      blocks,
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'A', voiceId: 'female-auto' })
+      ]),
+      expect.any(Object)
+    );
+  });
+
+  it('uses only the combined curated auto pool for random character fallback', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'B' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'B', voiceId: 'missing-voice', speed: 1, pitch: 0 }
+    ];
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Masculine'
+      },
+      {
+        id: 'combined-auto',
+        displayName: 'Ashley',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Feminine'
+      },
+      {
+        id: 'selectable-only',
+        displayName: 'Selectable Only',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: false,
+        gender: 'Feminine'
+      }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={blocks}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        availableVoices={availableVoices}
+        characterVoicePreferences={{ b: 'random' }}
+        narratorVoicePreference="male"
+      />
+    );
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    expect(getEngine().start).toHaveBeenCalledWith(
+      blocks,
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'B', voiceId: 'combined-auto' })
+      ]),
+      expect.any(Object)
+    );
   });
 });

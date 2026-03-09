@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ScriptBlock, VoiceConfig, BlockType } from '../types';
+import { ScriptBlock, VoiceConfig, BlockType, TtsVoice } from '../types';
 import { ScriptEngine, AudioChunk } from '../services/scriptEngine';
-import { DEFAULT_VOICE_CONFIG } from '../shared/voiceDefaults.js';
+import { DEFAULT_VOICE_CONFIG, sanitizeVoiceIdForUsage } from '../shared/voiceDefaults.js';
 import { GenerationOrchestrator, scopeKeys } from '../services/orchestration';
 
 type BlockAudioStatus = 'notGenerated' | 'generating' | 'ready' | 'error';
@@ -14,6 +14,9 @@ export type AudioOrchestrationContext = {
   scriptId?: string;
   voiceContextRevision?: number;
   blocks?: ScriptBlock[];
+  availableVoices?: TtsVoice[];
+  characterVoicePreferences?: Record<string, string>;
+  narratorVoicePreference?: string;
 };
 
 type PlaybackGate = {
@@ -83,6 +86,18 @@ export const useAudioPlayer = (
   useEffect(() => {
     voiceConfigsRef.current = voiceConfigs;
   }, [voiceConfigs]);
+  const availableVoicesRef = useRef(orchestrationContext?.availableVoices ?? []);
+  useEffect(() => {
+    availableVoicesRef.current = orchestrationContext?.availableVoices ?? [];
+  }, [orchestrationContext?.availableVoices]);
+  const characterVoicePreferencesRef = useRef(orchestrationContext?.characterVoicePreferences ?? {});
+  useEffect(() => {
+    characterVoicePreferencesRef.current = orchestrationContext?.characterVoicePreferences ?? {};
+  }, [orchestrationContext?.characterVoicePreferences]);
+  const narratorVoicePreferenceRef = useRef(orchestrationContext?.narratorVoicePreference ?? 'male');
+  useEffect(() => {
+    narratorVoicePreferenceRef.current = orchestrationContext?.narratorVoicePreference ?? 'male';
+  }, [orchestrationContext?.narratorVoicePreference]);
 
   useEffect(() => {
     scriptIdRef.current = orchestrationContext?.scriptId || 'local-script';
@@ -143,20 +158,53 @@ export const useAudioPlayer = (
       charName = 'Narrator';
     }
     const normalized = normalizeCharacterName(charName);
-    return voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === normalized)
+    const existing = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === normalized)
       || voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
+    const isNarrator = normalized === 'narrator';
+    const preference = isNarrator
+      ? narratorVoicePreferenceRef.current
+      : characterVoicePreferencesRef.current[normalized] || 'random';
+    return {
+      ...(existing || { name: charName, ...DEFAULT_VOICE_CONFIG }),
+      name: existing?.name || charName,
+      voiceId: sanitizeVoiceIdForUsage({
+        voiceId: existing?.voiceId || '',
+        voices: availableVoicesRef.current,
+        isNarrator,
+        preference,
+        seedKey: charName
+      })
+    };
   }, []);
+  const getSanitizedVoiceConfigs = useCallback(() => (
+    voiceConfigsRef.current.map((config) => {
+      const normalized = normalizeCharacterName(config.name);
+      const isNarrator = normalized === 'narrator';
+      return {
+        ...config,
+        voiceId: sanitizeVoiceIdForUsage({
+          voiceId: config.voiceId,
+          voices: availableVoicesRef.current,
+          isNarrator,
+          preference: isNarrator
+            ? narratorVoicePreferenceRef.current
+            : characterVoicePreferencesRef.current[normalized] || 'random',
+          seedKey: config.name
+        })
+      };
+    })
+  ), []);
 
   const getFallbackVoiceId = useCallback(() => {
-    const narrator = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
-    if (typeof narrator?.voiceId === 'string' && narrator.voiceId.trim().length > 0) {
-      return narrator.voiceId;
-    }
-    const firstConfiguredVoice = voiceConfigsRef.current.find((config) => (
-      typeof config.voiceId === 'string' && config.voiceId.trim().length > 0
-    ));
-    return firstConfiguredVoice?.voiceId || '';
-  }, []);
+    const narrator = getSanitizedVoiceConfigs().find((config) => normalizeCharacterName(config.name) === 'narrator');
+    return sanitizeVoiceIdForUsage({
+      voiceId: narrator?.voiceId || '',
+      voices: availableVoicesRef.current,
+      isNarrator: true,
+      preference: narratorVoicePreferenceRef.current,
+      seedKey: 'Narrator'
+    });
+  }, [getSanitizedVoiceConfigs]);
 
   const updateBufferProgress = useCallback((nextTotal?: number) => {
     const total = typeof nextTotal === 'number' ? nextTotal : totalCountRef.current;
@@ -579,7 +627,7 @@ export const useAudioPlayer = (
 
         signal.addEventListener('abort', onAbort, { once: true });
         engine.on('complete', onComplete);
-        void engine.start(blocks, voiceConfigsRef.current, {
+        void engine.start(blocks, getSanitizedVoiceConfigs(), {
           clearCache: forceRegenerate,
           playbackRunId,
           voiceContextRevision: startedVoiceContextRevision
@@ -607,7 +655,7 @@ export const useAudioPlayer = (
         onError?.(outcome.error, 'Audio generation failed.');
       }
     });
-  }, [getCurrentBlockRevision, getPlaybackScopeKey, onError]);
+  }, [getCurrentBlockRevision, getPlaybackScopeKey, getSanitizedVoiceConfigs, onError]);
 
   const playScript = (blocks: ScriptBlock[], options?: { forceRegenerate?: boolean }) => {
     const playableBlocks = getPlayableBlocks(blocks);
@@ -824,7 +872,21 @@ export const useAudioPlayer = (
     setIsLoadingAudio(true);
 
     const startedVoiceContextRevision = voiceContextRevisionRef.current;
-    const scopeIdentity = options?.scopeId || config.voiceId;
+    const normalizedPreviewName = normalizeCharacterName(config.name) || config.name;
+    const isNarratorPreview = normalizedPreviewName === 'narrator';
+    const sanitizedPreviewConfig: VoiceConfig = {
+      ...config,
+      voiceId: sanitizeVoiceIdForUsage({
+        voiceId: config.voiceId,
+        voices: availableVoicesRef.current,
+        isNarrator: isNarratorPreview,
+        preference: isNarratorPreview
+          ? narratorVoicePreferenceRef.current
+          : characterVoicePreferencesRef.current[normalizedPreviewName] || 'random',
+        seedKey: config.name
+      })
+    };
+    const scopeIdentity = options?.scopeId || sanitizedPreviewConfig.voiceId;
     const scopeKey = scopeKeys.ttsPreview(scriptIdRef.current, scopeIdentity);
     activePreviewScopeRef.current = scopeKey;
 
@@ -836,8 +898,8 @@ export const useAudioPlayer = (
         scopeIdentity
       },
       execute: async (signal) => {
-        const buffer = await engineRef.current?.generateSingle(text, config.voiceId, {
-          expressive: config.expressive || false,
+        const buffer = await engineRef.current?.generateSingle(text, sanitizedPreviewConfig.voiceId, {
+          expressive: sanitizedPreviewConfig.expressive || false,
           signal,
           requestId: `preview:${scopeIdentity}:${Date.now()}`
         });
@@ -853,8 +915,8 @@ export const useAudioPlayer = (
 
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
-        source.playbackRate.value = config.speed ?? DEFAULT_VOICE_CONFIG.speed;
-        source.detune.value = (config.pitch ?? DEFAULT_VOICE_CONFIG.pitch) * 100;
+        source.playbackRate.value = sanitizedPreviewConfig.speed ?? DEFAULT_VOICE_CONFIG.speed;
+        source.detune.value = (sanitizedPreviewConfig.pitch ?? DEFAULT_VOICE_CONFIG.pitch) * 100;
 
         const gainNode = ctx.createGain();
         gainNode.gain.value = 0.92;

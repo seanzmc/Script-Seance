@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   SetupFormState,
+  type VoicePreference,
   synchronizeSetupVoicePreferences,
   DEFAULT_CHARACTER_VOICE_PREFERENCE,
   DEFAULT_NARRATOR_VOICE_PREFERENCE
@@ -38,7 +39,7 @@ import {
 } from './types';
 import {
   DEFAULT_VOICE_CONFIG,
-  resolveDefaultNarratorVoiceId
+  sanitizeVoiceIdForUsage
 } from './shared/voiceDefaults.js';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import {
@@ -95,6 +96,21 @@ const normalizeSetupState = (value: SetupFormState): SetupFormState => ({
   ...value,
   ...synchronizeSetupVoicePreferences(value)
 });
+const buildCharacterPreferenceLookup = (setup: SetupFormState) => {
+  const lookup = new Map<string, VoicePreference>();
+  const preferences = synchronizeSetupVoicePreferences(setup).characterVoicePreferences;
+  setup.characters.forEach((character, index) => {
+    const normalized = normalizeCharacterName(character);
+    if (normalized) {
+      lookup.set(normalized, preferences[index] ?? DEFAULT_CHARACTER_VOICE_PREFERENCE);
+    }
+  });
+  return lookup;
+};
+const getVoicePreferenceForCharacter = (
+  characterName: string,
+  lookup: Map<string, VoicePreference>
+) => lookup.get(normalizeCharacterName(characterName)) ?? DEFAULT_CHARACTER_VOICE_PREFERENCE;
 
 const isStoryContext = (value: unknown): value is StoryContext => {
   if (!value || typeof value !== 'object') {
@@ -186,8 +202,6 @@ export const normalizeSceneCharacters = (scene: Scene, characters: string[]): Sc
     blocks: normalizedBlocks
   };
 };
-
-const getVoiceIdList = (voices: TtsVoice[]) => voices.map((voice) => voice.id);
 
 const buildFallbackTitle = (premise: string, genre: string) => {
   const words = premise
@@ -393,6 +407,14 @@ export default function App() {
   const promptStyleFingerprint = useMemo(() => (
     buildPromptStyleFingerprint(scriptStyleContext)
   ), [scriptStyleContext]);
+  const characterVoicePreferenceLookup = useMemo(
+    () => buildCharacterPreferenceLookup(setupState),
+    [setupState]
+  );
+  const narratorVoicePreference = useMemo(
+    () => normalizeSetupState(setupState).narratorVoicePreference ?? DEFAULT_NARRATOR_VOICE_PREFERENCE,
+    [setupState]
+  );
 
   const allBlocks = useMemo(
     () => (context ? context.scenes.flatMap(scene => scene.blocks) : []),
@@ -694,7 +716,10 @@ export default function App() {
   } = useAudioPlayer(voiceConfigs, handleAiError, handleAudioSkip, {
     scriptId: scriptIdRef.current,
     voiceContextRevision: voiceContextRevisionRef.current,
-    blocks: allBlocks
+    blocks: allBlocks,
+    availableVoices,
+    characterVoicePreferences: Object.fromEntries(characterVoicePreferenceLookup),
+    narratorVoicePreference
   });
 
   // Clear preview state when playback ends
@@ -715,8 +740,13 @@ export default function App() {
   // Initialize Voices when characters change
   useEffect(() => {
     if (!context?.characters) return;
-    const voiceIds = getVoiceIdList(availableVoices);
-    const narratorVoiceId = resolveDefaultNarratorVoiceId(availableVoices);
+    const narratorVoiceId = sanitizeVoiceIdForUsage({
+      voiceId: '',
+      voices: availableVoices,
+      isNarrator: true,
+      preference: narratorVoicePreference,
+      seedKey: 'Narrator'
+    });
 
     applyVoiceConfigMutation((prev) => {
       const next = [...prev];
@@ -729,19 +759,77 @@ export default function App() {
           voiceId: narratorVoiceId,
           ...DEFAULT_VOICE_CONFIG
         });
+      } else {
+        const narratorIndex = next.findIndex((config) => (
+          normalizeCharacterName(config.name) === normalizeCharacterName('Narrator')
+        ));
+        if (narratorIndex >= 0) {
+          const current = next[narratorIndex];
+          next[narratorIndex] = {
+            ...current,
+            voiceId: sanitizeVoiceIdForUsage({
+              voiceId: current.voiceId,
+              voices: availableVoices,
+              isNarrator: true,
+              preference: narratorVoicePreference,
+              seedKey: 'Narrator'
+            })
+          };
+        }
       }
 
-      context.characters.forEach((char, idx) => {
+      const assignedCharacterVoiceIds = next
+        .filter((config) => normalizeCharacterName(config.name) !== normalizeCharacterName('Narrator'))
+        .map((config) => config.voiceId)
+        .filter(Boolean);
+
+      context.characters.forEach((char) => {
+        const preference = getVoicePreferenceForCharacter(char, characterVoicePreferenceLookup);
         if (!hasVoiceConfig(char)) {
-          const hasVoiceOptions = voiceIds.length > 0;
-          const voice = hasVoiceOptions ? voiceIds[idx % voiceIds.length] : narratorVoiceId;
+          const voice = sanitizeVoiceIdForUsage({
+            voiceId: '',
+            voices: availableVoices,
+            preference,
+            seedKey: char,
+            usedVoiceIds: assignedCharacterVoiceIds
+          });
+          if (voice) {
+            assignedCharacterVoiceIds.push(voice);
+          }
           next.push({ name: char, voiceId: voice, ...DEFAULT_VOICE_CONFIG });
+          return;
         }
+
+        const index = next.findIndex((config) => (
+          normalizeCharacterName(config.name) === normalizeCharacterName(char)
+        ));
+        if (index < 0) return;
+        const current = next[index];
+        const sanitizedVoiceId = sanitizeVoiceIdForUsage({
+          voiceId: current.voiceId,
+          voices: availableVoices,
+          preference,
+          seedKey: char,
+          usedVoiceIds: assignedCharacterVoiceIds
+        });
+        if (sanitizedVoiceId) {
+          assignedCharacterVoiceIds.push(sanitizedVoiceId);
+        }
+        next[index] = {
+          ...current,
+          voiceId: sanitizedVoiceId
+        };
       });
 
       return next;
     });
-  }, [applyVoiceConfigMutation, availableVoices, context?.characters, playbackSpeed]);
+  }, [
+    applyVoiceConfigMutation,
+    availableVoices,
+    characterVoicePreferenceLookup,
+    context?.characters,
+    narratorVoicePreference
+  ]);
 
   useEffect(() => {
     if (context) {
@@ -1294,16 +1382,36 @@ export default function App() {
   }, [scriptMutationController]);
 
   const updateVoiceConfig = (char: string, updates: Partial<VoiceConfig>) => {
-    const voiceIds = getVoiceIdList(availableVoices);
-    const defaultVoiceId = voiceIds[0] || resolveDefaultNarratorVoiceId(availableVoices);
+    const normalizedChar = normalizeCharacterName(char);
+    const isNarrator = normalizedChar === normalizeCharacterName('Narrator');
+    const defaultVoiceId = sanitizeVoiceIdForUsage({
+      voiceId: '',
+      voices: availableVoices,
+      isNarrator,
+      preference: isNarrator
+        ? narratorVoicePreference
+        : getVoicePreferenceForCharacter(char, characterVoicePreferenceLookup),
+      seedKey: char
+    });
     let shouldClearGeneratedAudio = false;
     applyVoiceConfigMutation((prev) => {
-      const normalized = normalizeCharacterName(char);
-      const existingIdx = prev.findIndex(c => normalizeCharacterName(c.name) === normalized);
+      const existingIdx = prev.findIndex(c => normalizeCharacterName(c.name) === normalizedChar);
       if (existingIdx >= 0) {
         const updated = [...prev];
         const current = updated[existingIdx];
-        const nextConfig = { ...current, ...updates };
+        const nextConfig = {
+          ...current,
+          ...updates,
+          voiceId: sanitizeVoiceIdForUsage({
+            voiceId: typeof updates.voiceId === 'string' ? updates.voiceId : current.voiceId,
+            voices: availableVoices,
+            isNarrator,
+            preference: isNarrator
+              ? narratorVoicePreference
+              : getVoicePreferenceForCharacter(char, characterVoicePreferenceLookup),
+            seedKey: char
+          })
+        };
         const voiceChanged = typeof updates.voiceId === 'string' && updates.voiceId !== current.voiceId;
         const expressiveChanged =
           typeof updates.expressive === 'boolean' &&
@@ -1319,7 +1427,15 @@ export default function App() {
       }
       return [...prev, { 
         name: char, 
-        voiceId: defaultVoiceId,
+        voiceId: sanitizeVoiceIdForUsage({
+          voiceId: typeof updates.voiceId === 'string' ? updates.voiceId : defaultVoiceId,
+          voices: availableVoices,
+          isNarrator,
+          preference: isNarrator
+            ? narratorVoicePreference
+            : getVoicePreferenceForCharacter(char, characterVoicePreferenceLookup),
+          seedKey: char
+        }),
         ...DEFAULT_VOICE_CONFIG,
         ...updates 
       } as VoiceConfig];
@@ -1508,8 +1624,13 @@ export default function App() {
 
   const bufferedBlocks = bufferedCount;
   const totalBufferedBlocks = totalBufferedCount;
-  const voiceIds = getVoiceIdList(availableVoices);
-  const defaultVoiceId = voiceIds[0] || resolveDefaultNarratorVoiceId(availableVoices);
+  const defaultVoiceId = sanitizeVoiceIdForUsage({
+    voiceId: '',
+    voices: availableVoices,
+    isNarrator: true,
+    preference: narratorVoicePreference,
+    seedKey: 'Narrator'
+  });
   const isTtsPreviewEnabled = voiceCatalogState === 'ready' && availableVoices.length > 0;
 
   const voicesContent = context ? (
