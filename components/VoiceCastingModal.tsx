@@ -174,6 +174,9 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
     () => new Set(availableVoices.map((voice) => voice.id)),
     [availableVoices]
   );
+  const gridClassName = embedded
+    ? 'grid grid-cols-1 min-[360px]:grid-cols-2 gap-2'
+    : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2';
 
   if (!isOpen) return null;
 
@@ -290,7 +293,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
               <p>No voices match your filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className={gridClassName} data-testid="voice-casting-grid">
               {filteredVoices.map((voice) => {
                 const isSelected = currentVoiceId === voice.id;
                 const isPlaying = isPreviewing && previewVoiceId === voice.id;
@@ -306,7 +309,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                   <div
                     key={voice.id}
                     onClick={() => onSelect(voice.id)}
-                    className={`group relative flex flex-col p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
+                    className={`group relative flex ${embedded ? 'h-full' : ''} flex-col p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
                       isSelected
                         ? 'bg-indigo-900/30 border-indigo-500 ring-1 ring-indigo-500/30'
                         : isPlaying
@@ -316,12 +319,15 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                   >
                     {/* Top Row: Name & Active State */}
                     <div className="flex justify-between items-start mb-1">
-                      <div className="overflow-hidden">
+                      <div className="min-w-0 flex-1">
                         <h3 className={`font-bold text-sm truncate ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                           {voice.name}
                         </h3>
                         {(voice.gender || voice.category) && (
-                          <div className="flex gap-1 mt-0.5">
+                          <div
+                            className="mt-0.5 flex flex-wrap gap-1"
+                            data-testid={`voice-card-canonical-badges-${voice.id}`}
+                          >
                             {voice.gender && (
                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
                                 isSelected ? 'bg-indigo-500/30 text-indigo-300' : 'bg-gray-700 text-gray-400'
@@ -341,7 +347,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                       </div>
 
                       {/* Right Indicator: Selected Check or Now Playing */}
-                      <div className="flex items-center gap-2">
+                      <div className="ml-2 flex shrink-0 items-center gap-2">
                          {isPlaying && (
                            <div className="flex gap-0.5">
                              <div className="w-1 h-3 bg-indigo-400 animate-[bounce_1s_infinite_0s] rounded-full"></div>
@@ -377,7 +383,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
                     <div className="mb-2 pt-2 border-t border-gray-700/50">
                       <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-tight">
                         <User className={`w-3 h-3 ${isAssignedElsewhere ? 'text-indigo-400' : 'text-emerald-400'}`} />
-                        <span className={isAssignedElsewhere ? 'text-indigo-300' : 'text-emerald-400'}>
+                        <span className={`${isAssignedElsewhere ? 'text-indigo-300' : 'text-emerald-400'} min-w-0 break-words`}>
                           {isAssignedElsewhere ? `In use by: ${assignments.join(', ')}` : 'Available'}
                         </span>
                       </div>

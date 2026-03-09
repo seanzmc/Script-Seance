@@ -1,8 +1,12 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { VoiceCastingModal } from '../components/VoiceCastingModal';
 import { VoiceConfig } from '../types';
+
+afterEach(() => {
+  cleanup();
+});
 
 describe('VoiceCastingModal', () => {
   it('shows casting semantics and back action in embedded mode', () => {
@@ -76,11 +80,42 @@ describe('VoiceCastingModal', () => {
       throw new Error('Voice card not found');
     }
     const scoped = within(card as HTMLElement);
+    const grid = screen.getByTestId('voice-casting-grid');
+    const canonicalBadges = screen.getByTestId('voice-card-canonical-badges-test-voice');
 
+    expect(grid.className).toContain('grid-cols-1');
+    expect(grid.className).toContain('min-[360px]:grid-cols-2');
+    expect(grid.className).not.toContain('lg:grid-cols-3');
+    expect(canonicalBadges.className).toContain('flex-wrap');
     expect(scoped.getAllByText('Feminine')).toHaveLength(1);
     expect(scoped.getAllByText('High Energy')).toHaveLength(1);
     expect(scoped.getAllByText('Calm')).toHaveLength(1);
     expect(scoped.getByText('Mystery')).toBeTruthy();
+  });
+
+  it('preserves the wider non-embedded modal grid progression', () => {
+    render(
+      <VoiceCastingModal
+        isOpen={true}
+        onClose={vi.fn()}
+        characterName="Narrator"
+        currentVoiceId="test-voice"
+        availableVoices={[
+          {
+            id: 'test-voice',
+            displayName: 'Test Voice',
+            source: 'inworld-premade',
+            labels: ['calm'],
+            isCustom: false
+          }
+        ]}
+        voiceConfigs={[{ name: 'Narrator', voiceId: 'test-voice', speed: 1, pitch: 0 }]}
+        onSelect={vi.fn()}
+        onPreview={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('voice-casting-grid').className).toContain('lg:grid-cols-3');
   });
 
   it('shows synthetic assigned voice when current voice is missing from provider catalog', () => {
