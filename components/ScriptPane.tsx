@@ -115,6 +115,24 @@ export interface ScriptPaneProps {
 
 const PROMPT_CHAR_LIMIT = 320;
 
+type InlineTooltipProps = {
+  label: string;
+  children: React.ReactNode;
+  wrapperClassName?: string;
+};
+
+const InlineTooltip = ({ label, children, wrapperClassName }: InlineTooltipProps) => (
+  <span className={`group relative inline-flex ${wrapperClassName ?? ''}`.trim()}>
+    {children}
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-[6] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+    >
+      {label}
+    </span>
+  </span>
+);
+
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
   titleInputRef,
@@ -210,20 +228,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const toolSectionClass = 'space-y-2';
   const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
   const draftSaveIndicator = (
-    <span
-      role="img"
-      aria-label="Draft saves locally"
-      tabIndex={0}
-      className="group relative inline-flex items-center text-emerald-200/90 outline-none"
-    >
-      <ShieldCheck className="h-3.5 w-3.5" />
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-[6] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-      >
-        Draft saves locally
+    <InlineTooltip label="Draft saves locally" wrapperClassName="items-center text-emerald-200/90">
+      <span role="img" aria-label="Draft saves locally" tabIndex={0} className="inline-flex items-center outline-none">
+        <ShieldCheck className="h-3.5 w-3.5" />
       </span>
-    </span>
+    </InlineTooltip>
   );
   const generationIndicator = (
     <div className="min-h-[2.5rem]">
@@ -629,37 +638,40 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         </div>
       </div>
       <div className="grid gap-2">
-        <Button
-          onClick={handleGenerateNext}
-          disabled={isPlaying || isGenerating}
-          className="justify-start shadow-lg shadow-indigo-500/20"
-          title="Generate the next section of the screenplay"
-        >
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Generate / Continue Writing
-        </Button>
-        <Button
-          onClick={handleGeneratePlotTwist}
-          variant="secondary"
-          size="sm"
-          disabled={isGenerating}
-          className="justify-start"
-          title="Generate a plot twist"
-        >
-          <Sparkles className="mr-2 h-3.5 w-3.5" />
-          Plot Twist
-        </Button>
-        <Button
-          onClick={handleInsertSceneBeat}
-          variant="secondary"
-          size="sm"
-          disabled={!sceneEndAnchor || isGenerating || isPlaying}
-          className="justify-start"
-          title="Insert a new scene or beat at the current draft edge"
-        >
-          <PlusCircle className="mr-2 h-3.5 w-3.5" />
-          Insert Scene / New Beat
-        </Button>
+        <InlineTooltip label="Generate the next section of the screenplay" wrapperClassName="flex w-full">
+          <Button
+            onClick={handleGenerateNext}
+            disabled={isPlaying || isGenerating}
+            className="justify-start shadow-lg shadow-indigo-500/20"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Generate / Continue Writing
+          </Button>
+        </InlineTooltip>
+        <InlineTooltip label="Generate a plot twist" wrapperClassName="flex w-full">
+          <Button
+            onClick={handleGeneratePlotTwist}
+            variant="secondary"
+            size="sm"
+            disabled={isGenerating}
+            className="justify-start"
+          >
+            <Sparkles className="mr-2 h-3.5 w-3.5" />
+            Plot Twist
+          </Button>
+        </InlineTooltip>
+        <InlineTooltip label="Insert a new scene or beat at the current draft edge" wrapperClassName="flex w-full">
+          <Button
+            onClick={handleInsertSceneBeat}
+            variant="secondary"
+            size="sm"
+            disabled={!sceneEndAnchor || isGenerating || isPlaying}
+            className="justify-start"
+          >
+            <PlusCircle className="mr-2 h-3.5 w-3.5" />
+            Insert Scene / New Beat
+          </Button>
+        </InlineTooltip>
       </div>
       {generationIndicator}
     </div>
@@ -822,45 +834,48 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               <div className="relative flex w-full flex-col items-stretch gap-2 xl:w-auto xl:items-end xl:justify-start">
                 <div className={headerActionRowsClass}>
                   <div className={headerActionSlotClass}>
-                    <button
-                      type="button"
-                      onClick={onUndo}
-                      disabled={!canUndo}
-                      className={headerToolButtonClass}
-                      title="Undo"
-                      aria-label="Undo"
-                    >
-                      <Undo2 className="h-3.5 w-3.5" />
-                      <span className={headerToolTextClass}>Undo</span>
-                    </button>
+                    <InlineTooltip label="Undo" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={onUndo}
+                        disabled={!canUndo}
+                        className={headerToolButtonClass}
+                        aria-label="Undo"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" />
+                        <span className={headerToolTextClass}>Undo</span>
+                      </button>
+                    </InlineTooltip>
                   </div>
                   <div className={headerActionSlotClass}>
-                    <button
-                      type="button"
-                      onClick={() => onRedo?.()}
-                      disabled={!canRedo || !onRedo}
-                      className={headerToolButtonClass}
-                      title="Redo"
-                      aria-label="Redo"
-                    >
-                      <Redo2 className="h-3.5 w-3.5" />
-                      <span className={headerToolTextClass}>Redo</span>
-                    </button>
+                    <InlineTooltip label="Redo" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => onRedo?.()}
+                        disabled={!canRedo || !onRedo}
+                        className={headerToolButtonClass}
+                        aria-label="Redo"
+                      >
+                        <Redo2 className="h-3.5 w-3.5" />
+                        <span className={headerToolTextClass}>Redo</span>
+                      </button>
+                    </InlineTooltip>
                   </div>
                   <div className={`relative ${headerActionSlotClass}`} ref={exportMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setIsExportMenuOpen((previous) => !previous)}
-                      disabled={!canExport}
-                      className={headerToolButtonClass}
-                      title="Export"
-                      aria-haspopup="menu"
-                      aria-expanded={isExportMenuOpen}
-                      aria-label="Open export menu"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span className={headerToolTextClass}>Export</span>
-                    </button>
+                    <InlineTooltip label="Export" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setIsExportMenuOpen((previous) => !previous)}
+                        disabled={!canExport}
+                        className={headerToolButtonClass}
+                        aria-haspopup="menu"
+                        aria-expanded={isExportMenuOpen}
+                        aria-label="Open export menu"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span className={headerToolTextClass}>Export</span>
+                      </button>
+                    </InlineTooltip>
                     {isExportMenuOpen && (
                       <div
                         role="menu"
@@ -903,35 +918,37 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     )}
                   </div>
                   <div className={headerActionSlotClass}>
-                    <button
-                      type="button"
-                      onClick={onClearDraft}
-                      disabled={!context}
-                      className={`${headerToolButtonClass} border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 disabled:opacity-60`}
-                      title="Clear Draft"
-                      aria-label="Clear Draft"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span className={headerToolTextClass}>Clear Draft</span>
-                    </button>
+                    <InlineTooltip label="Clear Draft" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={onClearDraft}
+                        disabled={!context}
+                        className={`${headerToolButtonClass} border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 disabled:opacity-60`}
+                        aria-label="Clear Draft"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className={headerToolTextClass}>Clear Draft</span>
+                      </button>
+                    </InlineTooltip>
                   </div>
                 </div>
                 <div className={headerActionRowsClass}>
                   <div className={`relative ${headerActionSlotClass}`} ref={generateMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
-                      disabled={isPlaying}
-                      className={headerPrimaryToolButtonClass}
-                      title="Generate Next Scene"
-                      aria-haspopup="dialog"
-                      aria-expanded={isGenerateMenuOpen}
-                      aria-label="Open generate menu"
-                    >
-                      <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className={headerToolTextClass}>GENERATE NEXT SCENE</span>
-                      <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[940px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
-                    </button>
+                    <InlineTooltip label="Generate Next Scene" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
+                        disabled={isPlaying}
+                        className={headerPrimaryToolButtonClass}
+                        aria-haspopup="dialog"
+                        aria-expanded={isGenerateMenuOpen}
+                        aria-label="Open generate menu"
+                      >
+                        <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className={headerToolTextClass}>GENERATE NEXT SCENE</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[940px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </InlineTooltip>
                     {isGenerateMenuOpen && (
                       <div
                         role="dialog"
@@ -943,18 +960,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     )}
                   </div>
                   <div className={headerActionSlotClass}>
-                    <button
-                      type="button"
-                      onClick={() => setIsAudioDrawerOpen(true)}
-                      className={headerAudioButtonClass}
-                      title="Audio"
-                      aria-haspopup="dialog"
-                      aria-expanded={isAudioDrawerOpen}
-                      aria-label="Open audio drawer"
-                    >
-                      <Speech className="h-4 w-4" />
-                      <span className={headerToolTextClass}>Audio</span>
-                    </button>
+                    <InlineTooltip label="Audio" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setIsAudioDrawerOpen(true)}
+                        className={headerAudioButtonClass}
+                        aria-haspopup="dialog"
+                        aria-expanded={isAudioDrawerOpen}
+                        aria-label="Open audio drawer"
+                      >
+                        <Speech className="h-4 w-4" />
+                        <span className={headerToolTextClass}>Audio</span>
+                      </button>
+                    </InlineTooltip>
                   </div>
                 </div>
                 {isGenerating && (
