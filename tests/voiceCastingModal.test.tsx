@@ -106,4 +106,42 @@ describe('VoiceCastingModal', () => {
     const scoped = within(orphanCard as HTMLElement);
     expect(scoped.getByText('Voice assigned in draft but missing from active provider catalog.')).toBeTruthy();
   });
+
+  it('keeps manually selectable voices visible even when they are not auto-assignable, without surfacing Hades', () => {
+    render(
+      <VoiceCastingModal
+        isOpen={true}
+        embedded
+        onClose={vi.fn()}
+        onBack={vi.fn()}
+        characterName="Hero"
+        currentVoiceId="manual-only"
+        availableVoices={[
+          {
+            id: 'mark-voice',
+            displayName: 'Mark',
+            source: 'inworld-premade',
+            labels: ['narrator', 'professional'],
+            isCustom: false,
+            autoAssignable: true
+          },
+          {
+            id: 'manual-only',
+            displayName: 'Manual Only',
+            source: 'inworld-premade',
+            labels: ['calm'],
+            isCustom: false,
+            autoAssignable: false
+          }
+        ]}
+        voiceConfigs={[{ name: 'Hero', voiceId: 'manual-only', speed: 1, pitch: 0 }]}
+        onSelect={vi.fn()}
+        onPreview={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Manual Only')).toBeTruthy();
+    expect(screen.getByText('Mark')).toBeTruthy();
+    expect(screen.queryByText('Hades')).toBeNull();
+  });
 });

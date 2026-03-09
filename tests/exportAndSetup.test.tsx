@@ -410,6 +410,43 @@ describe("SetupForm submit validation", () => {
     expect(preferenceButton.getAttribute("aria-label")).toContain("Random");
   });
 
+  it("cycles character preference male -> female -> random", () => {
+    const CharacterPreferenceHarness: React.FC = () => {
+      const [setupState, setSetupState] = React.useState<SetupFormState>({
+        ...baseValue,
+        characterVoicePreferences: ["male", "random"],
+      });
+      const handleSetupChange = React.useCallback(
+        (next: Partial<SetupFormState>) => {
+          setSetupState((previous) => ({ ...previous, ...next }));
+        },
+        [],
+      );
+
+      return (
+        <SetupForm
+          value={setupState}
+          onChange={handleSetupChange}
+          isLoading={false}
+        />
+      );
+    };
+
+    render(<CharacterPreferenceHarness />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /write my own premise/i }),
+    );
+
+    const preferenceButton = screen.getByTestId("setup-character-preference-0");
+    expect(preferenceButton.getAttribute("aria-label")).toContain("Male");
+
+    fireEvent.click(preferenceButton);
+    expect(preferenceButton.getAttribute("aria-label")).toContain("Female");
+
+    fireEvent.click(preferenceButton);
+    expect(preferenceButton.getAttribute("aria-label")).toContain("Random");
+  });
+
   it("style library selection updates shared context style and bumps prompt revision synchronously", () => {
     const StylePresetHarness: React.FC = () => {
       const [context, setContext] = React.useState<StoryContext | null>({

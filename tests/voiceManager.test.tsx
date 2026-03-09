@@ -89,4 +89,50 @@ describe('VoiceManager', () => {
     expect(onOpenCasting).toHaveBeenCalledTimes(1);
     expect(onOpenCasting).toHaveBeenCalledWith('Hero');
   });
+
+  it('does not expose Hades in selectable voice options when it is absent from the catalog', () => {
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true
+      },
+      {
+        id: 'manual-only',
+        displayName: 'Manual Only',
+        source: 'inworld-premade',
+        labels: ['calm'],
+        isCustom: false,
+        autoAssignable: false
+      }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'Hero', voiceId: 'manual-only', speed: 1, pitch: 0 }
+    ];
+
+    render(
+      <VoiceManager
+        characters={['Hero']}
+        availableVoices={availableVoices}
+        voiceConfigs={voiceConfigs}
+        onUpdateConfig={vi.fn()}
+        onOpenCasting={vi.fn()}
+        onPreview={vi.fn(async () => {})}
+        onStop={vi.fn()}
+        isAudioPlaying={false}
+        isLoading={false}
+      />
+    );
+
+    const voiceSelectors = screen.getAllByRole('combobox');
+    const heroSelector = voiceSelectors[1];
+    const options = within(heroSelector).getAllByRole('option').map((option) => option.textContent);
+
+    expect(options).toContain('Manual Only');
+    expect(options).not.toContain('Hades');
+  });
 });

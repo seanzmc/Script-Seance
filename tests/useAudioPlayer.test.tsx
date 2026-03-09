@@ -766,4 +766,70 @@ describe('useAudioPlayer', () => {
       expect.any(Object)
     );
   });
+
+  it('preserves a valid manually selected selectable-only voice instead of auto-reassigning it', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'C' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'C', voiceId: 'manual-only', speed: 1, pitch: 0 }
+    ];
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Masculine'
+      },
+      {
+        id: 'female-auto',
+        displayName: 'Olivia',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Feminine'
+      },
+      {
+        id: 'manual-only',
+        displayName: 'Manual Only',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: false,
+        gender: 'Feminine'
+      }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={blocks}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        availableVoices={availableVoices}
+        characterVoicePreferences={{ c: 'female' }}
+        narratorVoicePreference="male"
+      />
+    );
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    expect(getEngine().start).toHaveBeenCalledWith(
+      blocks,
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'C', voiceId: 'manual-only' })
+      ]),
+      expect.any(Object)
+    );
+  });
 });
