@@ -140,7 +140,8 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     const generateMenu = await screen.findByRole('dialog', { name: 'Generate menu' });
     expect(generateMenu).toBeTruthy();
-    expect(generateMenu.className).toContain('max-[1100px]:left-0');
+    expect(screen.getByText('Shape the next beat')).toBeTruthy();
+    expect(screen.getByLabelText('Draft prompt')).toBeTruthy();
     expect(screen.getByRole('button', { name: /generate \/ continue writing/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /plot twist/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /insert scene \/ new beat/i })).toBeTruthy();
@@ -311,11 +312,9 @@ describe('ScriptPane header generation and audio drawer', () => {
     const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
 
     expect(within(generateMenu).getByText('1 scenes')).toBeTruthy();
-    expect(within(generateMenu).getByLabelText('Draft saves locally')).toBeTruthy();
     expect(within(generateMenu).getByText('Draft saves locally')).toBeTruthy();
-    expect(within(generateMenu).getByText('Generate the next section of the screenplay')).toBeTruthy();
-    expect(within(generateMenu).getByText('Generate a plot twist')).toBeTruthy();
-    expect(within(generateMenu).getByText('Insert a new scene or beat at the current draft edge')).toBeTruthy();
+    expect(within(generateMenu).getByText('Shape the next beat')).toBeTruthy();
+    expect(within(generateMenu).getByText('Keep prompts concise.')).toBeTruthy();
     expect(within(generateMenu).getByRole('button', { name: 'Privacy' })).toBeTruthy();
   });
 
@@ -381,6 +380,24 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     expect(screen.getByText('Working on your request...')).toBeTruthy();
     expect(screen.getByRole('button', { name: /generate \/ continue writing/i }).getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('opens the scene outline and routes selection through existing scene heading navigation', async () => {
+    render(<ScriptPane {...createProps()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open scene outline' }));
+
+    const outlineDrawer = await screen.findByRole('dialog', { name: 'Scene outline' });
+    expect(outlineDrawer).toBeTruthy();
+    expect(within(outlineDrawer).getByText('INT. OFFICE - NIGHT')).toBeTruthy();
+    expect(within(outlineDrawer).getByText('Alex studies evidence in silence.')).toBeTruthy();
+
+    fireEvent.click(within(outlineDrawer).getByTestId('draft-outline-item-s1'));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Scene outline' })).toBeNull();
+    });
+    expect(screen.getByTestId('selected-heading-actions-s1')).toBeTruthy();
   });
 
   it('setup screen ignores background clicks and closes only via explicit close button', () => {

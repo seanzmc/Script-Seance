@@ -3,6 +3,8 @@ import { BlockType, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryConte
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
 import { RewriteComposerPopover } from './RewriteComposerPopover';
+import { DraftComposerPanel } from './workspace/DraftComposerPanel';
+import { DraftOutlinePanel } from './workspace/DraftOutlinePanel';
 import { Button } from './Button';
 import {
   paperPopoverFieldClassName,
@@ -29,10 +31,10 @@ import {
   ChevronDown,
   Download,
   FileDown,
+  List,
   Loader2,
   Pencil,
   PlusCircle,
-  ShieldCheck,
   Sparkles,
   Speech,
   Trash2,
@@ -113,13 +115,13 @@ export interface ScriptPaneProps {
   insertScrollToken: number;
 }
 
-const PROMPT_CHAR_LIMIT = 320;
-
 type InlineTooltipProps = {
   label: string;
   children: React.ReactNode;
   wrapperClassName?: string;
 };
+
+const MOBILE_DIALOG_BREAKPOINT = 768;
 
 const InlineTooltip = ({ label, children, wrapperClassName }: InlineTooltipProps) => (
   <span className={`group relative inline-flex ${wrapperClassName ?? ''}`.trim()}>
@@ -185,7 +187,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertScrollToken
 }) => {
   const [isGenerateMenuOpen, setIsGenerateMenuOpen] = useState(false);
+  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isAudioDrawerOpen, setIsAudioDrawerOpen] = useState(false);
+  const [isMobileDialogViewport, setIsMobileDialogViewport] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth < MOBILE_DIALOG_BREAKPOINT : false
+  ));
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
@@ -194,6 +200,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);
   const [headingDraft, setHeadingDraft] = useState('');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [lastNavigatedSceneId, setLastNavigatedSceneId] = useState<string | null>(null);
   const generateMenuRef = useRef<HTMLDivElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const scriptController = useScriptController({
@@ -208,8 +215,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onGenerateRewritePreview,
     onApplyRewritePreview
   });
-  const promptCount = userInstruction.length;
-  const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
   const previewClassName = 'w-full';
   const genreLabel = context?.genre ?? 'Genre';
@@ -224,33 +229,20 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerPrimaryToolButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
   const headerAudioButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
   const headerActionRowsClass = 'flex w-full items-stretch gap-2 xl:w-auto xl:items-center';
-  const toolLabelClass = 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300';
-  const toolSectionClass = 'space-y-2';
-  const toolInputClass = 'w-full bg-gray-950 border border-gray-700 rounded-xl p-3 text-sm focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-gray-500 shadow-inner';
-  const draftSaveIndicator = (
-    <InlineTooltip label="Draft saves locally" wrapperClassName="items-center text-emerald-200/90">
-      <span role="img" aria-label="Draft saves locally" tabIndex={0} className="inline-flex items-center outline-none">
-        <ShieldCheck className="h-3.5 w-3.5" />
-      </span>
-    </InlineTooltip>
-  );
-  const generationIndicator = (
-    <div className="min-h-[2.5rem]">
-      {isGenerating ? (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-400/20 bg-indigo-500/5 px-3 py-2 text-[11px] text-indigo-100">
-          <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-            <span className="font-medium">Working on your request...</span>
-          </span>
-          <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
-            Cancel
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  );
   const showStartScreen = !context && !isGenerating;
   const showInitialGeneration = !context && isGenerating;
+  const activeSceneId = useMemo(() => {
+    if (!context || context.scenes.length === 0) {
+      return null;
+    }
+    if (scriptController.selectedTarget?.sceneId) {
+      return scriptController.selectedTarget.sceneId;
+    }
+    if (lastNavigatedSceneId && context.scenes.some((scene) => scene.id === lastNavigatedSceneId)) {
+      return lastNavigatedSceneId;
+    }
+    return context.scenes[0]?.id ?? null;
+  }, [context, lastNavigatedSceneId, scriptController.selectedTarget]);
   const errorBanner = error ? (
     <div className="bg-red-900/40 border border-red-500/60 text-red-200 p-4 rounded-lg flex items-start gap-2">
       <AlertCircle className="w-5 h-5 mt-0.5" />
@@ -534,12 +526,57 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     }
   }, [context, editingHeadingSceneId]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateViewport = () => {
+      setIsMobileDialogViewport(window.innerWidth < MOBILE_DIALOG_BREAKPOINT);
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (context?.scenes.some((scene) => scene.id === lastNavigatedSceneId)) {
+      return;
+    }
+    setLastNavigatedSceneId(null);
+  }, [context, lastNavigatedSceneId]);
+
+  useEffect(() => {
+    if (context) return;
+    setIsOutlineOpen(false);
+  }, [context]);
+
   const focusScriptScroll = useCallback(() => {
     requestAnimationFrame(() => {
       const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
       scrollContainer?.focus({ preventScroll: true });
     });
   }, []);
+  const handleOpenOutline = useCallback(() => {
+    setIsGenerateMenuOpen(false);
+    setIsAudioDrawerOpen(false);
+    setIsOutlineOpen((previous) => !previous);
+  }, []);
+  const handleCloseOutline = useCallback(() => {
+    setIsOutlineOpen(false);
+  }, []);
+  const handleSelectOutlineScene = useCallback((sceneId: string) => {
+    setLastNavigatedSceneId(sceneId);
+    setInsertPlacementTarget(null);
+    setEditingHeadingSceneId(null);
+    scriptController.selectSceneHeading(sceneId);
+    setIsOutlineOpen(false);
+    requestAnimationFrame(() => {
+      const sceneHeading = document.getElementById(`scene-heading-${sceneId}`);
+      const sceneContainer = document.getElementById(`scene-${sceneId}`);
+      const scrollTarget = sceneHeading ?? sceneContainer;
+      if (scrollTarget && typeof scrollTarget.scrollIntoView === 'function') {
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+      }
+    });
+  }, [scriptController]);
   const handleOpenTitleModal = () => {
     if (isTitleModalOpen) {
       setIsTitleModalOpen(false);
@@ -606,76 +643,102 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     scriptController.requestInsert(sceneEndAnchor);
     focusScriptScroll();
   }, [focusScriptScroll, sceneEndAnchor, scriptController]);
-  const generatePanelContent = (
-    <div className="space-y-3">
-      <div className={toolSectionClass}>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className={toolLabelClass}>Prompt</h3>
-          <span className={`text-[10px] ${promptWarning ? 'text-amber-400' : 'text-gray-500'}`}>
-            {promptCount}/{PROMPT_CHAR_LIMIT}
-          </span>
-        </div>
-        <textarea
-          value={userInstruction}
-          onChange={(event) => onInstructionChange(event.target.value)}
-          placeholder="Suggest an action, beat, or tonal adjustment..."
-          className={`${toolInputClass} h-24 resize-none`}
-        />
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>Keep prompts concise.</span>
-            <button
-              type="button"
-              onClick={onOpenPrivacy}
-              className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
-            >
-              Privacy
-            </button>
-            <span className="whitespace-nowrap">{sceneCountLabel}</span>
-            {draftSaveIndicator}
-          </div>
-          {promptWarning && <span className="whitespace-nowrap">Trim prompts.</span>}
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <InlineTooltip label="Generate the next section of the screenplay" wrapperClassName="flex w-full">
-          <Button
-            onClick={handleGenerateNext}
-            disabled={isPlaying || isGenerating}
-            className="justify-start shadow-lg shadow-indigo-500/20"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Generate / Continue Writing
-          </Button>
-        </InlineTooltip>
-        <InlineTooltip label="Generate a plot twist" wrapperClassName="flex w-full">
-          <Button
-            onClick={handleGeneratePlotTwist}
-            variant="secondary"
-            size="sm"
-            disabled={isGenerating}
-            className="justify-start"
-          >
-            <Sparkles className="mr-2 h-3.5 w-3.5" />
-            Plot Twist
-          </Button>
-        </InlineTooltip>
-        <InlineTooltip label="Insert a new scene or beat at the current draft edge" wrapperClassName="flex w-full">
-          <Button
-            onClick={handleInsertSceneBeat}
-            variant="secondary"
-            size="sm"
-            disabled={!sceneEndAnchor || isGenerating || isPlaying}
-            className="justify-start"
-          >
-            <PlusCircle className="mr-2 h-3.5 w-3.5" />
-            Insert Scene / New Beat
-          </Button>
-        </InlineTooltip>
-      </div>
-      {generationIndicator}
-    </div>
+  const composerPanelNode = (
+    <DraftComposerPanel
+      userInstruction={userInstruction}
+      onInstructionChange={onInstructionChange}
+      onGenerateNext={handleGenerateNext}
+      onPlotTwist={handleGeneratePlotTwist}
+      onInsertSceneBeat={handleInsertSceneBeat}
+      isGenerating={isGenerating}
+      isPlaying={isPlaying}
+      onCancelGenerate={onCancelGenerate}
+      error={error}
+      insertSceneBeatDisabled={!sceneEndAnchor}
+      onOpenPrivacy={onOpenPrivacy}
+      sceneCountLabel={sceneCountLabel}
+    />
   );
+  const outlineDrawer = context && isOutlineOpen ? (
+    <>
+      <div
+        className="fixed inset-0 z-[96] bg-black/45 backdrop-blur-[2px]"
+        onClick={handleCloseOutline}
+        aria-hidden="true"
+      />
+      <aside
+        role="dialog"
+        aria-label="Scene outline"
+        data-testid="scene-outline-drawer"
+        className="fixed z-[97] flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-4 sm:px-5">
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Scene Outline</p>
+            <h2 className="text-lg font-semibold text-white">Navigate the draft</h2>
+            <p className="text-[11px] text-gray-400">Jump between scenes without changing the main script layout.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCloseOutline}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+            aria-label="Close scene outline"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <DraftOutlinePanel
+            scenes={context.scenes}
+            activeSceneId={activeSceneId}
+            onSelectScene={handleSelectOutlineScene}
+          />
+        </div>
+      </aside>
+    </>
+  ) : null;
+  const generateMenuDialog = isGenerateMenuOpen ? (
+    <>
+      {isMobileDialogViewport ? (
+        <>
+          <div
+            className="fixed inset-0 z-[84] bg-black/45 backdrop-blur-[1px]"
+            onClick={() => setIsGenerateMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-label="Generate menu"
+            className="fixed inset-x-0 bottom-0 z-[85] rounded-t-[1.75rem] border border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] p-3 shadow-[0_-24px_48px_rgba(0,0,0,0.42)]"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3 px-1">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Generate</p>
+                <h3 className="text-sm font-semibold text-white">Draft composer</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGenerateMenuOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                aria-label="Close generate menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {composerPanelNode}
+          </div>
+        </>
+      ) : (
+        <div
+          role="dialog"
+          aria-label="Generate menu"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(28rem,calc(100vw-1.5rem))] rounded-[1.35rem] bg-gray-950 shadow-[0_24px_48px_rgba(0,0,0,0.42)]"
+        >
+          {composerPanelNode}
+        </div>
+      )}
+    </>
+  ) : null;
   const setupModal = isSetupOpen ? (
     <div
       className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
@@ -760,6 +823,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isGenerateMenuOpen]);
+
+  useEffect(() => {
+    if (!isOutlineOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOutlineOpen(false);
+        focusScriptScroll();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusScriptScroll, isOutlineOpen]);
 
   useEffect(() => {
     if (!isAudioDrawerOpen) return;
@@ -937,7 +1012,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     <InlineTooltip label="Generate Next Scene" wrapperClassName="flex w-full xl:w-auto">
                       <button
                         type="button"
-                        onClick={() => setIsGenerateMenuOpen((previous) => !previous)}
+                        onClick={() => {
+                          setIsOutlineOpen(false);
+                          setIsGenerateMenuOpen((previous) => !previous);
+                        }}
                         disabled={isPlaying}
                         className={headerPrimaryToolButtonClass}
                         aria-haspopup="dialog"
@@ -949,21 +1027,32 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                         <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[940px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
                       </button>
                     </InlineTooltip>
-                    {isGenerateMenuOpen && (
-                      <div
-                        role="dialog"
-                        aria-label="Generate menu"
-                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-gray-700 bg-gray-950 p-4 shadow-[0_24px_48px_rgba(0,0,0,0.42)] max-[1100px]:left-0 max-[1100px]:right-auto"
+                    {generateMenuDialog}
+                  </div>
+                  <div className={headerActionSlotClass}>
+                    <InlineTooltip label="Scene outline" wrapperClassName="flex w-full xl:w-auto">
+                      <button
+                        type="button"
+                        onClick={handleOpenOutline}
+                        disabled={!context}
+                        className={headerAudioButtonClass}
+                        aria-haspopup="dialog"
+                        aria-expanded={isOutlineOpen}
+                        aria-label="Open scene outline"
                       >
-                        {generatePanelContent}
-                      </div>
-                    )}
+                        <List className="h-4 w-4" />
+                        <span className={headerToolTextClass}>Outline</span>
+                      </button>
+                    </InlineTooltip>
                   </div>
                   <div className={headerActionSlotClass}>
                     <InlineTooltip label="Audio" wrapperClassName="flex w-full xl:w-auto">
                       <button
                         type="button"
-                        onClick={() => setIsAudioDrawerOpen(true)}
+                        onClick={() => {
+                          setIsOutlineOpen(false);
+                          setIsAudioDrawerOpen(true);
+                        }}
                         className={headerAudioButtonClass}
                         aria-haspopup="dialog"
                         aria-expanded={isAudioDrawerOpen}
@@ -1034,9 +1123,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           onStop={playbackProps.onStop}
           onPrev={playbackProps.onPrev}
           onNext={playbackProps.onNext}
-          onOpenAudioDrawer={() => setIsAudioDrawerOpen(true)}
+          onOpenAudioDrawer={() => {
+            setIsOutlineOpen(false);
+            setIsAudioDrawerOpen(true);
+          }}
         />
       )}
+      {outlineDrawer}
       {context && isAudioDrawerOpen && (
         <>
           <div
