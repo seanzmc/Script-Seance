@@ -77,7 +77,7 @@ describe('VoiceManager', () => {
     );
 
     const heroName = screen.getByText('Hero');
-    const heroRow = heroName.parentElement?.parentElement;
+    const heroRow = heroName.closest('.rounded-lg') as HTMLElement | null;
     if (!heroRow) {
       throw new Error('Hero row not found');
     }

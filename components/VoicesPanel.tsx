@@ -28,9 +28,9 @@ export const VoicesPanel: React.FC<VoicesPanelProps> = ({
   isPreviewEnabled = true
 }) => {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">VOICES</p>
-      <p className="text-[10px] text-gray-500">
+      <p className="text-[10px] leading-tight text-gray-500">
         Assign voices and preview reads. Defaults are auto-assigned.
       </p>
       <VoiceManager
