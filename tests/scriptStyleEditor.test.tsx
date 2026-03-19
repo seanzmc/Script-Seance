@@ -247,7 +247,7 @@ describe('script view style editor', () => {
     render(<ScriptPane {...createPaneProps(context, vi.fn())} onPlotTwist={onPlotTwist} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
-    fireEvent.click(screen.getByRole('button', { name: /plot twist/i }));
+    fireEvent.click(screen.getByRole('button', { name: /twist/i }));
 
     expect(onPlotTwist).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog', { name: 'Generate menu' })).toBeTruthy();

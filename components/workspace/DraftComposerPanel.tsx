@@ -45,23 +45,20 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
   const promptWarning = promptCount > PROMPT_CHAR_LIMIT;
 
   return (
-    <section className={`${paperPopoverAnimatedShellClassName} p-4 sm:p-4 ${className ?? ''}`.trim()}>
-      <div className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
+    <section className={`${paperPopoverAnimatedShellClassName} p-3.5 ${className ?? ''}`.trim()}>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className={paperPopoverLabelClassName}>Draft Composer</p>
-            <h2 className={`${paperPopoverTitleClassName} mt-1`}>Shape the next beat</h2>
-            <p className="mt-1 text-sm leading-relaxed text-gray-600">
-              Keep the prompt short and directional, then continue writing or branch with a twist.
-            </p>
+            <h2 className={`${paperPopoverTitleClassName} mt-1`}>Next Beat</h2>
           </div>
-          <div className="inline-flex items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-800">
+          <div className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-700" />
             <span>Draft saves locally</span>
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <label htmlFor="draft-composer-prompt" className={paperPopoverLabelClassName}>
               Prompt
@@ -75,12 +72,11 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
             aria-label="Draft prompt"
             value={userInstruction}
             onChange={(event) => onInstructionChange(event.target.value)}
-            placeholder="Suggest an action, tonal shift, character beat, or next move..."
-            className={`${paperPopoverTextAreaClassName} h-24`}
+            placeholder="Action, tonal shift, character beat, or next move..."
+            className={`${paperPopoverTextAreaClassName} h-20`}
           />
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-gray-600">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>Keep prompts concise.</span>
               <button
                 type="button"
                 onClick={onOpenPrivacy}
@@ -91,19 +87,20 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
               <span className="whitespace-nowrap">{sceneCountLabel}</span>
             </div>
             {promptWarning ? (
-              <span className="whitespace-nowrap text-amber-700">Trim prompts to keep generation focused.</span>
+              <span className="whitespace-nowrap text-amber-700">Trim prompts.</span>
             ) : null}
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={onGenerateNext}
             disabled={isPlaying || isGenerating}
-            className="justify-start sm:col-span-2 xl:col-span-1"
+            size="sm"
+            className="min-w-[10rem] justify-start"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
-            Generate / Continue Writing
+            Continue
           </Button>
           <Button
             onClick={onPlotTwist}
@@ -113,7 +110,7 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
             className="justify-start"
           >
             <Sparkles className="mr-2 h-3.5 w-3.5" />
-            Plot Twist
+            Twist
           </Button>
           <Button
             onClick={onInsertSceneBeat}
@@ -123,7 +120,7 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
             className="justify-start"
           >
             <PlusCircle className="mr-2 h-3.5 w-3.5" />
-            Insert Scene / New Beat
+            Insert Beat
           </Button>
         </div>
 
@@ -131,7 +128,7 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
           <div className="flex items-center justify-between gap-3 rounded-xl border border-[#d6cdbd] bg-white/85 px-3 py-2 text-[11px] text-gray-700">
             <span className="inline-flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
-              <span className="font-medium">Working on your request...</span>
+              <span className="font-medium">Generating...</span>
             </span>
             <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
               Cancel

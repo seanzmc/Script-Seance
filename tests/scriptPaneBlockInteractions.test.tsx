@@ -356,7 +356,7 @@ describe('ScriptPane block interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
     const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
     expect(generateMenu.textContent).toContain('Draft Composer');
-    fireEvent.click(screen.getByRole('button', { name: /insert scene \/ new beat/i }));
+    fireEvent.click(screen.getByRole('button', { name: /insert beat/i }));
 
     const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An ending beat closes the scene.' } });
