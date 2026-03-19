@@ -709,17 +709,17 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <div
             role="dialog"
             aria-label="Generate menu"
-            className="fixed inset-x-0 bottom-0 z-[85] rounded-t-[1.75rem] border border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] p-3 shadow-[0_-24px_48px_rgba(0,0,0,0.42)]"
+            className="fixed inset-x-0 bottom-0 z-[85] p-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]"
           >
-            <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <div className="mb-2 flex items-center justify-between gap-3 rounded-[1.35rem] border border-[#d6cdbd] bg-[#f6f1e7] px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.16)]">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Generate</p>
-                <h3 className="text-sm font-semibold text-white">Draft composer</h3>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">Generate</p>
+                <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Draft Composer</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsGenerateMenuOpen(false)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-800"
                 aria-label="Close generate menu"
               >
                 <X className="h-4 w-4" />
@@ -732,7 +732,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <div
           role="dialog"
           aria-label="Generate menu"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(28rem,calc(100vw-1.5rem))] rounded-[1.35rem] bg-gray-950 shadow-[0_24px_48px_rgba(0,0,0,0.42)]"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(28rem,calc(100vw-1.5rem))]"
         >
           {composerPanelNode}
         </div>

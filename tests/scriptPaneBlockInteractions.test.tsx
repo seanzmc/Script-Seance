@@ -355,7 +355,7 @@ describe('ScriptPane block interactions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
     const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
-    expect(generateMenu.className).toContain('bg-gray-950');
+    expect(generateMenu.textContent).toContain('Draft Composer');
     fireEvent.click(screen.getByRole('button', { name: /insert scene \/ new beat/i }));
 
     const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
