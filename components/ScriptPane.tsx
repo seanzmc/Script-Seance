@@ -672,22 +672,21 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         data-testid="scene-outline-drawer"
         className="fixed z-[97] flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-gray-800 px-4 py-4 sm:px-5">
-          <div className="space-y-1">
+        <div className="flex items-start justify-between gap-3 border-b border-gray-800/80 px-3 py-3 sm:px-4">
+          <div className="space-y-0.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Scene Outline</p>
-            <h2 className="text-lg font-semibold text-white">Navigate the draft</h2>
-            <p className="text-[11px] text-gray-400">Jump between scenes without changing the main script layout.</p>
+            <h2 className="text-base font-semibold text-white">Navigate the draft</h2>
           </div>
           <button
             type="button"
             onClick={handleCloseOutline}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-700 bg-gray-900/50 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
             aria-label="Close scene outline"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+        <div className="flex-1 overflow-y-auto px-2.5 py-2.5 sm:px-3 sm:py-3">
           <DraftOutlinePanel
             scenes={context.scenes}
             activeSceneId={activeSceneId}
