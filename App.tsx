@@ -1067,6 +1067,7 @@ export default function App() {
           undefined,
           instruction,
           contextText,
+          { purpose: 'titleSuggestion' },
           { signal, opType: 'titleSuggestion', scopeKey }
         ),
         isFresh: () => isTitleSuggestionFresh({

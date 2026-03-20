@@ -94,6 +94,12 @@ export type PromptStyleContext = {
   style?: string;
 };
 
+export type ScriptElementPurpose = 'titleSuggestion' | 'insertBlock';
+
+export type ScriptElementRequestContext = PromptStyleContext & {
+  purpose?: ScriptElementPurpose;
+};
+
 export type PlotTwistStoryContext = {
   premise?: string;
   characters?: string[];
@@ -189,6 +195,15 @@ const isPromptStyleContext = (value: unknown): value is PromptStyleContext => (
   )
 );
 
+const isScriptElementRequestContext = (value: unknown): value is ScriptElementRequestContext => (
+  typeof value === 'object' &&
+  value !== null &&
+  (
+    isPromptStyleContext(value) ||
+    Object.prototype.hasOwnProperty.call(value, 'purpose')
+  )
+);
+
 const normalizePromptStyleContext = (
   value: string | PromptStyleContext | undefined
 ): PromptStyleContext | undefined => {
@@ -211,6 +226,25 @@ const normalizePromptStyleContext = (
     return undefined;
   }
   return { styleId, styleName, style };
+};
+
+const normalizeScriptElementRequestContext = (
+  value: ScriptElementRequestContext | undefined
+): ScriptElementRequestContext | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const promptStyleContext = normalizePromptStyleContext(value);
+  const purpose = value.purpose === 'titleSuggestion' || value.purpose === 'insertBlock'
+    ? value.purpose
+    : undefined;
+  if (!promptStyleContext && !purpose) {
+    return undefined;
+  }
+  return {
+    ...(promptStyleContext ?? {}),
+    ...(purpose ? { purpose } : {})
+  };
 };
 
 const isRequestOptions = (value: unknown): value is RequestOptions => (
@@ -630,21 +664,21 @@ export const executeGenerateScriptElement = async (
   character: string | undefined,
   instruction: string,
   styleContext: string,
-  styleContextOrOptions?: PromptStyleContext | RequestOptions,
+  requestContextOrOptions?: ScriptElementRequestContext | RequestOptions,
   maybeOptions?: RequestOptions
 ): Promise<string> => {
-  const promptStyleContext = normalizePromptStyleContext(
-    isPromptStyleContext(styleContextOrOptions) ? styleContextOrOptions : undefined
+  const requestContext = normalizeScriptElementRequestContext(
+    isScriptElementRequestContext(requestContextOrOptions) ? requestContextOrOptions : undefined
   );
-  const options = isPromptStyleContext(styleContextOrOptions)
+  const options = isScriptElementRequestContext(requestContextOrOptions)
     ? maybeOptions
-    : styleContextOrOptions;
+    : requestContextOrOptions;
   const request = createAiRequest<{ text: string }>(AI_KINDS.generateScriptElement, {
     type,
     character,
     instruction,
     styleContext,
-    ...(promptStyleContext ?? {})
+    ...(requestContext ?? {})
   }, options);
   const data = await request.promise;
   return data.text?.trim() || '';
@@ -714,7 +748,7 @@ export const generateScriptElement = async (
   character: string | undefined,
   instruction: string,
   styleContext: string,
-  styleContextOrOptions?: PromptStyleContext | RequestOptions,
+  requestContextOrOptions?: ScriptElementRequestContext | RequestOptions,
   maybeOptions?: RequestOptions
 ): Promise<string> => {
   return executeGenerateScriptElement(
@@ -722,7 +756,7 @@ export const generateScriptElement = async (
     character,
     instruction,
     styleContext,
-    styleContextOrOptions,
+    requestContextOrOptions,
     maybeOptions
   );
 };

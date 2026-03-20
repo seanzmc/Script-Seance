@@ -819,6 +819,7 @@ export const createScriptMutationController = (
         instruction,
         styleContext,
         {
+          purpose: 'insertBlock',
           styleId: latestContext.styleId,
           styleName: latestContext.style,
           style: latestContext.style

@@ -873,7 +873,7 @@ export const generateTextByKind = async ({
     throw new Error(`Unsupported text generation kind: ${kind}`);
   }
 
-  const models = resolveTextGenerationModels(kind);
+  const models = resolveTextGenerationModels(kind, context);
   const traceMeta = upstreamContext?.promptTrace;
 
   if (kind === 'generateScene') {
@@ -1086,7 +1086,7 @@ export const generateTextByKind = async ({
   }
 
   if (kind === 'generateScriptElement') {
-    const { type, character, instruction, styleContext } = context;
+    const { type, character, instruction, styleContext, purpose } = context;
     const resolvedStyle = resolvePromptStyleContext(context, styleContext);
     const promptParts = buildScriptElementPrompt({
       type,
@@ -1107,10 +1107,13 @@ export const generateTextByKind = async ({
     };
     const scriptElementModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
-      task: 'Generate one script element block',
+      task: purpose === 'titleSuggestion'
+        ? 'Generate title suggestion'
+        : 'Generate one script element block',
       instruction
     };
     const contextPreview = {
+      purpose: purpose || null,
       type,
       character,
       styleId: resolvedStyle.styleId,
@@ -1140,7 +1143,11 @@ export const generateTextByKind = async ({
           maxOutputTokens: 100,
           temperature: 0.72,
           topP: 0.92,
-          cacheKey: buildPromptCacheKey(kind, type, models.openai),
+          cacheKey: buildPromptCacheKey(
+            kind,
+            `${purpose || 'legacy'}:${type}`,
+            models.openai
+          ),
           cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
           upstreamContext,
           timeoutMs

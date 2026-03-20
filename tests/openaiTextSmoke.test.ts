@@ -91,6 +91,7 @@ describe('OpenAI text generation smoke', () => {
         ]
       })))
       .mockResolvedValueOnce(asResponse('The hero realizes the villain is their future self.'))
+      .mockResolvedValueOnce(asResponse('Shadow Ledger'))
       .mockResolvedValueOnce(asResponse('A flickering neon sign hums over the rain-soaked alley.'))
       .mockResolvedValueOnce(asResponse('I have buried this secret long enough.'))
       .mockResolvedValueOnce(asResponse(JSON.stringify({
@@ -133,11 +134,29 @@ describe('OpenAI text generation smoke', () => {
     expect(twistRes.statusCode).toBe(200);
     expect(String((twistRes.body?.data as Record<string, unknown>)?.text || '').trim().length).toBeGreaterThan(0);
 
+    const titleReq = {
+      body: {
+        kind: 'generateScriptElement',
+        context: {
+          type: 'action',
+          purpose: 'titleSuggestion',
+          instruction: 'Create a concise, evocative screenplay title (2-6 words).',
+          styleContext: 'Genre: Noir. Premise: A vanished witness sends clues from impossible places.',
+          character: null
+        }
+      }
+    } as any;
+    const titleRes = createMockRes();
+    await handleAiGenerate(titleReq, titleRes as any);
+    expect(titleRes.statusCode).toBe(200);
+    expect(String((titleRes.body?.data as Record<string, unknown>)?.text || '').trim().length).toBeGreaterThan(0);
+
     const elementReq = {
       body: {
         kind: 'generateScriptElement',
         context: {
           type: 'action',
+          purpose: 'insertBlock',
           instruction: 'Set mood quickly.',
           styleContext: 'Genre: Noir. Style: Cinematic.',
           character: null
@@ -181,11 +200,12 @@ describe('OpenAI text generation smoke', () => {
     expect(String(surpriseData?.premise || '').trim().length).toBeGreaterThan(0);
     expect(Array.isArray(surpriseData?.characters)).toBe(true);
 
-    expect(mockResponsesCreate).toHaveBeenCalledTimes(5);
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(6);
     const expectedModels = [
       'test-openai-primary',
       'test-openai-balanced',
       'test-openai-fast',
+      'test-openai-balanced',
       'test-openai-balanced',
       'test-openai-balanced'
     ];
@@ -239,7 +259,12 @@ describe('OpenAI text generation smoke', () => {
     expect(sceneRequest.instructions || '').not.toContain('The JSON schema is:');
     expect(sceneRequest.instructions || '').not.toContain('Do NOT emit a heading block inside "blocks".');
 
+    expect((mockResponsesCreate.mock.calls[2]?.[0] as { model?: unknown })?.model).toBe('test-openai-fast');
+    expect((mockResponsesCreate.mock.calls[3]?.[0] as { model?: unknown })?.model).toBe('test-openai-balanced');
     expect(String((mockResponsesCreate.mock.calls[2]?.[0] as { instructions?: unknown })?.instructions || '')).toContain(
+      'Output ONLY the raw script text requested.'
+    );
+    expect(String((mockResponsesCreate.mock.calls[3]?.[0] as { instructions?: unknown })?.instructions || '')).toContain(
       'Output ONLY the raw script text requested.'
     );
   });

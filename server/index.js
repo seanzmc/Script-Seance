@@ -86,6 +86,7 @@ const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition'
 const VALID_SCENE_BLOCK_TYPES = new Set(['action', 'dialogue', 'transition']);
 const VALID_REWRITE_BLOCK_TYPES = new Set(['action', 'dialogue', 'transition']);
 const VALID_SCENE_LENGTHS = new Set(['Short', 'Medium', 'Long']);
+const VALID_SCRIPT_ELEMENT_PURPOSES = new Set(['titleSuggestion', 'insertBlock']);
 const SCENE_DIALOGUE_BLOCK_FIELDS = new Set(['type', 'character', 'parenthetical', 'text']);
 const SCENE_NON_DIALOGUE_BLOCK_FIELDS = new Set(['type', 'text']);
 const sessions = new Map();
@@ -1164,7 +1165,7 @@ const handleAiGenerate = async (req, res) => {
             return sendError(res, 400, 'Invalid suggestPlotTwist style.', 'INVALID_REQUEST');
           }
         } else if (kind === 'generateScriptElement') {
-          const { type, character, instruction, styleContext, styleId, styleName, style } = context;
+          const { type, character, instruction, styleContext, purpose, styleId, styleName, style } = context;
           if (
             !isNonEmptyString(type, 24) ||
             !VALID_BLOCK_TYPES.has(type) ||
@@ -1180,6 +1181,13 @@ const handleAiGenerate = async (req, res) => {
             (type !== 'dialogue' && hasCharacter && !isNonEmptyString(character, 120))
           ) {
             return sendError(res, 400, 'Invalid character data.', 'INVALID_REQUEST');
+          }
+          if (
+            purpose !== undefined &&
+            purpose !== null &&
+            (typeof purpose !== 'string' || !VALID_SCRIPT_ELEMENT_PURPOSES.has(purpose))
+          ) {
+            return sendError(res, 400, 'Invalid script element purpose.', 'INVALID_REQUEST');
           }
           if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
             return sendError(res, 400, 'Invalid script element style id.', 'INVALID_REQUEST');

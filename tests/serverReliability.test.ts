@@ -350,6 +350,7 @@ describe('server reliability', () => {
             type: 'action',
             instruction: 'Set mood quickly.',
             styleContext: 'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+            purpose: 'insertBlock',
             styleId: 'noir-1940s-detective',
             styleName: 'Client supplied label',
             style: 'Hardboiled fallback',
@@ -367,6 +368,7 @@ describe('server reliability', () => {
 
       expect(elementRes.statusCode).toBe(200);
       expect(elementRes.body?.debug?.previews?.context).toMatchObject({
+        purpose: 'insertBlock',
         type: 'action',
         styleId: 'noir-1940s-detective',
         styleName: '1940s Noir Detective'
@@ -446,6 +448,43 @@ describe('server reliability', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body?.error?.code).toBe('INVALID_REQUEST');
     expect(String(res.body?.error?.message || '')).toContain('Invalid suggestPlotTwist characters.');
+  });
+
+  it('rejects generateScriptElement when purpose is unsupported', async () => {
+    const req = {
+      body: {
+        kind: 'generateScriptElement',
+        context: {
+          type: 'action',
+          instruction: 'Set mood quickly.',
+          styleContext: 'Genre: Noir.',
+          purpose: 'unknownPurpose',
+          character: null
+        }
+      }
+    } as any;
+    const res = {
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    } as any;
+
+    await handleAiGenerate(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body?.error?.code).toBe('INVALID_REQUEST');
+    expect(String(res.body?.error?.message || '')).toContain('Invalid script element purpose.');
   });
 
   it('keeps legacy style in surprise setup debug preview when styleId is absent', async () => {

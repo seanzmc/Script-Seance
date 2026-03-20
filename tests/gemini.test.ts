@@ -153,7 +153,7 @@ describe('AI API wrapper', () => {
     expect((fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)?.['X-SS-Debug-Prompts']).toBeUndefined();
   });
 
-  it('sends canonical style metadata for twist, insert, and rewrite requests', async () => {
+  it('sends canonical style metadata and script-element purpose for twist, title, insert, and rewrite requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createMockResponse(200, {
         data: {
@@ -171,9 +171,19 @@ describe('AI API wrapper', () => {
     await executeGenerateScriptElement(
       BlockType.ACTION,
       undefined,
+      'Create a concise, evocative screenplay title (2-6 words).',
+      'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+      {
+        purpose: 'titleSuggestion'
+      }
+    );
+    await executeGenerateScriptElement(
+      BlockType.ACTION,
+      undefined,
       'Set mood quickly.',
       'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
       {
+        purpose: 'insertBlock',
         styleId: 'noir-1940s-detective',
         styleName: '1940s Noir Detective',
         style: 'Client fallback label'
@@ -199,16 +209,24 @@ describe('AI API wrapper', () => {
       style: 'Client fallback label'
     });
 
-    const insertRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body || '{}'));
+    const titleRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body || '{}'));
+    expect(titleRequest.context).toMatchObject({
+      type: 'action',
+      styleContext: 'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+      purpose: 'titleSuggestion'
+    });
+
+    const insertRequest = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body || '{}'));
     expect(insertRequest.context).toMatchObject({
       type: 'action',
       styleContext: 'Genre: Noir.\nPremise: A detective unravels a conspiracy.',
+      purpose: 'insertBlock',
       styleId: 'noir-1940s-detective',
       styleName: '1940s Noir Detective',
       style: 'Client fallback label'
     });
 
-    const rewriteRequest = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body || '{}'));
+    const rewriteRequest = JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body || '{}'));
     expect(rewriteRequest.context).toMatchObject({
       genre: 'Noir',
       premise: 'A detective unravels a conspiracy.',

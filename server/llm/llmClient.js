@@ -20,7 +20,7 @@ const normalizeProvider = (value) => {
 export const getTextProvider = () =>
   normalizeProvider(process.env.TEXT_LLM_PROVIDER || DEFAULT_TEXT_PROVIDER);
 
-const resolveOpenAiTextModel = (kind) => {
+const resolveOpenAiTextModel = (kind, context = undefined) => {
   switch (kind) {
     case 'generateScene':
       return DEFAULT_OPENAI_MODEL;
@@ -29,6 +29,10 @@ const resolveOpenAiTextModel = (kind) => {
     case 'generateSurpriseSetup':
       return DEFAULT_OPENAI_BALANCED_MODEL;
     case 'generateScriptElement':
+      if (context?.purpose === 'insertBlock') {
+        return DEFAULT_OPENAI_BALANCED_MODEL;
+      }
+      return DEFAULT_OPENAI_FAST_MODEL;
     default:
       return DEFAULT_OPENAI_FAST_MODEL;
   }
@@ -39,9 +43,9 @@ const resolveGeminiTextModel = (kind) => {
   return DEFAULT_GEMINI_FAST_MODEL;
 };
 
-export const resolveTextGenerationModels = (kind) => {
+export const resolveTextGenerationModels = (kind, context = undefined) => {
   return {
-    openai: resolveOpenAiTextModel(kind),
+    openai: resolveOpenAiTextModel(kind, context),
     gemini: resolveGeminiTextModel(kind)
   };
 };
