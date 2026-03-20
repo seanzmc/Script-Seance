@@ -484,7 +484,21 @@ describe('server reliability', () => {
               genre: 'Noir',
               premise: 'A mystery unfolds.',
               characters: ['Alex'],
-              scenes: [],
+              scenes: [
+                {
+                  heading: 'INT. BAR - NIGHT',
+                  summary: 'Alex corners a reluctant informant.'
+                },
+                {
+                  heading: 'EXT. DOCKSIDE - NIGHT',
+                  summary: 'The detective loses the courier in the rain.',
+                  blocks: [
+                    { type: 'action', text: 'Rain needles the dock while the detective scans the dark water.' },
+                    { type: 'dialogue', character: 'Alex', text: 'He was here.', parenthetical: '(under breath)' },
+                    { type: 'transition', text: 'CUT TO:' }
+                  ]
+                }
+              ],
               style: 'Client supplied label',
               styleId: 'noir-1940s-detective'
             },
@@ -525,10 +539,23 @@ describe('server reliability', () => {
       });
       expect(String(res.body?.debug?.previews?.context?.styleContext || '')).toContain('1940s Noir Detective');
       expect(String(res.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
+      expect(res.body?.debug?.previews?.context).toMatchObject({
+        olderSceneSummaries: ['Scene 1: Alex corners a reluctant informant.'],
+        recentSceneHeading: 'EXT. DOCKSIDE - NIGHT'
+      });
+      expect(Array.isArray(res.body?.debug?.previews?.context?.recentSceneBlocks)).toBe(true);
 
       const prompt = String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '');
+      const systemInstruction = String(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction || '');
       expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective).');
       expect(prompt).toContain('Style guidance: Everyone speaks in brooding metaphors, rain is always falling, and there is a heavy reliance on cynical voiceovers.');
+      expect(prompt).toContain('Earlier scene summaries:\nScene 1: Alex corners a reluctant informant.');
+      expect(prompt).toContain('Most recent prior scene:\nHeading: EXT. DOCKSIDE - NIGHT');
+      expect(prompt).toContain('1. ACTION: Rain needles the dock while the detective scans the dark water.');
+      expect(prompt).toContain('2. DIALOGUE - Alex (under breath): He was here.');
+      expect(prompt).toContain('3. TRANSITION: CUT TO:');
+      expect(systemInstruction).toContain('Completion criteria:');
+      expect(systemInstruction).toContain('Stay consistent with the provided recent-scene details.');
     } finally {
       if (previousDebugEnv === undefined) {
         delete process.env.SS_DEBUG_PROMPTS;

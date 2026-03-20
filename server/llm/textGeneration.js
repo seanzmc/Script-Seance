@@ -2,6 +2,7 @@ import { Type } from '@google/genai';
 import crypto from 'node:crypto';
 import {
   SCRIPT_ELEMENT_SYSTEM_INSTRUCTION,
+  buildSceneHistoryContext,
   buildGenerateScenePrompt,
   buildPlotTwistPrompt,
   buildScriptElementPrompt,
@@ -450,18 +451,6 @@ const sanitizeContextPreviewForDebug = (contextPreview) => {
   return sanitizedContextPreview;
 };
 
-const getSceneSummariesPreview = (scenes) => (
-  Array.isArray(scenes)
-    ? scenes
-      .map((scene, index) => {
-        const summary = typeof scene?.summary === 'string' ? scene.summary.trim() : '';
-        return summary ? `Scene ${index + 1}: ${summary}` : null;
-      })
-      .filter(Boolean)
-      .slice(0, 6)
-    : []
-);
-
 const emitKindPromptTrace = ({
   traceMeta,
   kind,
@@ -882,6 +871,7 @@ export const generateTextByKind = async ({
   if (kind === 'generateScene') {
     const { storyContext, userInstruction, isFirstScene } = context;
     const styleContext = resolveSceneStyleContext(storyContext);
+    const sceneHistory = buildSceneHistoryContext(storyContext.scenes);
     const { instructions, input, previewText, lengthProfile } = buildGenerateScenePrompt({
       genre: storyContext.genre,
       premise: storyContext.premise,
@@ -906,7 +896,9 @@ export const generateTextByKind = async ({
       styleId: storyContext.styleId || null,
       styleContext,
       targetLength: storyContext.targetLength || lengthProfile.label,
-      previousSceneSummaries: getSceneSummariesPreview(storyContext.scenes)
+      olderSceneSummaries: sceneHistory.olderSceneSummaries,
+      recentSceneHeading: sceneHistory.recentSceneHeading || null,
+      recentSceneBlocks: sceneHistory.recentSceneBlocks
     };
     emitKindPromptTrace({
       traceMeta,

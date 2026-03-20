@@ -3,6 +3,7 @@ export const SCRIPT_ELEMENT_SYSTEM_INSTRUCTION =
 
 const STYLE_BLOCK_MAX_CHARS = 500;
 const SURPRISE_STYLE_GUIDANCE_MAX_CHARS = 240;
+const RECENT_SCENE_BLOCK_COUNT = 3;
 const collapseWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
 const joinPromptSections = (sections, separator = '\n\n') => sections
   .filter((section) => typeof section === 'string' && section.trim())
@@ -83,6 +84,75 @@ export const getSceneLengthProfile = (targetLength, isFirstScene) => {
   };
 };
 
+const formatSceneSummaryLine = (scene, index) => {
+  const summary = typeof scene?.summary === 'string' ? scene.summary.trim() : '';
+  return summary ? `Scene ${index + 1}: ${summary}` : null;
+};
+
+const formatRecentSceneBlock = (block, index) => {
+  if (!block || typeof block !== 'object') return null;
+  const text = typeof block.text === 'string' ? block.text.trim() : '';
+  const type = typeof block.type === 'string' ? block.type.trim().toLowerCase() : '';
+  if (!text || !type) return null;
+
+  if (type === 'dialogue') {
+    const character = typeof block.character === 'string' ? block.character.trim() : '';
+    const parenthetical = typeof block.parenthetical === 'string' ? block.parenthetical.trim() : '';
+    const speakerLine = [character || 'UNKNOWN', parenthetical].filter(Boolean).join(' ');
+    return `${index + 1}. DIALOGUE - ${speakerLine}: ${text}`;
+  }
+
+  if (type === 'transition') {
+    return `${index + 1}. TRANSITION: ${text}`;
+  }
+
+  return `${index + 1}. ACTION: ${text}`;
+};
+
+export const buildSceneHistoryContext = (scenes) => {
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    return {
+      olderSceneSummaries: [],
+      recentSceneHeading: '',
+      recentSceneBlocks: [],
+      inputText: ''
+    };
+  }
+
+  const recentScene = scenes[scenes.length - 1];
+  const olderSceneSummaries = scenes
+    .slice(0, -1)
+    .map(formatSceneSummaryLine)
+    .filter(Boolean);
+  const recentSceneHeading = typeof recentScene?.heading === 'string' ? recentScene.heading.trim() : '';
+  const recentSceneBlocks = Array.isArray(recentScene?.blocks)
+    ? recentScene.blocks
+      .slice(-RECENT_SCENE_BLOCK_COUNT)
+      .map(formatRecentSceneBlock)
+      .filter(Boolean)
+    : [];
+
+  const inputText = joinPromptSections([
+    olderSceneSummaries.length
+      ? `Earlier scene summaries:\n${olderSceneSummaries.join('\n')}`
+      : '',
+    (recentSceneHeading || recentSceneBlocks.length)
+      ? joinPromptSections([
+          'Most recent prior scene:',
+          recentSceneHeading ? `Heading: ${recentSceneHeading}` : '',
+          recentSceneBlocks.length ? `Recent blocks:\n${recentSceneBlocks.join('\n')}` : ''
+        ], '\n')
+      : ''
+  ]);
+
+  return {
+    olderSceneSummaries,
+    recentSceneHeading,
+    recentSceneBlocks,
+    inputText
+  };
+};
+
 export const buildGenerateScenePrompt = ({
   genre,
   premise,
@@ -94,23 +164,19 @@ export const buildGenerateScenePrompt = ({
   styleContext = '',
   targetLength
 }) => {
-  const previousScenesSummary = Array.isArray(scenes)
-    ? scenes
-        .map((scene, index) =>
-          scene && typeof scene === 'object' && typeof scene.summary === 'string' && scene.summary.trim().length > 0
-            ? `Scene ${index + 1}: ${scene.summary}`
-            : null
-        )
-        .filter(Boolean)
-        .join('\n')
-    : '';
-
   const charactersList = Array.isArray(characters) ? characters.join(', ') : '';
   const styleTheme = formatStyleBlock(styleContext || style);
   const lengthProfile = getSceneLengthProfile(targetLength, isFirstScene);
+  const sceneHistory = buildSceneHistoryContext(scenes);
   const promptParts = createPromptParts({
     instructions: [
       `You are a professional screenwriter. Write the ${isFirstScene ? 'opening' : 'next'} scene for a screenplay.`,
+      [
+        'Completion criteria:',
+        '- Advance the story with a concrete turn, reveal, or complication.',
+        '- Stay consistent with the provided recent-scene details.',
+        '- End on a playable beat with complete thoughts.'
+      ].join('\n'),
       [
         'Style requirements:',
         '- Keep the selected style unmistakable in imagery, dialogue cadence, and word choice.',
@@ -133,7 +199,7 @@ export const buildGenerateScenePrompt = ({
       `Characters: ${charactersList}`,
       styleTheme || 'Style Theme: Lean into a vivid, genre-faithful cinematic voice.',
       `Target Length: ${lengthProfile.label}`,
-      previousScenesSummary ? `Previous Story Context:\n${previousScenesSummary}` : '',
+      sceneHistory.inputText ? `Previous Story Context:\n${sceneHistory.inputText}` : '',
       `User Instruction for this scene: "${userInstruction}"`
     ]
   });

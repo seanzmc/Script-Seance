@@ -33,11 +33,47 @@ describe('promptBuilders style injection', () => {
       targetLength: 'Medium'
     });
     expect(input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(instructions).toContain('Completion criteria:');
+    expect(instructions).toContain('Advance the story with a concrete turn, reveal, or complication.');
     expect(instructions).not.toContain('The JSON schema is:');
     expect(instructions).not.toContain('Do NOT emit a heading block inside "blocks".');
     expect(instructions).toContain('Return ONLY a JSON object representing the scene.');
     expect(previewText).toContain('Instructions:');
     expect(previewText).toContain('Input:');
+  });
+
+  it('uses older scene summaries plus detailed recent-scene context for generateScene', () => {
+    const { input } = buildGenerateScenePrompt({
+      genre: 'Noir',
+      premise: 'A detective unravels a conspiracy.',
+      characters: ['Alex', 'Mara'],
+      scenes: [
+        {
+          heading: 'INT. BAR - NIGHT',
+          summary: 'Alex corners a reluctant informant.'
+        },
+        {
+          heading: 'EXT. DOCKS - LATER',
+          summary: 'Mara spots the handoff before it goes wrong.',
+          blocks: [
+            { type: 'action', text: 'Rain pelts the dock as Mara watches a shadow slip between crates.' },
+            { type: 'dialogue', character: 'Mara', text: 'He is early.', parenthetical: '(into earpiece)' },
+            { type: 'action', text: 'A gun clatters across the planks when the courier stumbles.' },
+            { type: 'transition', text: 'CUT TO:' }
+          ]
+        }
+      ],
+      userInstruction: 'Continue the fallout.',
+      isFirstScene: false,
+      targetLength: 'Medium'
+    });
+
+    expect(input).toContain('Earlier scene summaries:\nScene 1: Alex corners a reluctant informant.');
+    expect(input).toContain('Most recent prior scene:\nHeading: EXT. DOCKS - LATER');
+    expect(input).toContain('Recent blocks:\n1. DIALOGUE - Mara (into earpiece): He is early.');
+    expect(input).toContain('2. ACTION: A gun clatters across the planks when the courier stumbles.');
+    expect(input).toContain('3. TRANSITION: CUT TO:');
+    expect(input).not.toContain('Rain pelts the dock as Mara watches a shadow slip between crates.');
   });
 
   it('injects style into suggestPlotTwist prompt', () => {
