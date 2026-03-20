@@ -9,7 +9,7 @@ import {
   buildSurpriseSetupPrompt
 } from './promptBuilders.js';
 import { resolveLibraryStyleById } from './styleCatalog.js';
-import { getTextModels } from './llmClient.js';
+import { resolveTextGenerationModels } from './llmClient.js';
 import { isTextGenerationKind } from './types.js';
 import {
   runWithAbortableTimeout,
@@ -51,11 +51,6 @@ const OPENAI_SCENE_COMPLETION_BUFFER_TOKENS = parsePositiveInt(
   process.env.OPENAI_SCENE_COMPLETION_BUFFER_TOKENS,
   180
 );
-const OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS = parsePositiveInt(
-  process.env.OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS,
-  2600
-);
-const OPENAI_SCENE_USE_MINI_FOR_LONG = (process.env.OPENAI_SCENE_USE_MINI_FOR_LONG || '1') !== '0';
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP = parsePositiveInt(process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_CAP, 5000);
 const OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS = parsePositiveInt(
   process.env.OPENAI_MAX_OUTPUT_TOKENS_RETRY_ATTEMPTS,
@@ -177,20 +172,31 @@ const extractOpenAiText = (response) => {
   }
   return parts.join('\n').trim();
 };
-
-const createOpenAiInput = (prompt, systemInstruction) => {
-  const input = [];
-  if (systemInstruction) {
-    input.push({
-      role: 'system',
-      content: [{ type: 'input_text', text: systemInstruction }]
-    });
-  }
-  input.push({
-    role: 'user',
-    content: [{ type: 'input_text', text: prompt }]
-  });
-  return input;
+const getPromptInstructionsText = (promptParts) => (
+  typeof promptParts?.instructions === 'string' ? promptParts.instructions.trim() : ''
+);
+const getPromptInputText = (promptParts) => (
+  typeof promptParts?.input === 'string' ? promptParts.input.trim() : ''
+);
+const getPromptPreviewText = (promptParts) => (
+  typeof promptParts?.previewText === 'string' ? promptParts.previewText.trim() : ''
+);
+const joinPromptTexts = (...values) => values
+  .filter((value) => typeof value === 'string' && value.trim())
+  .map((value) => value.trim())
+  .join('\n\n');
+const resolveGeminiPromptRequest = ({ promptParts, config }) => {
+  const instructions = getPromptInstructionsText(promptParts);
+  const input = getPromptInputText(promptParts) || getPromptPreviewText(promptParts);
+  return {
+    contents: input,
+    config: instructions
+      ? {
+          ...(config ? { ...config } : {}),
+          systemInstruction: joinPromptTexts(config?.systemInstruction, instructions)
+        }
+      : config
+  };
 };
 
 const normalizeModelName = (model) => (typeof model === 'string' ? model.trim().toLowerCase() : '');
@@ -254,13 +260,6 @@ const resolveSceneMaxOutputTokens = (lengthProfile) => {
   if (lengthProfile.key === 'short') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_SHORT + completionBuffer;
   if (lengthProfile.key === 'long') return OPENAI_SCENE_MAX_OUTPUT_TOKENS_LONG + completionBuffer;
   return OPENAI_SCENE_MAX_OUTPUT_TOKENS_MEDIUM + completionBuffer;
-};
-const resolveSceneModel = (models, lengthProfile, sceneMaxOutputTokens) => {
-  const baseModel = models?.openai;
-  const balancedModel = models?.openaiBalanced || baseModel;
-  const shouldUseBalancedForLength = OPENAI_SCENE_USE_MINI_FOR_LONG && lengthProfile?.key === 'long';
-  const shouldUseBalancedForBudget = sceneMaxOutputTokens >= OPENAI_SCENE_MINI_MODEL_MIN_OUTPUT_TOKENS;
-  return shouldUseBalancedForLength || shouldUseBalancedForBudget ? balancedModel : baseModel;
 };
 const SENTENCE_END_RE = /[.!?…]["')\]]*$/;
 const TRANSITION_END_RE = /[:.!?]["')\]]*$/;
@@ -511,8 +510,7 @@ const requestOpenAiText = async ({
   openai,
   kind,
   model,
-  prompt,
-  systemInstruction,
+  promptParts,
   maxOutputTokens,
   temperature,
   topP,
@@ -535,15 +533,20 @@ const requestOpenAiText = async ({
   const startedAt = Date.now();
   let attempt = 0;
   let outputTokenLimit = maxOutputTokens;
+  const instructions = getPromptInstructionsText(promptParts);
+  const input = getPromptInputText(promptParts) || getPromptPreviewText(promptParts);
 
   while (true) {
     const requestPayload = {
       model,
-      input: createOpenAiInput(prompt, systemInstruction),
+      input,
       max_output_tokens: outputTokenLimit,
       store: false,
       prompt_cache_key: cacheKey || buildPromptCacheKey(kind, undefined, model)
     };
+    if (instructions) {
+      requestPayload.instructions = instructions;
+    }
     if (jsonSchemaFormat) {
       requestPayload.text = {
         format: {
@@ -771,7 +774,7 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
 
   if (kind === 'suggestPlotTwist') {
     const resolvedStyle = resolvePromptStyleContext(context);
-    return buildPlotTwistPrompt(context.genre || '', resolvedStyle.styleContext).length;
+    return buildPlotTwistPrompt(context.genre || '', resolvedStyle.styleContext).previewText.length;
   }
 
   if (kind === 'generateScriptElement') {
@@ -781,7 +784,7 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
       character: context.character,
       instruction: context.instruction || '',
       styleContext: resolvedStyle.styleContext
-    }).length;
+    }).previewText.length;
   }
 
   if (kind === 'regenerateScriptBlock') {
@@ -794,7 +797,7 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
       text: context.block?.text || '',
       style: resolvedStyle.styleContext,
       rewriteGuidance: context.rewriteGuidance
-    }).length;
+    }).previewText.length;
   }
 
   if (kind === 'generateSurpriseSetup') {
@@ -808,7 +811,7 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
         styleGuidance: canonicalStyle?.description || '',
         legacyStyle: context.style || ''
       }
-    }).length;
+    }).previewText.length;
   }
 
   return 0;
@@ -828,13 +831,13 @@ export const generateTextByKind = async ({
     throw new Error(`Unsupported text generation kind: ${kind}`);
   }
 
-  const models = getTextModels(kind);
+  const models = resolveTextGenerationModels(kind);
   const traceMeta = upstreamContext?.promptTrace;
 
   if (kind === 'generateScene') {
     const { storyContext, userInstruction, isFirstScene } = context;
     const styleContext = resolveSceneStyleContext(storyContext);
-    const { prompt, lengthProfile } = buildGenerateScenePrompt({
+    const { instructions, input, previewText, lengthProfile } = buildGenerateScenePrompt({
       genre: storyContext.genre,
       premise: storyContext.premise,
       characters: storyContext.characters,
@@ -846,9 +849,7 @@ export const generateTextByKind = async ({
       targetLength: storyContext.targetLength
     });
     const sceneMaxOutputTokens = resolveSceneMaxOutputTokens(lengthProfile);
-    const sceneModel = provider === 'openai'
-      ? resolveSceneModel(models, lengthProfile, sceneMaxOutputTokens)
-      : models.gemini;
+    const sceneModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
       task: isFirstScene ? 'Write opening scene' : 'Write next scene',
       userInstruction
@@ -880,7 +881,7 @@ export const generateTextByKind = async ({
           openai,
           kind,
           model: sceneModel,
-          prompt,
+          promptParts: { instructions, input, previewText },
           maxOutputTokens: sceneMaxOutputTokens,
           temperature: 0.82,
           topP: 0.95,
@@ -903,8 +904,9 @@ export const generateTextByKind = async ({
           geminiAi,
           kind,
           model: models.gemini,
-          contents: prompt,
-          config: {
+          ...resolveGeminiPromptRequest({
+            promptParts: { instructions, input, previewText },
+            config: {
             responseMimeType: 'application/json',
             responseSchema: {
               type: Type.OBJECT,
@@ -927,7 +929,8 @@ export const generateTextByKind = async ({
               },
               required: ['heading', 'summary', 'blocks']
             }
-          },
+            }
+          }),
           upstreamContext,
           timeoutMs
         });
@@ -966,7 +969,7 @@ export const generateTextByKind = async ({
           styleSource: styleContext,
           instructionPreview,
           contextPreview,
-          promptPreview: prompt,
+          promptPreview: previewText,
           requestMetrics: responsePayload
         })
       }
@@ -975,7 +978,7 @@ export const generateTextByKind = async ({
 
   if (kind === 'suggestPlotTwist') {
     const resolvedStyle = resolvePromptStyleContext(context);
-    const prompt = buildPlotTwistPrompt(context.genre, resolvedStyle.styleContext);
+    const promptParts = buildPlotTwistPrompt(context.genre, resolvedStyle.styleContext);
     const twistModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
       task: 'Give one shocking, single-sentence plot twist'
@@ -1004,7 +1007,7 @@ export const generateTextByKind = async ({
           openai,
           kind,
           model: models.openai,
-          prompt,
+          promptParts,
           maxOutputTokens: 90,
           temperature: 0.92,
           topP: 0.98,
@@ -1017,7 +1020,7 @@ export const generateTextByKind = async ({
           geminiAi,
           kind,
           model: models.gemini,
-          contents: prompt,
+          ...resolveGeminiPromptRequest({ promptParts }),
           upstreamContext,
           timeoutMs
         });
@@ -1037,7 +1040,7 @@ export const generateTextByKind = async ({
           styleSource: resolvedStyle.styleContext,
           instructionPreview,
           contextPreview,
-          promptPreview: prompt,
+          promptPreview: promptParts.previewText,
           requestMetrics: responsePayload
         })
       }
@@ -1047,12 +1050,23 @@ export const generateTextByKind = async ({
   if (kind === 'generateScriptElement') {
     const { type, character, instruction, styleContext } = context;
     const resolvedStyle = resolvePromptStyleContext(context, styleContext);
-    const prompt = buildScriptElementPrompt({
+    const promptParts = buildScriptElementPrompt({
       type,
       character,
       instruction,
       styleContext: resolvedStyle.styleContext
     });
+    const requestPromptParts = {
+      instructions: joinPromptTexts(SCRIPT_ELEMENT_SYSTEM_INSTRUCTION, promptParts.instructions),
+      input: promptParts.input,
+      previewText: joinPromptTexts(
+        'Instructions:',
+        SCRIPT_ELEMENT_SYSTEM_INSTRUCTION,
+        promptParts.instructions,
+        'Input:',
+        promptParts.input
+      )
+    };
     const scriptElementModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
       task: 'Generate one script element block',
@@ -1084,8 +1098,7 @@ export const generateTextByKind = async ({
           openai,
           kind,
           model: models.openai,
-          prompt,
-          systemInstruction: SCRIPT_ELEMENT_SYSTEM_INSTRUCTION,
+          promptParts: requestPromptParts,
           maxOutputTokens: 100,
           temperature: 0.72,
           topP: 0.92,
@@ -1098,12 +1111,13 @@ export const generateTextByKind = async ({
           geminiAi,
           kind,
           model: models.gemini,
-          contents: prompt,
-          config: {
-            systemInstruction: SCRIPT_ELEMENT_SYSTEM_INSTRUCTION,
+          ...resolveGeminiPromptRequest({
+            promptParts: requestPromptParts,
+            config: {
             maxOutputTokens: 100,
             temperature: 0.7
-          },
+            }
+          }),
           upstreamContext,
           timeoutMs
         });
@@ -1125,7 +1139,7 @@ export const generateTextByKind = async ({
           styleSource: resolvedStyle.styleContext,
           instructionPreview,
           contextPreview,
-          promptPreview: `${SCRIPT_ELEMENT_SYSTEM_INSTRUCTION}\n${prompt}`,
+          promptPreview: requestPromptParts.previewText,
           requestMetrics: responsePayload
         })
       }
@@ -1135,7 +1149,7 @@ export const generateTextByKind = async ({
   if (kind === 'regenerateScriptBlock') {
     const { block, genre, premise, rewriteGuidance } = context;
     const resolvedStyle = resolvePromptStyleContext(context);
-    const prompt = buildRegenerateBlockPrompt({
+    const promptParts = buildRegenerateBlockPrompt({
       type: block.type,
       character: block.character,
       genre,
@@ -1178,7 +1192,7 @@ export const generateTextByKind = async ({
           openai,
           kind,
           model: models.openai,
-          prompt,
+          promptParts,
           maxOutputTokens: 150,
           temperature: 0.82,
           topP: 0.95,
@@ -1191,11 +1205,13 @@ export const generateTextByKind = async ({
           geminiAi,
           kind,
           model: models.gemini,
-          contents: prompt,
-          config: {
+          ...resolveGeminiPromptRequest({
+            promptParts,
+            config: {
             maxOutputTokens: 150,
             temperature: 0.8
-          },
+            }
+          }),
           upstreamContext,
           timeoutMs
         });
@@ -1217,7 +1233,7 @@ export const generateTextByKind = async ({
           styleSource: resolvedStyle.styleContext,
           instructionPreview,
           contextPreview,
-          promptPreview: prompt,
+          promptPreview: promptParts.previewText,
           requestMetrics: responsePayload
         })
       }
@@ -1231,7 +1247,7 @@ export const generateTextByKind = async ({
   );
   const legacyStyle = typeof context.style === 'string' ? context.style.trim() : '';
 
-  const prompt = buildSurpriseSetupPrompt({
+  const promptParts = buildSurpriseSetupPrompt({
     targetGenre: context.targetGenre,
     genres,
     style: {
@@ -1277,7 +1293,7 @@ export const generateTextByKind = async ({
         openai,
         kind,
         model: models.openai,
-        prompt,
+        promptParts,
         maxOutputTokens: 350,
         temperature: 0.95,
         topP: 0.98,
@@ -1295,8 +1311,9 @@ export const generateTextByKind = async ({
         geminiAi,
         kind,
         model: models.gemini,
-        contents: prompt,
-        config: {
+        ...resolveGeminiPromptRequest({
+          promptParts,
+          config: {
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -1307,7 +1324,8 @@ export const generateTextByKind = async ({
             },
             required: ['genre', 'premise', 'characters']
           }
-        },
+          }
+        }),
         upstreamContext,
         timeoutMs
       });
@@ -1329,7 +1347,7 @@ export const generateTextByKind = async ({
         styleSource: styleFingerprintSource,
         instructionPreview,
         contextPreview,
-        promptPreview: prompt,
+        promptPreview: promptParts.previewText,
         requestMetrics: responsePayload
       })
     }

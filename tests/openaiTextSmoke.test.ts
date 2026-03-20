@@ -13,12 +13,27 @@ vi.mock('openai', () => ({
 let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
 const previousProvider = process.env.TEXT_LLM_PROVIDER;
 const previousOpenAiKey = process.env.OPENAI_API_KEY;
+const previousOpenAiModel = process.env.OPENAI_MODEL;
+const previousOpenAiFastModel = process.env.OPENAI_FAST_MODEL;
+const previousOpenAiBalancedModel = process.env.OPENAI_BALANCED_MODEL;
+
+const restoreEnv = (key: string, value: string | undefined) => {
+  if (typeof value === 'undefined') {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+};
 
 beforeAll(async () => {
+  process.env.OPENAI_MODEL = 'test-openai-primary';
+  process.env.OPENAI_FAST_MODEL = 'test-openai-fast';
+  process.env.OPENAI_BALANCED_MODEL = 'test-openai-balanced';
   process.env.TEXT_LLM_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'test-openai-key';
   process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'test-password';
 
+  vi.resetModules();
   const serverModule = await import('../server/index.js');
   handleAiGenerate = serverModule.handleAiGenerate;
 });
@@ -26,6 +41,9 @@ beforeAll(async () => {
 afterAll(() => {
   process.env.TEXT_LLM_PROVIDER = previousProvider;
   process.env.OPENAI_API_KEY = previousOpenAiKey;
+  restoreEnv('OPENAI_MODEL', previousOpenAiModel);
+  restoreEnv('OPENAI_FAST_MODEL', previousOpenAiFastModel);
+  restoreEnv('OPENAI_BALANCED_MODEL', previousOpenAiBalancedModel);
 });
 
 beforeEach(() => {
@@ -90,7 +108,8 @@ describe('OpenAI text generation smoke', () => {
             genre: 'Noir',
             premise: 'A vanished witness sends clues from impossible places.',
             characters: ['Mara', 'Denton'],
-            scenes: []
+            scenes: [],
+            targetLength: 'Long'
           },
           userInstruction: 'Open on a tense reveal.',
           isFirstScene: true
@@ -163,9 +182,27 @@ describe('OpenAI text generation smoke', () => {
     expect(Array.isArray(surpriseData?.characters)).toBe(true);
 
     expect(mockResponsesCreate).toHaveBeenCalledTimes(5);
-    for (const call of mockResponsesCreate.mock.calls) {
+    const expectedModels = [
+      'test-openai-primary',
+      'test-openai-balanced',
+      'test-openai-fast',
+      'test-openai-balanced',
+      'test-openai-balanced'
+    ];
+    for (const [index, call] of mockResponsesCreate.mock.calls.entries()) {
+      const request = call[0] as { model?: string; instructions?: unknown; input?: unknown };
+      expect(request.model).toBe(expectedModels[index]);
+      expect(typeof request.instructions).toBe('string');
+      expect(String(request.instructions || '').trim().length).toBeGreaterThan(0);
+      expect(typeof request.input).toBe('string');
+      expect(String(request.input || '').trim().length).toBeGreaterThan(0);
+      expect(Array.isArray(request.input)).toBe(false);
       const options = call[1] as { signal?: AbortSignal } | undefined;
       expect(options?.signal).toBeInstanceOf(AbortSignal);
     }
+
+    expect(String((mockResponsesCreate.mock.calls[2]?.[0] as { instructions?: unknown })?.instructions || '')).toContain(
+      'Output ONLY the raw script text requested.'
+    );
   });
 });

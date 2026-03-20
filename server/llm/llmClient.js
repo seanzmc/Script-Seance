@@ -2,9 +2,9 @@ import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 
 const DEFAULT_TEXT_PROVIDER = 'openai';
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.2';
-const DEFAULT_OPENAI_FAST_MODEL = process.env.OPENAI_FAST_MODEL || 'gpt-5-nano';
-const DEFAULT_OPENAI_BALANCED_MODEL = process.env.OPENAI_BALANCED_MODEL || 'gpt-5-mini';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4';
+const DEFAULT_OPENAI_FAST_MODEL = process.env.OPENAI_FAST_MODEL || 'gpt-5.4-nano';
+const DEFAULT_OPENAI_BALANCED_MODEL = process.env.OPENAI_BALANCED_MODEL || 'gpt-5.4-mini';
 const DEFAULT_GEMINI_SCENE_MODEL = process.env.GEMINI_TEXT_MODEL_SCENE || 'gemini-2.5-flash';
 const DEFAULT_GEMINI_FAST_MODEL = process.env.GEMINI_TEXT_MODEL_FAST || 'gemini-2.5-flash-lite';
 
@@ -20,12 +20,29 @@ const normalizeProvider = (value) => {
 export const getTextProvider = () =>
   normalizeProvider(process.env.TEXT_LLM_PROVIDER || DEFAULT_TEXT_PROVIDER);
 
-export const getTextModels = (kind) => {
-  const isScene = kind === 'generateScene';
+const resolveOpenAiTextModel = (kind) => {
+  switch (kind) {
+    case 'generateScene':
+      return DEFAULT_OPENAI_MODEL;
+    case 'suggestPlotTwist':
+    case 'regenerateScriptBlock':
+    case 'generateSurpriseSetup':
+      return DEFAULT_OPENAI_BALANCED_MODEL;
+    case 'generateScriptElement':
+    default:
+      return DEFAULT_OPENAI_FAST_MODEL;
+  }
+};
+
+const resolveGeminiTextModel = (kind) => {
+  if (kind === 'generateScene') return DEFAULT_GEMINI_SCENE_MODEL;
+  return DEFAULT_GEMINI_FAST_MODEL;
+};
+
+export const resolveTextGenerationModels = (kind) => {
   return {
-    openai: isScene ? DEFAULT_OPENAI_MODEL : DEFAULT_OPENAI_FAST_MODEL,
-    openaiBalanced: DEFAULT_OPENAI_BALANCED_MODEL,
-    gemini: isScene ? DEFAULT_GEMINI_SCENE_MODEL : DEFAULT_GEMINI_FAST_MODEL
+    openai: resolveOpenAiTextModel(kind),
+    gemini: resolveGeminiTextModel(kind)
   };
 };
 

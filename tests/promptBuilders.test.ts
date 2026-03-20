@@ -22,7 +22,7 @@ describe('promptBuilders style injection', () => {
   });
 
   it('injects style into generateScene prompt', () => {
-    const { prompt } = buildGenerateScenePrompt({
+    const { instructions, input, previewText } = buildGenerateScenePrompt({
       genre: 'Noir',
       premise: 'A detective unravels a conspiracy.',
       characters: ['Alex'],
@@ -32,9 +32,11 @@ describe('promptBuilders style injection', () => {
       styleContext: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.',
       targetLength: 'Medium'
     });
-    expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
-    expect(prompt).toContain('"type": "action" | "dialogue" | "transition"');
-    expect(prompt).toContain('Do NOT emit a heading block inside "blocks".');
+    expect(input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(instructions).toContain('"type": "action" | "dialogue" | "transition"');
+    expect(instructions).toContain('Do NOT emit a heading block inside "blocks".');
+    expect(previewText).toContain('Instructions:');
+    expect(previewText).toContain('Input:');
   });
 
   it('injects style into suggestPlotTwist prompt', () => {
@@ -42,7 +44,8 @@ describe('promptBuilders style injection', () => {
       'Noir',
       'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.'
     );
-    expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(prompt.input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(prompt.instructions).toContain('Output only one sentence.');
   });
 
   it('injects style into generateScriptElement prompt', () => {
@@ -52,7 +55,8 @@ describe('promptBuilders style injection', () => {
       instruction: 'Set mood quickly.',
       styleContext: 'Genre: Noir. Style: Cinematic.'
     });
-    expect(prompt).toContain('Style Theme: Genre: Noir. Style: Cinematic.');
+    expect(prompt.input).toContain('Style Theme: Genre: Noir. Style: Cinematic.');
+    expect(prompt.instructions).toContain('Write a concise screenplay action line.');
   });
 
   it('injects style into regenerateScriptBlock prompt for dialogue and non-dialogue', () => {
@@ -65,7 +69,8 @@ describe('promptBuilders style injection', () => {
       style: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.',
       rewriteGuidance: 'Sharpen it.'
     });
-    expect(dialoguePrompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(dialoguePrompt.input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(dialoguePrompt.instructions).toContain('Output ONLY the new dialogue text.');
 
     const actionPrompt = buildRegenerateBlockPrompt({
       type: 'action',
@@ -76,7 +81,8 @@ describe('promptBuilders style injection', () => {
       style: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.',
       rewriteGuidance: 'Make it vivid.'
     });
-    expect(actionPrompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(actionPrompt.input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(actionPrompt.instructions).toContain('Output ONLY the new text.');
   });
 
   it('injects style into generateSurpriseSetup prompt', () => {
@@ -90,8 +96,8 @@ describe('promptBuilders style injection', () => {
         legacyStyle: ''
       }
     });
-    expect(prompt).toContain('Style: All dialogue rhymes (all-dialogue-rhymes)');
-    expect(prompt).toContain('Style guidance: Every spoken line should rhyme while remaining natural enough for performance.');
+    expect(prompt.input).toContain('Style: All dialogue rhymes (all-dialogue-rhymes)');
+    expect(prompt.input).toContain('Style guidance: Every spoken line should rhyme while remaining natural enough for performance.');
   });
 
   it('omits surprise setup style block when no style is provided', () => {
@@ -105,8 +111,8 @@ describe('promptBuilders style injection', () => {
         legacyStyle: ''
       }
     });
-    expect(prompt).not.toContain('Style:');
-    expect(prompt).not.toContain('Style guidance:');
+    expect(prompt.input).not.toContain('Style:');
+    expect(prompt.input).not.toContain('Style guidance:');
   });
 
   it('forces Thriller when targetGenre is Thriller', () => {
@@ -120,6 +126,6 @@ describe('promptBuilders style injection', () => {
         legacyStyle: ''
       }
     });
-    expect(prompt).toContain('The genre MUST be "Thriller".');
+    expect(prompt.instructions).toContain('The genre MUST be "Thriller".');
   });
 });
