@@ -992,6 +992,64 @@ describe('server reliability', () => {
     }
   });
 
+  it('accepts generateScene dialogue blocks when parenthetical is null', async () => {
+    mockGenerateContent.mockResolvedValue({
+      text: JSON.stringify({
+        heading: 'INT. OFFICE - DAY',
+        summary: 'An old recorder clicks on.',
+        blocks: [
+          { type: 'dialogue', character: 'Alex', parenthetical: null, text: 'We are out of time.' }
+        ]
+      })
+    });
+
+    const req = {
+      body: {
+        kind: 'generateScene',
+        context: {
+          storyContext: {
+            title: 'Test',
+            genre: 'Noir',
+            premise: 'A mystery unfolds.',
+            characters: ['Alex'],
+            scenes: []
+          },
+          userInstruction: 'Begin.',
+          isFirstScene: true
+        }
+      }
+    } as any;
+
+    const res = {
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    } as any;
+
+    await handleAiGenerate(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body?.data).toMatchObject({
+      heading: 'INT. OFFICE - DAY',
+      summary: 'An old recorder clicks on.',
+      blocks: [
+        { type: 'dialogue', character: 'Alex', parenthetical: null, text: 'We are out of time.' }
+      ]
+    });
+  });
+
   it('returns 502 when non-dialogue scene blocks include dialogue-only fields', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {

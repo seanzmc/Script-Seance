@@ -261,7 +261,7 @@ describe('OpenAI text generation smoke', () => {
     expect(dialogueBlockSchema?.properties?.parenthetical).toMatchObject({
       type: ['string', 'null']
     });
-    expect(dialogueBlockSchema?.required).toEqual(['type', 'character', 'text']);
+    expect(dialogueBlockSchema?.required).toEqual(['type', 'character', 'parenthetical', 'text']);
     expect(sceneRequest.instructions || '').not.toContain('The JSON schema is:');
     expect(sceneRequest.instructions || '').not.toContain('Do NOT emit a heading block inside "blocks".');
 

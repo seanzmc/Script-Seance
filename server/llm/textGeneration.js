@@ -63,7 +63,7 @@ const DEFAULT_UPSTREAM_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.AI_
 const DEFAULT_UPSTREAM_RETRY_MAX_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_DELAY_MS, 4000);
 const DEFAULT_UPSTREAM_RETRY_JITTER_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_JITTER_MS, 150);
 
-const DIALOGUE_SCENE_BLOCK_REQUIRED_FIELDS = ['type', 'character', 'text'];
+const DIALOGUE_SCENE_BLOCK_REQUIRED_FIELDS = ['type', 'character', 'parenthetical', 'text'];
 const SCENE_BLOCK_SCHEMA_VARIANTS = {
   action: {
     type: 'object',
