@@ -77,11 +77,22 @@ describe('promptBuilders style injection', () => {
   });
 
   it('injects style into suggestPlotTwist prompt', () => {
-    const prompt = buildPlotTwistPrompt(
-      'Noir',
-      'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.'
-    );
+    const prompt = buildPlotTwistPrompt({
+      genre: 'Noir',
+      premise: 'A detective unravels a conspiracy.',
+      characters: ['Alex', 'Mara'],
+      recentSceneHeading: 'EXT. DOCKS - LATER',
+      recentSceneSummary: 'Mara spots the handoff before it goes wrong.',
+      userInstruction: 'Make the next beat feel dangerous.',
+      style: 'Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.'
+    });
+    expect(prompt.input).toContain('Premise: A detective unravels a conspiracy.');
+    expect(prompt.input).toContain('Named characters: Alex, Mara.');
+    expect(prompt.input).toContain('Recent story context:\nHeading: EXT. DOCKS - LATER\nSummary: Mara spots the handoff before it goes wrong.');
+    expect(prompt.input).toContain('Current user instruction: Make the next beat feel dangerous.');
     expect(prompt.input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(prompt.instructions).toContain('It must stay compatible with the premise, named characters, and recent story facts.');
+    expect(prompt.instructions).toContain('Avoid generic filler phrasing or vague "everything changes" language.');
     expect(prompt.instructions).toContain('Output only one sentence.');
   });
 
@@ -107,6 +118,8 @@ describe('promptBuilders style injection', () => {
       rewriteGuidance: 'Sharpen it.'
     });
     expect(dialoguePrompt.input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(dialoguePrompt.instructions).toContain("preserving the line's core intent");
+    expect(dialoguePrompt.instructions).toContain('Keep the same speaker identity and stay consistent with the surrounding story continuity.');
     expect(dialoguePrompt.instructions).toContain('Output ONLY the new dialogue text.');
 
     const actionPrompt = buildRegenerateBlockPrompt({
@@ -119,6 +132,8 @@ describe('promptBuilders style injection', () => {
       rewriteGuidance: 'Make it vivid.'
     });
     expect(actionPrompt.input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
+    expect(actionPrompt.instructions).toContain('preserving its core intent.');
+    expect(actionPrompt.instructions).toContain('Keep continuity with the surrounding story context and preserve the same block type.');
     expect(actionPrompt.instructions).toContain('Output ONLY the new text.');
   });
 
@@ -135,6 +150,8 @@ describe('promptBuilders style injection', () => {
     });
     expect(prompt.input).toContain('Style: All dialogue rhymes (all-dialogue-rhymes)');
     expect(prompt.input).toContain('Style guidance: Every spoken line should rhyme while remaining natural enough for performance.');
+    expect(prompt.instructions).toContain('Make the premise concrete rather than generic or cliche.');
+    expect(prompt.instructions).toContain('Make the three characters clearly distinct from one another in role and energy.');
   });
 
   it('omits surprise setup style block when no style is provided', () => {

@@ -180,7 +180,17 @@ describe('script view style editor', () => {
       }, [applyContextMutation]);
 
       const triggerTwist = () => {
-        void executeSuggestPlotTwist(context.genre, context.style);
+        const recentScene = context.scenes[context.scenes.length - 1];
+        void executeSuggestPlotTwist(
+          context.genre,
+          context.style,
+          {
+            premise: context.premise,
+            characters: context.characters,
+            recentSceneHeading: recentScene?.heading,
+            recentSceneSummary: recentScene?.summary
+          }
+        );
       };
 
       return (
@@ -215,6 +225,10 @@ describe('script view style editor', () => {
     expect(requestBody.kind).toBe('suggestPlotTwist');
     expect(requestBody.context).toMatchObject({
       genre: 'Noir',
+      premise: 'A detective uncovers a conspiracy.',
+      characters: ['Alex', 'Sam'],
+      recentSceneHeading: 'INT. OFFICE - NIGHT',
+      recentSceneSummary: 'Alex studies evidence.',
       style: 'Unhinged'
     });
   });

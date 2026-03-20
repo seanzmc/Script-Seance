@@ -213,16 +213,47 @@ export const buildGenerateScenePrompt = ({
   };
 };
 
-export const buildPlotTwistPrompt = (genre, style) => createPromptParts({
-  instructions: [
-    'Give me a short, shocking, single-sentence plot twist idea.',
-    'Output only one sentence.'
-  ],
-  input: [
-    `Genre: ${genre}.`,
-    formatStyleBlock(style)
-  ]
-});
+export const buildPlotTwistPrompt = ({
+  genre,
+  premise,
+  characters,
+  recentSceneHeading,
+  recentSceneSummary,
+  userInstruction,
+  style
+}) => {
+  const normalizedCharacters = Array.isArray(characters)
+    ? characters.map((character) => collapseWhitespace(character)).filter(Boolean)
+    : [];
+  const recentStoryContext = [
+    typeof recentSceneHeading === 'string' && recentSceneHeading.trim()
+      ? `Heading: ${recentSceneHeading.trim()}`
+      : '',
+    typeof recentSceneSummary === 'string' && recentSceneSummary.trim()
+      ? `Summary: ${recentSceneSummary.trim()}`
+      : ''
+  ].filter(Boolean);
+
+  return createPromptParts({
+    instructions: [
+      'Suggest exactly one plot twist sentence for what should happen next in the screenplay.',
+      'It must stay compatible with the premise, named characters, and recent story facts.',
+      'It must introduce a concrete complication, reveal, or reversal that changes what happens next.',
+      'Avoid generic filler phrasing or vague "everything changes" language.',
+      'Output only one sentence.'
+    ],
+    input: [
+      `Genre: ${genre}.`,
+      typeof premise === 'string' && premise.trim() ? `Premise: ${premise.trim()}` : '',
+      normalizedCharacters.length ? `Named characters: ${normalizedCharacters.join(', ')}.` : '',
+      recentStoryContext.length ? `Recent story context:\n${recentStoryContext.join('\n')}` : '',
+      typeof userInstruction === 'string' && userInstruction.trim()
+        ? `Current user instruction: ${userInstruction.trim()}`
+        : '',
+      formatStyleBlock(style)
+    ]
+  });
+};
 
 export const buildScriptElementPrompt = ({ type, character, instruction, styleContext }) => {
   const styleBlock = formatStyleBlock(styleContext) || 'Style Theme: Match the established screenplay voice.';
@@ -272,7 +303,9 @@ export const buildRegenerateBlockPrompt = ({ type, character, genre, premise, te
   if (type === 'dialogue') {
     return createPromptParts({
       instructions: [
-        `Rewrite this dialogue line for ${character} to be more impactful, witty, or dramatic, fitting the genre "${genre}".`,
+        `Rewrite this dialogue line for ${character} so it lands better while preserving the line's core intent in the genre "${genre}".`,
+        'Keep the same speaker identity and stay consistent with the surrounding story continuity.',
+        'Return dialogue only. Do not add speaker labels, stage directions, or extra lines.',
         'Output ONLY the new dialogue text.'
       ],
       input: [
@@ -286,7 +319,9 @@ export const buildRegenerateBlockPrompt = ({ type, character, genre, premise, te
 
   return createPromptParts({
     instructions: [
-      `Rewrite this screenplay ${type} block to be more descriptive and engaging.`,
+      `Rewrite this screenplay ${type} block to improve phrasing while preserving its core intent.`,
+      'Keep continuity with the surrounding story context and preserve the same block type.',
+      'Do not add dialogue, speaker labels, or extra screenplay blocks.',
       'Output ONLY the new text.'
     ],
     input: [
@@ -324,8 +359,11 @@ export const buildSurpriseSetupPrompt = ({ targetGenre, genres, style }) => {
 
   return createPromptParts({
     instructions: [
-      'Generate a creative, unique, and interesting movie premise.',
+      'Generate a creative, specific movie premise.',
       genreInstruction,
+      'Make the premise concrete rather than generic or cliche.',
+      'Make the three characters clearly distinct from one another in role and energy.',
+      'Avoid vague setup language and generic stakes.',
       'Return a JSON object with:',
       `'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''},`,
       "'premise' (string, 1-2 sentences),",

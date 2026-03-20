@@ -808,7 +808,15 @@ export const getPromptSizeEstimate = ({ kind, context, genres }) => {
 
   if (kind === 'suggestPlotTwist') {
     const resolvedStyle = resolvePromptStyleContext(context);
-    return buildPlotTwistPrompt(context.genre || '', resolvedStyle.styleContext).previewText.length;
+    return buildPlotTwistPrompt({
+      genre: context.genre || '',
+      premise: context.premise || '',
+      characters: context.characters || [],
+      recentSceneHeading: context.recentSceneHeading || '',
+      recentSceneSummary: context.recentSceneSummary || '',
+      userInstruction: context.userInstruction || '',
+      style: resolvedStyle.styleContext
+    }).previewText.length;
   }
 
   if (kind === 'generateScriptElement') {
@@ -995,13 +1003,26 @@ export const generateTextByKind = async ({
 
   if (kind === 'suggestPlotTwist') {
     const resolvedStyle = resolvePromptStyleContext(context);
-    const promptParts = buildPlotTwistPrompt(context.genre, resolvedStyle.styleContext);
+    const promptParts = buildPlotTwistPrompt({
+      genre: context.genre,
+      premise: context.premise,
+      characters: context.characters,
+      recentSceneHeading: context.recentSceneHeading,
+      recentSceneSummary: context.recentSceneSummary,
+      userInstruction: context.userInstruction,
+      style: resolvedStyle.styleContext
+    });
     const twistModel = provider === 'openai' ? models.openai : models.gemini;
     const instructionPreview = {
-      task: 'Give one shocking, single-sentence plot twist'
+      task: 'Give one grounded, single-sentence plot twist'
     };
     const contextPreview = {
       genre: context.genre,
+      premise: context.premise || null,
+      characters: Array.isArray(context.characters) ? context.characters : [],
+      recentSceneHeading: context.recentSceneHeading || null,
+      recentSceneSummary: context.recentSceneSummary || null,
+      userInstruction: context.userInstruction || null,
       styleId: resolvedStyle.styleId,
       styleName: resolvedStyle.styleName,
       styleContext: resolvedStyle.styleContext,

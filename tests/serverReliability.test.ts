@@ -305,6 +305,11 @@ describe('server reliability', () => {
           kind: 'suggestPlotTwist',
           context: {
             genre: 'Noir',
+            premise: 'A vanished witness sends clues from impossible places.',
+            characters: ['Mara', 'Vale', 'Iris'],
+            recentSceneHeading: 'INT. UNION STATION - NIGHT',
+            recentSceneSummary: 'Mara realizes the courier is guiding her into a trap.',
+            userInstruction: 'Push the next scene into a worse trap.',
             styleId: 'noir-1940s-detective',
             styleName: 'Client supplied label',
             style: 'Hardboiled fallback'
@@ -322,11 +327,21 @@ describe('server reliability', () => {
       expect(twistRes.statusCode).toBe(200);
       expect(twistRes.body?.debug?.previews?.context).toMatchObject({
         genre: 'Noir',
+        premise: 'A vanished witness sends clues from impossible places.',
+        characters: ['Mara', 'Vale', 'Iris'],
+        recentSceneHeading: 'INT. UNION STATION - NIGHT',
+        recentSceneSummary: 'Mara realizes the courier is guiding her into a trap.',
+        userInstruction: 'Push the next scene into a worse trap.',
         styleId: 'noir-1940s-detective',
         styleName: '1940s Noir Detective'
       });
       expect(String(twistRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
+      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Premise: A vanished witness sends clues from impossible places.');
+      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Named characters: Mara, Vale, Iris.');
+      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Recent story context:\nHeading: INT. UNION STATION - NIGHT\nSummary: Mara realizes the courier is guiding her into a trap.');
+      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Current user instruction: Push the next scene into a worse trap.');
       expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction || '')).toContain('It must stay compatible with the premise, named characters, and recent story facts.');
 
       const elementReq = {
         body: {
@@ -397,6 +412,40 @@ describe('server reliability', () => {
         process.env.SS_DEBUG_PROMPTS = previousDebugEnv;
       }
     }
+  });
+
+  it('rejects suggestPlotTwist when character context is invalid', async () => {
+    const req = {
+      body: {
+        kind: 'suggestPlotTwist',
+        context: {
+          genre: 'Noir',
+          characters: ['Mara', '']
+        }
+      }
+    } as any;
+    const res = {
+      statusCode: 200,
+      body: null as any,
+      headers: {} as Record<string, string>,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        this.body = payload;
+        return this;
+      },
+      set(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      }
+    } as any;
+
+    await handleAiGenerate(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body?.error?.code).toBe('INVALID_REQUEST');
+    expect(String(res.body?.error?.message || '')).toContain('Invalid suggestPlotTwist characters.');
   });
 
   it('keeps legacy style in surprise setup debug preview when styleId is absent', async () => {

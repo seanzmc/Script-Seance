@@ -1107,9 +1107,52 @@ const handleAiGenerate = async (req, res) => {
             return sendError(res, 400, 'Invalid target length.', 'INVALID_REQUEST');
           }
         } else if (kind === 'suggestPlotTwist') {
-          const { genre, styleId, styleName, style } = context;
+          const {
+            genre,
+            premise,
+            characters,
+            recentSceneHeading,
+            recentSceneSummary,
+            userInstruction,
+            styleId,
+            styleName,
+            style
+          } = context;
           if (!isNonEmptyString(genre, 120)) {
             return sendError(res, 400, 'Invalid suggestPlotTwist context.', 'INVALID_REQUEST');
+          }
+          if (premise !== undefined && premise !== null && !isNonEmptyString(premise, MAX_PREMISE_CHARS)) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist premise.', 'INVALID_REQUEST');
+          }
+          if (characters !== undefined && characters !== null) {
+            if (
+              !Array.isArray(characters) ||
+              characters.length > MAX_CHARACTERS ||
+              characters.some((character) => !isNonEmptyString(character, MAX_BLOCK_CHARACTER_CHARS))
+            ) {
+              return sendError(res, 400, 'Invalid suggestPlotTwist characters.', 'INVALID_REQUEST');
+            }
+          }
+          if (
+            recentSceneHeading !== undefined &&
+            recentSceneHeading !== null &&
+            !isNonEmptyString(recentSceneHeading, MAX_SCENE_HEADING_CHARS)
+          ) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist recent scene heading.', 'INVALID_REQUEST');
+          }
+          if (
+            recentSceneSummary !== undefined &&
+            recentSceneSummary !== null &&
+            !isNonEmptyString(recentSceneSummary, MAX_SCENE_SUMMARY_CHARS)
+          ) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist recent scene summary.', 'INVALID_REQUEST');
+          }
+          if (
+            userInstruction !== undefined &&
+            userInstruction !== null &&
+            !isNonEmptyString(userInstruction, 2000)
+          ) {
+            return sendError(res, 400, 'Invalid suggestPlotTwist user instruction.', 'INVALID_REQUEST');
           }
           if (styleId !== undefined && styleId !== null && !isNonEmptyString(styleId, 120)) {
             return sendError(res, 400, 'Invalid suggestPlotTwist style id.', 'INVALID_REQUEST');

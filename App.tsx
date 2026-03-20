@@ -1185,6 +1185,7 @@ export default function App() {
     try {
       const startedPromptContextRevision = promptContextRevisionRef.current;
       const startedUserInstruction = userInstructionRef.current;
+      const recentScene = context.scenes[context.scenes.length - 1];
       const scopeKey = scopeKeys.suggestPlotTwist(scriptIdRef.current);
       activeGenerationScopeRef.current = scopeKey;
       setIsGenerating(true);
@@ -1199,6 +1200,13 @@ export default function App() {
             styleId: context.styleId,
             styleName: context.style,
             style: context.style
+          },
+          {
+            premise: context.premise,
+            characters: context.characters,
+            recentSceneHeading: recentScene?.heading,
+            recentSceneSummary: recentScene?.summary,
+            userInstruction: startedUserInstruction
           },
           { signal, opType: 'suggestPlotTwist', scopeKey }
         ),

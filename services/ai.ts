@@ -94,6 +94,14 @@ export type PromptStyleContext = {
   style?: string;
 };
 
+export type PlotTwistStoryContext = {
+  premise?: string;
+  characters?: string[];
+  recentSceneHeading?: string;
+  recentSceneSummary?: string;
+  userInstruction?: string;
+};
+
 export type CancellableRequest<T> = {
   promise: Promise<T>;
   cancel: () => void;
@@ -203,6 +211,54 @@ const normalizePromptStyleContext = (
     return undefined;
   }
   return { styleId, styleName, style };
+};
+
+const isRequestOptions = (value: unknown): value is RequestOptions => (
+  typeof value === 'object' &&
+  value !== null &&
+  (
+    Object.prototype.hasOwnProperty.call(value, 'signal') ||
+    Object.prototype.hasOwnProperty.call(value, 'timeoutMs') ||
+    Object.prototype.hasOwnProperty.call(value, 'opType') ||
+    Object.prototype.hasOwnProperty.call(value, 'scopeKey')
+  )
+);
+
+const normalizePlotTwistStoryContext = (
+  value: PlotTwistStoryContext | undefined
+): PlotTwistStoryContext | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const premise = typeof value.premise === 'string' && value.premise.trim()
+    ? value.premise.trim()
+    : undefined;
+  const characters = Array.isArray(value.characters)
+    ? value.characters
+      .map((character) => (typeof character === 'string' ? character.trim() : ''))
+      .filter(Boolean)
+    : undefined;
+  const recentSceneHeading = typeof value.recentSceneHeading === 'string' && value.recentSceneHeading.trim()
+    ? value.recentSceneHeading.trim()
+    : undefined;
+  const recentSceneSummary = typeof value.recentSceneSummary === 'string' && value.recentSceneSummary.trim()
+    ? value.recentSceneSummary.trim()
+    : undefined;
+  const userInstruction = typeof value.userInstruction === 'string' && value.userInstruction.trim()
+    ? value.userInstruction.trim()
+    : undefined;
+
+  if (!premise && !characters?.length && !recentSceneHeading && !recentSceneSummary && !userInstruction) {
+    return undefined;
+  }
+
+  return {
+    ...(premise ? { premise } : {}),
+    ...(characters?.length ? { characters } : {}),
+    ...(recentSceneHeading ? { recentSceneHeading } : {}),
+    ...(recentSceneSummary ? { recentSceneSummary } : {}),
+    ...(userInstruction ? { userInstruction } : {})
+  };
 };
 
 type GenerateSpeechContext = {
@@ -544,6 +600,7 @@ export const executeGenerateScene = async (
 export const executeSuggestPlotTwist = async (
   genre: string,
   styleOrOptions?: string | PromptStyleContext | RequestOptions,
+  storyContextOrOptions?: PlotTwistStoryContext | RequestOptions,
   maybeOptions?: RequestOptions
 ): Promise<string> => {
   const styleContext = normalizePromptStyleContext(
@@ -551,12 +608,17 @@ export const executeSuggestPlotTwist = async (
       ? styleOrOptions
       : undefined
   );
+  const storyContext = normalizePlotTwistStoryContext(
+    isRequestOptions(storyContextOrOptions) ? undefined : storyContextOrOptions
+  );
   const options = styleOrOptions && !isPromptStyleContext(styleOrOptions) && typeof styleOrOptions !== 'string'
     ? styleOrOptions
+    : isRequestOptions(storyContextOrOptions)
+    ? storyContextOrOptions
     : maybeOptions;
   const request = createAiRequest<{ text: string }>(
     AI_KINDS.suggestPlotTwist,
-    { genre, ...(styleContext ?? {}) },
+    { genre, ...(storyContext ?? {}), ...(styleContext ?? {}) },
     options
   );
   const data = await request.promise;
@@ -640,10 +702,11 @@ export const generateScene = async (
 
 export const suggestPlotTwist = async (
   genre: string,
-  styleOrContext?: string | PromptStyleContext,
-  options?: RequestOptions
+  styleOrContext?: string | PromptStyleContext | RequestOptions,
+  storyContextOrOptions?: PlotTwistStoryContext | RequestOptions,
+  maybeOptions?: RequestOptions
 ): Promise<string> => {
-  return executeSuggestPlotTwist(genre, styleOrContext, options);
+  return executeSuggestPlotTwist(genre, styleOrContext, storyContextOrOptions, maybeOptions);
 };
 
 export const generateScriptElement = async (
