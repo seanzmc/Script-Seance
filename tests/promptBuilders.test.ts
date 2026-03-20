@@ -33,8 +33,9 @@ describe('promptBuilders style injection', () => {
       targetLength: 'Medium'
     });
     expect(input).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective). Style guidance: Everyone speaks in brooding metaphors.');
-    expect(instructions).toContain('"type": "action" | "dialogue" | "transition"');
-    expect(instructions).toContain('Do NOT emit a heading block inside "blocks".');
+    expect(instructions).not.toContain('The JSON schema is:');
+    expect(instructions).not.toContain('Do NOT emit a heading block inside "blocks".');
+    expect(instructions).toContain('Return ONLY a JSON object representing the scene.');
     expect(previewText).toContain('Instructions:');
     expect(previewText).toContain('Input:');
   });

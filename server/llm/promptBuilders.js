@@ -125,26 +125,6 @@ export const buildGenerateScenePrompt = ({
         '- Never end a block in a cut-off sentence or dangling fragment.'
       ].join('\n'),
       'IMPORTANT: Return ONLY a JSON object representing the scene. Do not include markdown formatting or extra text.',
-      [
-        'The JSON schema is:',
-        '{',
-        '  "heading": "INT. LOCATION - TIME",',
-        '  "summary": "A one sentence summary of what happens in this scene for context tracking.",',
-        '  "blocks": [',
-        '    {',
-        '      "type": "action" | "dialogue" | "transition",',
-        '      "character": "CHARACTER NAME (only for dialogue)",',
-        '      "parenthetical": "(optional parenthetical instruction)",',
-        '      "text": "The content of the block"',
-        '    }',
-        '  ]',
-        '}'
-      ].join('\n'),
-      [
-        'Scene heading contract:',
-        '- Put the scene heading ONLY in top-level "heading".',
-        '- Do NOT emit a heading block inside "blocks".'
-      ].join('\n'),
       'Ensure the output is valid JSON.'
     ],
     input: [

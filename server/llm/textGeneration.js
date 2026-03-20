@@ -62,6 +62,39 @@ const DEFAULT_UPSTREAM_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.AI_
 const DEFAULT_UPSTREAM_RETRY_MAX_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_DELAY_MS, 4000);
 const DEFAULT_UPSTREAM_RETRY_JITTER_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_JITTER_MS, 150);
 
+const DIALOGUE_SCENE_BLOCK_REQUIRED_FIELDS = ['type', 'character', 'text'];
+const SCENE_BLOCK_SCHEMA_VARIANTS = {
+  action: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      type: { type: 'string', enum: ['action'] },
+      text: { type: 'string' }
+    },
+    required: ['type', 'text']
+  },
+  transition: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      type: { type: 'string', enum: ['transition'] },
+      text: { type: 'string' }
+    },
+    required: ['type', 'text']
+  },
+  dialogue: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      type: { type: 'string', enum: ['dialogue'] },
+      character: { type: 'string', minLength: 1 },
+      parenthetical: { type: ['string', 'null'] },
+      text: { type: 'string' }
+    },
+    required: DIALOGUE_SCENE_BLOCK_REQUIRED_FIELDS
+  }
+};
+
 const buildSceneJsonSchema = (lengthProfile) => ({
   type: 'object',
   additionalProperties: false,
@@ -74,35 +107,47 @@ const buildSceneJsonSchema = (lengthProfile) => ({
       maxItems: lengthProfile.maxBlocks,
       items: {
         anyOf: [
-          {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              type: { type: 'string', enum: ['action'] },
-              text: { type: 'string' }
-            },
-            required: ['type', 'text']
-          },
-          {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              type: { type: 'string', enum: ['transition'] },
-              text: { type: 'string' }
-            },
-            required: ['type', 'text']
-          },
-          {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              type: { type: 'string', enum: ['dialogue'] },
-              character: { type: ['string', 'null'], minLength: 1 },
-              parenthetical: { type: ['string', 'null'] },
-              text: { type: 'string' }
-            },
-            required: ['type', 'character', 'text', 'parenthetical']
-          }
+          SCENE_BLOCK_SCHEMA_VARIANTS.action,
+          SCENE_BLOCK_SCHEMA_VARIANTS.transition,
+          SCENE_BLOCK_SCHEMA_VARIANTS.dialogue
+        ]
+      }
+    }
+  },
+  required: ['heading', 'summary', 'blocks']
+});
+
+const buildGeminiSceneBlockSchema = (blockSchema) => ({
+  type: Type.OBJECT,
+  properties: Object.fromEntries(
+    Object.entries(blockSchema.properties).map(([key, value]) => {
+      const property = { ...value };
+      if (Array.isArray(property.type)) {
+        property.nullable = property.type.includes('null');
+        property.type = property.type.find((entry) => entry !== 'null')?.toUpperCase();
+      } else {
+        property.type = property.type.toUpperCase();
+      }
+      return [key, property];
+    })
+  ),
+  required: blockSchema.required
+});
+
+const buildGeminiSceneResponseSchema = (lengthProfile) => ({
+  type: Type.OBJECT,
+  properties: {
+    heading: { type: Type.STRING },
+    summary: { type: Type.STRING },
+    blocks: {
+      type: Type.ARRAY,
+      minItems: lengthProfile.minBlocks,
+      maxItems: lengthProfile.maxBlocks,
+      items: {
+        anyOf: [
+          buildGeminiSceneBlockSchema(SCENE_BLOCK_SCHEMA_VARIANTS.action),
+          buildGeminiSceneBlockSchema(SCENE_BLOCK_SCHEMA_VARIANTS.transition),
+          buildGeminiSceneBlockSchema(SCENE_BLOCK_SCHEMA_VARIANTS.dialogue)
         ]
       }
     }
@@ -907,28 +952,8 @@ export const generateTextByKind = async ({
           ...resolveGeminiPromptRequest({
             promptParts: { instructions, input, previewText },
             config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                heading: { type: Type.STRING },
-                summary: { type: Type.STRING },
-                blocks: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      type: { type: Type.STRING, enum: ['action', 'dialogue', 'transition'] },
-                      character: { type: Type.STRING, nullable: true },
-                      parenthetical: { type: Type.STRING, nullable: true },
-                      text: { type: Type.STRING }
-                    },
-                    required: ['type', 'text']
-                  }
-                }
-              },
-              required: ['heading', 'summary', 'blocks']
-            }
+              responseMimeType: 'application/json',
+              responseSchema: buildGeminiSceneResponseSchema(lengthProfile)
             }
           }),
           upstreamContext,

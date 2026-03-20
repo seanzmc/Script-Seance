@@ -201,6 +201,44 @@ describe('OpenAI text generation smoke', () => {
       expect(options?.signal).toBeInstanceOf(AbortSignal);
     }
 
+    const sceneRequest = mockResponsesCreate.mock.calls[0]?.[0] as {
+      instructions?: string;
+      text?: {
+        format?: {
+          schema?: {
+            properties?: {
+              blocks?: {
+                items?: {
+                  anyOf?: Array<{
+                    properties?: {
+                      type?: { enum?: string[] };
+                      character?: { type?: string | string[]; minLength?: number };
+                      parenthetical?: { type?: string | string[] };
+                    };
+                    required?: string[];
+                  }>;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+    const sceneBlockVariants = sceneRequest.text?.format?.schema?.properties?.blocks?.items?.anyOf || [];
+    const dialogueBlockSchema = sceneBlockVariants.find((variant) => (
+      variant.properties?.type?.enum?.includes('dialogue')
+    ));
+    expect(dialogueBlockSchema?.properties?.character).toMatchObject({
+      type: 'string',
+      minLength: 1
+    });
+    expect(dialogueBlockSchema?.properties?.parenthetical).toMatchObject({
+      type: ['string', 'null']
+    });
+    expect(dialogueBlockSchema?.required).toEqual(['type', 'character', 'text']);
+    expect(sceneRequest.instructions || '').not.toContain('The JSON schema is:');
+    expect(sceneRequest.instructions || '').not.toContain('Do NOT emit a heading block inside "blocks".');
+
     expect(String((mockResponsesCreate.mock.calls[2]?.[0] as { instructions?: unknown })?.instructions || '')).toContain(
       'Output ONLY the raw script text requested.'
     );

@@ -86,6 +86,8 @@ const VALID_BLOCK_TYPES = new Set(['heading', 'action', 'dialogue', 'transition'
 const VALID_SCENE_BLOCK_TYPES = new Set(['action', 'dialogue', 'transition']);
 const VALID_REWRITE_BLOCK_TYPES = new Set(['action', 'dialogue', 'transition']);
 const VALID_SCENE_LENGTHS = new Set(['Short', 'Medium', 'Long']);
+const SCENE_DIALOGUE_BLOCK_FIELDS = new Set(['type', 'character', 'parenthetical', 'text']);
+const SCENE_NON_DIALOGUE_BLOCK_FIELDS = new Set(['type', 'text']);
 const sessions = new Map();
 const rateBuckets = new Map();
 const loginBuckets = new Map();
@@ -163,6 +165,7 @@ const isNonEmptyString = (value, max = 4000) => (
   typeof value === 'string' && value.trim().length > 0 && value.length <= max
 );
 const isStringWithin = (value, max) => typeof value === 'string' && value.length <= max;
+const hasOnlyAllowedKeys = (value, allowedKeys) => Object.keys(value).every((key) => allowedKeys.has(key));
 
 const isValidSceneBlock = (block) => {
   if (!isObject(block)) return false;
@@ -173,6 +176,7 @@ const isValidSceneBlock = (block) => {
   const hasParentheticalField = block.parenthetical !== undefined;
 
   if (block.type === 'dialogue') {
+    if (!hasOnlyAllowedKeys(block, SCENE_DIALOGUE_BLOCK_FIELDS)) return false;
     if (!isNonEmptyString(block.character, MAX_BLOCK_CHARACTER_CHARS)) return false;
     if (hasParentheticalField && block.parenthetical !== null) {
       if (!isStringWithin(block.parenthetical, MAX_BLOCK_PARENTHETICAL_CHARS)) return false;
@@ -180,7 +184,7 @@ const isValidSceneBlock = (block) => {
     return true;
   }
 
-  return !hasCharacterField && !hasParentheticalField;
+  return hasOnlyAllowedKeys(block, SCENE_NON_DIALOGUE_BLOCK_FIELDS) && !hasCharacterField && !hasParentheticalField;
 };
 
 const validateAiResponse = (kind, data) => {
