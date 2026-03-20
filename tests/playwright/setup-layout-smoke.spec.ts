@@ -35,6 +35,24 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: /Start a New Script/i }).click();
   await expect(page.getByTestId('setup-screen')).toBeVisible();
   await expect(page.getByTestId('setup-genre-wheel')).toBeVisible();
+
+  const genreMetrics = await page.getByTestId('setup-genre-value-viewport').evaluate((element) => {
+    const valueElement = element.querySelector<HTMLElement>('[data-testid="setup-genre-value"]');
+    if (!valueElement) return null;
+    const viewportRect = element.getBoundingClientRect();
+    const valueRect = valueElement.getBoundingClientRect();
+    return {
+      viewportClientWidth: element.clientWidth,
+      viewportScrollWidth: element.scrollWidth,
+      valueWithinViewport:
+        valueRect.left >= viewportRect.left - 0.5 &&
+        valueRect.right <= viewportRect.right + 0.5
+    };
+  });
+
+  expect(genreMetrics).not.toBeNull();
+  expect(genreMetrics?.valueWithinViewport).toBe(true);
+
   await page.getByTestId('setup-continue-to-style').click();
   await expect(page.getByTestId('setup-genre-summary')).toBeVisible();
   await page.getByRole('button', { name: /Write My Own Premise/i }).click();
@@ -76,6 +94,12 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
     (lengthMetrics?.viewportClientHeight ?? 0) + 1
   );
   expect(lengthMetrics?.valueWithinViewport).toBe(true);
+
+  const generateButton = page.getByRole('button', { name: /Generate First Scene/i });
+  await expect(generateButton).toBeVisible();
+  const generateButtonBox = await generateButton.boundingBox();
+  expect(generateButtonBox).not.toBeNull();
+  expect(generateButtonBox?.y ?? 9999).toBeLessThan(760);
 
   await testInfo.attach('setup-desktop-layout', {
     body: await page.screenshot({ fullPage: true }),

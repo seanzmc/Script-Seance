@@ -309,7 +309,7 @@ describe("SetupForm submit validation", () => {
     expect(button.disabled).toBe(false);
   });
 
-  it("cycles length and stages incoming wheel text before animating", async () => {
+  it("cycles scene length by click, keyboard, and drag while animating the incoming text", async () => {
     const LengthCycleHarness: React.FC = () => {
       const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
       const handleSetupChange = React.useCallback(
@@ -331,7 +331,7 @@ describe("SetupForm submit validation", () => {
     render(<LengthCycleHarness />);
 
     const cycleButton = screen.getByRole("button", {
-      name: /cycle scene length/i,
+      name: /scene length:/i,
     });
     const lengthValue = screen.getByTestId("setup-length-value");
 
@@ -349,7 +349,23 @@ describe("SetupForm submit validation", () => {
       expect(lengthValue.textContent).toBe("Short");
     });
 
-    fireEvent.click(cycleButton);
+    fireEvent.keyDown(cycleButton, { key: "ArrowDown" });
+    await waitFor(() => {
+      expect(lengthValue.textContent).toBe("Medium");
+    });
+
+    fireEvent.pointerDown(cycleButton, { pointerId: 1, clientY: 100 });
+    fireEvent.pointerMove(cycleButton, { pointerId: 1, clientY: 130 });
+    fireEvent.pointerUp(cycleButton, { pointerId: 1, clientY: 130 });
+
+    await waitFor(() => {
+      expect(lengthValue.textContent).toBe("Long");
+    });
+
+    fireEvent.pointerDown(cycleButton, { pointerId: 2, clientY: 130 });
+    fireEvent.pointerMove(cycleButton, { pointerId: 2, clientY: 100 });
+    fireEvent.pointerUp(cycleButton, { pointerId: 2, clientY: 100 });
+
     await waitFor(() => {
       expect(lengthValue.textContent).toBe("Medium");
     });
@@ -454,12 +470,16 @@ describe("SetupForm submit validation", () => {
 
     const preferenceButton = screen.getByTestId("setup-narrator-preference");
     expect(preferenceButton.getAttribute("aria-label")).toContain("Male");
+    expect(preferenceButton.textContent).toContain("Voice");
+    expect(preferenceButton.textContent).toContain("Male");
 
     fireEvent.click(preferenceButton);
     expect(preferenceButton.getAttribute("aria-label")).toContain("Female");
+    expect(preferenceButton.textContent).toContain("Female");
 
     fireEvent.click(preferenceButton);
     expect(preferenceButton.getAttribute("aria-label")).toContain("Random");
+    expect(preferenceButton.textContent).toContain("Random");
   });
 
   it("cycles character preference male -> female -> random", () => {
@@ -488,12 +508,16 @@ describe("SetupForm submit validation", () => {
 
     const preferenceButton = screen.getByTestId("setup-character-preference-0");
     expect(preferenceButton.getAttribute("aria-label")).toContain("Male");
+    expect(preferenceButton.textContent).toContain("Voice");
+    expect(preferenceButton.textContent).toContain("Male");
 
     fireEvent.click(preferenceButton);
     expect(preferenceButton.getAttribute("aria-label")).toContain("Female");
+    expect(preferenceButton.textContent).toContain("Female");
 
     fireEvent.click(preferenceButton);
     expect(preferenceButton.getAttribute("aria-label")).toContain("Random");
+    expect(preferenceButton.textContent).toContain("Random");
   });
 
   it("style library selection updates shared context style and bumps prompt revision synchronously", () => {
@@ -626,9 +650,9 @@ describe("SetupForm submit validation", () => {
       selectedStyle.title,
     );
     expect(screen.getByTestId("prompt-revision").textContent).toBe("1");
-    expect(
-      screen.getByText((content) => content.includes(selectedStyle.description)),
-    ).toBeTruthy();
+    expect(screen.getByTestId("setup-style-summary").textContent).toContain(
+      selectedStyle.title,
+    );
     expect(screen.queryByRole("dialog", { name: /style library/i })).toBeNull();
   });
 
@@ -707,11 +731,9 @@ describe("SetupForm submit validation", () => {
     expect(screen.getByTestId("selected-style").textContent).toBe(
       stylesLibrary[0]?.title ?? "",
     );
-    expect(
-      screen.getByText((content) =>
-        content.includes(stylesLibrary[0]?.description ?? ""),
-      ),
-    ).toBeTruthy();
+    expect(screen.getByTestId("setup-style-summary").textContent).toContain(
+      stylesLibrary[0]?.title ?? "",
+    );
     expect(randomSpy).toHaveBeenCalledTimes(1);
   });
 
