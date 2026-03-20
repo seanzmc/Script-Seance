@@ -34,7 +34,11 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
 
   await page.getByRole('button', { name: /Start a New Script/i }).click();
   await expect(page.getByTestId('setup-screen')).toBeVisible();
+  await expect(page.getByTestId('setup-genre-wheel')).toBeVisible();
+  await page.getByTestId('setup-continue-to-style').click();
+  await expect(page.getByTestId('setup-genre-summary')).toBeVisible();
   await page.getByRole('button', { name: /Write My Own Premise/i }).click();
+  await expect(page.getByTestId('setup-style-summary')).toBeVisible();
 
   const premisePanel = page.getByTestId('setup-premise-panel');
   const charactersPanel = page.getByTestId('setup-characters-panel');
@@ -49,9 +53,7 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
   ]);
   expect(premiseBox).not.toBeNull();
   expect(charactersBox).not.toBeNull();
-
-  const panelHeightDelta = Math.abs((premiseBox?.height ?? 0) - (charactersBox?.height ?? 0));
-  expect(panelHeightDelta).toBeLessThanOrEqual(2);
+  expect((premiseBox?.width ?? 0)).toBeGreaterThan((charactersBox?.width ?? 0));
 
   const lengthViewport = page.getByTestId('setup-length-value-viewport');
   await expect(lengthViewport).toBeVisible();

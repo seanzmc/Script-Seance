@@ -18,7 +18,7 @@ import {
   synchronizeSetupVoicePreferences,
 } from "../components/SetupForm";
 import { stylesLibrary } from "../stylesLibrary";
-import { BlockType, Scene, StoryContext } from "../types";
+import { BlockType, GENRES, Scene, StoryContext } from "../types";
 
 afterEach(() => {
   cleanup();
@@ -281,6 +281,7 @@ describe("SetupForm submit validation", () => {
       />,
     );
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
       screen.getByRole("button", { name: /write my own premise/i }),
     );
@@ -300,10 +301,6 @@ describe("SetupForm submit validation", () => {
         isLoading={false}
         showSubmit
       />,
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
     );
 
     const button = screen.getByRole("button", {
@@ -332,9 +329,6 @@ describe("SetupForm submit validation", () => {
     };
 
     render(<LengthCycleHarness />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
-    );
 
     const cycleButton = screen.getByRole("button", {
       name: /cycle scene length/i,
@@ -361,13 +355,74 @@ describe("SetupForm submit validation", () => {
     });
   });
 
+  it("starts with a genre-first stage and advances to style after continue", () => {
+    render(
+      <SetupForm
+        value={{ ...baseValue, premise: "", style: "" }}
+        onChange={vi.fn()}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByTestId("setup-genre-wheel")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /browse/i })).toBeNull();
+
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+
+    expect(screen.getByTestId("setup-genre-summary")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /browse/i })).toBeTruthy();
+  });
+
+  it("cycles genre by click, keyboard, and drag", async () => {
+    const nextGenre = GENRES[(GENRES.indexOf("Noir") + 1) % GENRES.length] ?? "Noir";
+
+    const GenreHarness: React.FC = () => {
+      const [setupState, setSetupState] = React.useState<SetupFormState>({
+        ...baseValue,
+        premise: "",
+        style: "",
+      });
+      const handleSetupChange = React.useCallback(
+        (next: Partial<SetupFormState>) => {
+          setSetupState((previous) => ({ ...previous, ...next }));
+        },
+        [],
+      );
+
+      return (
+        <SetupForm
+          value={setupState}
+          onChange={handleSetupChange}
+          isLoading={false}
+        />
+      );
+    };
+
+    render(<GenreHarness />);
+
+    const genreWheel = screen.getByTestId("setup-genre-wheel");
+    const genreValue = screen.getByTestId("setup-genre-value");
+
+    expect(genreValue.textContent).toBe("Noir");
+
+    fireEvent.click(genreWheel);
+    expect(genreValue.textContent).toBe(nextGenre);
+
+    fireEvent.keyDown(genreWheel, { key: "ArrowUp" });
+    expect(genreValue.textContent).toBe("Noir");
+
+    fireEvent.pointerDown(genreWheel, { pointerId: 1, clientY: 100 });
+    fireEvent.pointerMove(genreWheel, { pointerId: 1, clientY: 130 });
+    fireEvent.pointerUp(genreWheel, { pointerId: 1, clientY: 130 });
+
+    await waitFor(() => {
+      expect(genreValue.textContent).toBe(nextGenre);
+    });
+  });
+
   it("renders a built-in narrator row that is non-editable and non-deletable", () => {
     render(
       <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
     );
 
     expect(screen.getByText("Narrator")).toBeTruthy();
@@ -396,9 +451,6 @@ describe("SetupForm submit validation", () => {
     };
 
     render(<NarratorPreferenceHarness />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
-    );
 
     const preferenceButton = screen.getByTestId("setup-narrator-preference");
     expect(preferenceButton.getAttribute("aria-label")).toContain("Male");
@@ -433,9 +485,6 @@ describe("SetupForm submit validation", () => {
     };
 
     render(<CharacterPreferenceHarness />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
-    );
 
     const preferenceButton = screen.getByTestId("setup-character-preference-0");
     expect(preferenceButton.getAttribute("aria-label")).toContain("Male");
@@ -578,7 +627,7 @@ describe("SetupForm submit validation", () => {
     );
     expect(screen.getByTestId("prompt-revision").textContent).toBe("1");
     expect(
-      screen.getByText((content) => content.includes(selectedStyle.sampleLine)),
+      screen.getByText((content) => content.includes(selectedStyle.description)),
     ).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: /style library/i })).toBeNull();
   });
@@ -660,7 +709,7 @@ describe("SetupForm submit validation", () => {
     );
     expect(
       screen.getByText((content) =>
-        content.includes(stylesLibrary[0]?.sampleLine ?? ""),
+        content.includes(stylesLibrary[0]?.description ?? ""),
       ),
     ).toBeTruthy();
     expect(randomSpy).toHaveBeenCalledTimes(1);
@@ -779,6 +828,7 @@ describe("SetupForm detail reveal timing", () => {
       />,
     );
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
       screen.getByRole("button", { name: /write my own premise/i }),
     );
@@ -827,6 +877,7 @@ describe("SetupForm detail reveal timing", () => {
 
     render(<SurpriseHarness />);
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
       screen.getByRole("button", { name: /generate ai premise/i }),
     );
@@ -884,6 +935,7 @@ describe("SetupForm detail reveal timing", () => {
 
     expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
       screen.getByRole("button", { name: /resolve auto surprise/i }),
     );
