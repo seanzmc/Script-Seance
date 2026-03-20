@@ -276,18 +276,15 @@ const getPromptInstructionsText = (promptParts) => (
 const getPromptInputText = (promptParts) => (
   typeof promptParts?.input === 'string' ? promptParts.input.trim() : ''
 );
-const getPromptPreviewText = (promptParts) => (
-  typeof promptParts?.previewText === 'string' ? promptParts.previewText.trim() : ''
-);
 const joinPromptTexts = (...values) => values
   .filter((value) => typeof value === 'string' && value.trim())
   .map((value) => value.trim())
   .join('\n\n');
 const resolveGeminiPromptRequest = ({ promptParts, config }) => {
   const instructions = getPromptInstructionsText(promptParts);
-  const input = getPromptInputText(promptParts) || getPromptPreviewText(promptParts);
+  const input = getPromptInputText(promptParts);
   return {
-    contents: input,
+    contents: input || '',
     config: instructions
       ? {
           ...(config ? { ...config } : {}),
@@ -654,12 +651,12 @@ const requestOpenAiText = async ({
   let attempt = 0;
   let outputTokenLimit = maxOutputTokens;
   const instructions = getPromptInstructionsText(promptParts);
-  const input = getPromptInputText(promptParts) || getPromptPreviewText(promptParts);
+  const input = getPromptInputText(promptParts);
 
   while (true) {
     const requestPayload = {
       model,
-      input,
+      input: input || '',
       max_output_tokens: outputTokenLimit,
       store: false,
       prompt_cache_key: cacheKey || buildPromptCacheKey(kind, undefined, model)

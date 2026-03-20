@@ -87,7 +87,7 @@ describe('OpenAI text generation smoke', () => {
         summary: 'A stage illusion reveals a dangerous truth.',
         blocks: [
           { type: 'action', text: 'Dust rolls off velvet curtains as the trapdoor creaks open.' },
-          { type: 'dialogue', character: 'Mara', text: 'We are not alone down here.' }
+          { type: 'dialogue', character: 'Mara', parenthetical: null, text: 'We are not alone down here.' }
         ]
       })))
       .mockResolvedValueOnce(asResponse('The hero realizes the villain is their future self.'))
@@ -220,7 +220,11 @@ describe('OpenAI text generation smoke', () => {
       expect(typeof request.instructions).toBe('string');
       expect(String(request.instructions || '').trim().length).toBeGreaterThan(0);
       expect(typeof request.input).toBe('string');
-      expect(String(request.input || '').trim().length).toBeGreaterThan(0);
+      if (index === 5) {
+        expect(String(request.input || '')).toBe('');
+      } else {
+        expect(String(request.input || '').trim().length).toBeGreaterThan(0);
+      }
       expect(Array.isArray(request.input)).toBe(false);
       expect(request.reasoning).toEqual({ effort: 'none' });
       const options = call[1] as { signal?: AbortSignal } | undefined;
@@ -273,5 +277,12 @@ describe('OpenAI text generation smoke', () => {
     expect(String((mockResponsesCreate.mock.calls[3]?.[0] as { instructions?: unknown })?.instructions || '')).toContain(
       'Output ONLY the raw script text requested.'
     );
+
+    const surpriseRequest = mockResponsesCreate.mock.calls[5]?.[0] as {
+      input?: unknown;
+      instructions?: unknown;
+    };
+    expect(surpriseRequest.input).toBe('');
+    expect(String(surpriseRequest.instructions || '')).toContain('Generate a creative, specific movie premise.');
   });
 });

@@ -179,6 +179,7 @@ const isValidSceneBlock = (block) => {
   if (block.type === 'dialogue') {
     if (!hasOnlyAllowedKeys(block, SCENE_DIALOGUE_BLOCK_FIELDS)) return false;
     if (!isNonEmptyString(block.character, MAX_BLOCK_CHARACTER_CHARS)) return false;
+    if (!hasParentheticalField) return false;
     if (hasParentheticalField && block.parenthetical !== null) {
       if (!isStringWithin(block.parenthetical, MAX_BLOCK_PARENTHETICAL_CHARS)) return false;
     }

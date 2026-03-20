@@ -43,22 +43,19 @@ const SCENE_LENGTH_PROFILES = {
     label: 'Short',
     wordRange: '140-260',
     openingBlocks: { min: 4, max: 7 },
-    nextBlocks: { min: 5, max: 8 },
-    maxOutputTokens: 900
+    nextBlocks: { min: 5, max: 8 }
   },
   medium: {
     label: 'Medium',
     wordRange: '260-480',
     openingBlocks: { min: 6, max: 10 },
-    nextBlocks: { min: 8, max: 12 },
-    maxOutputTokens: 1500
+    nextBlocks: { min: 8, max: 12 }
   },
   long: {
     label: 'Long',
     wordRange: '480-850',
     openingBlocks: { min: 10, max: 15 },
-    nextBlocks: { min: 12, max: 18 },
-    maxOutputTokens: 2600
+    nextBlocks: { min: 12, max: 18 }
   }
 };
 
@@ -79,8 +76,7 @@ export const getSceneLengthProfile = (targetLength, isFirstScene) => {
     label: profile.label,
     wordRange: profile.wordRange,
     minBlocks: blockRange.min,
-    maxBlocks: blockRange.max,
-    maxOutputTokens: profile.maxOutputTokens
+    maxBlocks: blockRange.max
   };
 };
 
