@@ -166,12 +166,64 @@ const SURPRISE_SETUP_JSON_SCHEMA = {
   },
   required: ['genre', 'premise', 'characters']
 };
+const MAX_VALIDATED_TEXT_CHARS = 4000;
+const MAX_VALIDATED_GENRE_CHARS = 120;
+const MAX_VALIDATED_PREMISE_CHARS = 4000;
+const MAX_VALIDATED_CHARACTERS = 12;
+const MAX_VALIDATED_CHARACTER_CHARS = 120;
 
 const createInvalidAiResponseError = (kind, reason) => {
   const error = new Error('AI response did not match expected format.');
   error.code = 'INVALID_AI_RESPONSE';
   error.details = { kind, reason };
   return error;
+};
+const isInvalidAiResponseError = (error) => (
+  Boolean(error) &&
+  typeof error === 'object' &&
+  error.code === 'INVALID_AI_RESPONSE'
+);
+const validateGeneratedTextResponse = (kind, rawText) => {
+  const text = typeof rawText === 'string' ? rawText.trim() : '';
+  if (!text) {
+    throw createInvalidAiResponseError(kind, 'Empty text response.');
+  }
+  if (text.length > MAX_VALIDATED_TEXT_CHARS) {
+    throw createInvalidAiResponseError(kind, 'Text response too long.');
+  }
+  return text;
+};
+const validateSurpriseSetupResponseData = (kind, data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw createInvalidAiResponseError(kind, 'Response was not an object.');
+  }
+  if (
+    typeof data.genre !== 'string' ||
+    !data.genre.trim() ||
+    data.genre.length > MAX_VALIDATED_GENRE_CHARS
+  ) {
+    throw createInvalidAiResponseError(kind, 'Genre missing or too long.');
+  }
+  if (
+    typeof data.premise !== 'string' ||
+    !data.premise.trim() ||
+    data.premise.length > MAX_VALIDATED_PREMISE_CHARS
+  ) {
+    throw createInvalidAiResponseError(kind, 'Premise missing or too long.');
+  }
+  if (
+    !Array.isArray(data.characters) ||
+    data.characters.length === 0 ||
+    data.characters.length > MAX_VALIDATED_CHARACTERS ||
+    data.characters.some((character) => (
+      typeof character !== 'string' ||
+      !character.trim() ||
+      character.length > MAX_VALIDATED_CHARACTER_CHARS
+    ))
+  ) {
+    throw createInvalidAiResponseError(kind, 'Characters missing or invalid.');
+  }
+  return data;
 };
 
 const stripJsonFormatting = (value) => {
@@ -272,15 +324,26 @@ const resolvePromptCacheRetention = (model, retentionOverride) => {
   if (normalized === '24h' && supportsExtendedPromptCacheRetention(model)) return '24h';
   return null;
 };
-const getReasoningEffortForModel = (model) => {
-  if (isGpt52OrGpt51Model(model)) return 'none';
-  if (isLegacyGpt5Model(model)) return 'minimal';
-  return undefined;
-};
+const supportsExplicitOpenAiReasoningPolicy = (model) => normalizeModelName(model).startsWith('gpt-5.4');
 const shouldApplySamplingControls = (model, reasoningEffort) => {
   if (!isLegacyGpt5Model(model)) return true;
   if (isGpt52OrGpt51Model(model) && reasoningEffort === 'none') return true;
   return false;
+};
+const resolveOpenAiFlowPolicy = (kind, context, models) => {
+  const reasoningEffort = supportsExplicitOpenAiReasoningPolicy(models?.openai) ? 'none' : undefined;
+  const shouldPromote = (
+    kind === 'suggestPlotTwist' ||
+    kind === 'regenerateScriptBlock' ||
+    kind === 'generateSurpriseSetup' ||
+    (kind === 'generateScriptElement' && context?.purpose === 'insertBlock')
+  );
+  return {
+    reasoningEffort,
+    promotedModel: shouldPromote && models?.openaiPrimary && models.openaiPrimary !== models.openai
+      ? models.openaiPrimary
+      : null
+  };
 };
 const buildPromptCacheKey = (kind, discriminator, model) => {
   const suffix = discriminator ? `:${discriminator}` : '';
@@ -539,12 +602,36 @@ const buildKindDebugMeta = ({
     prompt: traceMeta?.enabled ? buildPromptPreviewText(promptPreview) : null
   }
 });
+const runOpenAiWithSemanticPromotion = async ({
+  kind,
+  initialModel,
+  promotedModel,
+  executeAttempt
+}) => {
+  try {
+    const result = await executeAttempt(initialModel);
+    return { ...result, promoted: false, promotedFromModel: null };
+  } catch (error) {
+    if (!isInvalidAiResponseError(error) || !promotedModel || promotedModel === initialModel) {
+      throw error;
+    }
+    console.warn('[text-gen] promoting after invalid output', {
+      kind,
+      fromModel: initialModel,
+      toModel: promotedModel,
+      reason: error?.details?.reason || error?.message || 'Invalid AI response'
+    });
+    const result = await executeAttempt(promotedModel);
+    return { ...result, promoted: true, promotedFromModel: initialModel };
+  }
+};
 
 const requestOpenAiText = async ({
   openai,
   kind,
   model,
   promptParts,
+  reasoningEffort,
   maxOutputTokens,
   temperature,
   topP,
@@ -562,7 +649,6 @@ const requestOpenAiText = async ({
     model,
     timeoutMs: resolvedTimeoutMs
   });
-  const reasoningEffort = getReasoningEffortForModel(model);
   const shouldApplySampling = shouldApplySamplingControls(model, reasoningEffort);
   const startedAt = Date.now();
   let attempt = 0;
@@ -874,6 +960,7 @@ export const generateTextByKind = async ({
   }
 
   const models = resolveTextGenerationModels(kind, context);
+  const openAiFlowPolicy = resolveOpenAiFlowPolicy(kind, context, models);
   const traceMeta = upstreamContext?.promptTrace;
 
   if (kind === 'generateScene') {
@@ -927,6 +1014,7 @@ export const generateTextByKind = async ({
           kind,
           model: sceneModel,
           promptParts: { instructions, input, previewText },
+          reasoningEffort: openAiFlowPolicy.reasoningEffort,
           maxOutputTokens: sceneMaxOutputTokens,
           temperature: 0.82,
           topP: 0.95,
@@ -1040,20 +1128,36 @@ export const generateTextByKind = async ({
       instructionPreview,
       contextPreview
     });
-    const responsePayload = provider === 'openai'
-      ? await requestOpenAiText({
-          openai,
+    const openAiResult = provider === 'openai'
+      ? await runOpenAiWithSemanticPromotion({
           kind,
-          model: models.openai,
-          promptParts,
-          maxOutputTokens: 90,
-          temperature: 0.92,
-          topP: 0.98,
-          cacheKey: buildPromptCacheKey(kind, undefined, models.openai),
-          cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-          upstreamContext,
-          timeoutMs
+          initialModel: models.openai,
+          promotedModel: openAiFlowPolicy.promotedModel,
+          executeAttempt: async (model) => {
+            const responsePayload = await requestOpenAiText({
+              openai,
+              kind,
+              model,
+              promptParts,
+              reasoningEffort: openAiFlowPolicy.reasoningEffort,
+              maxOutputTokens: 90,
+              temperature: 0.92,
+              topP: 0.98,
+              cacheKey: buildPromptCacheKey(kind, undefined, model),
+              cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
+              upstreamContext,
+              timeoutMs
+            });
+            return {
+              responsePayload,
+              text: validateGeneratedTextResponse(kind, responsePayload.text),
+              model
+            };
+          }
         })
+      : null;
+    const responsePayload = provider === 'openai'
+      ? openAiResult.responsePayload
       : await requestGeminiText({
           geminiAi,
           kind,
@@ -1062,7 +1166,8 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
-    const text = responsePayload.text;
+    const text = provider === 'openai' ? openAiResult.text : responsePayload.text;
+    const finalModel = provider === 'openai' ? openAiResult.model : twistModel;
 
     return {
       data: { text: text || 'Suddenly, everything changes.' },
@@ -1071,7 +1176,7 @@ export const generateTextByKind = async ({
           traceMeta,
           kind,
           provider,
-          model: twistModel,
+          model: finalModel,
           timeoutMs,
           upstreamContext,
           maxOutputTokens: provider === 'openai' ? responsePayload.finalMaxOutputTokens : null,
@@ -1134,24 +1239,43 @@ export const generateTextByKind = async ({
       contextPreview
     });
 
-    const responsePayload = provider === 'openai'
-      ? await requestOpenAiText({
-          openai,
+    const shouldValidateForPromotion = purpose === 'insertBlock';
+    const openAiResult = provider === 'openai'
+      ? await runOpenAiWithSemanticPromotion({
           kind,
-          model: models.openai,
-          promptParts: requestPromptParts,
-          maxOutputTokens: 100,
-          temperature: 0.72,
-          topP: 0.92,
-          cacheKey: buildPromptCacheKey(
-            kind,
-            `${purpose || 'legacy'}:${type}`,
-            models.openai
-          ),
-          cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-          upstreamContext,
-          timeoutMs
+          initialModel: models.openai,
+          promotedModel: openAiFlowPolicy.promotedModel,
+          executeAttempt: async (model) => {
+            const responsePayload = await requestOpenAiText({
+              openai,
+              kind,
+              model,
+              promptParts: requestPromptParts,
+              reasoningEffort: openAiFlowPolicy.reasoningEffort,
+              maxOutputTokens: 100,
+              temperature: 0.72,
+              topP: 0.92,
+              cacheKey: buildPromptCacheKey(
+                kind,
+                `${purpose || 'legacy'}:${type}`,
+                model
+              ),
+              cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
+              upstreamContext,
+              timeoutMs
+            });
+            return {
+              responsePayload,
+              text: shouldValidateForPromotion
+                ? validateGeneratedTextResponse(kind, responsePayload.text)
+                : responsePayload.text.trim(),
+              model
+            };
+          }
         })
+      : null;
+    const responsePayload = provider === 'openai'
+      ? openAiResult.responsePayload
       : await requestGeminiText({
           geminiAi,
           kind,
@@ -1166,7 +1290,8 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
-    const text = responsePayload.text;
+    const text = provider === 'openai' ? openAiResult.text : responsePayload.text;
+    const finalModel = provider === 'openai' ? openAiResult.model : scriptElementModel;
 
     return {
       data: { text: text.trim() },
@@ -1175,7 +1300,7 @@ export const generateTextByKind = async ({
           traceMeta,
           kind,
           provider,
-          model: scriptElementModel,
+          model: finalModel,
           timeoutMs,
           upstreamContext,
           maxOutputTokens: provider === 'openai'
@@ -1232,20 +1357,36 @@ export const generateTextByKind = async ({
       contextPreview
     });
 
-    const responsePayload = provider === 'openai'
-      ? await requestOpenAiText({
-          openai,
+    const openAiResult = provider === 'openai'
+      ? await runOpenAiWithSemanticPromotion({
           kind,
-          model: models.openai,
-          promptParts,
-          maxOutputTokens: 150,
-          temperature: 0.82,
-          topP: 0.95,
-          cacheKey: buildPromptCacheKey(kind, block.type, models.openai),
-          cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-          upstreamContext,
-          timeoutMs
+          initialModel: models.openai,
+          promotedModel: openAiFlowPolicy.promotedModel,
+          executeAttempt: async (model) => {
+            const responsePayload = await requestOpenAiText({
+              openai,
+              kind,
+              model,
+              promptParts,
+              reasoningEffort: openAiFlowPolicy.reasoningEffort,
+              maxOutputTokens: 150,
+              temperature: 0.82,
+              topP: 0.95,
+              cacheKey: buildPromptCacheKey(kind, block.type, model),
+              cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
+              upstreamContext,
+              timeoutMs
+            });
+            return {
+              responsePayload,
+              text: validateGeneratedTextResponse(kind, responsePayload.text),
+              model
+            };
+          }
         })
+      : null;
+    const responsePayload = provider === 'openai'
+      ? openAiResult.responsePayload
       : await requestGeminiText({
           geminiAi,
           kind,
@@ -1260,7 +1401,8 @@ export const generateTextByKind = async ({
           upstreamContext,
           timeoutMs
         });
-    const text = responsePayload.text;
+    const text = provider === 'openai' ? openAiResult.text : responsePayload.text;
+    const finalModel = provider === 'openai' ? openAiResult.model : rewriteModel;
 
     return {
       data: { text: text.trim() || block.text },
@@ -1269,7 +1411,7 @@ export const generateTextByKind = async ({
           traceMeta,
           kind,
           provider,
-          model: rewriteModel,
+          model: finalModel,
           timeoutMs,
           upstreamContext,
           maxOutputTokens: provider === 'openai'
@@ -1333,25 +1475,41 @@ export const generateTextByKind = async ({
     contextPreview
   });
 
-  const responsePayload = provider === 'openai'
-    ? await requestOpenAiText({
-        openai,
+  const openAiResult = provider === 'openai'
+    ? await runOpenAiWithSemanticPromotion({
         kind,
-        model: models.openai,
-        promptParts,
-        maxOutputTokens: 350,
-        temperature: 0.95,
-        topP: 0.98,
-        cacheKey: buildPromptCacheKey(kind, context.targetGenre ? 'targeted' : 'freeform', models.openai),
-        cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
-        jsonSchemaFormat: {
-          name: 'surprise_setup_output',
-          description: 'Structured surprise setup response.',
-          schema: SURPRISE_SETUP_JSON_SCHEMA
-        },
-        upstreamContext,
-        timeoutMs
+        initialModel: models.openai,
+        promotedModel: openAiFlowPolicy.promotedModel,
+        executeAttempt: async (model) => {
+          const responsePayload = await requestOpenAiText({
+            openai,
+            kind,
+            model,
+            promptParts,
+            reasoningEffort: openAiFlowPolicy.reasoningEffort,
+            maxOutputTokens: 350,
+            temperature: 0.95,
+            topP: 0.98,
+            cacheKey: buildPromptCacheKey(kind, context.targetGenre ? 'targeted' : 'freeform', model),
+            cacheRetention: DEFAULT_OPENAI_PROMPT_CACHE_RETENTION,
+            jsonSchemaFormat: {
+              name: 'surprise_setup_output',
+              description: 'Structured surprise setup response.',
+              schema: SURPRISE_SETUP_JSON_SCHEMA
+            },
+            upstreamContext,
+            timeoutMs
+          });
+          return {
+            responsePayload,
+            data: validateSurpriseSetupResponseData(kind, parseJsonObject(responsePayload.text, kind)),
+            model
+          };
+        }
       })
+    : null;
+  const responsePayload = provider === 'openai'
+    ? openAiResult.responsePayload
     : await requestGeminiText({
         geminiAi,
         kind,
@@ -1375,15 +1533,19 @@ export const generateTextByKind = async ({
         timeoutMs
       });
   const rawText = responsePayload.text;
+  const finalModel = provider === 'openai' ? openAiResult.model : surpriseModel;
+  const surpriseData = provider === 'openai'
+    ? openAiResult.data
+    : parseJsonObject(rawText, kind);
 
   return {
-    data: parseJsonObject(rawText, kind),
+    data: surpriseData,
     meta: {
       debug: buildKindDebugMeta({
         traceMeta,
         kind,
         provider,
-        model: surpriseModel,
+        model: finalModel,
         timeoutMs,
         upstreamContext,
         maxOutputTokens: provider === 'openai'

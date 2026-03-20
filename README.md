@@ -29,6 +29,7 @@ The app is functional end-to-end and in active UI iteration.
 - Each run carries a receipt (`opId`, `opType`, `scopeKey`, `startedAt`, `status`, `metadata`). Commits only happen when the run is still active and `isFresh(...)` passes; stale/superseded outcomes are dropped.
 - Orchestrator aborts are treated as expected control flow (silent from a user-error perspective), not hard failures.
 - Text generation kinds are routed through `/api/ai/generate` and include `generateScene`, `suggestPlotTwist`, `generateScriptElement`, `regenerateScriptBlock`, and `generateSurpriseSetup` (`server/llm/types.js`).
+- `generateScriptElement` uses a narrow `purpose` discriminator so title suggestion stays on the fast tier while insert-block generation uses the balanced tier.
 - Prompt templates/builders live in `server/llm/promptBuilders.js`; per-kind execution/model/token handling is in `server/llm/textGeneration.js`.
 - TTS uses `generateSpeech`/`listVoices` through the same API route. Playback, preview, and retry are driven by `hooks/useAudioPlayer.ts` + `services/scriptEngine.ts`, with cache keys in `services/ttsCacheKeys.ts`.
 
@@ -50,6 +51,7 @@ ADMIN_PASSWORD=...
 
 Common optional env vars:
 
+- OpenAI defaults in `.env.example` use the GPT-5.4 family: `OPENAI_MODEL=gpt-5.4`, `OPENAI_BALANCED_MODEL=gpt-5.4-mini`, `OPENAI_FAST_MODEL=gpt-5.4-nano`.
 - `ALLOWED_ORIGINS`: comma-separated allowed browser origins for mutating `/api/auth/*` and `/api/ai/*` requests.
 - `TEXT_LLM_PROVIDER=gemini` requires `GEMINI_API_KEY`.
 - Inworld TTS requires `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.

@@ -16,6 +16,9 @@ let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
 const previousEnv = {
   TEXT_LLM_PROVIDER: process.env.TEXT_LLM_PROVIDER,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_MODEL: process.env.OPENAI_MODEL,
+  OPENAI_FAST_MODEL: process.env.OPENAI_FAST_MODEL,
+  OPENAI_BALANCED_MODEL: process.env.OPENAI_BALANCED_MODEL,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   AI_UPSTREAM_TIMEOUT_MS: process.env.AI_UPSTREAM_TIMEOUT_MS,
   AI_UPSTREAM_TIMEOUT_MS_SCENE: process.env.AI_UPSTREAM_TIMEOUT_MS_SCENE,
@@ -66,6 +69,9 @@ const createAbortableReq = (body: Record<string, unknown>) => {
 beforeAll(async () => {
   process.env.TEXT_LLM_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'test-openai-key';
+  process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
+  process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
+  process.env.OPENAI_BALANCED_MODEL = 'gpt-5.4-mini-test-balanced';
   process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'test-password';
   process.env.AI_UPSTREAM_TIMEOUT_MS = '25';
   process.env.AI_UPSTREAM_TIMEOUT_MS_SCENE = '25';
@@ -77,6 +83,7 @@ beforeAll(async () => {
   process.env.INWORLD_API_SECRET = 'test-inworld-secret';
   process.env.INWORLD_WORKSPACE_ID = 'test-workspace';
 
+  vi.resetModules();
   const serverModule = await import('../server/index.js');
   handleAiGenerate = serverModule.handleAiGenerate;
 });
@@ -84,6 +91,9 @@ beforeAll(async () => {
 afterAll(() => {
   process.env.TEXT_LLM_PROVIDER = previousEnv.TEXT_LLM_PROVIDER;
   process.env.OPENAI_API_KEY = previousEnv.OPENAI_API_KEY;
+  process.env.OPENAI_MODEL = previousEnv.OPENAI_MODEL;
+  process.env.OPENAI_FAST_MODEL = previousEnv.OPENAI_FAST_MODEL;
+  process.env.OPENAI_BALANCED_MODEL = previousEnv.OPENAI_BALANCED_MODEL;
   process.env.ADMIN_PASSWORD = previousEnv.ADMIN_PASSWORD;
   process.env.AI_UPSTREAM_TIMEOUT_MS = previousEnv.AI_UPSTREAM_TIMEOUT_MS;
   process.env.AI_UPSTREAM_TIMEOUT_MS_SCENE = previousEnv.AI_UPSTREAM_TIMEOUT_MS_SCENE;
@@ -203,6 +213,69 @@ describe('server abort and retry reliability', () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockResponsesCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it('promotes one invalid surprise setup response from balanced to primary and then succeeds', async () => {
+    mockResponsesCreate
+      .mockResolvedValueOnce({ output_text: '{not valid json' })
+      .mockResolvedValueOnce({
+        output_text: JSON.stringify({
+          genre: 'Noir',
+          premise: 'A vanished magician is forced back for one impossible final con.',
+          characters: ['Mara (Illusionist)', 'Denton (Fixer)', 'Lena (Reporter)']
+        })
+      });
+
+    const req = {
+      body: {
+        kind: 'generateSurpriseSetup',
+        context: {
+          targetGenre: 'Noir'
+        }
+      }
+    } as any;
+    const res = createMockRes();
+
+    await handleAiGenerate(req, res as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(2);
+    expect((mockResponsesCreate.mock.calls[0]?.[0] as { model?: string })?.model).toBe('gpt-5.4-mini-test-balanced');
+    expect((mockResponsesCreate.mock.calls[1]?.[0] as { model?: string })?.model).toBe('gpt-5.4-test-primary');
+  });
+
+  it('promotes insert-block generation only once on invalid output and then returns INVALID_AI_RESPONSE', async () => {
+    const invalidInsert = 'x'.repeat(5001);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockResponsesCreate
+        .mockResolvedValueOnce({ output_text: invalidInsert })
+        .mockResolvedValueOnce({ output_text: invalidInsert });
+
+      const req = {
+        body: {
+          kind: 'generateScriptElement',
+          context: {
+            type: 'action',
+            purpose: 'insertBlock',
+            instruction: 'Set mood quickly.',
+            styleContext: 'Genre: Noir. Premise: A detective unravels a conspiracy.',
+            character: null
+          }
+        }
+      } as any;
+      const res = createMockRes();
+
+      await handleAiGenerate(req, res as any);
+
+      expect(res.statusCode).toBe(502);
+      expect((res.body as any)?.error?.code).toBe('INVALID_AI_RESPONSE');
+      expect(mockResponsesCreate).toHaveBeenCalledTimes(2);
+      expect((mockResponsesCreate.mock.calls[0]?.[0] as { model?: string })?.model).toBe('gpt-5.4-mini-test-balanced');
+      expect((mockResponsesCreate.mock.calls[1]?.[0] as { model?: string })?.model).toBe('gpt-5.4-test-primary');
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('retries selected 5xx errors up to the cap and then fails', async () => {

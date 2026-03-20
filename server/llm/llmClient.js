@@ -46,6 +46,7 @@ const resolveGeminiTextModel = (kind) => {
 export const resolveTextGenerationModels = (kind, context = undefined) => {
   return {
     openai: resolveOpenAiTextModel(kind, context),
+    openaiPrimary: DEFAULT_OPENAI_MODEL,
     gemini: resolveGeminiTextModel(kind)
   };
 };

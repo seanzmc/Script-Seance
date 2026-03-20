@@ -26,9 +26,9 @@ const restoreEnv = (key: string, value: string | undefined) => {
 };
 
 beforeAll(async () => {
-  process.env.OPENAI_MODEL = 'test-openai-primary';
-  process.env.OPENAI_FAST_MODEL = 'test-openai-fast';
-  process.env.OPENAI_BALANCED_MODEL = 'test-openai-balanced';
+  process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
+  process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
+  process.env.OPENAI_BALANCED_MODEL = 'gpt-5.4-mini-test-balanced';
   process.env.TEXT_LLM_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'test-openai-key';
   process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'test-password';
@@ -202,21 +202,27 @@ describe('OpenAI text generation smoke', () => {
 
     expect(mockResponsesCreate).toHaveBeenCalledTimes(6);
     const expectedModels = [
-      'test-openai-primary',
-      'test-openai-balanced',
-      'test-openai-fast',
-      'test-openai-balanced',
-      'test-openai-balanced',
-      'test-openai-balanced'
+      'gpt-5.4-test-primary',
+      'gpt-5.4-mini-test-balanced',
+      'gpt-5.4-nano-test-fast',
+      'gpt-5.4-mini-test-balanced',
+      'gpt-5.4-mini-test-balanced',
+      'gpt-5.4-mini-test-balanced'
     ];
     for (const [index, call] of mockResponsesCreate.mock.calls.entries()) {
-      const request = call[0] as { model?: string; instructions?: unknown; input?: unknown };
+      const request = call[0] as {
+        model?: string;
+        instructions?: unknown;
+        input?: unknown;
+        reasoning?: { effort?: string };
+      };
       expect(request.model).toBe(expectedModels[index]);
       expect(typeof request.instructions).toBe('string');
       expect(String(request.instructions || '').trim().length).toBeGreaterThan(0);
       expect(typeof request.input).toBe('string');
       expect(String(request.input || '').trim().length).toBeGreaterThan(0);
       expect(Array.isArray(request.input)).toBe(false);
+      expect(request.reasoning).toEqual({ effort: 'none' });
       const options = call[1] as { signal?: AbortSignal } | undefined;
       expect(options?.signal).toBeInstanceOf(AbortSignal);
     }
@@ -259,8 +265,8 @@ describe('OpenAI text generation smoke', () => {
     expect(sceneRequest.instructions || '').not.toContain('The JSON schema is:');
     expect(sceneRequest.instructions || '').not.toContain('Do NOT emit a heading block inside "blocks".');
 
-    expect((mockResponsesCreate.mock.calls[2]?.[0] as { model?: unknown })?.model).toBe('test-openai-fast');
-    expect((mockResponsesCreate.mock.calls[3]?.[0] as { model?: unknown })?.model).toBe('test-openai-balanced');
+    expect((mockResponsesCreate.mock.calls[2]?.[0] as { model?: unknown })?.model).toBe('gpt-5.4-nano-test-fast');
+    expect((mockResponsesCreate.mock.calls[3]?.[0] as { model?: unknown })?.model).toBe('gpt-5.4-mini-test-balanced');
     expect(String((mockResponsesCreate.mock.calls[2]?.[0] as { instructions?: unknown })?.instructions || '')).toContain(
       'Output ONLY the raw script text requested.'
     );
