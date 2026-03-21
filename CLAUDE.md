@@ -23,6 +23,13 @@ For many tasks, the best fix is visual, structural, or cleanup-oriented rather t
 - Do not add dependencies unless necessary.
 - Do not create wrappers, helper components, or layers unless they clearly reduce complexity.
 
+## Search and inspection rules
+- Use `rg` as the default tool for codebase search instead of `grep`.
+- Start with narrow, intentional searches before expanding scope.
+- Prefer searching by component name, exported symbol, prop name, route, hook, or feature flag before reading whole directories.
+- When auditing stale systems, search imports, types, config, env, provider wiring, tests, docs, and UI labels separately.
+- Do not scan large portions of the repo without a clear reason.
+
 ## UI rules
 - Avoid over-containerization.
 - Reduce padding before adding more layout structure.

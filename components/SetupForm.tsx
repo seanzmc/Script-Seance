@@ -1444,10 +1444,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       onClick={handleGenreAdvance}
                       disabled={isLocked}
                       data-testid="setup-continue-to-style"
-                      className={`${setupActionButtonBaseClass} max-w-xs ${
+                      className={`${setupActionButtonBaseClass} ${focusRingClass} max-w-xs ${
                         isLocked
                           ? "cursor-not-allowed bg-indigo-500/12 text-slate-400 opacity-60"
-                          : "bg-indigo-500/18 text-indigo-100 shadow-[0_16px_34px_-28px_rgba(99,102,241,0.9)] hover:bg-indigo-500/24"
+                          : "bg-indigo-600 text-white ring-1 ring-indigo-400/50 shadow-[0_12px_24px_-8px_rgba(99,102,241,0.55)] hover:bg-indigo-500"
                       }`}
                     >
                       Continue to Style
