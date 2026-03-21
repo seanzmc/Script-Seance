@@ -3,8 +3,10 @@ import request from 'supertest';
 
 const MANAGED_ENV_KEYS = [
   'ADMIN_PASSWORD',
-  'TEXT_LLM_PROVIDER',
-  'GEMINI_API_KEY',
+  'OPENAI_API_KEY',
+  'OPENAI_MODEL',
+  'OPENAI_FAST_MODEL',
+  'OPENAI_BALANCED_MODEL',
   'INWORLD_API_KEY',
   'INWORLD_API_SECRET',
   'INWORLD_WORKSPACE_ID',
@@ -30,8 +32,10 @@ const restoreManagedEnv = () => {
 const loadApp = async (overrides?: Partial<Record<ManagedEnvKey, string>>) => {
   vi.resetModules();
   process.env.ADMIN_PASSWORD = 'test-password';
-  process.env.TEXT_LLM_PROVIDER = 'gemini';
-  process.env.GEMINI_API_KEY = 'test-key';
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
+  process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
+  process.env.OPENAI_BALANCED_MODEL = 'gpt-5.4-mini-test-balanced';
   process.env.INWORLD_API_KEY = '';
   process.env.INWORLD_API_SECRET = '';
   process.env.INWORLD_WORKSPACE_ID = '';

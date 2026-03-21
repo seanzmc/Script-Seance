@@ -11,7 +11,6 @@ vi.mock('openai', () => ({
 }));
 
 let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
-const previousProvider = process.env.TEXT_LLM_PROVIDER;
 const previousOpenAiKey = process.env.OPENAI_API_KEY;
 const previousOpenAiModel = process.env.OPENAI_MODEL;
 const previousOpenAiFastModel = process.env.OPENAI_FAST_MODEL;
@@ -29,7 +28,6 @@ beforeAll(async () => {
   process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
   process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
   process.env.OPENAI_BALANCED_MODEL = 'gpt-5.4-mini-test-balanced';
-  process.env.TEXT_LLM_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'test-openai-key';
   process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'test-password';
 
@@ -39,7 +37,6 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  process.env.TEXT_LLM_PROVIDER = previousProvider;
   process.env.OPENAI_API_KEY = previousOpenAiKey;
   restoreEnv('OPENAI_MODEL', previousOpenAiModel);
   restoreEnv('OPENAI_FAST_MODEL', previousOpenAiFastModel);

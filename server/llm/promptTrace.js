@@ -7,7 +7,6 @@ const MAX_PREVIEW_OBJECT_KEYS = 12;
 const STYLE_FINGERPRINT_RE = /^[a-f0-9]{8,64}$/i;
 const REDACTION_PATTERNS = [
   { pattern: /sk-[a-zA-Z0-9]{12,}/g, replacement: '[REDACTED_OPENAI_KEY]' },
-  { pattern: /AIza[0-9A-Za-z_-]{20,}/g, replacement: '[REDACTED_GOOGLE_KEY]' },
   { pattern: /Bearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, replacement: 'Bearer [REDACTED_TOKEN]' },
   { pattern: /[A-Za-z0-9_\-.]+@[A-Za-z0-9\-.]+\.[A-Za-z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
   { pattern: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: '[REDACTED_SSN]' }

@@ -19,7 +19,6 @@ The app is functional end-to-end and in active UI iteration.
 - Vite 6
 - Express 5 API server
 - OpenAI SDK (`openai`)
-- Google GenAI SDK (`@google/genai`) for optional Gemini text generation
 - Vitest + Testing Library
 
 ## Architecture at a glance
@@ -53,7 +52,6 @@ Common optional env vars:
 
 - OpenAI defaults in `.env.example` use the GPT-5.4 family: `OPENAI_MODEL=gpt-5.4`, `OPENAI_BALANCED_MODEL=gpt-5.4-mini`, `OPENAI_FAST_MODEL=gpt-5.4-nano`.
 - `ALLOWED_ORIGINS`: comma-separated allowed browser origins for mutating `/api/auth/*` and `/api/ai/*` requests.
-- `TEXT_LLM_PROVIDER=gemini` requires `GEMINI_API_KEY`.
 - Inworld TTS requires `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
 
 `ALLOWED_ORIGINS` behavior:

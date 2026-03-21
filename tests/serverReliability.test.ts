@@ -9,21 +9,22 @@ let sessions: typeof import('../server/index.js').sessions;
 let rateBuckets: typeof import('../server/index.js').rateBuckets;
 let loginBuckets: typeof import('../server/index.js').loginBuckets;
 
-const mockGenerateContent = vi.fn();
+const mockResponsesCreate = vi.fn();
 
-vi.mock('@google/genai', () => ({
-  GoogleGenAI: class {
-    models = {
-      generateContent: (...args: unknown[]) => mockGenerateContent(...args)
+vi.mock('openai', () => ({
+  default: class {
+    responses = {
+      create: (...args: unknown[]) => mockResponsesCreate(...args)
     };
-  },
-  Type: { OBJECT: 'object', ARRAY: 'array', STRING: 'string' }
+  }
 }));
 
 beforeAll(async () => {
   process.env.ADMIN_PASSWORD = 'test-password';
-  process.env.GEMINI_API_KEY = 'test-key';
-  process.env.TEXT_LLM_PROVIDER = 'gemini';
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
+  process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
+  process.env.OPENAI_BALANCED_MODEL = 'gpt-5.4-mini-test-balanced';
   process.env.INWORLD_API_KEY = '';
   process.env.INWORLD_API_SECRET = '';
   process.env.INWORLD_WORKSPACE_ID = '';
@@ -38,7 +39,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  mockGenerateContent.mockReset();
+  mockResponsesCreate.mockReset();
   sessions.clear();
   rateBuckets.clear();
   loginBuckets.clear();
@@ -49,7 +50,7 @@ describe('server reliability', () => {
     const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
     try {
       delete process.env.SS_DEBUG_PROMPTS;
-      mockGenerateContent.mockResolvedValueOnce({ text: 'A twist appears.' });
+      mockResponsesCreate.mockResolvedValueOnce({ output_text: 'A twist appears.' });
 
       const reqWithoutEnv = {
         body: {
@@ -85,7 +86,7 @@ describe('server reliability', () => {
       expect(resWithoutEnv.body?.debug).toBeUndefined();
 
       process.env.SS_DEBUG_PROMPTS = '1';
-      mockGenerateContent.mockResolvedValueOnce({ text: 'Another twist appears.' });
+      mockResponsesCreate.mockResolvedValueOnce({ output_text: 'Another twist appears.' });
 
       const reqWithoutClientFlag = {
         body: {
@@ -115,7 +116,7 @@ describe('server reliability', () => {
       expect(resWithoutClientFlag.statusCode).toBe(200);
       expect(resWithoutClientFlag.body?.debug).toBeUndefined();
 
-      mockGenerateContent.mockResolvedValueOnce({ text: 'Final twist appears.' });
+      mockResponsesCreate.mockResolvedValueOnce({ output_text: 'Final twist appears.' });
 
       const reqWithBothFlags = {
         body: {
@@ -150,7 +151,7 @@ describe('server reliability', () => {
       expect(resWithBothFlags.statusCode).toBe(200);
       expect(resWithBothFlags.body?.debug).toMatchObject({
         kind: 'suggestPlotTwist',
-        provider: 'gemini',
+        provider: 'openai',
         promptContextRevision: 17,
         styleFingerprint: 'abc123ff'
       });
@@ -170,7 +171,7 @@ describe('server reliability', () => {
     try {
       const timeoutError = new Error('Upstream request timed out.');
       (timeoutError as Error & { code?: string }).code = 'UPSTREAM_TIMEOUT';
-      mockGenerateContent.mockRejectedValue(timeoutError);
+      mockResponsesCreate.mockRejectedValue(timeoutError);
 
       const req = {
         body: {
@@ -208,8 +209,8 @@ describe('server reliability', () => {
     const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
     try {
       process.env.SS_DEBUG_PROMPTS = '1';
-      mockGenerateContent.mockResolvedValueOnce({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValueOnce({
+        output_text: JSON.stringify({
           genre: 'Noir',
           premise: 'A detective takes one impossible final case.',
           characters: ['Mara (Detective)', 'Vale (Fixer)', 'Iris (Witness)']
@@ -262,7 +263,7 @@ describe('server reliability', () => {
       expect(Array.isArray(res.body?.debug?.previews?.context?.allowedGenres)).toBe(true);
       expect(res.body?.debug?.previews?.context?.allowedGenres).toEqual(CANONICAL_GENRES);
       expect(res.body?.debug?.previews?.context?.allowedGenres).toContain('Thriller');
-      const prompt = String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '');
+      const prompt = String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '');
       expect(prompt).toContain('Style: 1940s Noir Detective (noir-1940s-detective)');
       expect(prompt).toContain('Style guidance: Everyone speaks in brooding metaphors');
     } finally {
@@ -295,10 +296,10 @@ describe('server reliability', () => {
     });
     try {
       process.env.SS_DEBUG_PROMPTS = '1';
-      mockGenerateContent
-        .mockResolvedValueOnce({ text: 'A witness is the detective.' })
-        .mockResolvedValueOnce({ text: 'Rain needles the alley.' })
-        .mockResolvedValueOnce({ text: 'The board stares back.' });
+      mockResponsesCreate
+        .mockResolvedValueOnce({ output_text: 'A witness is the detective.' })
+        .mockResolvedValueOnce({ output_text: 'Rain needles the alley.' })
+        .mockResolvedValueOnce({ output_text: 'The board stares back.' });
 
       const twistReq = {
         body: {
@@ -336,12 +337,12 @@ describe('server reliability', () => {
         styleName: '1940s Noir Detective'
       });
       expect(String(twistRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
-      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Premise: A vanished witness sends clues from impossible places.');
-      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Named characters: Mara, Vale, Iris.');
-      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Recent story context:\nHeading: INT. UNION STATION - NIGHT\nSummary: Mara realizes the courier is guiding her into a trap.');
-      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Current user instruction: Push the next scene into a worse trap.');
-      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
-      expect(String(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction || '')).toContain('It must stay compatible with the premise, named characters, and recent story facts.');
+      expect(String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '')).toContain('Premise: A vanished witness sends clues from impossible places.');
+      expect(String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '')).toContain('Named characters: Mara, Vale, Iris.');
+      expect(String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '')).toContain('Recent story context:\nHeading: INT. UNION STATION - NIGHT\nSummary: Mara realizes the courier is guiding her into a trap.');
+      expect(String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '')).toContain('Current user instruction: Push the next scene into a worse trap.');
+      expect(String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+      expect(String(mockResponsesCreate.mock.calls[0]?.[0]?.instructions || '')).toContain('It must stay compatible with the premise, named characters, and recent story facts.');
 
       const elementReq = {
         body: {
@@ -375,7 +376,7 @@ describe('server reliability', () => {
       });
       expect(String(elementRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Genre: Noir.');
       expect(String(elementRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
-      expect(String(mockGenerateContent.mock.calls[1]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+      expect(String(mockResponsesCreate.mock.calls[1]?.[0]?.input || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
 
       const rewriteReq = {
         body: {
@@ -406,7 +407,7 @@ describe('server reliability', () => {
         styleName: '1940s Noir Detective'
       });
       expect(String(rewriteRes.body?.debug?.previews?.context?.styleContext || '')).toContain('Everyone speaks in brooding metaphors');
-      expect(String(mockGenerateContent.mock.calls[2]?.[0]?.contents || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
+      expect(String(mockResponsesCreate.mock.calls[2]?.[0]?.input || '')).toContain('Style guidance: Everyone speaks in brooding metaphors');
     } finally {
       if (previousDebugEnv === undefined) {
         delete process.env.SS_DEBUG_PROMPTS;
@@ -491,8 +492,8 @@ describe('server reliability', () => {
     const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
     try {
       process.env.SS_DEBUG_PROMPTS = '1';
-      mockGenerateContent.mockResolvedValueOnce({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValueOnce({
+        output_text: JSON.stringify({
           genre: 'Noir',
           premise: 'A detective takes one impossible final case.',
           characters: ['Mara (Detective)', 'Vale (Fixer)', 'Iris (Witness)']
@@ -553,8 +554,8 @@ describe('server reliability', () => {
     const previousDebugEnv = process.env.SS_DEBUG_PROMPTS;
     try {
       process.env.SS_DEBUG_PROMPTS = '1';
-      mockGenerateContent.mockResolvedValueOnce({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValueOnce({
+        output_text: JSON.stringify({
           heading: 'EXT. DOCKSIDE - NIGHT',
           summary: 'A detective arrives under hard rain.',
           blocks: [
@@ -633,8 +634,8 @@ describe('server reliability', () => {
       });
       expect(Array.isArray(res.body?.debug?.previews?.context?.recentSceneBlocks)).toBe(true);
 
-      const prompt = String(mockGenerateContent.mock.calls[0]?.[0]?.contents || '');
-      const systemInstruction = String(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction || '');
+      const prompt = String(mockResponsesCreate.mock.calls[0]?.[0]?.input || '');
+      const systemInstruction = String(mockResponsesCreate.mock.calls[0]?.[0]?.instructions || '');
       expect(prompt).toContain('Style Theme: Style: 1940s Noir Detective (noir-1940s-detective).');
       expect(prompt).toContain('Style guidance: Everyone speaks in brooding metaphors, rain is always falling, and there is a heavy reliance on cynical voiceovers.');
       expect(prompt).toContain('Earlier scene summaries:\nScene 1: Alex corners a reluctant informant.');
@@ -661,7 +662,7 @@ describe('server reliability', () => {
       const typedError = canceledError as Error & { code?: string; status?: number };
       typedError.code = 'REQUEST_ABORTED';
       typedError.status = 499;
-      mockGenerateContent.mockRejectedValue(typedError);
+      mockResponsesCreate.mockRejectedValue(typedError);
 
       const req = {
         body: {
@@ -732,7 +733,7 @@ describe('server reliability', () => {
   it('returns 429 when upstream error message indicates a rate limit in mixed case', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockRejectedValue(new Error('Rate limit exceeded. Please retry.'));
+      mockResponsesCreate.mockRejectedValue(new Error('Rate limit exceeded. Please retry.'));
 
       const req = {
         body: {
@@ -773,8 +774,8 @@ describe('server reliability', () => {
   it('returns 502 when AI response fails schema validation', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockResolvedValue({
-        text: JSON.stringify({ heading: 'INT. OFFICE - DAY', blocks: [] })
+      mockResponsesCreate.mockResolvedValue({
+        output_text: JSON.stringify({ heading: 'INT. OFFICE - DAY', blocks: [] })
       });
 
       const req = {
@@ -824,8 +825,8 @@ describe('server reliability', () => {
   it('returns 502 when generateScene includes heading blocks in scene.blocks', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockResolvedValue({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValue({
+        output_text: JSON.stringify({
           heading: 'INT. OFFICE - DAY',
           summary: 'An old recorder clicks on.',
           blocks: [
@@ -881,8 +882,8 @@ describe('server reliability', () => {
   it('returns 502 when generateScene dialogue blocks omit character', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockResolvedValue({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValue({
+        output_text: JSON.stringify({
           heading: 'INT. OFFICE - DAY',
           summary: 'An old recorder clicks on.',
           blocks: [
@@ -938,8 +939,8 @@ describe('server reliability', () => {
   it('returns 502 when generateScene dialogue blocks use a null character', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockResolvedValue({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValue({
+        output_text: JSON.stringify({
           heading: 'INT. OFFICE - DAY',
           summary: 'An old recorder clicks on.',
           blocks: [
@@ -995,8 +996,8 @@ describe('server reliability', () => {
   it('returns 502 when generateScene dialogue blocks omit parenthetical', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockResolvedValue({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValue({
+        output_text: JSON.stringify({
           heading: 'INT. OFFICE - DAY',
           summary: 'An old recorder clicks on.',
           blocks: [
@@ -1050,8 +1051,8 @@ describe('server reliability', () => {
   });
 
   it('accepts generateScene dialogue blocks when parenthetical is null', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify({
+    mockResponsesCreate.mockResolvedValue({
+      output_text: JSON.stringify({
         heading: 'INT. OFFICE - DAY',
         summary: 'An old recorder clicks on.',
         blocks: [
@@ -1110,8 +1111,8 @@ describe('server reliability', () => {
   it('returns 502 when non-dialogue scene blocks include dialogue-only fields', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockGenerateContent.mockResolvedValue({
-        text: JSON.stringify({
+      mockResponsesCreate.mockResolvedValue({
+        output_text: JSON.stringify({
           heading: 'INT. OFFICE - DAY',
           summary: 'An old recorder clicks on.',
           blocks: [

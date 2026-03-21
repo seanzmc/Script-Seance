@@ -5,9 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import cookie from 'cookie';
 import {
-  getGeminiClient,
-  getOpenAIClient,
-  getTextProvider
+  getOpenAIClient
 } from './llm/llmClient.js';
 import { generateTextByKind, getPromptSizeEstimate } from './llm/textGeneration.js';
 import { isTextGenerationKind } from './llm/types.js';
@@ -1261,7 +1259,6 @@ const handleAiGenerate = async (req, res) => {
           return;
         }
 
-        const textProvider = getTextProvider();
         const textTimeoutMs = kind === 'generateScene'
           ? AI_UPSTREAM_TIMEOUT_MS_SCENE
           : AI_UPSTREAM_TIMEOUT_MS;
@@ -1269,9 +1266,7 @@ const handleAiGenerate = async (req, res) => {
           kind,
           context,
           genres: CANONICAL_GENRES,
-          provider: textProvider,
-          openai: textProvider === 'openai' ? getOpenAIClient() : null,
-          geminiAi: textProvider === 'gemini' ? getGeminiClient() : null,
+          openai: getOpenAIClient(),
           upstreamContext: {
             ...baseExecutionContext,
             timeoutMs: textTimeoutMs,

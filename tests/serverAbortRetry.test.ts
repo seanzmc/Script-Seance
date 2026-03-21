@@ -14,7 +14,6 @@ vi.mock('openai', () => ({
 
 let handleAiGenerate: typeof import('../server/index.js').handleAiGenerate;
 const previousEnv = {
-  TEXT_LLM_PROVIDER: process.env.TEXT_LLM_PROVIDER,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENAI_MODEL: process.env.OPENAI_MODEL,
   OPENAI_FAST_MODEL: process.env.OPENAI_FAST_MODEL,
@@ -67,7 +66,6 @@ const createAbortableReq = (body: Record<string, unknown>) => {
 };
 
 beforeAll(async () => {
-  process.env.TEXT_LLM_PROVIDER = 'openai';
   process.env.OPENAI_API_KEY = 'test-openai-key';
   process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
   process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
@@ -89,7 +87,6 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  process.env.TEXT_LLM_PROVIDER = previousEnv.TEXT_LLM_PROVIDER;
   process.env.OPENAI_API_KEY = previousEnv.OPENAI_API_KEY;
   process.env.OPENAI_MODEL = previousEnv.OPENAI_MODEL;
   process.env.OPENAI_FAST_MODEL = previousEnv.OPENAI_FAST_MODEL;

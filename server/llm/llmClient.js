@@ -1,26 +1,12 @@
 import OpenAI from 'openai';
-import { GoogleGenAI } from '@google/genai';
 
-const DEFAULT_TEXT_PROVIDER = 'openai';
 const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4';
 const DEFAULT_OPENAI_FAST_MODEL = process.env.OPENAI_FAST_MODEL || 'gpt-5.4-nano';
 const DEFAULT_OPENAI_BALANCED_MODEL = process.env.OPENAI_BALANCED_MODEL || 'gpt-5.4-mini';
-const DEFAULT_GEMINI_SCENE_MODEL = process.env.GEMINI_TEXT_MODEL_SCENE || 'gemini-2.5-flash';
-const DEFAULT_GEMINI_FAST_MODEL = process.env.GEMINI_TEXT_MODEL_FAST || 'gemini-2.5-flash-lite';
 
 let cachedOpenAiClient = null;
-let cachedGeminiClient = null;
 
-const normalizeProvider = (value) => {
-  const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  if (raw === 'gemini') return 'gemini';
-  return 'openai';
-};
-
-export const getTextProvider = () =>
-  normalizeProvider(process.env.TEXT_LLM_PROVIDER || DEFAULT_TEXT_PROVIDER);
-
-const resolveOpenAiTextModel = (kind, context = undefined) => {
+const resolveDefaultOpenAiTextModel = (kind, context = undefined) => {
   switch (kind) {
     case 'generateScene':
       return DEFAULT_OPENAI_MODEL;
@@ -38,16 +24,10 @@ const resolveOpenAiTextModel = (kind, context = undefined) => {
   }
 };
 
-const resolveGeminiTextModel = (kind) => {
-  if (kind === 'generateScene') return DEFAULT_GEMINI_SCENE_MODEL;
-  return DEFAULT_GEMINI_FAST_MODEL;
-};
-
 export const resolveTextGenerationModels = (kind, context = undefined) => {
   return {
-    openai: resolveOpenAiTextModel(kind, context),
-    openaiPrimary: DEFAULT_OPENAI_MODEL,
-    gemini: resolveGeminiTextModel(kind)
+    defaultModel: resolveDefaultOpenAiTextModel(kind, context),
+    primaryModel: DEFAULT_OPENAI_MODEL
   };
 };
 
@@ -74,16 +54,4 @@ export const getOpenAIClient = () => {
     maxRetries: 0
   });
   return cachedOpenAiClient;
-};
-
-export const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !apiKey.trim()) {
-    throw createConfigError('Server missing GEMINI_API_KEY.');
-  }
-  if (cachedGeminiClient) {
-    return cachedGeminiClient;
-  }
-  cachedGeminiClient = new GoogleGenAI({ apiKey });
-  return cachedGeminiClient;
 };
