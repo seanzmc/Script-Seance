@@ -38,6 +38,11 @@ For many tasks, the best fix is visual, structural, or cleanup-oriented rather t
 - Do not let adjacent components feel like different products.
 - Prefer revealing content simply rather than burying it behind more chrome.
 
+## Local UI polish rule
+For UI tasks, prefer the smallest coherent local polish pass over a literal symptom-only patch.
+When a requested fix clearly exposes adjacent inconsistency in the same pane, same control family, or same interaction flow, include that cleanup in scope.
+Do not broaden into unrelated redesign or app-wide refactor.
+
 ## Cleanup rules
 When removing stale references or old framework residue:
 - inspect imports, branches, config, env, tests, docs, labels, and provider wiring

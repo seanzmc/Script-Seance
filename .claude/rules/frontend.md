@@ -12,7 +12,9 @@ Apply these rules when editing frontend code such as:
 
 ## Primary goal
 
-Make the smallest effective UI change while preserving the current architecture, ownership boundaries, and working behavior.
+Complete the smallest coherent UI fix, not just the smallest literal code change.
+
+Preserve architecture, ownership boundaries, and working behavior, while allowing enough scope to finish the local design/interaction problem in one pass.
 
 ## Core principles
 
@@ -23,6 +25,34 @@ Make the smallest effective UI change while preserving the current architecture,
 - Keep the diff reviewable.
 - Preserve current naming and code style.
 - Do not introduce a second design language into an existing screen.
+- Prefer a complete local polish pass over a symptom-only patch when the surrounding inconsistency is obvious and directly related.
+
+## Scope model for UI tasks
+
+When working on a UI issue, use this scope boundary:
+
+### Always in scope
+
+- the targeted control or element
+- its full interaction state
+- same-role sibling controls in the same pane/section
+- local layout/styling sources that directly define its behavior
+- conflicting class/style systems affecting that element
+- obvious visual inconsistencies exposed by the requested fix in that same area
+
+### Usually in scope
+
+- nearest parent container if it controls hierarchy, spacing, or affordance
+- local shared constants/classes used only by that area
+- adjacent copy or spacing if needed to make the element read correctly
+
+### Out of scope unless explicitly requested
+
+- broad screen redesign
+- app-wide design system refactors
+- unrelated components in other panes or flows
+- speculative abstraction work
+- global cleanup not required to complete the local UI task
 
 ## UI review checklist
 
@@ -34,6 +64,16 @@ When working on a UI task, explicitly check:
 4. Is there duplicated styling logic that should be consolidated into existing patterns?
 5. Are adjacent components visually coherent?
 6. Is content unnecessarily hidden when a lighter disclosure pattern would work better?
+7. Is the requested fix exposing a second obvious inconsistency in the same local area?
+8. Is the control being styled by more than one competing class system?
+
+## Interaction-state rule
+
+Treat hover, active, focus-visible, disabled, motion, color, border, shadow, and emphasis as one interaction system.
+
+Do not stop at fixing a single sub-state if the control still feels visibly inconsistent in the same local context.
+
+For controls of the same role in the same pane, aim for coherent interaction behavior across the full set.
 
 ## Layout guidance
 
@@ -50,6 +90,8 @@ When working on a UI task, explicitly check:
 - Menus, toggles, disclosures, and tabs should be visually distinct from static text.
 - Hover/focus/active states should remain coherent with the existing design language.
 - Do not make interactive affordances subtle to the point of ambiguity.
+- If multiple same-role controls in one area feel like different products, unify them locally.
+- Fix the full hover/focus/active behavior for the target area rather than only the specifically named symptom.
 
 ## Component rules
 
@@ -58,6 +100,7 @@ When working on a UI task, explicitly check:
 - Keep prop surfaces tight.
 - Prefer existing primitives and patterns before creating new shared ones.
 - Avoid “helper” components that only wrap one use site unless they materially simplify the code.
+- If a shared component is fighting the local UI task, prefer a local ownership fix before escalating into shared-component refactor.
 
 ## Styling rules
 
@@ -65,6 +108,8 @@ When working on a UI task, explicitly check:
 - Avoid one-off styling systems that compete with neighboring UI.
 - Prefer local cleanup over broad theme rewrites.
 - If a style issue can be fixed by deleting classes instead of adding more, prefer deletion.
+- If an element is being styled by two competing systems, resolve the ownership conflict instead of layering more overrides.
+- Favor one coherent local style source over stacked conflicting utilities.
 
 ## Task workflow
 
@@ -72,17 +117,32 @@ For non-trivial UI tasks:
 
 1. Inspect the target component.
 2. Inspect the nearest parent or sibling that controls layout or visual language.
-3. Classify the issue as:
+3. Inspect any shared local styling source directly affecting the target.
+4. Classify the issue as:
    - styling-only
    - structure-only
    - logic-linked
-4. Propose the smallest patch that solves the actual problem.
+   - mixed interaction-state
+   - conflicting style ownership
+5. Propose the smallest coherent patch that fully resolves the local issue.
+
+## Completion rule
+
+A UI task is not complete if:
+
+- the named symptom is fixed
+- but the same control still feels visibly inconsistent
+- or same-role controls in the same pane still behave differently for the same interaction state
+- or the fix leaves behind an obvious local styling conflict
+
+Prefer one complete local pass over multiple tiny corrective passes.
 
 ## Frontend validation
 
 - For browser-visible changes, do not claim the UI is fully cleared from code inspection alone.
 - Include a short manual verification checklist when visual behavior matters.
-- When interaction states are part of the task, check enabled, disabled, hover, and focus-visible states explicitly.
+- When interaction states are part of the task, check enabled, disabled, hover, focus-visible, and active states explicitly.
+- If the task involves same-role controls, verify consistency across the affected set, not just one element.
 
 ## What to avoid
 
@@ -91,12 +151,18 @@ For non-trivial UI tasks:
 - Rewriting stable wiring just to make a component “cleaner”
 - Replacing working patterns with speculative abstractions
 - Inflating the component tree with cosmetic wrappers
+- Stopping at a symptom fix when the local interaction/design problem is still clearly unfinished
 
 ## Expected output format
 
-- Diagnosis
-- Files inspected
-- Patch plan
-- Risks
-- Patch summary
-- Validation
+### Diagnosis
+
+### Files inspected
+
+### Patch plan
+
+### Risks
+
+### Patch summary
+
+### Validation
