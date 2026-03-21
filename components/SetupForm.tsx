@@ -1569,27 +1569,33 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <Button
-                      variant="secondary"
+                    <button
+                      type="button"
                       onClick={() => {
                         void handleGenerateSurpriseSetup("manual");
                       }}
-                      className={`${setupActionButtonBaseClass} ${focusRingClass} !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100`}
-                      type="button"
-                      loading={isSurprising}
                       disabled={isLoading || isSurprising || isLocked}
+                      aria-busy={isSurprising || undefined}
+                      aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
+                      className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 disabled:opacity-50 disabled:pointer-events-none`}
                     >
+                      {isSurprising ? (
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : null}
                       Generate AI Premise
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={showManualDetails}
-                      className={`${setupActionButtonBaseClass} ${focusRingClass} !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300`}
+                    </button>
+                    <button
                       type="button"
+                      onClick={showManualDetails}
                       disabled={isLocked}
+                      aria-disabled={isLocked || undefined}
+                      className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none`}
                     >
                       Write My Own Premise
-                    </Button>
+                    </button>
                   </div>
                 </div>
               </div>
