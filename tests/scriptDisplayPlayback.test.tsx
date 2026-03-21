@@ -45,7 +45,6 @@ const createProps = () => ({
   blockStatuses: {},
   showHighlights: true,
   autoScroll: false,
-  onToggleLock: vi.fn(),
   onSelectInsertTarget: vi.fn(),
   onChangeSpeaker: vi.fn(),
   characters: ['Alex']

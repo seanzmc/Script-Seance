@@ -13,7 +13,6 @@ export interface RewriteOption {
   blockId: string;
   type: BlockType;
   label: string;
-  locked: boolean;
   displayText: string;
 }
 
@@ -148,7 +147,6 @@ export const useScriptController = ({
           blockId: block.id,
           type: block.type,
           label,
-          locked: Boolean(block.locked),
           displayText: displayText || '(No text)'
         };
       })

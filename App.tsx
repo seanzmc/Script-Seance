@@ -1310,10 +1310,6 @@ export default function App() {
     });
   };
 
-  const handleToggleLock = useCallback((sceneId: string, blockId: string) => {
-    scriptMutationController.toggleBlockLock(sceneId, blockId);
-  }, [scriptMutationController]);
-
   const handleChangeSpeaker = useCallback((sceneId: string, blockId: string, character: string) => {
     scriptMutationController.changeSpeaker(sceneId, blockId, character);
   }, [scriptMutationController]);
@@ -1759,7 +1755,6 @@ export default function App() {
         onInsertAtAnchor={handleInsertAtAnchor}
         onGenerateInsertAtAnchor={handleGenerateInsertAtAnchor}
         onUpdateSceneHeading={handleUpdateSceneHeading}
-        onToggleLock={handleToggleLock}
         isGenerating={isGenerating}
         isPlaying={isPlaying}
         onCancelGenerate={cancelAiRequest}

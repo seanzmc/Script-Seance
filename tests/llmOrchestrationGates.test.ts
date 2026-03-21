@@ -177,11 +177,11 @@ describe('LLM orchestration receipt gating', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
-  it('drops rewrite when target block is locked before resolve', async () => {
+  it('keeps rewrite fresh when legacy locked data appears on the target block', async () => {
     const orchestrator = new GenerationOrchestrator();
     const execution = deferred<string>();
     const commit = vi.fn();
-    let context: StoryContext = {
+    const legacyLockedContext = {
       title: 'Draft',
       genre: 'Noir',
       premise: 'A tense conspiracy.',
@@ -198,7 +198,8 @@ describe('LLM orchestration receipt gating', () => {
           locked: false
         }]
       }]
-    };
+    } as unknown as StoryContext;
+    let context: StoryContext = legacyLockedContext;
 
     const run = orchestrator.run<string>({
       opType: 'rewriteBlock',
@@ -216,20 +217,20 @@ describe('LLM orchestration receipt gating', () => {
     });
 
     context = {
-      ...context,
+      ...legacyLockedContext,
       scenes: [{
-        ...context.scenes[0],
+        ...legacyLockedContext.scenes[0],
         blocks: [{
-          ...context.scenes[0].blocks[0],
+          ...legacyLockedContext.scenes[0].blocks[0],
           locked: true
         }]
       }]
-    };
+    } as unknown as StoryContext;
     execution.resolve('Updated line');
 
     const outcome = await run;
-    expect(outcome.kind).toBe('dropped');
-    expect(commit).not.toHaveBeenCalled();
+    expect(outcome.kind).toBe('committed');
+    expect(commit).toHaveBeenCalledWith('Updated line', expect.any(Object));
   });
 
   it('drops setup auto-surprise when manual edit revision changes before resolve', async () => {

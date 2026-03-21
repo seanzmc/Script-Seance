@@ -86,7 +86,6 @@ export interface ScriptPaneProps {
     character?: string;
   }) => Promise<void>;
   onUpdateSceneHeading?: (sceneId: string, heading: string) => void;
-  onToggleLock: (sceneId: string, blockId: string) => void;
   isGenerating: boolean;
   isPlaying: boolean;
   onCancelGenerate: () => void;
@@ -158,7 +157,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onInsertAtAnchor,
   onGenerateInsertAtAnchor,
   onUpdateSceneHeading,
-  onToggleLock,
   isGenerating,
   isPlaying,
   onCancelGenerate,
@@ -483,7 +481,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       blockStatuses={blockStatuses}
       showHighlights={showHighlights}
       autoScroll={autoScroll}
-      onToggleLock={onToggleLock}
       onSelectInsertTarget={handleLegacyInsertTargetSelection}
       onChangeSpeaker={onChangeSpeaker}
       characters={context.characters}

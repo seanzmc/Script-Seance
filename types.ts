@@ -23,7 +23,6 @@ export interface ScriptBlock {
   blockRevision: number;
   character?: string;
   parenthetical?: string;
-  locked?: boolean;
   meta?: ScriptBlockMeta;
 }
 

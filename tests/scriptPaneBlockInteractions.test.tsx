@@ -27,13 +27,28 @@ const contextFixture: StoryContext = {
           type: BlockType.DIALOGUE,
           character: 'Alex',
           text: 'This changes everything.',
-          blockRevision: 1,
-          locked: true
+          blockRevision: 1
         }
       ]
     }
   ]
 };
+
+const legacyLockedContextFixture = {
+  ...contextFixture,
+  scenes: [
+    {
+      ...contextFixture.scenes[0],
+      blocks: [
+        contextFixture.scenes[0].blocks[0],
+        {
+          ...contextFixture.scenes[0].blocks[1],
+          locked: true
+        }
+      ]
+    }
+  ]
+} as unknown as StoryContext;
 
 const setupStateFixture: SetupFormState = {
   genre: 'Noir',
@@ -94,7 +109,6 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onRequestInsert: vi.fn(),
   onInsertAtAnchor: vi.fn(),
   onGenerateInsertAtAnchor: vi.fn(async () => {}),
-  onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
   onCancelGenerate: vi.fn(),
@@ -742,18 +756,30 @@ describe('ScriptPane block interactions', () => {
     });
   });
 
-  it('disables inline rewrite for locked blocks and stubs delete when handler is missing', () => {
+  it('keeps inline delete disabled without a handler while rewrite stays available', () => {
     const { container } = render(
       <ScriptPane {...createProps({ onDeleteBlock: undefined })} />
     );
 
-    const lockedBlock = container.querySelector('#block-block-2') as HTMLElement;
-    fireEvent.click(lockedBlock);
+    const block = container.querySelector('#block-block-2') as HTMLElement;
+    fireEvent.click(block);
 
     const rewriteButton = screen.getByRole('button', { name: 'Rewrite selected block' }) as HTMLButtonElement;
     const deleteButton = screen.getByRole('button', { name: 'Delete selected block' }) as HTMLButtonElement;
 
-    expect(rewriteButton.disabled).toBe(true);
+    expect(rewriteButton.disabled).toBe(false);
     expect(deleteButton.disabled).toBe(true);
+  });
+
+  it('does not let legacy locked block data disable rewrite', () => {
+    const { container } = render(
+      <ScriptPane {...createProps({ context: legacyLockedContextFixture })} />
+    );
+
+    const block = container.querySelector('#block-block-2') as HTMLElement;
+    fireEvent.click(block);
+
+    const rewriteButton = screen.getByRole('button', { name: 'Rewrite selected block' }) as HTMLButtonElement;
+    expect(rewriteButton.disabled).toBe(false);
   });
 });

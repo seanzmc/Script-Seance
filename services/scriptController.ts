@@ -21,7 +21,6 @@ export interface ScriptBlockPatch {
   text?: string;
   character?: string;
   parenthetical?: string;
-  locked?: boolean;
 }
 
 export interface ScriptController {
@@ -271,7 +270,6 @@ export interface ScriptMutationController {
     heading: string;
     clearRedo?: boolean;
   }) => boolean;
-  toggleBlockLock: (sceneId: string, blockId: string) => void;
   changeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   deleteBlock: (sceneId: string, blockId: string) => void;
   generateNextScene: (params: {
@@ -642,28 +640,6 @@ export const createScriptMutationController = (
     return true;
   };
 
-  const toggleBlockLock = (sceneId: string, blockId: string) => {
-    deps.clearRedo();
-    deps.applyContextMutation((previous) => {
-      if (!previous) return null;
-      return {
-        ...previous,
-        scenes: previous.scenes.map((scene) => (
-          scene.id !== sceneId
-            ? scene
-            : {
-                ...scene,
-                blocks: scene.blocks.map((block) => (
-                  block.id === blockId
-                    ? { ...block, locked: !block.locked }
-                    : block
-                ))
-              }
-        ))
-      };
-    });
-  };
-
   const changeSpeaker = (sceneId: string, blockId: string, character: string) => {
     deps.clearRedo();
     deps.applyContextMutation((previous) => {
@@ -886,10 +862,6 @@ export const createScriptMutationController = (
     }
 
     const targetBlock = targetInfo.block;
-    if (targetBlock.locked) {
-      throw new Error('Locked blocks cannot be rewritten.');
-    }
-
     const previousBlock = targetInfo.index > 0 ? targetInfo.ordered[targetInfo.index - 1]?.block : null;
     const nextBlock = targetInfo.index < targetInfo.ordered.length - 1
       ? targetInfo.ordered[targetInfo.index + 1]?.block
@@ -1038,7 +1010,6 @@ export const createScriptMutationController = (
     applyRewritePreview,
     updateBlock,
     updateSceneHeading,
-    toggleBlockLock,
     changeSpeaker,
     deleteBlock,
     generateNextScene

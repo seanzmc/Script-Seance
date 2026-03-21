@@ -13,7 +13,7 @@ type CreateBlockParams = {
   meta?: ScriptBlockMeta | null;
 };
 
-type UpdateBlockPatch = Partial<Pick<ScriptBlock, 'text' | 'character' | 'parenthetical' | 'locked'>>;
+type UpdateBlockPatch = Partial<Pick<ScriptBlock, 'text' | 'character' | 'parenthetical'>>;
 type BlockFieldRule = {
   storedInSceneBlocks: boolean;
   requiresCharacter: boolean;
@@ -198,7 +198,6 @@ export const normalizeSceneBlock = (
     type: block.type,
     text: sanitizeBlockText(block.text),
     blockRevision: normalizeBlockRevision(block.blockRevision),
-    ...(typeof block.locked === 'boolean' ? { locked: block.locked } : {}),
     ...(meta ? { meta } : {})
   };
 
@@ -289,7 +288,6 @@ export const updateBlock = (block: ScriptBlock, patch: UpdateBlockPatch): Script
   const normalizedMeta = normalizeBlockMeta(block.meta);
   return {
     ...block,
-    ...(patch.locked !== undefined ? { locked: patch.locked } : {}),
     text,
     character: semanticBase.character,
     parenthetical: semanticBase.parenthetical,

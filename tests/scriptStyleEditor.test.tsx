@@ -84,7 +84,6 @@ const createPaneProps = (
   insertCompleteToken: 0,
   onChangeSpeaker: vi.fn(),
   onInsertError: vi.fn(),
-  onToggleLock: vi.fn(),
   isGenerating: false,
   isPlaying: false,
   onCancelGenerate: vi.fn(),

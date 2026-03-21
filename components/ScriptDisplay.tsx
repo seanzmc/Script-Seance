@@ -8,7 +8,7 @@ import {
   ScriptBlock,
   ScriptSelectionTarget
 } from '../types';
-import { Lock, Unlock, PlusCircle } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { createAfterBlockAnchor, createSceneTopAnchor } from '../services/scriptController';
 import { AnchoredPopover } from './AnchoredPopover';
 
@@ -19,7 +19,6 @@ export interface ScriptDisplayProps {
   blockStatuses: Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>;
   showHighlights: boolean;
   autoScroll: boolean;
-  onToggleLock: (sceneId: string, blockId: string) => void;
   onSelectInsertTarget: (target: { sceneId: string; blockId: string }) => void;
   onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
   characters: string[];
@@ -254,7 +253,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   blockStatuses,
   showHighlights,
   autoScroll,
-  onToggleLock,
   onSelectInsertTarget,
   onConfirmInsertMode,
   onCancelInsertMode,
@@ -865,33 +863,6 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                         Audio error
                       </span>
                     )}
-                    {!isInsertMode && (
-                      <div
-                        className={`script-export-chrome absolute right-0 top-1 transition-opacity duration-150 ease-out ${
-                          block.locked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                      >
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleLock(scene.id, block.id);
-                          }}
-                          className={`p-1.5 rounded-full border bg-white shadow-sm transition-[color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-[1px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
-                            block.locked
-                              ? 'border-indigo-300 text-indigo-700 hover:text-indigo-800'
-                              : 'border-gray-200 text-gray-500 hover:text-indigo-600'
-                          }`}
-                          title={block.locked ? 'Unlock block' : 'Lock block'}
-                          aria-label={block.locked ? 'Unlock block' : 'Lock block'}
-                        >
-                          {block.locked ? (
-                            <Lock className="w-3.5 h-3.5" />
-                          ) : (
-                            <Unlock className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    )}
                     {content}
                   </div>
 
@@ -927,7 +898,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   const selectedBlock = selectedTarget?.kind === 'block'
     ? selectedScene?.blocks.find((block) => block.id === selectedTarget.blockId) ?? null
     : null;
-  const selectedBlockRewriteDisabled = Boolean(selectedBlock?.locked) || !onRewriteBlock;
+  const selectedBlockRewriteDisabled = !onRewriteBlock;
   const selectedBlockDeleteDisabled = !onDeleteBlock;
 
   const containerClasses = `font-screenplay script-export-root bg-[#f6f1e7] text-black px-2 py-0 sm:px-3 shadow-[0_24px_60px_rgba(0,0,0,0.25)] border border-[#d6cdbd] w-full max-w-[1120px] mx-auto rounded-md relative ${
