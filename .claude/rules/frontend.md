@@ -78,6 +78,12 @@ For non-trivial UI tasks:
    - logic-linked
 4. Propose the smallest patch that solves the actual problem.
 
+## Frontend validation
+
+- For browser-visible changes, do not claim the UI is fully cleared from code inspection alone.
+- Include a short manual verification checklist when visual behavior matters.
+- When interaction states are part of the task, check enabled, disabled, hover, and focus-visible states explicitly.
+
 ## What to avoid
 
 - Unasked-for redesigns
@@ -88,14 +94,9 @@ For non-trivial UI tasks:
 
 ## Expected output format
 
-### Diagnosis
-
-### Files inspected
-
-### Patch plan
-
-### Risks
-
-### Patch summary
-
-### Validation
+- Diagnosis
+- Files inspected
+- Patch plan
+- Risks
+- Patch summary
+- Validation

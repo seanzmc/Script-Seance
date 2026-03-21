@@ -64,6 +64,11 @@ Always report:
 - whether they passed or failed
 - whether there are untested risk areas
 
+## Completion gate
+
+- Do not describe a fix as complete unless test, lint, and typecheck status are reported explicitly.
+- For regressions, add focused coverage when feasible rather than relying only on manual retest.
+
 ## Expected output format
 
 ### Behavior change

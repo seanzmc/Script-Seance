@@ -45,6 +45,10 @@ When removing stale references or old framework residue:
 - remove only what is clearly dead
 - flag uncertain items instead of guessing
 
+## Separation of concerns for tasks
+- Keep visual consistency work separate from behavior/regression fixes unless the same ownership point clearly requires both.
+- Do not mix setup-flow styling cleanup with generation pipeline changes in one patch unless explicitly requested.
+
 ## Planning
 For non-trivial work, first determine:
 - true ownership point
@@ -60,6 +64,31 @@ Default to targeted refinement, not broad refactor.
 - wrapper inflation
 - cleanup mixed into unrelated feature work
 
+## Repo execution rules
+- Run commands from the repository root.
+- Use `pnpm`, not `npm` or `yarn`.
+- Use repo-relative paths in responses and handoffs.
+- For non-trivial work, default to spec-first: inspect, write the spec, then wait for approval.
+- Do not claim completion unless validation commands were actually run and reported explicitly.
+
+## Validation expectations
+For completed tasks, report the exact command(s) run.
+If a task is claimed complete, final validation should include:
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm test`
+
+## Validation command rules
+- For final validation, run the repo scripts exactly as written:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm test`
+- Do not wrap, pipe, redirect, truncate, or chain these final validation commands.
+- Do not replace repo validation scripts with underlying tool commands.
+- Commands like `2>&1 | head -40`, `tee`, `tail`, or custom `tsc --noEmit` invocations are debug-only and do not count as final validation.
+- `pnpm typecheck 2>&1 | head -40` does not count as running `pnpm typecheck`.
+
+If any of these are unrun or failing, say so explicitly.
 
 ## Validation
 Run the narrowest relevant checks first and report:

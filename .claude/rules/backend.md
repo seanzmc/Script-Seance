@@ -99,6 +99,12 @@ After a backend change:
 - Note anything not validated.
 - If runtime validation is not possible, explain the specific gap.
 
+## Backend validation
+
+- For bug fixes, prefer the owning layer over symptom masking.
+- Before deleting or bypassing logic, verify live references with repo search and report the result.
+- When response validation fails, inspect both the prompt/producer and the schema/validator before patching.
+
 ## Expected output format
 
 ### Diagnosis

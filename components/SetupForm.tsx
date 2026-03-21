@@ -1203,7 +1203,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const setupBodyTextClass = setupUi.bodyText;
   const setupBodyMutedTextClass = setupUi.bodyMutedText;
   const setupMetaTextClass = setupUi.metaText;
-  const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow] duration-[220ms] ease-out active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
+  const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow] duration-[220ms] ease-out hover:-translate-y-px active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
   const styleActionButtonBaseClass = `rounded-lg px-3 py-2 ${setupUi.buttonText} ring-1 ${interactiveControlClass}`;
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
@@ -1574,7 +1574,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       onClick={() => {
                         void handleGenerateSurpriseSetup("manual");
                       }}
-                      className={`${setupActionButtonBaseClass} !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100`}
+                      className={`${setupActionButtonBaseClass} ${focusRingClass} !bg-indigo-500/15 hover:!bg-indigo-500/25 !border-indigo-500/30 text-indigo-100`}
                       type="button"
                       loading={isSurprising}
                       disabled={isLoading || isSurprising || isLocked}
@@ -1584,7 +1584,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     <Button
                       variant="secondary"
                       onClick={showManualDetails}
-                      className={`${setupActionButtonBaseClass} !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300`}
+                      className={`${setupActionButtonBaseClass} ${focusRingClass} !bg-slate-800/50 hover:!bg-slate-700/50 !border-white/10 text-slate-300`}
                       type="button"
                       disabled={isLocked}
                     >
