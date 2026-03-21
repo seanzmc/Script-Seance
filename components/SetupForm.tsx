@@ -435,7 +435,7 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
       onClick={handleClick}
       disabled={disabled}
       data-testid="setup-length-wheel"
-      className={`inline-flex min-w-[8.6rem] items-center justify-between gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-slate-100 transition-[transform,box-shadow,border-color,background-color] duration-[220ms] ease-out ${focusRingClass} ${
+      className={`inline-flex min-w-[7.9rem] items-center justify-between gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-left text-slate-100 transition-[transform,box-shadow,border-color,background-color] duration-[220ms] ease-out ${focusRingClass} ${
         isDragging
           ? "border-indigo-300/55 bg-indigo-500/14 shadow-[0_18px_32px_-24px_rgba(99,102,241,0.65)]"
           : "hover:-translate-y-px hover:border-indigo-200/35 hover:bg-white/[0.05]"
@@ -447,7 +447,7 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
         Length
       </span>
       <span
-        className="relative inline-flex h-[1.35rem] w-[5.3ch] overflow-hidden align-middle text-right"
+        className="relative inline-flex h-[1.25rem] min-w-[4.4rem] flex-1 overflow-hidden align-middle text-right"
         data-testid="setup-length-value-viewport"
       >
         {isAnimating && (
@@ -724,8 +724,8 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       disabled={disabled}
       className={`group relative overflow-hidden rounded-[22px] border border-indigo-200/25 bg-white/[0.03] text-left text-slate-100 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.9)] transition-[transform,box-shadow,border-color,background-color] duration-[240ms] ease-out ${focusRingClass} ${
         isLarge
-          ? "min-w-[15rem] px-5 py-4 sm:min-w-[17rem] sm:px-6 sm:py-5"
-          : "min-w-[8.75rem] px-3 py-2"
+          ? "w-full min-w-[13.5rem] max-w-[18rem] px-4 py-3 sm:min-w-[15.5rem] sm:px-5 sm:py-4"
+          : "min-w-[7.75rem] max-w-[10.5rem] px-2.5 py-1.5"
       } ${
         isDragging
           ? "border-indigo-300/55 bg-indigo-500/16 shadow-[0_22px_46px_-28px_rgba(99,102,241,0.6)]"
@@ -734,7 +734,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       aria-label={`Genre: ${incomingValue}. Click to cycle or drag vertically.`}
       aria-roledescription="genre wheel"
       title="Click to cycle genre. Drag vertically to step through genres."
-    >
+      >
       <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
       <span
         className={`block ${isLarge ? "text-[10px]" : "text-[9px]"} uppercase tracking-[0.34em] text-indigo-100/58`}
@@ -742,8 +742,10 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         Genre
       </span>
       <span
-        className={`relative mt-2 inline-flex overflow-hidden align-middle ${
-          isLarge ? "h-[3.2rem] min-w-[11ch]" : "h-[1.8rem] min-w-[6.8ch]"
+        className={`relative mt-1.5 inline-flex overflow-hidden align-middle ${
+          isLarge
+            ? "h-[3.2rem] min-w-[9.5rem] w-full max-w-full"
+            : "h-[1.7rem] min-w-[6.25rem] w-full max-w-full"
         }`}
         data-testid="setup-genre-value-viewport"
       >
