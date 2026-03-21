@@ -1203,7 +1203,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const setupBodyTextClass = setupUi.bodyText;
   const setupBodyMutedTextClass = setupUi.bodyMutedText;
   const setupMetaTextClass = setupUi.metaText;
-  const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow] duration-[220ms] ease-out hover:-translate-y-px active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
+  const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow,background-color] duration-[220ms] ease-out hover:-translate-y-px active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
   const styleActionButtonBaseClass = `rounded-lg px-3 py-2 ${setupUi.buttonText} ring-1 ${interactiveControlClass}`;
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
