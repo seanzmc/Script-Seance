@@ -1198,7 +1198,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const focusRingClass =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
-  const detailPanelClass = "space-y-2";
+  const detailPanelClass = "space-y-2.5";
   const setupSectionLabelClass = setupUi.sectionLabel;
   const setupBodyTextClass = setupUi.bodyText;
   const setupBodyMutedTextClass = setupUi.bodyMutedText;
@@ -1255,7 +1255,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         data-testid={options?.testId}
         className={`inline-flex h-11 min-w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-slate-900/70 px-2 text-slate-200 transition-[opacity,color,border-color,background-color,box-shadow] duration-[220ms] ease-out hover:border-indigo-300/55 hover:bg-indigo-500/18 hover:text-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ${
           isLocked ? "opacity-60 cursor-not-allowed" : ""
-        } ${options?.narrator ? "border-indigo-300/25 bg-indigo-500/10" : ""}`}
+        } ${options?.narrator ? "border-white/12 bg-white/[0.035]" : ""}`}
       >
         <span className="text-[9px] uppercase tracking-[0.16em] text-slate-400">
           Voice
@@ -1597,21 +1597,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
             {showDetails && (
               <div
-                className={`${stageShellClass} space-y-3 px-5 py-3.5 sm:px-5 sm:py-4`}
+                className={`${stageShellClass} space-y-3.5 px-5 py-4 sm:px-6 sm:py-4`}
               >
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <p className={setupSectionLabelClass}>Step 3</p>
                   <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
                     Build the opening spark
                   </h3>
-                  <p className="text-sm leading-relaxed text-slate-400">
+                  <p className="text-sm leading-relaxed text-slate-300/85">
                     Premise leads while characters stay close at hand.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1.15fr_0.85fr] md:items-stretch">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(17.25rem,0.8fr)] md:items-stretch">
                   <div
-                    className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/10 bg-slate-950/52 px-4 py-3.5 shadow-[0_16px_38px_-30px_rgba(15,23,42,0.95)]`}
+                    className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-3.5 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.9)]`}
                     data-testid="setup-premise-panel"
                   >
                     <label className={setupSectionLabelClass}>
@@ -1622,10 +1622,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         rows={6}
                         value={premise}
                         onChange={(e) => updateValue({ premise: e.target.value })}
-                        className={`w-full flex-1 min-h-[152px] rounded-[20px] border border-white/8 p-4 !bg-slate-950 !text-slate-100 caret-indigo-200 placeholder:!text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out resize-none text-sm sm:text-base leading-relaxed ${
+                        className={`w-full flex-1 min-h-[152px] resize-none rounded-[18px] border border-white/8 px-4 py-3.5 pr-3 !bg-slate-950/90 !text-slate-100 caret-indigo-200 placeholder:!text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out text-[15px] sm:text-base leading-relaxed [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
                           justSurprised
-                            ? "!bg-slate-950 border-indigo-400/35 shadow-[0_0_18px_rgba(99,102,241,0.14)]"
-                            : "shadow-inner shadow-black/20"
+                            ? "!bg-slate-950/95 border-indigo-400/30 shadow-[0_0_0_1px_rgba(99,102,241,0.08),0_0_18px_rgba(99,102,241,0.12)]"
+                            : "shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                         } ${isLocked ? "opacity-60 cursor-not-allowed !bg-slate-950/80 !text-slate-400" : ""}`}
                         placeholder="e.g., A detective discovers his new partner is a ghost..."
                         disabled={isLocked}
@@ -1649,7 +1649,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
 
                   <div
-                    className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/8 bg-white/[0.02] px-4 py-3.5`}
+                    className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/10 bg-slate-950/42 px-4 py-3.5 shadow-[0_12px_30px_-34px_rgba(15,23,42,0.8)]`}
                     data-testid="setup-characters-panel"
                   >
                     <div className="flex h-full flex-1 flex-col space-y-1.5">
@@ -1658,12 +1658,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </label>
                       <div className="min-h-0 flex-1 space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <div className="flex min-h-[42px] flex-1 items-center justify-between rounded-xl border border-indigo-300/20 bg-indigo-500/10 px-3 py-2">
+                          <div className="flex min-h-[42px] flex-1 items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
                             <div className="min-w-0">
                               <p className="text-sm sm:text-base font-medium text-white">
                                 Narrator
                               </p>
-                              <p className="text-[10px] uppercase tracking-[0.22em] text-indigo-100/70">
+                              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
                                 Built in
                               </p>
                             </div>
@@ -1734,8 +1734,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
                 </div>
 
-                <div className="border-t border-white/8 pt-2.5">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
+                <div className="border-t border-white/8 pt-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2.5 text-sm text-slate-400 sm:items-center">
                     <LengthCycleWheel
                       value={normalizedLength}
                       disabled={isLocked}
@@ -1743,10 +1743,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       focusRingClass={focusRingClass}
                       onChange={(nextLength) => updateValue({ length: nextLength })}
                     />
-                    <p className={setupMetaTextClass}>
-                      {characterCount}{" "}
-                      {characterCount === 1 ? "character" : "characters"}
-                    </p>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.025] px-3 py-1.5">
+                      <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                        Cast
+                      </span>
+                      <p className={setupMetaTextClass}>
+                        {characterCount}{" "}
+                        {characterCount === 1 ? "character" : "characters"}
+                      </p>
+                    </div>
                   </div>
 
                   {showSubmit && onStart && (
