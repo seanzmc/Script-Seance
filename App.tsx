@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { AnimatePresence } from 'motion/react';
+import * as m from 'motion/react-m';
 import {
   SetupFormState,
   type VoicePreference,
@@ -41,6 +43,10 @@ import {
   DEFAULT_VOICE_CONFIG,
   sanitizeVoiceIdForUsage
 } from './shared/voiceDefaults.js';
+import {
+  fadeSlideYVariants,
+  floatingNoticeVariants
+} from './components/motion/primitives';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import {
   GenerationOrchestrator,
@@ -1649,43 +1655,61 @@ export default function App() {
       {voiceCatalogState === 'ready' && !isTtsPreviewEnabled && (
         <p className="text-[10px] text-amber-300">TTS provider not configured. Preview is disabled.</p>
       )}
-      {voicesView === 'casting' && castingCharacter ? (
-        <VoiceCastingModal
-          isOpen={true}
-          embedded
-          onClose={handleCloseCasting}
-          onBack={handleCloseCasting}
-          characterName={castingCharacter}
-          currentVoiceId={
-            voiceConfigs.find((config) => (
-              normalizeCharacterName(config.name) === normalizeCharacterName(castingCharacter)
-            ))?.voiceId || defaultVoiceId
-          }
-          availableVoices={availableVoices}
-          voiceConfigs={voiceConfigs}
-          onSelect={(voiceId) => {
-            updateVoiceConfig(castingCharacter, { voiceId });
-            handleCloseCasting();
-          }}
-          onPreview={handleModalPreview}
-          isPreviewing={isPreviewPlaying || isLoadingAudio}
-          previewVoiceId={previewVoiceId}
-          isPreviewEnabled={isTtsPreviewEnabled}
-        />
-      ) : (
-        <VoicesPanel
-          characters={context.characters}
-          availableVoices={availableVoices}
-          voiceConfigs={voiceConfigs}
-          onUpdateConfig={updateVoiceConfig}
-          onOpenCasting={handleOpenCasting}
-          onPreview={(config) => playPreview(getPreviewText(config.name), config, { scopeId: config.name })}
-          onStop={stop}
-          isAudioPlaying={isPreviewPlaying}
-          isLoading={isLoadingAudio && !isPlaying}
-          isPreviewEnabled={isTtsPreviewEnabled}
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        {voicesView === 'casting' && castingCharacter ? (
+          <m.div
+            key={`voices-casting-${castingCharacter}`}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={fadeSlideYVariants}
+          >
+            <VoiceCastingModal
+              isOpen={true}
+              embedded
+              onClose={handleCloseCasting}
+              onBack={handleCloseCasting}
+              characterName={castingCharacter}
+              currentVoiceId={
+                voiceConfigs.find((config) => (
+                  normalizeCharacterName(config.name) === normalizeCharacterName(castingCharacter)
+                ))?.voiceId || defaultVoiceId
+              }
+              availableVoices={availableVoices}
+              voiceConfigs={voiceConfigs}
+              onSelect={(voiceId) => {
+                updateVoiceConfig(castingCharacter, { voiceId });
+                handleCloseCasting();
+              }}
+              onPreview={handleModalPreview}
+              isPreviewing={isPreviewPlaying || isLoadingAudio}
+              previewVoiceId={previewVoiceId}
+              isPreviewEnabled={isTtsPreviewEnabled}
+            />
+          </m.div>
+        ) : (
+          <m.div
+            key="voices-assignments"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={fadeSlideYVariants}
+          >
+            <VoicesPanel
+              characters={context.characters}
+              availableVoices={availableVoices}
+              voiceConfigs={voiceConfigs}
+              onUpdateConfig={updateVoiceConfig}
+              onOpenCasting={handleOpenCasting}
+              onPreview={(config) => playPreview(getPreviewText(config.name), config, { scopeId: config.name })}
+              onStop={stop}
+              isAudioPlaying={isPreviewPlaying}
+              isLoading={isLoadingAudio && !isPlaying}
+              isPreviewEnabled={isTtsPreviewEnabled}
+            />
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   ) : (
     <p className="text-[11px] text-gray-500">Generate a script to unlock voice casting.</p>
@@ -1790,19 +1814,28 @@ export default function App() {
         />
       )}
 
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5 fade-in z-50">
-          <span className="text-sm font-medium">{toast.message}</span>
-          {toast.onUndo && (
-            <button
-              onClick={toast.onUndo}
-              className="text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-1 rounded flex items-center gap-1 transition-colors"
-            >
-              <RotateCcw className="w-3 h-3" /> Undo
-            </button>
-          )}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {toast ? (
+          <m.div
+            key={`toast-${toast.message}`}
+            className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-white shadow-2xl"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={floatingNoticeVariants}
+          >
+            <span className="text-sm font-medium">{toast.message}</span>
+            {toast.onUndo && (
+              <button
+                onClick={toast.onUndo}
+                className="text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-1 rounded flex items-center gap-1 transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" /> Undo
+              </button>
+            )}
+          </m.div>
+        ) : null}
+      </AnimatePresence>
 
       <LoginModal
         isOpen={authStatus === 'unauthenticated'}

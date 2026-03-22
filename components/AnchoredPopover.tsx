@@ -1,5 +1,8 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useIsPresent } from 'motion/react';
+import * as m from 'motion/react-m';
+import { anchoredPopoverVariants } from './motion/primitives';
 
 export type AnchoredPopoverPlacement = 'top' | 'bottom';
 export type AnchoredPopoverAlign = 'start' | 'center' | 'end';
@@ -45,6 +48,7 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
   ensureAnchorVisible = true,
   topBoundary = null
 }) => {
+  const isPresent = useIsPresent();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
   const settleFrameRef = useRef<number | null>(null);
@@ -144,21 +148,27 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
   const fallbackLeft = anchorRect.left;
 
   return createPortal(
-    <div
+    <m.div
       ref={popoverRef}
       className={className}
+      initial="hidden"
+      animate={position ? 'visible' : 'hidden'}
+      exit="exit"
+      variants={anchoredPopoverVariants}
       style={{
         position: 'fixed',
         top: position?.top ?? fallbackTop,
         left: position?.left ?? fallbackLeft,
         zIndex: 90,
         opacity: position ? 1 : 0,
-        pointerEvents: position ? 'auto' : 'none'
+        pointerEvents: position && isPresent ? 'auto' : 'none',
+        transformOrigin: `center ${position?.placement === 'top' ? 'bottom' : 'top'}`
       }}
+      aria-hidden={!isPresent ? true : undefined}
       data-placement={position?.placement ?? preferredPlacement}
     >
       {children}
-    </div>,
+    </m.div>,
     document.body
   );
 };

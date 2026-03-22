@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import * as m from 'motion/react-m';
 import { BlockType, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
@@ -42,6 +44,14 @@ import {
   Redo2,
   X
 } from 'lucide-react';
+import {
+  bottomSheetVariants,
+  drawerLeftVariants,
+  drawerRightVariants,
+  fadeSlideYVariants,
+  modalVariants,
+  overlayVariants
+} from './motion/primitives';
 
 export interface ScriptPaneProps {
   context: StoryContext | null;
@@ -257,7 +267,13 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onOpenSetup();
   };
   const startScreenCard = (
-    <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]">
+    <m.div
+      className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]"
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      variants={fadeSlideYVariants}
+    >
       <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="relative space-y-5">
         <div className="space-y-3">
@@ -278,10 +294,16 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </Button>
         </div>
       </div>
-    </div>
+    </m.div>
   );
   const startGenerationCard = (
-    <div className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]">
+    <m.div
+      className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]"
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      variants={fadeSlideYVariants}
+    >
       <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto" />
       <div className="space-y-2">
         <p className="text-xl font-semibold text-white">Generating your opening scene...</p>
@@ -290,7 +312,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
         Cancel
       </Button>
-    </div>
+    </m.div>
   );
   const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
     scriptController.selectBlockTarget(target);
@@ -656,127 +678,173 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       sceneCountLabel={sceneCountLabel}
     />
   );
-  const outlineDrawer = context && isOutlineOpen ? (
-    <>
-      <div
-        className="fixed inset-0 z-[96] bg-black/45 backdrop-blur-[2px]"
-        onClick={handleCloseOutline}
-        aria-hidden="true"
-      />
-      <aside
-        role="dialog"
-        aria-label="Scene outline"
-        data-testid="scene-outline-drawer"
-        className="fixed z-[97] flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-gray-800/80 px-3 py-3 sm:px-4">
-          <div className="space-y-0.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Scene Outline</p>
-            <h2 className="text-base font-semibold text-white">Navigate the draft</h2>
-          </div>
-          <button
-            type="button"
-            onClick={handleCloseOutline}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-700 bg-gray-900/50 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-            aria-label="Close scene outline"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-2.5 py-2.5 sm:px-3 sm:py-3">
-          <DraftOutlinePanel
-            scenes={context.scenes}
-            activeSceneId={activeSceneId}
-            onSelectScene={handleSelectOutlineScene}
-          />
-        </div>
-      </aside>
-    </>
-  ) : null;
-  const generateMenuDialog = isGenerateMenuOpen ? (
-    <>
-      {isMobileDialogViewport ? (
+  const outlineDrawer = (
+    <AnimatePresence initial={false}>
+      {context && isOutlineOpen ? (
         <>
-          <div
-            className="fixed inset-0 z-[84] bg-black/45 backdrop-blur-[1px]"
-            onClick={() => setIsGenerateMenuOpen(false)}
+          <m.div
+            key="scene-outline-backdrop"
+            className="fixed inset-0 z-[96] bg-black/45 backdrop-blur-[2px]"
+            onClick={handleCloseOutline}
             aria-hidden="true"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={overlayVariants}
           />
-          <div
+          <m.aside
+            key="scene-outline-panel"
             role="dialog"
-            aria-label="Generate menu"
-            className="fixed inset-x-0 bottom-0 z-[85] p-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]"
+            aria-label="Scene outline"
+            data-testid="scene-outline-drawer"
+            className="fixed z-[97] flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={isMobileDialogViewport ? bottomSheetVariants : drawerLeftVariants}
           >
-            <div className="mb-2 flex items-center justify-between gap-3 rounded-[1.35rem] border border-[#d6cdbd] bg-[#f6f1e7] px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.16)]">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">Generate</p>
-                <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Draft Composer</h3>
+            <div className="flex items-start justify-between gap-3 border-b border-gray-800/80 px-3 py-3 sm:px-4">
+              <div className="space-y-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Scene Outline</p>
+                <h2 className="text-base font-semibold text-white">Navigate the draft</h2>
               </div>
               <button
                 type="button"
-                onClick={() => setIsGenerateMenuOpen(false)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-800"
-                aria-label="Close generate menu"
+                onClick={handleCloseOutline}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-700 bg-gray-900/50 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                aria-label="Close scene outline"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {composerPanelNode}
-          </div>
-        </>
-      ) : (
-        <div
-          role="dialog"
-          aria-label="Generate menu"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(28rem,calc(100vw-1.5rem))]"
-        >
-          {composerPanelNode}
-        </div>
-      )}
-    </>
-  ) : null;
-  const setupModal = isSetupOpen ? (
-    <div
-      className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
-      role="region"
-      aria-label="Setup"
-      data-testid="setup-screen"
-    >
-      <div className="pointer-events-none absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.24),_transparent_42%)]" />
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
-        <div className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-slate-950/60 shadow-[0_35px_120px_rgba(2,6,23,0.75)] backdrop-blur-md sm:min-h-[calc(100vh-3rem)]">
-          <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
-            <div className="space-y-1">
-              <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-              <h2 className={SETUP_UI_TOKENS.title}>Start a new script</h2>
-              <p className={SETUP_UI_TOKENS.subtitle}>Pick a genre and let AI shape your opening spark.</p>
+            <div className="flex-1 overflow-y-auto px-2.5 py-2.5 sm:px-3 sm:py-3">
+              <DraftOutlinePanel
+                scenes={context.scenes}
+                activeSceneId={activeSceneId}
+                onSelectScene={handleSelectOutlineScene}
+              />
             </div>
-            <button
-              type="button"
-              onClick={onCloseSetup}
-              className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label="Close setup"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 sm:pb-6">
-            <SetupForm
-              value={setupState}
-              onChange={onSetupChange}
-              onRequestSurprise={onSetupSurprise}
-              onStart={onStartSetup}
-              isLoading={isGenerating}
-              onError={onSetupError}
-              isLocked={false}
-              showSubmit
-              autoSurprise={setupAutoSurprise}
+          </m.aside>
+        </>
+      ) : null}
+    </AnimatePresence>
+  );
+  const generateMenuDialog = (
+    <AnimatePresence initial={false}>
+      {isGenerateMenuOpen ? (
+        isMobileDialogViewport ? (
+          <>
+            <m.div
+              key="generate-menu-mobile-backdrop"
+              className="fixed inset-0 z-[84] bg-black/45 backdrop-blur-[1px]"
+              onClick={() => setIsGenerateMenuOpen(false)}
+              aria-hidden="true"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={overlayVariants}
             />
+            <m.div
+              key="generate-menu-mobile-panel"
+              role="dialog"
+              aria-label="Generate menu"
+              className="fixed inset-x-0 bottom-0 z-[85] p-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={bottomSheetVariants}
+            >
+              <div className="mb-2 flex items-center justify-between gap-3 rounded-[1.35rem] border border-[#d6cdbd] bg-[#f6f1e7] px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.16)]">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">Generate</p>
+                  <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Draft Composer</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsGenerateMenuOpen(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-800"
+                  aria-label="Close generate menu"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {composerPanelNode}
+            </m.div>
+          </>
+        ) : (
+          <m.div
+            key="generate-menu-desktop-panel"
+            role="dialog"
+            aria-label="Generate menu"
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(28rem,calc(100vw-1.5rem))]"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={fadeSlideYVariants}
+          >
+            {composerPanelNode}
+          </m.div>
+        )
+      ) : null}
+    </AnimatePresence>
+  );
+  const setupModal = (
+    <AnimatePresence initial={false}>
+      {isSetupOpen ? (
+        <m.div
+          key="setup-screen"
+          className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
+          role="region"
+          aria-label="Setup"
+          data-testid="setup-screen"
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          variants={overlayVariants}
+        >
+          <div className="pointer-events-none absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.24),_transparent_42%)]" />
+          <div className="relative mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
+            <m.div
+              className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-slate-950/60 shadow-[0_35px_120px_rgba(2,6,23,0.75)] backdrop-blur-md sm:min-h-[calc(100vh-3rem)]"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={modalVariants}
+            >
+              <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
+                  <h2 className={SETUP_UI_TOKENS.title}>Start a new script</h2>
+                  <p className={SETUP_UI_TOKENS.subtitle}>Pick a genre and let AI shape your opening spark.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCloseSetup}
+                  className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Close setup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 sm:pb-6">
+                <SetupForm
+                  value={setupState}
+                  onChange={onSetupChange}
+                  onRequestSurprise={onSetupSurprise}
+                  onStart={onStartSetup}
+                  isLoading={isGenerating}
+                  onError={onSetupError}
+                  isLocked={false}
+                  showSubmit
+                  autoSurprise={setupAutoSurprise}
+                />
+              </div>
+            </m.div>
           </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
+        </m.div>
+      ) : null}
+    </AnimatePresence>
+  );
 
   useEffect(() => {
     if (!isExportMenuOpen) return;
@@ -1060,24 +1128,33 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                     </InlineTooltip>
                   </div>
                 </div>
-                {isGenerating && (
-                  <div className="pointer-events-none absolute right-0 top-full z-[6] mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2">
-                    <div
-                      aria-live="polite"
-                      className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-100 shadow-[0_14px_28px_rgba(15,23,42,0.24)]"
+                <AnimatePresence initial={false}>
+                  {isGenerating ? (
+                    <m.div
+                      key="writing-indicator"
+                      className="pointer-events-none absolute right-0 top-full z-[6] mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2"
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      variants={fadeSlideYVariants}
                     >
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Writing
-                      <button
-                        type="button"
-                        onClick={onCancelGenerate}
-                        className="rounded-full border border-indigo-300/30 px-2 py-0.5 text-[9px] tracking-[0.16em] text-indigo-100 transition-colors hover:bg-indigo-400/10"
+                      <div
+                        aria-live="polite"
+                        className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-100 shadow-[0_14px_28px_rgba(15,23,42,0.24)]"
                       >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Writing
+                        <button
+                          type="button"
+                          onClick={onCancelGenerate}
+                          className="rounded-full border border-indigo-300/30 px-2 py-0.5 text-[9px] tracking-[0.16em] text-indigo-100 transition-colors hover:bg-indigo-400/10"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </m.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
             </div>
           </div>
@@ -1085,94 +1162,140 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       )}
 
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
-        {context ? (
-          <div className={contentWrapperClassName}>
-            {errorBanner}
+        <AnimatePresence mode="wait" initial={false}>
+          {context ? (
+            <m.div
+              key="script-workspace"
+              className={contentWrapperClassName}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={fadeSlideYVariants}
+            >
+              {errorBanner}
 
-            <div className="flex flex-col gap-3 flex-1 min-h-0 min-w-0">
-              <div className="flex-1 min-h-0 min-w-0">
-                {previewSection}
+              <div className="flex flex-col gap-3 flex-1 min-h-0 min-w-0">
+                <div className="flex-1 min-h-0 min-w-0">
+                  {previewSection}
+                </div>
               </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 flex items-center justify-center px-6 py-10">
+            </m.div>
+          ) : (
+            <m.div
+              key={showInitialGeneration ? 'initial-generation-state' : 'start-screen-state'}
+              className="flex-1 flex items-center justify-center px-6 py-10"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={fadeSlideYVariants}
+            >
               <div className="w-full max-w-2xl space-y-6">
                 {errorBanner}
-                {showInitialGeneration ? startGenerationCard : showStartScreen ? startScreenCard : null}
+                <AnimatePresence mode="wait" initial={false}>
+                  {showInitialGeneration ? (
+                    <React.Fragment key="start-generation-card">
+                      {startGenerationCard}
+                    </React.Fragment>
+                  ) : showStartScreen ? (
+                    <React.Fragment key="start-screen-card">
+                      {startScreenCard}
+                    </React.Fragment>
+                  ) : null}
+                </AnimatePresence>
               </div>
-            </div>
-          </>
-        )}
+            </m.div>
+          )}
+        </AnimatePresence>
       </div>
-      {showPlaybackMiniPlayer && playbackProps && (
-        <PlaybackMiniPlayer
-          isPlaying={playbackProps.isPlaying}
-          isPaused={playbackProps.isPaused}
-          currentBlockIndex={playbackProps.currentBlockIndex}
-          totalCount={playbackProps.totalCount}
-          currentSpeaker={playbackProps.currentSpeaker}
-          onPlay={playbackProps.onPlay}
-          onPause={playbackProps.onPause}
-          onResume={playbackProps.onResume}
-          onStop={playbackProps.onStop}
-          onPrev={playbackProps.onPrev}
-          onNext={playbackProps.onNext}
-          onOpenAudioDrawer={() => {
-            setIsOutlineOpen(false);
-            setIsAudioDrawerOpen(true);
-          }}
-        />
-      )}
-      {outlineDrawer}
-      {context && isAudioDrawerOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[96] bg-black/55 backdrop-blur-[2px]"
-            onClick={() => {
-              setIsAudioDrawerOpen(false);
-              focusScriptScroll();
-            }}
-            aria-hidden="true"
-          />
-          <aside
-            role="dialog"
-            aria-label="Audio drawer"
-            data-testid="audio-drawer"
-            className="fixed inset-y-0 right-0 z-[97] flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
+      <AnimatePresence initial={false}>
+        {showPlaybackMiniPlayer && playbackProps ? (
+          <m.div
+            key="playback-mini-player"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={fadeSlideYVariants}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-gray-800 px-3.5 py-3 sm:px-4">
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Audio</p>
-                <h2 className="text-base font-semibold text-white">Playback and Voice Utility</h2>
-                <p className="text-[11px] text-gray-400">Assign voices, control playback, and tune follow-along behavior.</p>
+            <PlaybackMiniPlayer
+              isPlaying={playbackProps.isPlaying}
+              isPaused={playbackProps.isPaused}
+              currentBlockIndex={playbackProps.currentBlockIndex}
+              totalCount={playbackProps.totalCount}
+              currentSpeaker={playbackProps.currentSpeaker}
+              onPlay={playbackProps.onPlay}
+              onPause={playbackProps.onPause}
+              onResume={playbackProps.onResume}
+              onStop={playbackProps.onStop}
+              onPrev={playbackProps.onPrev}
+              onNext={playbackProps.onNext}
+              onOpenAudioDrawer={() => {
+                setIsOutlineOpen(false);
+                setIsAudioDrawerOpen(true);
+              }}
+            />
+          </m.div>
+        ) : null}
+      </AnimatePresence>
+      {outlineDrawer}
+      <AnimatePresence initial={false}>
+        {context && isAudioDrawerOpen ? (
+          <>
+            <m.div
+              key="audio-drawer-backdrop"
+              className="fixed inset-0 z-[96] bg-black/55 backdrop-blur-[2px]"
+              onClick={() => {
+                setIsAudioDrawerOpen(false);
+                focusScriptScroll();
+              }}
+              aria-hidden="true"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={overlayVariants}
+            />
+            <m.aside
+              key="audio-drawer-panel"
+              role="dialog"
+              aria-label="Audio drawer"
+              data-testid="audio-drawer"
+              className="fixed inset-y-0 right-0 z-[97] flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={drawerRightVariants}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-gray-800 px-3.5 py-3 sm:px-4">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Audio</p>
+                  <h2 className="text-base font-semibold text-white">Playback and Voice Utility</h2>
+                  <p className="text-[11px] text-gray-400">Assign voices, control playback, and tune follow-along behavior.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAudioDrawerOpen(false);
+                    focusScriptScroll();
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                  aria-label="Close audio drawer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAudioDrawerOpen(false);
-                  focusScriptScroll();
-                }}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-                aria-label="Close audio drawer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">
-              <div className="space-y-3">
-                <section>
-                  {playbackContent}
-                </section>
-                <section className="rounded-xl border border-gray-800/80 bg-gray-950/20 px-3 py-2.5">
-                  {voicesContent ?? <p className="text-[11px] text-gray-500">Voice controls unavailable.</p>}
-                </section>
+              <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">
+                <div className="space-y-3">
+                  <section>
+                    {playbackContent}
+                  </section>
+                  <section className="rounded-xl border border-gray-800/80 bg-gray-950/20 px-3 py-2.5">
+                    {voicesContent ?? <p className="text-[11px] text-gray-500">Voice controls unavailable.</p>}
+                  </section>
+                </div>
               </div>
-            </div>
-          </aside>
-        </>
-      )}
+            </m.aside>
+          </>
+        ) : null}
+      </AnimatePresence>
       <TitleEditModal
         isOpen={isTitleModalOpen}
         value={titleDraft}

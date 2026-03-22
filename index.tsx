@@ -3,6 +3,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { AppMotionProvider } from "./components/motion/AppMotionProvider";
 import "./index.css";
 
 if (import.meta.env.DEV) {
@@ -22,6 +23,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <AppMotionProvider>
+      <App />
+    </AppMotionProvider>
   </React.StrictMode>,
 );

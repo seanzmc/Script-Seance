@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import * as m from 'motion/react-m';
 import { Search, X } from 'lucide-react';
 import { STYLE_CATEGORIES, StyleItem, stylesLibrary } from '../stylesLibrary';
+import { modalVariants, overlayVariants } from './motion/primitives';
 
 export interface StyleLibraryDialogProps {
   isOpen: boolean;
@@ -117,100 +120,110 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto px-4 py-4 sm:py-6">
-      <div
-        className="absolute inset-0 bg-black/72"
-        onClick={onClose}
-      />
-      <div
-        ref={modalRef}
-        className="relative w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl border border-white/12 bg-slate-950 shadow-[0_26px_70px_rgba(2,6,23,0.72)] sm:max-h-[88vh]"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-100/60">Style</p>
-            <h2 className="text-base font-semibold text-white">{title}</h2>
-            <p className="text-sm text-slate-300">{subtitle}</p>
-          </div>
-          <button
-            type="button"
+    <AnimatePresence initial={false}>
+      {isOpen ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto px-4 py-4 sm:py-6">
+          <m.div
+            className="absolute inset-0 bg-black/72"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
-            aria-label="Close style library"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={overlayVariants}
+          />
+          <m.div
+            ref={modalRef}
+            className="relative w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl border border-white/12 bg-slate-950 shadow-[0_26px_70px_rgba(2,6,23,0.72)] sm:max-h-[88vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={modalVariants}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-3 p-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              ref={searchInputRef}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="h-11 w-full rounded-xl border border-white/10 bg-slate-900 px-10 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              placeholder="Search styles..."
-              aria-label="Search styles"
-              disabled={disabled}
-            />
-          </div>
-          <div className="max-h-[58vh] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/80">
-            <div className="p-2">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-100/60">Style</p>
+                <h2 className="text-base font-semibold text-white">{title}</h2>
+                <p className="text-sm text-slate-300">{subtitle}</p>
+              </div>
               <button
                 type="button"
-                onClick={() => onSelect({ styleId: null, style: '' })}
-                disabled={disabled}
-                aria-pressed={isStyleBlank}
-                className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                  isStyleBlank
-                    ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
-                    : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
-                }`}
+                onClick={onClose}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+                aria-label="Close style library"
               >
-                None (default style)
+                <X className="h-4 w-4" />
               </button>
             </div>
-            {groupedFilteredStyles.length > 0 ? groupedFilteredStyles.map((group) => (
-              <div key={group.id} className="border-t border-white/10 px-2 py-2 space-y-1.5">
-                <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-100/55">
-                  {group.label}
-                </p>
-                {group.items.map((item) => {
-                  const isSelected = selectedLibraryStyle?.id === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      ref={(node) => {
-                        rowRefs.current[item.id] = node;
-                      }}
-                      type="button"
-                      onClick={() => onSelect({ styleId: item.id, style: item.title })}
-                      disabled={disabled}
-                      aria-pressed={isSelected}
-                      className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                        isSelected
-                          ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
-                          : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      <p className="text-sm font-semibold">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-slate-300">{item.description}</p>
-                    </button>
-                  );
-                })}
+            <div className="space-y-3 p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  ref={searchInputRef}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-white/10 bg-slate-900 px-10 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  placeholder="Search styles..."
+                  aria-label="Search styles"
+                  disabled={disabled}
+                />
               </div>
-            )) : (
-              <p className="px-4 py-4 text-sm text-slate-300">No styles match your search.</p>
-            )}
-          </div>
+              <div className="max-h-[58vh] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/80">
+                <div className="p-2">
+                  <button
+                    type="button"
+                    onClick={() => onSelect({ styleId: null, style: '' })}
+                    disabled={disabled}
+                    aria-pressed={isStyleBlank}
+                    className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                      isStyleBlank
+                        ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
+                        : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    None (default style)
+                  </button>
+                </div>
+                {groupedFilteredStyles.length > 0 ? groupedFilteredStyles.map((group) => (
+                  <div key={group.id} className="border-t border-white/10 px-2 py-2 space-y-1.5">
+                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-100/55">
+                      {group.label}
+                    </p>
+                    {group.items.map((item) => {
+                      const isSelected = selectedLibraryStyle?.id === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          ref={(node) => {
+                            rowRefs.current[item.id] = node;
+                          }}
+                          type="button"
+                          onClick={() => onSelect({ styleId: item.id, style: item.title })}
+                          disabled={disabled}
+                          aria-pressed={isSelected}
+                          className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                            isSelected
+                              ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
+                              : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <p className="text-sm font-semibold">{item.title}</p>
+                          <p className="mt-0.5 text-xs text-slate-300">{item.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )) : (
+                  <p className="px-4 py-4 text-sm text-slate-300">No styles match your search.</p>
+                )}
+              </div>
+            </div>
+          </m.div>
         </div>
-      </div>
-    </div>
+      ) : null}
+    </AnimatePresence>
   );
 };

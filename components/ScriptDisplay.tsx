@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
 import {
   BlockType,
   INSERT_BOTTOM_ID,
@@ -923,114 +924,130 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
       >
         {renderedScenes}
       </div>
-      {!isInsertMode && !activeInsertAnchor && selectedTarget && selectedAnchorElement && (
-        <AnchoredPopover
-          open
-          anchor={selectedAnchorElement}
-          className="script-export-chrome"
-          preferredPlacement="bottom"
-          offset={18}
-          topBoundary={rootElement}
-        >
-          <div
-            data-selected-actions="true"
-            data-testid={selectedTarget.kind === 'block' ? `selected-block-actions-${selectedTarget.blockId}` : `selected-heading-actions-${selectedTarget.sceneId}`}
-            className="flex items-center gap-1.5 rounded-full border border-[#cdbc9f] bg-[#fbf7ef] px-2.5 py-1.5 shadow-[0_18px_36px_rgba(15,23,42,0.22)] ring-1 ring-[#e8dcc9]"
+      <AnimatePresence initial={false}>
+        {!isInsertMode && !activeInsertAnchor && selectedTarget && selectedAnchorElement ? (
+          <AnchoredPopover
+            key={selectedTarget.kind === 'block' ? `selected-block-${selectedTarget.blockId}` : `selected-heading-${selectedTarget.sceneId}`}
+            open
+            anchor={selectedAnchorElement}
+            className="script-export-chrome"
+            preferredPlacement="bottom"
+            offset={18}
+            topBoundary={rootElement}
           >
-            {selectedTarget.kind === 'block' ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedScene || !selectedBlock || selectedBlockRewriteDisabled) return;
-                    onRewriteBlock?.({ sceneId: selectedScene.id, blockId: selectedBlock.id });
-                  }}
-                  disabled={selectedBlockRewriteDisabled}
-                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition-colors hover:bg-indigo-100 disabled:text-gray-400"
-                  aria-label="Rewrite selected block"
-                >
-                  Rewrite
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenInsertFromSelection?.(selectedTarget)}
-                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition-colors hover:bg-emerald-100"
-                  aria-label="Insert near selected block"
-                >
-                  Insert
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedScene || !selectedBlock || selectedBlockDeleteDisabled) return;
-                    onDeleteBlock?.({ sceneId: selectedScene.id, blockId: selectedBlock.id });
-                  }}
-                  disabled={selectedBlockDeleteDisabled}
-                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-100 disabled:text-gray-400"
-                  aria-label="Delete selected block"
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedScene) return;
-                    onEditSceneHeading?.(selectedScene.id, selectedScene.heading);
-                  }}
-                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition-colors hover:bg-indigo-100"
-                  aria-label="Edit selected scene heading"
-                >
-                  Edit Heading
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenInsertFromSelection?.(selectedTarget)}
-                  className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition-colors hover:bg-emerald-100"
-                  aria-label="Insert after scene heading"
-                >
-                  Insert After
-                </button>
-              </>
-            )}
-          </div>
-        </AnchoredPopover>
-      )}
-      {!isInsertMode && Boolean(insertComposer && insertAnchorElement) && (
-        <AnchoredPopover
-          open
-          anchor={insertAnchorElement}
-          className="script-export-chrome"
-          preferredPlacement="bottom"
-          topBoundary={rootElement}
-        >
-          {insertComposer}
-        </AnchoredPopover>
-      )}
-      {!isInsertMode && Boolean(rewriteComposer && rewriteAnchorElement) && (
-        <AnchoredPopover
-          open
-          anchor={rewriteAnchorElement}
-          className="script-export-chrome"
-          preferredPlacement="bottom"
-          topBoundary={rootElement}
-        >
-          {rewriteComposer}
-        </AnchoredPopover>
-      )}
-      {!isInsertMode && Boolean(headingEditor && headingEditorAnchorElement) && (
-        <AnchoredPopover
-          open
-          anchor={headingEditorAnchorElement}
-          className="script-export-chrome"
-          preferredPlacement="bottom"
-          topBoundary={rootElement}
-        >
-          {headingEditor}
-        </AnchoredPopover>
-      )}
+            <div
+              data-selected-actions="true"
+              data-testid={selectedTarget.kind === 'block' ? `selected-block-actions-${selectedTarget.blockId}` : `selected-heading-actions-${selectedTarget.sceneId}`}
+              className="flex items-center gap-1.5 rounded-full border border-[#cdbc9f] bg-[#fbf7ef] px-2.5 py-1.5 shadow-[0_18px_36px_rgba(15,23,42,0.22)] ring-1 ring-[#e8dcc9]"
+            >
+              {selectedTarget.kind === 'block' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedScene || !selectedBlock || selectedBlockRewriteDisabled) return;
+                      onRewriteBlock?.({ sceneId: selectedScene.id, blockId: selectedBlock.id });
+                    }}
+                    disabled={selectedBlockRewriteDisabled}
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition-colors hover:bg-indigo-100 disabled:text-gray-400"
+                    aria-label="Rewrite selected block"
+                  >
+                    Rewrite
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenInsertFromSelection?.(selectedTarget)}
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition-colors hover:bg-emerald-100"
+                    aria-label="Insert near selected block"
+                  >
+                    Insert
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedScene || !selectedBlock || selectedBlockDeleteDisabled) return;
+                      onDeleteBlock?.({ sceneId: selectedScene.id, blockId: selectedBlock.id });
+                    }}
+                    disabled={selectedBlockDeleteDisabled}
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-100 disabled:text-gray-400"
+                    aria-label="Delete selected block"
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedScene) return;
+                      onEditSceneHeading?.(selectedScene.id, selectedScene.heading);
+                    }}
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition-colors hover:bg-indigo-100"
+                    aria-label="Edit selected scene heading"
+                  >
+                    Edit Heading
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenInsertFromSelection?.(selectedTarget)}
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition-colors hover:bg-emerald-100"
+                    aria-label="Insert after scene heading"
+                  >
+                    Insert After
+                  </button>
+                </>
+              )}
+            </div>
+          </AnchoredPopover>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence initial={false}>
+        {!isInsertMode && Boolean(insertComposer && insertAnchorElement) ? (
+          <AnchoredPopover
+            key={
+              activeInsertAnchor?.kind === 'block'
+                ? `insert-composer-block-${activeInsertAnchor.blockId}`
+                : `insert-composer-scene-${activeInsertAnchor?.sceneId ?? 'none'}`
+            }
+            open
+            anchor={insertAnchorElement}
+            className="script-export-chrome"
+            preferredPlacement="bottom"
+            topBoundary={rootElement}
+          >
+            {insertComposer}
+          </AnchoredPopover>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence initial={false}>
+        {!isInsertMode && Boolean(rewriteComposer && rewriteAnchorElement) ? (
+          <AnchoredPopover
+            key={`rewrite-composer-${activeRewriteBlockId ?? 'none'}`}
+            open
+            anchor={rewriteAnchorElement}
+            className="script-export-chrome"
+            preferredPlacement="bottom"
+            topBoundary={rootElement}
+          >
+            {rewriteComposer}
+          </AnchoredPopover>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence initial={false}>
+        {!isInsertMode && Boolean(headingEditor && headingEditorAnchorElement) ? (
+          <AnchoredPopover
+            key={`heading-editor-${activeHeadingSceneId ?? 'none'}`}
+            open
+            anchor={headingEditorAnchorElement}
+            className="script-export-chrome"
+            preferredPlacement="bottom"
+            topBoundary={rootElement}
+          >
+            {headingEditor}
+          </AnchoredPopover>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

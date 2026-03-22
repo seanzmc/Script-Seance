@@ -5,10 +5,18 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { AnimatePresence } from "motion/react";
+import * as m from "motion/react-m";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
+import {
+  fadeSlideYVariants,
+  modalVariants,
+  overlayVariants,
+  stageShellVariants,
+} from "./motion/primitives";
 
 export type VoicePreference = "male" | "female" | "random";
 
@@ -1306,14 +1314,19 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
       {!isSummaryOnly && (
         <>
-          <div className="mx-auto flex w-full max-w-[58rem] flex-col gap-2.5">
+          <m.div
+            className="mx-auto flex w-full max-w-[58rem] flex-col gap-2.5"
+            layout="position"
+          >
             {!isGenreStage && (
-              <div
+              <m.div
+                layout="position"
                 className={`grid gap-2.5 transition-[transform,opacity] duration-[260ms] ease-out ${
                   isDetailsStage ? "md:grid-cols-2" : "max-w-md"
                 }`}
               >
-                <div
+                <m.div
+                  layout="position"
                   className={`${summaryCardClass} ${styleCardMotionClass}`}
                   data-testid="setup-genre-summary"
                 >
@@ -1344,267 +1357,292 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </button>
                     )}
                   </div>
-                </div>
+                </m.div>
 
-                {isDetailsStage && (
-                  <div
-                    className={`group ${summaryCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
-                    aria-live="polite"
-                    data-testid="setup-style-summary"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className={`${setupSectionLabelClass} text-slate-400`}>
-                          Selected style
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold text-slate-100">
-                            {styleSummaryLabel}
+                <AnimatePresence initial={false}>
+                  {isDetailsStage ? (
+                    <m.div
+                      key="setup-style-summary-card"
+                      layout="position"
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      variants={fadeSlideYVariants}
+                      className={`group ${summaryCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
+                      aria-live="polite"
+                      data-testid="setup-style-summary"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className={`${setupSectionLabelClass} text-slate-400`}>
+                            Selected style
                           </p>
-                          {selectedStyleCategoryLabel && (
-                            <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
-                              {selectedStyleCategoryLabel}
-                            </span>
-                          )}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-slate-100">
+                              {styleSummaryLabel}
+                            </p>
+                            {selectedStyleCategoryLabel && (
+                              <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
+                                {selectedStyleCategoryLabel}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        {!isStyleBlank && (
+                          <button
+                            type="button"
+                            onClick={handleClearStyle}
+                            disabled={isLocked}
+                            aria-label="Clear selected style"
+                            className={`${compactActionButtonClass} ${
+                              isLocked
+                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                                : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                            }`}
+                            title="Clear selected style"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
-                      {!isStyleBlank && (
+                      <div className={`${isDetailsStage ? "mt-2" : "mt-2.5"} flex flex-wrap gap-2`}>
                         <button
                           type="button"
-                          onClick={handleClearStyle}
-                          disabled={isLocked}
-                          aria-label="Clear selected style"
+                          onClick={handleStyleShuffle}
+                          disabled={isLocked || stylesLibrary.length === 0}
                           className={`${compactActionButtonClass} ${
-                            isLocked
-                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                              : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                            isLocked || stylesLibrary.length === 0
+                              ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
+                              : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
                           }`}
-                          title="Clear selected style"
                         >
-                          Clear
+                          Shuffle
                         </button>
-                      )}
-                    </div>
-                    {!isDetailsStage && (
-                      <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
-                        {styleSummaryDescription}
-                      </p>
-                    )}
-                    <div className={`${isDetailsStage ? "mt-2" : "mt-2.5"} flex flex-wrap gap-2`}>
+                        <button
+                          type="button"
+                          onClick={openStyleLibrary}
+                          disabled={isLocked}
+                          className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
+                            isLocked
+                              ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
+                              : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                          }`}
+                          aria-haspopup="dialog"
+                          aria-expanded={isStyleLibraryOpen}
+                        >
+                          <Search className="h-3 w-3" />
+                          Browse
+                        </button>
+                      </div>
+                    </m.div>
+                  ) : null}
+                </AnimatePresence>
+              </m.div>
+            )}
+            <AnimatePresence mode="wait" initial={false}>
+              {isGenreStage ? (
+                <m.div
+                  key="setup-stage-genre"
+                  layout="position"
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={stageShellVariants}
+                  className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
+                >
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_auto] lg:items-center">
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <p className={setupSectionLabelClass}>Step 1</p>
+                        <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
+                          Start with a genre
+                        </h3>
+                        <p className={setupBodyMutedTextClass}>
+                          Keep one decision in front of you. Click to step
+                          forward, or hold and drag vertically for a slot-style
+                          scrub.
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={handleStyleShuffle}
-                        disabled={isLocked || stylesLibrary.length === 0}
-                        className={`${compactActionButtonClass} ${
-                          isLocked || stylesLibrary.length === 0
-                            ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                            : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
-                        }`}
-                      >
-                        Shuffle
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openStyleLibrary}
+                        onClick={handleGenreAdvance}
                         disabled={isLocked}
-                        className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
+                        data-testid="setup-continue-to-style"
+                        className={`${setupActionButtonBaseClass} ${focusRingClass} max-w-xs ${
                           isLocked
-                            ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                            : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                            ? "cursor-not-allowed bg-indigo-500/12 text-slate-400 opacity-60"
+                            : "bg-indigo-600 text-white ring-1 ring-indigo-400/50 shadow-[0_12px_24px_-8px_rgba(99,102,241,0.55)] hover:bg-indigo-500"
                         }`}
-                        aria-haspopup="dialog"
-                        aria-expanded={isStyleLibraryOpen}
                       >
-                        <Search className="h-3 w-3" />
-                        Browse
+                        Continue to Style
                       </button>
+                    </div>
+                    <div className="flex justify-start lg:justify-end">
+                      <GenreCycleWheel
+                        value={genre}
+                        disabled={isLocked}
+                        prefersReducedMotion={prefersReducedMotion}
+                        focusRingClass={focusRingClass}
+                        onChange={handleGenreChange}
+                      />
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                </m.div>
+              ) : null}
 
-            {isGenreStage && (
-              <div className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}>
-                <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_auto] lg:items-center">
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <p className={setupSectionLabelClass}>Step 1</p>
-                      <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
-                        Start with a genre
+              {isStyleStage ? (
+                <m.div
+                  key="setup-stage-style"
+                  layout="position"
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={stageShellVariants}
+                  className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
+                >
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <p className={setupSectionLabelClass}>Step 2</p>
+                      <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                        Shape the tone
                       </h3>
                       <p className={setupBodyMutedTextClass}>
-                        Keep one decision in front of you. Click to step
-                        forward, or hold and drag vertically for a slot-style
-                        scrub.
+                        Style stays optional. Pick a vibe if it helps, then move
+                        straight into premise and cast.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleGenreAdvance}
-                      disabled={isLocked}
-                      data-testid="setup-continue-to-style"
-                      className={`${setupActionButtonBaseClass} ${focusRingClass} max-w-xs ${
-                        isLocked
-                          ? "cursor-not-allowed bg-indigo-500/12 text-slate-400 opacity-60"
-                          : "bg-indigo-600 text-white ring-1 ring-indigo-400/50 shadow-[0_12px_24px_-8px_rgba(99,102,241,0.55)] hover:bg-indigo-500"
-                      }`}
+                    <div
+                      className={`group rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 ${styleCardMotionClass} ${styleCardPulseClass}`}
+                      aria-live="polite"
                     >
-                      Continue to Style
-                    </button>
-                  </div>
-                  <div className="flex justify-start lg:justify-end">
-                    <GenreCycleWheel
-                      value={genre}
-                      disabled={isLocked}
-                      prefersReducedMotion={prefersReducedMotion}
-                      focusRingClass={focusRingClass}
-                      onChange={handleGenreChange}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isStyleStage && (
-              <div className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}>
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <p className={setupSectionLabelClass}>Step 2</p>
-                    <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-                      Shape the tone
-                    </h3>
-                    <p className={setupBodyMutedTextClass}>
-                      Style stays optional. Pick a vibe if it helps, then move
-                      straight into premise and cast.
-                    </p>
-                  </div>
-                  <div
-                    className={`group rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 ${styleCardMotionClass} ${styleCardPulseClass}`}
-                    aria-live="polite"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className={`${setupSectionLabelClass} text-slate-400`}>
-                          Selected style
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                          <p className="text-xl font-semibold leading-tight text-slate-100">
-                            {styleSummaryLabel}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className={`${setupSectionLabelClass} text-slate-400`}>
+                            Selected style
                           </p>
-                          {selectedStyleCategoryLabel && (
-                            <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/12">
-                              {selectedStyleCategoryLabel}
-                            </span>
-                          )}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <p className="text-xl font-semibold leading-tight text-slate-100">
+                              {styleSummaryLabel}
+                            </p>
+                            {selectedStyleCategoryLabel && (
+                              <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/12">
+                                {selectedStyleCategoryLabel}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        {!isStyleBlank && (
+                          <button
+                            type="button"
+                            onClick={handleClearStyle}
+                            disabled={isLocked}
+                            aria-label="Clear selected style"
+                            className={`rounded-md px-1.5 py-0.5 text-xs sm:text-sm font-medium text-slate-300 hover:text-indigo-100 hover:underline hover:bg-indigo-500/15 ${interactiveControlClass} ${
+                              canHover
+                                ? "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+                                : "opacity-100"
+                            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                            title="Clear selected style"
+                          >
+                            × Clear
+                          </button>
+                        )}
                       </div>
-                      {!isStyleBlank && (
+
+                      {selectedLibraryStyle ? (
+                        <div className="mt-2.5 grid gap-3 lg:grid-cols-[minmax(0,0.94fr)_minmax(12.5rem,0.66fr)]">
+                          <p className={`${setupBodyTextClass} leading-relaxed`}>
+                            {selectedLibraryStyle.description}
+                          </p>
+                          <div className="rounded-[18px] border border-white/10 bg-slate-950/55 px-3 py-2.5">
+                            <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+                              Sample line
+                            </p>
+                            <p className="mt-2 text-sm leading-relaxed text-slate-200">
+                              {selectedLibraryStyle.sampleLine}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className={`${setupBodyTextClass} mt-2.5`}>
+                          {styleSummaryDescription}
+                        </p>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={handleClearStyle}
-                          disabled={isLocked}
-                          aria-label="Clear selected style"
-                          className={`rounded-md px-1.5 py-0.5 text-xs sm:text-sm font-medium text-slate-300 hover:text-indigo-100 hover:underline hover:bg-indigo-500/15 ${interactiveControlClass} ${
-                            canHover
-                              ? "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
-                              : "opacity-100"
-                          } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                          title="Clear selected style"
+                          onClick={handleStyleShuffle}
+                          disabled={isLocked || stylesLibrary.length === 0}
+                          className={`shrink-0 ${styleActionButtonBaseClass} ${
+                            isLocked || stylesLibrary.length === 0
+                              ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
+                              : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
+                          }`}
                         >
-                          × Clear
+                          Shuffle
                         </button>
-                      )}
-                    </div>
-
-                    {selectedLibraryStyle ? (
-                      <div className="mt-2.5 grid gap-3 lg:grid-cols-[minmax(0,0.94fr)_minmax(12.5rem,0.66fr)]">
-                        <p className={`${setupBodyTextClass} leading-relaxed`}>
-                          {selectedLibraryStyle.description}
-                        </p>
-                        <div className="rounded-[18px] border border-white/10 bg-slate-950/55 px-3 py-2.5">
-                          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
-                            Sample line
-                          </p>
-                          <p className="mt-2 text-sm leading-relaxed text-slate-200">
-                            {selectedLibraryStyle.sampleLine}
-                          </p>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={openStyleLibrary}
+                          disabled={isLocked}
+                          className={`inline-flex items-center gap-1.5 ${styleActionButtonBaseClass} ${
+                            isLocked
+                              ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
+                              : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
+                          }`}
+                          aria-haspopup="dialog"
+                          aria-expanded={isStyleLibraryOpen}
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                          Browse
+                        </button>
                       </div>
-                    ) : (
-                      <p className={`${setupBodyTextClass} mt-2.5`}>
-                        {styleSummaryDescription}
-                      </p>
-                    )}
+                    </div>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <button
                         type="button"
-                        onClick={handleStyleShuffle}
-                        disabled={isLocked || stylesLibrary.length === 0}
-                        className={`shrink-0 ${styleActionButtonBaseClass} ${
-                          isLocked || stylesLibrary.length === 0
-                            ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
-                            : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
-                        }`}
+                        onClick={() => {
+                          void handleGenerateSurpriseSetup("manual");
+                        }}
+                        disabled={isLoading || isSurprising || isLocked}
+                        aria-busy={isSurprising || undefined}
+                        aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
+                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 disabled:opacity-50 disabled:pointer-events-none`}
                       >
-                        Shuffle
+                        {isSurprising ? (
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : null}
+                        Generate AI Premise
                       </button>
                       <button
                         type="button"
-                        onClick={openStyleLibrary}
+                        onClick={showManualDetails}
                         disabled={isLocked}
-                        className={`inline-flex items-center gap-1.5 ${styleActionButtonBaseClass} ${
-                          isLocked
-                            ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
-                            : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
-                        }`}
-                        aria-haspopup="dialog"
-                        aria-expanded={isStyleLibraryOpen}
+                        aria-disabled={isLocked || undefined}
+                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none`}
                       >
-                        <Search className="h-3.5 w-3.5" />
-                        Browse
+                        Write My Own Premise
                       </button>
                     </div>
                   </div>
+                </m.div>
+              ) : null}
 
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleGenerateSurpriseSetup("manual");
-                      }}
-                      disabled={isLoading || isSurprising || isLocked}
-                      aria-busy={isSurprising || undefined}
-                      aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
-                      className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 disabled:opacity-50 disabled:pointer-events-none`}
-                    >
-                      {isSurprising ? (
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      ) : null}
-                      Generate AI Premise
-                    </button>
-                    <button
-                      type="button"
-                      onClick={showManualDetails}
-                      disabled={isLocked}
-                      aria-disabled={isLocked || undefined}
-                      className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none`}
-                    >
-                      Write My Own Premise
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showDetails && (
-              <div
-                className={`${stageShellClass} space-y-3.5 px-5 py-4 sm:px-6 sm:py-4`}
-              >
+              {showDetails ? (
+                <m.div
+                  key="setup-stage-details"
+                  layout="position"
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={stageShellVariants}
+                  className={`${stageShellClass} space-y-3.5 px-5 py-4 sm:px-6 sm:py-4`}
+                >
                 <div className="space-y-1.5">
                   <p className={setupSectionLabelClass}>Step 3</p>
                   <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
@@ -1615,7 +1653,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(17.25rem,0.8fr)] md:items-stretch">
+                <m.div
+                  layout="position"
+                  className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(17.25rem,0.8fr)] md:items-stretch"
+                >
                   <div
                     className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-3.5 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.9)]`}
                     data-testid="setup-premise-panel"
@@ -1738,7 +1779,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </div>
                     </div>
                   </div>
-                </div>
+                </m.div>
 
                 <div className="border-t border-white/8 pt-3">
                   <div className="flex flex-wrap items-start justify-between gap-2.5 text-sm text-slate-400 sm:items-center">
@@ -1780,127 +1821,138 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     </Button>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
+                </m.div>
+              ) : null}
+            </AnimatePresence>
+          </m.div>
 
-          {isStyleLibraryOpen && (
-            <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
-              <div
-                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                onClick={() => setIsStyleLibraryOpen(false)}
-              />
-              <div
-                ref={styleLibraryModalRef}
-                className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Style Library"
-              >
-                <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
-                      Style
-                    </p>
-                    <h2 className="text-sm font-semibold text-indigo-100">
-                      Style Library
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsStyleLibraryOpen(false)}
-                    className={`rounded-lg p-1.5 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 ${interactiveControlClass}`}
-                    aria-label="Close style library"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="space-y-3 p-4">
-                  <input
-                    ref={styleLibrarySearchInputRef}
-                    value={styleSearch}
-                    onChange={(event) => setStyleSearch(event.target.value)}
-                    className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-[box-shadow,opacity] duration-[220ms] ease-in-out"
-                    placeholder="Search styles..."
-                    aria-label="Search styles"
-                    disabled={isLocked}
-                  />
-                  <div className="max-h-[58vh] overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
-                    <div className="p-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSelectStyleFromLibrary({
-                            styleId: null,
-                            style: "",
-                          })
-                        }
-                        disabled={isLocked}
-                        aria-pressed={isStyleBlank}
-                        className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
-                          isStyleBlank
-                            ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                            : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
-                        } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                        title="Use no style"
-                      >
-                        None (no style)
-                      </button>
-                    </div>
-                    {groupedFilteredStyles.length > 0 ? (
-                      groupedFilteredStyles.map((group) => (
-                        <div
-                          key={group.id}
-                          className="border-t border-white/10 px-2 py-2 space-y-1.5"
-                        >
-                          <p className="px-2 text-[10px] uppercase tracking-[0.26em] text-indigo-100/50">
-                            {group.label}
-                          </p>
-                          {group.items.map((item) => {
-                            const isSelected = selectedLibraryStyle?.id === item.id;
-                            return (
-                              <button
-                                key={item.id}
-                                ref={(element) => {
-                                  styleRowRefs.current[item.id] = element;
-                                }}
-                                type="button"
-                                onClick={() =>
-                                  handleSelectStyleFromLibrary({
-                                    styleId: item.id,
-                                    style: item.title,
-                                  })
-                                }
-                                disabled={isLocked}
-                                aria-pressed={isSelected}
-                                className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
-                                  isSelected
-                                    ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                                    : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
-                                } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                                title={`Use style: ${item.title}`}
-                              >
-                                <p className="text-xs font-semibold">
-                                  {item.title}
-                                </p>
-                                <p className="mt-0.5 text-[11px] text-indigo-100/75">
-                                  {item.description}
-                                </p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="px-4 py-4 text-xs text-slate-300">
-                        No styles match your search.
+          <AnimatePresence initial={false}>
+            {isStyleLibraryOpen ? (
+              <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+                <m.div
+                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                  onClick={() => setIsStyleLibraryOpen(false)}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={overlayVariants}
+                />
+                <m.div
+                  ref={styleLibraryModalRef}
+                  className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Style Library"
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={modalVariants}
+                >
+                  <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
+                        Style
                       </p>
-                    )}
+                      <h2 className="text-sm font-semibold text-indigo-100">
+                        Style Library
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsStyleLibraryOpen(false)}
+                      className={`rounded-lg p-1.5 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 ${interactiveControlClass}`}
+                      aria-label="Close style library"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                </div>
+                  <div className="space-y-3 p-4">
+                    <input
+                      ref={styleLibrarySearchInputRef}
+                      value={styleSearch}
+                      onChange={(event) => setStyleSearch(event.target.value)}
+                      className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-[box-shadow,opacity] duration-[220ms] ease-in-out"
+                      placeholder="Search styles..."
+                      aria-label="Search styles"
+                      disabled={isLocked}
+                    />
+                    <div className="max-h-[58vh] overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
+                      <div className="p-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSelectStyleFromLibrary({
+                              styleId: null,
+                              style: "",
+                            })
+                          }
+                          disabled={isLocked}
+                          aria-pressed={isStyleBlank}
+                          className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
+                            isStyleBlank
+                              ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
+                              : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
+                          } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                          title="Use no style"
+                        >
+                          None (no style)
+                        </button>
+                      </div>
+                      {groupedFilteredStyles.length > 0 ? (
+                        groupedFilteredStyles.map((group) => (
+                          <div
+                            key={group.id}
+                            className="border-t border-white/10 px-2 py-2 space-y-1.5"
+                          >
+                            <p className="px-2 text-[10px] uppercase tracking-[0.26em] text-indigo-100/50">
+                              {group.label}
+                            </p>
+                            {group.items.map((item) => {
+                              const isSelected = selectedLibraryStyle?.id === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  ref={(element) => {
+                                    styleRowRefs.current[item.id] = element;
+                                  }}
+                                  type="button"
+                                  onClick={() =>
+                                    handleSelectStyleFromLibrary({
+                                      styleId: item.id,
+                                      style: item.title,
+                                    })
+                                  }
+                                  disabled={isLocked}
+                                  aria-pressed={isSelected}
+                                  className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
+                                    isSelected
+                                      ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
+                                      : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
+                                  } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
+                                  title={`Use style: ${item.title}`}
+                                >
+                                  <p className="text-xs font-semibold">
+                                    {item.title}
+                                  </p>
+                                  <p className="mt-0.5 text-[11px] text-indigo-100/75">
+                                    {item.description}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="px-4 py-4 text-xs text-slate-300">
+                          No styles match your search.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </m.div>
               </div>
-            </div>
-          )}
+            ) : null}
+          </AnimatePresence>
         </>
       )}
     </div>

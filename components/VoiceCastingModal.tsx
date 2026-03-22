@@ -1,6 +1,13 @@
 import React, { useState, useMemo } from 'react';
+import { AnimatePresence } from 'motion/react';
+import * as m from 'motion/react-m';
 import { X, Play, Check, Mic, User, Pause, Info, ChevronLeft } from 'lucide-react';
 import { VoiceConfig, TtsVoice } from '../types';
+import {
+  fadeSlideYVariants,
+  modalVariants,
+  overlayVariants
+} from './motion/primitives';
 
 export interface VoiceCastingModalProps {
   isOpen: boolean;
@@ -178,8 +185,6 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
     ? 'grid grid-cols-1 min-[360px]:grid-cols-2 gap-2'
     : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2';
 
-  if (!isOpen) return null;
-
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -196,20 +201,30 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
     : 'relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200';
 
   return (
-    <div className={containerClassName}>
-      {!embedded && (
-        <div
-          className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
-          onClick={onClose}
-        />
-      )}
+    <AnimatePresence initial={false}>
+      {isOpen ? (
+        <div className={containerClassName}>
+          {!embedded && (
+            <m.div
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+              onClick={onClose}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={overlayVariants}
+            />
+          )}
 
-      <div
-        className={contentClassName}
-        role="dialog"
-        aria-modal={embedded ? undefined : true}
-        aria-label={`Cast voices for ${characterName}`}
-      >
+          <m.div
+            className={contentClassName}
+            role="dialog"
+            aria-modal={embedded ? undefined : true}
+            aria-label={`Cast voices for ${characterName}`}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={embedded ? fadeSlideYVariants : modalVariants}
+          >
         <div className={`flex items-center justify-between border-b border-gray-800 bg-gray-900/50 ${embedded ? 'px-3 py-1.5' : 'px-6 py-4'}`}>
           <div className="min-w-0 space-y-0.5">
             <div className="flex items-center gap-2">
@@ -450,14 +465,16 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
            )}
         </div>
 
-      </div>
+          </m.div>
 
-      <style>{`
-        @keyframes slide {
-          from { transform: translateX(-100%); }
-          to { transform: translateX(300%); }
-        }
-      `}</style>
-    </div>
+          <style>{`
+            @keyframes slide {
+              from { transform: translateX(-100%); }
+              to { transform: translateX(300%); }
+            }
+          `}</style>
+        </div>
+      ) : null}
+    </AnimatePresence>
   );
 };

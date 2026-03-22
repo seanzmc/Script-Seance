@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import * as m from 'motion/react-m';
 import { Lock, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
+import { modalVariants, overlayVariants } from './motion/primitives';
 
 export interface LoginModalProps {
   isOpen: boolean;
@@ -23,8 +26,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!password.trim()) return;
@@ -32,54 +33,68 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Admin login"
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
-            <Lock className="w-5 h-5 text-indigo-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">Admin Login</h2>
-            <p className="text-xs text-gray-400">Enter the password to unlock AI features.</p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-500/60 bg-red-900/30 text-red-200 px-3 py-2 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold tracking-widest text-gray-500">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-              placeholder="password"
-              autoFocus
-            />
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full"
-            loading={isLoading}
-            disabled={isLoading || !password.trim()}
+    <AnimatePresence initial={false}>
+      {isOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <m.div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={overlayVariants}
+          />
+          <m.div
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Admin login"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={modalVariants}
           >
-            Unlock AI
-          </Button>
-        </form>
-      </div>
-    </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                <Lock className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Admin Login</h2>
+                <p className="text-xs text-gray-400">Enter the password to unlock AI features.</p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-500/60 bg-red-900/30 text-red-200 px-3 py-2 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold tracking-widest text-gray-500">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                  placeholder="password"
+                  autoFocus
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                loading={isLoading}
+                disabled={isLoading || !password.trim()}
+              >
+                Unlock AI
+              </Button>
+            </form>
+          </m.div>
+        </div>
+      ) : null}
+    </AnimatePresence>
   );
 };
