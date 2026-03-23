@@ -1310,6 +1310,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const summaryLinkButtonClass = `inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] ${interactiveControlClass}`;
   const summaryStatusTextClass =
     "hidden text-[10px] uppercase tracking-[0.22em] text-slate-500 sm:inline";
+  const parkedRailClass = isDetailsStage
+    ? "grid gap-3 md:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]"
+    : "grid max-w-md gap-3";
+  const detailSectionSurfaceClass =
+    "flex h-full min-h-0 flex-col rounded-[20px] border border-white/8 bg-white/[0.028] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+  const detailsStageShellClass = `${stageShellClass} flex flex-col gap-3 overflow-hidden px-5 py-4 sm:px-6 sm:py-4 lg:max-h-[calc(100vh-23.5rem)]`;
   const genreSurfaceLayoutId = prefersReducedMotion
     ? undefined
     : "setup-genre-surface";
@@ -1414,12 +1420,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               className="flex w-full flex-col gap-3"
               layout="position"
             >
-              {!isGenreStage && !isDetailsStage && (
+              {!isGenreStage && (
                 <m.div
                   layout="position"
-                  className={`grid gap-3 transition-[transform,opacity] duration-[260ms] ease-out ${
-                    "max-w-md"
-                  }`}
+                  className={`${parkedRailClass} transition-[transform,opacity] duration-[260ms] ease-out`}
                 >
                   <m.div
                     layout
@@ -1509,7 +1513,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             </button>
                           )}
                         </div>
-                        <div className={`${isDetailsStage ? "mt-2" : "mt-2.5"} flex flex-wrap gap-2`}>
+                        <div className="mt-2 flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={handleStyleShuffle}
@@ -1758,7 +1762,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   animate="visible"
                   exit="exit"
                   variants={stageShellVariants}
-                  className={`${stageShellClass} flex flex-col gap-3 px-5 py-4 sm:px-6 sm:py-4 lg:max-h-[calc(100vh-26.5rem)]`}
+                  className={detailsStageShellClass}
                 >
                 <div className="space-y-1.5">
                   <p className={setupSectionLabelClass}>Step 3</p>
@@ -1770,116 +1774,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </p>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <m.div
-                    layout
-                    layoutId={genreSurfaceLayoutId}
-                    className={`${summaryCardClass} ${styleCardMotionClass}`}
-                    data-testid="setup-genre-summary"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className={`${setupSectionLabelClass} text-slate-400`}>
-                          Selected genre
-                        </p>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                          Opening lane locked in.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-end justify-between gap-3">
-                      <GenreCycleWheel
-                        value={genre}
-                        disabled={isLocked}
-                        compact
-                        prefersReducedMotion={prefersReducedMotion}
-                        focusRingClass={focusRingClass}
-                        onChange={handleGenreChange}
-                      />
-                      <span className={summaryStatusTextClass}>
-                        Step 1 complete
-                      </span>
-                    </div>
-                  </m.div>
-
-                  <m.div
-                    layout
-                    layoutId={styleSurfaceLayoutId}
-                    className={`group ${summaryCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
-                    aria-live="polite"
-                    data-testid="setup-style-summary"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className={`${setupSectionLabelClass} text-slate-400`}>
-                          Selected style
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold text-slate-100">
-                            {styleSummaryLabel}
-                          </p>
-                          {selectedStyleCategoryLabel && (
-                            <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
-                              {selectedStyleCategoryLabel}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {!isStyleBlank && (
-                        <button
-                          type="button"
-                          onClick={handleClearStyle}
-                          disabled={isLocked}
-                          aria-label="Clear selected style"
-                          className={`${compactActionButtonClass} ${
-                            isLocked
-                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                              : "bg-white/[0.035] text-slate-300 ring-white/10 hover:bg-white/[0.07] hover:text-white"
-                          }`}
-                          title="Clear selected style"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleStyleShuffle}
-                        disabled={isLocked || stylesLibrary.length === 0}
-                        className={`${compactActionButtonClass} ${
-                          isLocked || stylesLibrary.length === 0
-                            ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                            : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
-                        }`}
-                      >
-                        Shuffle
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openStyleLibrary}
-                        disabled={isLocked}
-                        className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
-                          isLocked
-                            ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                            : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
-                        }`}
-                        aria-haspopup="dialog"
-                        aria-expanded={isStyleLibraryOpen}
-                      >
-                        <Search className="h-3 w-3" />
-                        Browse
-                      </button>
-                    </div>
-                  </m.div>
-                </div>
-
                 <m.div
                   layout="position"
                   className="grid grid-cols-1 gap-3 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1.2fr)_minmax(17.25rem,0.8fr)] md:items-stretch"
                 >
                   <div
-                    className={`${detailPanelClass} flex h-full min-h-0 flex-col rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-3.5 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.9)]`}
+                    className={`${detailPanelClass} ${detailSectionSurfaceClass}`}
                     data-testid="setup-premise-panel"
                   >
                     <label className={setupSectionLabelClass}>
@@ -1917,7 +1817,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
 
                   <div
-                    className={`${detailPanelClass} flex h-full min-h-0 flex-col rounded-[22px] border border-white/10 bg-slate-950/42 px-4 py-3.5 shadow-[0_12px_30px_-34px_rgba(15,23,42,0.8)]`}
+                    className={`${detailPanelClass} ${detailSectionSurfaceClass}`}
                     data-testid="setup-characters-panel"
                   >
                     <div className="flex h-full flex-1 flex-col space-y-1.5">
@@ -2004,7 +1904,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
                 <div
                   ref={detailsFooterRef}
-                  className="border-t border-white/8 pt-3"
+                  className="mt-0.5 pt-1.5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2.5 text-sm text-slate-400 sm:items-center">
                     <LengthCycleWheel
@@ -2014,7 +1914,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       focusRingClass={focusRingClass}
                       onChange={(nextLength) => updateValue({ length: nextLength })}
                     />
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.025] px-3 py-1.5">
+                    <div className="flex items-baseline gap-2">
                       <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
                         Cast
                       </span>
