@@ -417,22 +417,30 @@ describe("SetupForm submit validation", () => {
     render(<GenreHarness />);
 
     const genreWheel = screen.getByTestId("setup-genre-wheel");
-    const genreValue = screen.getByTestId("setup-genre-value");
+    const readGenreValue = () => screen.getByTestId("setup-genre-value").textContent;
 
-    expect(genreValue.textContent).toBe("Noir");
+    expect(readGenreValue()).toBe("Noir");
 
     fireEvent.click(genreWheel);
-    expect(genreValue.textContent).toBe(nextGenre);
+    expect(readGenreValue()).toBe(nextGenre);
 
     fireEvent.keyDown(genreWheel, { key: "ArrowUp" });
-    expect(genreValue.textContent).toBe("Noir");
+    expect(readGenreValue()).toBe("Noir");
+
+    fireEvent.pointerDown(genreWheel, { pointerId: 1, clientY: 100 });
+    fireEvent.pointerMove(genreWheel, { pointerId: 1, clientY: 112 });
+    fireEvent.pointerUp(genreWheel, { pointerId: 1, clientY: 112 });
+
+    await waitFor(() => {
+      expect(readGenreValue()).toBe("Noir");
+    });
 
     fireEvent.pointerDown(genreWheel, { pointerId: 1, clientY: 100 });
     fireEvent.pointerMove(genreWheel, { pointerId: 1, clientY: 130 });
     fireEvent.pointerUp(genreWheel, { pointerId: 1, clientY: 130 });
 
     await waitFor(() => {
-      expect(genreValue.textContent).toBe(nextGenre);
+      expect(readGenreValue()).toBe(nextGenre);
     });
   });
 

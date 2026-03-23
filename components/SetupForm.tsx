@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { AnimatePresence, LayoutGroup } from "motion/react";
+import { AnimatePresence, LayoutGroup, animate, useMotionValue } from "motion/react";
 import * as m from "motion/react-m";
 import { GENRES } from "../types";
 import { Button } from "./Button";
@@ -136,6 +136,13 @@ type WheelPointerState = {
   carryY: number;
   moved: boolean;
 };
+type GenreWheelPointerState = {
+  pointerId: number | null;
+  startY: number;
+  lastY: number;
+  dragOffset: number;
+  moved: boolean;
+};
 
 const SCENE_LENGTH_VALUES: readonly SceneLengthValue[] = ["Short", "Medium", "Long"];
 
@@ -210,12 +217,26 @@ type LengthCycleWheelProps = {
 };
 
 const LENGTH_TICK_DURATION_MS = 240;
-const GENRE_TICK_DURATION_MS = 220;
 const WHEEL_DRAG_STEP_PX = 26;
-const GENRE_VALUE_TRANSITION = {
-  duration: 0.2,
-  ease: [0.16, 1, 0.3, 1] as const,
+const GENRE_WHEEL_STEP_SPRING = {
+  type: "spring" as const,
+  stiffness: 520,
+  damping: 42,
+  mass: 0.72,
+  restSpeed: 0.5,
+  restDelta: 0.5,
 };
+const GENRE_WHEEL_RETURN_SPRING = {
+  type: "spring" as const,
+  stiffness: 560,
+  damping: 44,
+  mass: 0.7,
+  restSpeed: 0.5,
+  restDelta: 0.5,
+};
+const GENRE_WHEEL_DRAG_COMMIT_RATIO = 0.4;
+const GENRE_WHEEL_DRAG_CLAMP_RATIO = 0.92;
+const GENRE_WHEEL_DRAG_CLICK_SLOP_PX = 6;
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   value,
@@ -513,91 +534,164 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
   onChange,
 }) => {
   const [currentValue, setCurrentValue] = useState(value);
-  const [nextValue, setNextValue] = useState<string | null>(null);
+  const [pendingValue, setPendingValue] = useState<string | null>(null);
   const [phase, setPhase] = useState<LengthTickPhase>("idle");
-  const [direction, setDirection] = useState<GenreWheelDirection>(1);
   const [isDragging, setIsDragging] = useState(false);
-  const timeoutRef = useRef<number | null>(null);
-  const frameRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
-  const pointerStateRef = useRef<WheelPointerState>({
+  const currentValueRef = useRef(value);
+  const pendingValueRef = useRef<string | null>(null);
+  const animationIdRef = useRef(0);
+  const animationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const pointerStateRef = useRef<GenreWheelPointerState>({
     pointerId: null,
+    startY: 0,
     lastY: 0,
-    carryY: 0,
+    dragOffset: 0,
     moved: false,
   });
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const wheelMetrics = useMemo(() => {
+    const itemHeight = compact ? 30 : 46;
+    const peek = compact ? 8 : 12;
+    return {
+      itemHeight,
+      peek,
+      viewportHeight: itemHeight + peek * 2,
+      restY: -itemHeight + peek,
+      dragClamp: itemHeight * GENRE_WHEEL_DRAG_CLAMP_RATIO,
+      commitThreshold: itemHeight * GENRE_WHEEL_DRAG_COMMIT_RATIO,
+    };
+  }, [compact]);
+  const trackY = useMotionValue(wheelMetrics.restY);
 
-  const clearScheduledAnimation = useCallback(() => {
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-    }
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+  const stopTrackAnimation = useCallback(() => {
+    animationIdRef.current += 1;
+    animationRef.current?.stop();
+    animationRef.current = null;
   }, []);
 
   useEffect(() => {
+    currentValueRef.current = currentValue;
+  }, [currentValue]);
+
+  useEffect(() => {
+    pendingValueRef.current = pendingValue;
+  }, [pendingValue]);
+
+  useEffect(() => {
     return () => {
-      clearScheduledAnimation();
+      stopTrackAnimation();
     };
-  }, [clearScheduledAnimation]);
+  }, [stopTrackAnimation]);
+
+  useEffect(() => {
+    if (phase !== "idle" || isDragging) return;
+    if (currentValueRef.current === value) return;
+    stopTrackAnimation();
+    setPendingValue(null);
+    pendingValueRef.current = null;
+    currentValueRef.current = value;
+    setCurrentValue(value);
+    trackY.set(wheelMetrics.restY);
+  }, [isDragging, phase, stopTrackAnimation, trackY, value, wheelMetrics.restY]);
 
   useEffect(() => {
     if (phase !== "idle") return;
-    if (currentValue === value) return;
-    setCurrentValue(value);
-  }, [currentValue, phase, value]);
+    trackY.set(wheelMetrics.restY);
+  }, [phase, trackY, wheelMetrics.restY]);
 
-  useEffect(() => {
-    if (!prefersReducedMotion || phase === "idle" || nextValue === null) return;
-    clearScheduledAnimation();
-    setCurrentValue(nextValue);
-    setNextValue(null);
+  const completePendingStep = useCallback(() => {
+    const resolvedValue = pendingValueRef.current;
+    stopTrackAnimation();
+    if (resolvedValue) {
+      currentValueRef.current = resolvedValue;
+      setCurrentValue(resolvedValue);
+      setPendingValue(null);
+      pendingValueRef.current = null;
+    }
     setPhase("idle");
-  }, [clearScheduledAnimation, nextValue, phase, prefersReducedMotion]);
+    trackY.set(wheelMetrics.restY);
+  }, [stopTrackAnimation, trackY, wheelMetrics.restY]);
+
+  const springTrackTo = useCallback(
+    (
+      targetY: number,
+      transition: typeof GENRE_WHEEL_RETURN_SPRING,
+      onComplete?: () => void,
+    ) => {
+      stopTrackAnimation();
+      const animationId = animationIdRef.current;
+      animationRef.current = animate(trackY, targetY, {
+        ...transition,
+        onComplete: () => {
+          if (animationIdRef.current !== animationId) return;
+          animationRef.current = null;
+          onComplete?.();
+        },
+      });
+    },
+    [stopTrackAnimation, trackY],
+  );
+
+  const springTrackToCenter = useCallback(() => {
+    if (prefersReducedMotion) {
+      stopTrackAnimation();
+      trackY.set(wheelMetrics.restY);
+      return;
+    }
+    springTrackTo(wheelMetrics.restY, GENRE_WHEEL_RETURN_SPRING);
+  }, [prefersReducedMotion, springTrackTo, stopTrackAnimation, trackY, wheelMetrics.restY]);
 
   const stepGenre = useCallback(
-    (stepDirection: GenreWheelDirection) => {
+    (
+      stepDirection: GenreWheelDirection,
+      options?: { fromDrag?: boolean },
+    ) => {
       if (disabled) return;
-      const baseValue = nextValue ?? currentValue;
+      if (!options?.fromDrag) {
+        completePendingStep();
+      }
+      const baseValue = currentValueRef.current;
       const nextGenre = getAdjacentGenre(baseValue, stepDirection);
-      setDirection(stepDirection);
       onChange(nextGenre);
 
       if (prefersReducedMotion) {
-        clearScheduledAnimation();
+        stopTrackAnimation();
+        currentValueRef.current = nextGenre;
         setCurrentValue(nextGenre);
-        setNextValue(null);
+        setPendingValue(null);
+        pendingValueRef.current = null;
         setPhase("idle");
+        trackY.set(wheelMetrics.restY);
         return;
       }
 
-      clearScheduledAnimation();
-      setNextValue(nextGenre);
-      setPhase("prep");
-
-      frameRef.current = window.requestAnimationFrame(() => {
-        frameRef.current = null;
-        setPhase("animate");
-      });
-
-      timeoutRef.current = window.setTimeout(() => {
-        setCurrentValue(nextGenre);
-        setNextValue(null);
-        setPhase("idle");
-        timeoutRef.current = null;
-      }, GENRE_TICK_DURATION_MS);
+      setPendingValue(nextGenre);
+      pendingValueRef.current = nextGenre;
+      setPhase("animate");
+      springTrackTo(
+        wheelMetrics.restY - stepDirection * wheelMetrics.itemHeight,
+        GENRE_WHEEL_STEP_SPRING,
+        () => {
+          currentValueRef.current = nextGenre;
+          setCurrentValue(nextGenre);
+          setPendingValue(null);
+          pendingValueRef.current = null;
+          setPhase("idle");
+          trackY.set(wheelMetrics.restY);
+        },
+      );
     },
     [
-      clearScheduledAnimation,
-      currentValue,
       disabled,
-      nextValue,
+      completePendingStep,
       onChange,
       prefersReducedMotion,
+      springTrackTo,
+      stopTrackAnimation,
+      trackY,
+      wheelMetrics.itemHeight,
+      wheelMetrics.restY,
     ],
   );
 
@@ -613,8 +707,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     }
     pointerStateRef.current = {
       pointerId: null,
+      startY: 0,
       lastY: 0,
-      carryY: 0,
+      dragOffset: 0,
       moved: false,
     };
     setIsDragging(false);
@@ -623,10 +718,12 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) return;
+      completePendingStep();
       pointerStateRef.current = {
         pointerId: event.pointerId,
+        startY: event.clientY,
         lastY: event.clientY,
-        carryY: 0,
+        dragOffset: 0,
         moved: false,
       };
       suppressClickRef.current = false;
@@ -635,45 +732,53 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       }
       setIsDragging(true);
     },
-    [disabled],
+    [completePendingStep, disabled],
   );
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) return;
       if (pointerStateRef.current.pointerId !== event.pointerId) return;
-      const delta = event.clientY - pointerStateRef.current.lastY;
       pointerStateRef.current.lastY = event.clientY;
-      pointerStateRef.current.carryY += delta;
-
-      let didStep = false;
-      while (pointerStateRef.current.carryY >= WHEEL_DRAG_STEP_PX) {
-        pointerStateRef.current.carryY -= WHEEL_DRAG_STEP_PX;
+      const dragOffset = Math.max(
+        -wheelMetrics.dragClamp,
+        Math.min(
+          event.clientY - pointerStateRef.current.startY,
+          wheelMetrics.dragClamp,
+        ),
+      );
+      pointerStateRef.current.dragOffset = dragOffset;
+      if (Math.abs(dragOffset) >= GENRE_WHEEL_DRAG_CLICK_SLOP_PX) {
         pointerStateRef.current.moved = true;
-        didStep = true;
-        stepGenre(1);
-      }
-      while (pointerStateRef.current.carryY <= -WHEEL_DRAG_STEP_PX) {
-        pointerStateRef.current.carryY += WHEEL_DRAG_STEP_PX;
-        pointerStateRef.current.moved = true;
-        didStep = true;
-        stepGenre(-1);
-      }
-
-      if (didStep) {
         suppressClickRef.current = true;
       }
+      if (prefersReducedMotion) return;
+      trackY.set(wheelMetrics.restY - dragOffset);
     },
-    [disabled, stepGenre],
+    [disabled, prefersReducedMotion, trackY, wheelMetrics.dragClamp, wheelMetrics.restY],
   );
 
   const handlePointerEnd = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (pointerStateRef.current.pointerId !== event.pointerId) return;
+      const dragOffset = pointerStateRef.current.dragOffset;
       suppressClickRef.current = pointerStateRef.current.moved;
       resetPointerState();
+      if (event.type === "pointercancel") {
+        springTrackToCenter();
+        return;
+      }
+      if (dragOffset >= wheelMetrics.commitThreshold) {
+        stepGenre(1, { fromDrag: true });
+        return;
+      }
+      if (dragOffset <= -wheelMetrics.commitThreshold) {
+        stepGenre(-1, { fromDrag: true });
+        return;
+      }
+      springTrackToCenter();
     },
-    [resetPointerState],
+    [resetPointerState, springTrackToCenter, stepGenre, wheelMetrics.commitThreshold],
   );
 
   const handleClick = useCallback(
@@ -683,9 +788,10 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         event.preventDefault();
         return;
       }
+      completePendingStep();
       stepGenre(1);
     },
-    [stepGenre],
+    [completePendingStep, stepGenre],
   );
 
   const handleKeyDown = useCallback(
@@ -697,6 +803,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         event.key === "PageDown"
       ) {
         event.preventDefault();
+        completePendingStep();
         stepGenre(1);
         return;
       }
@@ -706,19 +813,23 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         event.key === "PageUp"
       ) {
         event.preventDefault();
+        completePendingStep();
         stepGenre(-1);
       }
     },
-    [disabled, stepGenre],
+    [completePendingStep, disabled, stepGenre],
   );
 
-  const isAnimating =
-    !prefersReducedMotion && phase !== "idle" && nextValue !== null;
-  const incomingValue = nextValue ?? currentValue;
+  const selectedValue = pendingValue ?? currentValue;
   const isLarge = !compact;
-  const valueTravel = compact ? 8 : 12;
-  const outgoingY = direction === 1 ? -valueTravel : valueTravel;
-  const incomingStartY = direction === 1 ? valueTravel : -valueTravel;
+  const visibleItems = useMemo(
+    () => [
+      { slot: "previous" as const, value: getAdjacentGenre(currentValue, -1) },
+      { slot: "current" as const, value: currentValue },
+      { slot: "next" as const, value: getAdjacentGenre(currentValue, 1) },
+    ],
+    [currentValue],
+  );
 
   return (
     <button
@@ -743,9 +854,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
             : "text-indigo-100"
           : isLarge
             ? "hover:-translate-y-px hover:border-indigo-200/40 hover:bg-white/[0.045]"
-            : "hover:text-white"
+          : "hover:text-white"
       } ${disabled ? "cursor-not-allowed opacity-60" : "touch-none select-none"}`}
-      aria-label={`Genre: ${incomingValue}. Click to cycle or drag vertically.`}
+      aria-label={`Genre: ${selectedValue}. Click to cycle or drag vertically.`}
       aria-roledescription="genre wheel"
       title="Click to cycle genre. Drag vertically to step through genres."
       >
@@ -758,54 +869,57 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         </span>
       ) : null}
       <span
-        className={`relative mt-1.5 inline-flex overflow-hidden align-middle ${
+        className={`relative mt-1.5 inline-flex w-full overflow-hidden rounded-[1.05rem] align-middle ${
           isLarge
-            ? "h-[3.2rem] min-w-[9.5rem] w-full max-w-full"
-            : "h-[1.9rem] min-w-[6.5rem] w-full max-w-full"
+            ? "min-w-[9.5rem] max-w-full bg-slate-950/22 ring-1 ring-white/8"
+            : "min-w-[6.5rem] max-w-full bg-white/[0.03] ring-1 ring-white/6"
         }`}
+        style={{ height: wheelMetrics.viewportHeight }}
         data-testid="setup-genre-value-viewport"
+        aria-hidden="true"
       >
-        {isAnimating && (
-          <m.span
-            initial={false}
-            animate={{
-              y: phase === "animate" ? outgoingY : 0,
-              opacity: phase === "animate" ? 0 : 1,
-            }}
-            transition={GENRE_VALUE_TRANSITION}
-            className={`pointer-events-none absolute inset-0 flex items-center font-semibold leading-none transform-gpu will-change-transform ${
-              isLarge
-                ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]"
-                : "whitespace-nowrap text-[1.5rem] tracking-[-0.01em] text-slate-200/50"
-            }`}
-          >
-            {currentValue}
-          </m.span>
-        )}
         <m.span
-          data-testid="setup-genre-value"
-          initial={false}
-          animate={{
-            y: isAnimating
-              ? phase === "animate"
-                ? 0
-                : incomingStartY
-              : 0,
-            opacity: isAnimating
-              ? phase === "animate"
-                ? 1
-                : 0
-              : 1,
-          }}
-          transition={GENRE_VALUE_TRANSITION}
-          className={`absolute inset-0 flex items-center font-semibold leading-none transform-gpu will-change-transform ${
-            isLarge
-              ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]"
-              : "whitespace-nowrap text-[1.5rem] tracking-[-0.01em]"
-          }`}
+          style={{ y: trackY }}
+          className="absolute inset-x-0 top-0 flex flex-col transform-gpu will-change-transform"
         >
-          {incomingValue}
+          {visibleItems.map((item) => {
+            const isSelectedItem = item.value === selectedValue;
+            const slotClass =
+              item.slot === "current"
+                ? isLarge
+                  ? "text-[2rem] sm:text-[2.3rem] text-slate-50"
+                  : "text-[1.5rem] tracking-[-0.01em] text-slate-50"
+                : isLarge
+                  ? "text-[1.15rem] sm:text-[1.25rem] text-slate-300/46"
+                  : "text-[1rem] tracking-[-0.01em] text-slate-300/42";
+
+            return (
+              <span
+                key={`${currentValue}-${item.slot}-${item.value}`}
+                data-testid={isSelectedItem ? "setup-genre-value" : undefined}
+                className={`flex items-center font-semibold leading-none ${slotClass}`}
+                style={{ height: wheelMetrics.itemHeight }}
+              >
+                <span
+                  className={`block w-full whitespace-nowrap ${
+                    item.slot === "current" ? "" : "translate-y-[0.5px]"
+                  }`}
+                >
+                  {item.value}
+                </span>
+              </span>
+            );
+          })}
         </m.span>
+        <span
+          className="pointer-events-none absolute inset-x-0 rounded-[0.95rem] border border-white/10 bg-white/[0.035]"
+          style={{
+            top: wheelMetrics.peek,
+            height: wheelMetrics.itemHeight,
+          }}
+        />
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-slate-950/70 to-transparent" />
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-slate-950/70 to-transparent" />
       </span>
       {isLarge && (
         <span className="mt-1 block text-xs text-slate-400 sm:text-sm">
