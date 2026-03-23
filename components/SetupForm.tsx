@@ -5,14 +5,13 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, LayoutGroup } from "motion/react";
 import * as m from "motion/react-m";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
 import {
-  fadeSlideYVariants,
   modalVariants,
   overlayVariants,
   stageShellVariants,
@@ -1220,7 +1219,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     "rounded-[26px] border border-white/10 bg-slate-950/55 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]";
   const summaryCardClass =
     "rounded-[20px] border border-white/10 bg-white/[0.025] px-3 py-1.5 shadow-[0_12px_30px_-26px_rgba(15,23,42,0.95)] transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out";
+  const sharedSurfaceCardClass =
+    "rounded-[20px] border border-white/10 bg-white/[0.03] px-3.5 py-3 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.88)]";
   const compactActionButtonClass = `rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ring-1 ${interactiveControlClass}`;
+  const genreSurfaceLayoutId = prefersReducedMotion
+    ? undefined
+    : "setup-genre-surface";
+  const styleSurfaceLayoutId = prefersReducedMotion
+    ? undefined
+    : "setup-style-surface";
   const handleGenreAdvance = useCallback(() => {
     setActiveStage((previousStage) =>
       getStageRank(previousStage) < getStageRank("style")
@@ -1314,132 +1321,131 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
       {!isSummaryOnly && (
         <>
-          <m.div
-            className="mx-auto flex w-full max-w-[58rem] flex-col gap-2.5"
-            layout="position"
-          >
-            {!isGenreStage && (
-              <m.div
-                layout="position"
-                className={`grid gap-2.5 transition-[transform,opacity] duration-[260ms] ease-out ${
-                  isDetailsStage ? "md:grid-cols-2" : "max-w-md"
-                }`}
-              >
+          <LayoutGroup id="setup-progression">
+            <m.div
+              className="mx-auto flex w-full max-w-[58rem] flex-col gap-2.5"
+              layout="position"
+            >
+              {!isGenreStage && (
                 <m.div
                   layout="position"
-                  className={`${summaryCardClass} ${styleCardMotionClass}`}
-                  data-testid="setup-genre-summary"
+                  className={`grid gap-2.5 transition-[transform,opacity] duration-[260ms] ease-out ${
+                    isDetailsStage ? "md:grid-cols-2" : "max-w-md"
+                  }`}
                 >
-                  <p className={`${setupSectionLabelClass} text-slate-400`}>
-                    Selected genre
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <GenreCycleWheel
-                      value={genre}
-                      disabled={isLocked}
-                      compact
-                      prefersReducedMotion={prefersReducedMotion}
-                      focusRingClass={focusRingClass}
-                      onChange={handleGenreChange}
-                    />
-                    {isStyleStage && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveStage("genre")}
+                  <m.div
+                    layout
+                    layoutId={genreSurfaceLayoutId}
+                    className={`${summaryCardClass} ${styleCardMotionClass}`}
+                    data-testid="setup-genre-summary"
+                  >
+                    <p className={`${setupSectionLabelClass} text-slate-400`}>
+                      Selected genre
+                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <GenreCycleWheel
+                        value={genre}
                         disabled={isLocked}
-                        className={`${compactActionButtonClass} ${
-                          isLocked
-                            ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                            : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
-                        }`}
-                      >
-                        Focus
-                      </button>
-                    )}
-                  </div>
-                </m.div>
+                        compact
+                        prefersReducedMotion={prefersReducedMotion}
+                        focusRingClass={focusRingClass}
+                        onChange={handleGenreChange}
+                      />
+                      {isStyleStage && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveStage("genre")}
+                          disabled={isLocked}
+                          className={`${compactActionButtonClass} ${
+                            isLocked
+                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                              : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                          }`}
+                        >
+                          Focus
+                        </button>
+                      )}
+                    </div>
+                  </m.div>
 
-                <AnimatePresence initial={false}>
-                  {isDetailsStage ? (
-                    <m.div
-                      key="setup-style-summary-card"
-                      layout="position"
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      variants={fadeSlideYVariants}
-                      className={`group ${summaryCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
-                      aria-live="polite"
-                      data-testid="setup-style-summary"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className={`${setupSectionLabelClass} text-slate-400`}>
-                            Selected style
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            <p className="text-base font-semibold text-slate-100">
-                              {styleSummaryLabel}
+                  <AnimatePresence initial={false}>
+                    {isDetailsStage ? (
+                      <m.div
+                        key="setup-style-summary-card"
+                        layout
+                        layoutId={styleSurfaceLayoutId}
+                        className={`group ${summaryCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
+                        aria-live="polite"
+                        data-testid="setup-style-summary"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={`${setupSectionLabelClass} text-slate-400`}>
+                              Selected style
                             </p>
-                            {selectedStyleCategoryLabel && (
-                              <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
-                                {selectedStyleCategoryLabel}
-                              </span>
-                            )}
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                              <p className="text-base font-semibold text-slate-100">
+                                {styleSummaryLabel}
+                              </p>
+                              {selectedStyleCategoryLabel && (
+                                <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
+                                  {selectedStyleCategoryLabel}
+                                </span>
+                              )}
+                            </div>
                           </div>
+                          {!isStyleBlank && (
+                            <button
+                              type="button"
+                              onClick={handleClearStyle}
+                              disabled={isLocked}
+                              aria-label="Clear selected style"
+                              className={`${compactActionButtonClass} ${
+                                isLocked
+                                  ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                                  : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                              }`}
+                              title="Clear selected style"
+                            >
+                              Clear
+                            </button>
+                          )}
                         </div>
-                        {!isStyleBlank && (
+                        <div className={`${isDetailsStage ? "mt-2" : "mt-2.5"} flex flex-wrap gap-2`}>
                           <button
                             type="button"
-                            onClick={handleClearStyle}
-                            disabled={isLocked}
-                            aria-label="Clear selected style"
+                            onClick={handleStyleShuffle}
+                            disabled={isLocked || stylesLibrary.length === 0}
                             className={`${compactActionButtonClass} ${
-                              isLocked
-                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                                : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                              isLocked || stylesLibrary.length === 0
+                                ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
+                                : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
                             }`}
-                            title="Clear selected style"
                           >
-                            Clear
+                            Shuffle
                           </button>
-                        )}
-                      </div>
-                      <div className={`${isDetailsStage ? "mt-2" : "mt-2.5"} flex flex-wrap gap-2`}>
-                        <button
-                          type="button"
-                          onClick={handleStyleShuffle}
-                          disabled={isLocked || stylesLibrary.length === 0}
-                          className={`${compactActionButtonClass} ${
-                            isLocked || stylesLibrary.length === 0
-                              ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                              : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
-                          }`}
-                        >
-                          Shuffle
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openStyleLibrary}
-                          disabled={isLocked}
-                          className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
-                            isLocked
-                              ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                              : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
-                          }`}
-                          aria-haspopup="dialog"
-                          aria-expanded={isStyleLibraryOpen}
-                        >
-                          <Search className="h-3 w-3" />
-                          Browse
-                        </button>
-                      </div>
-                    </m.div>
-                  ) : null}
-                </AnimatePresence>
-              </m.div>
-            )}
-            <AnimatePresence mode="wait" initial={false}>
+                          <button
+                            type="button"
+                            onClick={openStyleLibrary}
+                            disabled={isLocked}
+                            className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
+                              isLocked
+                                ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
+                                : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                            }`}
+                            aria-haspopup="dialog"
+                            aria-expanded={isStyleLibraryOpen}
+                          >
+                            <Search className="h-3 w-3" />
+                            Browse
+                          </button>
+                        </div>
+                      </m.div>
+                    ) : null}
+                  </AnimatePresence>
+                </m.div>
+              )}
+              <AnimatePresence initial={false}>
               {isGenreStage ? (
                 <m.div
                   key="setup-stage-genre"
@@ -1478,13 +1484,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       </button>
                     </div>
                     <div className="flex justify-start lg:justify-end">
-                      <GenreCycleWheel
-                        value={genre}
-                        disabled={isLocked}
-                        prefersReducedMotion={prefersReducedMotion}
-                        focusRingClass={focusRingClass}
-                        onChange={handleGenreChange}
-                      />
+                      <m.div
+                        layout
+                        layoutId={genreSurfaceLayoutId}
+                        className={`${sharedSurfaceCardClass} w-full max-w-[23rem]`}
+                      >
+                        <p className={`${setupSectionLabelClass} text-slate-400`}>
+                          Selected genre
+                        </p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <GenreCycleWheel
+                            value={genre}
+                            disabled={isLocked}
+                            prefersReducedMotion={prefersReducedMotion}
+                            focusRingClass={focusRingClass}
+                            onChange={handleGenreChange}
+                          />
+                        </div>
+                      </m.div>
                     </div>
                   </div>
                 </m.div>
@@ -1511,7 +1528,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         straight into premise and cast.
                       </p>
                     </div>
-                    <div
+                    <m.div
+                      layout
+                      layoutId={styleSurfaceLayoutId}
                       className={`group rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 ${styleCardMotionClass} ${styleCardPulseClass}`}
                       aria-live="polite"
                     >
@@ -1598,7 +1617,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           Browse
                         </button>
                       </div>
-                    </div>
+                    </m.div>
 
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <button
@@ -1823,8 +1842,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </div>
                 </m.div>
               ) : null}
-            </AnimatePresence>
-          </m.div>
+              </AnimatePresence>
+            </m.div>
+          </LayoutGroup>
 
           <AnimatePresence initial={false}>
             {isStyleLibraryOpen ? (

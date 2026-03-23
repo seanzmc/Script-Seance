@@ -239,6 +239,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const headerActionRowsClass = 'flex w-full items-stretch gap-2 xl:w-auto xl:items-center';
   const showStartScreen = !context && !isGenerating;
   const showInitialGeneration = !context && isGenerating;
+  const showSetupHandoffLoading = !isSetupOpen && showInitialGeneration;
+  const showSetupSurface = isSetupOpen || showSetupHandoffLoading;
   const activeSceneId = useMemo(() => {
     if (!context || context.scenes.length === 0) {
       return null;
@@ -790,10 +792,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
   const setupModal = (
     <AnimatePresence initial={false}>
-      {isSetupOpen ? (
+      {showSetupSurface ? (
         <m.div
           key="setup-screen"
-          className="fixed inset-0 z-[70] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
+          className="fixed inset-0 z-[98] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
           role="region"
           aria-label="Setup"
           data-testid="setup-screen"
@@ -814,30 +816,67 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
                 <div className="space-y-1">
                   <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-                  <h2 className={SETUP_UI_TOKENS.title}>Start a new script</h2>
-                  <p className={SETUP_UI_TOKENS.subtitle}>Pick a genre and let AI shape your opening spark.</p>
+                  <h2 className={SETUP_UI_TOKENS.title}>
+                    {showSetupHandoffLoading ? 'Starting your script' : 'Start a new script'}
+                  </h2>
+                  <p className={SETUP_UI_TOKENS.subtitle}>
+                    {showSetupHandoffLoading
+                      ? 'Locking in the opening beat and preparing the workspace.'
+                      : 'Pick a genre and let AI shape your opening spark.'}
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={onCloseSetup}
-                  className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Close setup"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex h-10 w-10 items-center justify-center">
+                  {!showSetupHandoffLoading ? (
+                    <button
+                      type="button"
+                      onClick={onCloseSetup}
+                      className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      aria-label="Close setup"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <span className="h-10 w-10" aria-hidden="true" />
+                  )}
+                </div>
               </div>
               <div className="relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 sm:pb-6">
-                <SetupForm
-                  value={setupState}
-                  onChange={onSetupChange}
-                  onRequestSurprise={onSetupSurprise}
-                  onStart={onStartSetup}
-                  isLoading={isGenerating}
-                  onError={onSetupError}
-                  isLocked={false}
-                  showSubmit
-                  autoSurprise={setupAutoSurprise}
-                />
+                <AnimatePresence initial={false} mode="wait">
+                  {isSetupOpen ? (
+                    <m.div
+                      key="setup-surface-form"
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      variants={fadeSlideYVariants}
+                    >
+                      <SetupForm
+                        value={setupState}
+                        onChange={onSetupChange}
+                        onRequestSurprise={onSetupSurprise}
+                        onStart={onStartSetup}
+                        isLoading={isGenerating}
+                        onError={onSetupError}
+                        isLocked={false}
+                        showSubmit
+                        autoSurprise={setupAutoSurprise}
+                      />
+                    </m.div>
+                  ) : (
+                    <m.div
+                      key="setup-surface-loading"
+                      className="flex min-h-[calc(100vh-12rem)] items-center justify-center"
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      variants={fadeSlideYVariants}
+                    >
+                      <div className="w-full max-w-2xl">
+                        {startGenerationCard}
+                      </div>
+                    </m.div>
+                  )}
+                </AnimatePresence>
               </div>
             </m.div>
           </div>
@@ -1162,7 +1201,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       )}
 
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence initial={false}>
           {context ? (
             <m.div
               key="script-workspace"
@@ -1182,7 +1221,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             </m.div>
           ) : (
             <m.div
-              key={showInitialGeneration ? 'initial-generation-state' : 'start-screen-state'}
+              key="pre-context-state"
               className="flex-1 flex items-center justify-center px-6 py-10"
               initial="hidden"
               animate="visible"
@@ -1191,17 +1230,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             >
               <div className="w-full max-w-2xl space-y-6">
                 {errorBanner}
-                <AnimatePresence mode="wait" initial={false}>
-                  {showInitialGeneration ? (
-                    <React.Fragment key="start-generation-card">
-                      {startGenerationCard}
-                    </React.Fragment>
-                  ) : showStartScreen ? (
-                    <React.Fragment key="start-screen-card">
-                      {startScreenCard}
-                    </React.Fragment>
-                  ) : null}
-                </AnimatePresence>
+                {showStartScreen ? startScreenCard : null}
               </div>
             </m.div>
           )}
