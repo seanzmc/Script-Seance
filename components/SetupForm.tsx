@@ -169,6 +169,18 @@ const getAdjacentGenre = (
 const getStageRank = (stage: SetupActiveStage): number =>
   stage === "genre" ? 0 : stage === "style" ? 1 : 2;
 
+const getNearestScrollContainer = (element: HTMLElement | null) => {
+  let current = element?.parentElement ?? null;
+  while (current) {
+    const { overflowY } = window.getComputedStyle(current);
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+};
+
 const deriveInitialStage = ({
   premise,
   characters,
@@ -201,8 +213,8 @@ const LENGTH_TICK_DURATION_MS = 240;
 const GENRE_TICK_DURATION_MS = 220;
 const WHEEL_DRAG_STEP_PX = 26;
 const GENRE_VALUE_TRANSITION = {
-  duration: 0.18,
-  ease: [0.22, 1, 0.36, 1] as const,
+  duration: 0.2,
+  ease: [0.16, 1, 0.3, 1] as const,
 };
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
@@ -704,7 +716,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     !prefersReducedMotion && phase !== "idle" && nextValue !== null;
   const incomingValue = nextValue ?? currentValue;
   const isLarge = !compact;
-  const valueTravel = compact ? 10 : 14;
+  const valueTravel = compact ? 8 : 12;
   const outgoingY = direction === 1 ? -valueTravel : valueTravel;
   const incomingStartY = direction === 1 ? valueTravel : -valueTravel;
 
@@ -761,10 +773,10 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
               opacity: phase === "animate" ? 0 : 1,
             }}
             transition={GENRE_VALUE_TRANSITION}
-            className={`pointer-events-none absolute inset-0 flex items-center font-semibold leading-none will-change-transform ${
+            className={`pointer-events-none absolute inset-0 flex items-center font-semibold leading-none transform-gpu will-change-transform ${
               isLarge
                 ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]"
-                : "whitespace-nowrap text-[1.55rem] tracking-tight text-slate-200/55"
+                : "whitespace-nowrap text-[1.5rem] tracking-[-0.01em] text-slate-200/50"
             }`}
           >
             {currentValue}
@@ -786,10 +798,10 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
               : 1,
           }}
           transition={GENRE_VALUE_TRANSITION}
-          className={`absolute inset-0 flex items-center font-semibold leading-none will-change-transform ${
+          className={`absolute inset-0 flex items-center font-semibold leading-none transform-gpu will-change-transform ${
             isLarge
               ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]"
-              : "whitespace-nowrap text-[1.55rem] tracking-tight"
+              : "whitespace-nowrap text-[1.5rem] tracking-[-0.01em]"
           }`}
         >
           {incomingValue}
@@ -1059,10 +1071,55 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     if (activeStage !== "details") return;
     const footer = detailsFooterRef.current;
     if (!footer || typeof footer.scrollIntoView !== "function") return;
-    const frameId = window.requestAnimationFrame(() => {
-      footer.scrollIntoView({ block: "nearest", inline: "nearest" });
+    let frameId = 0;
+    let settleFrameId = 0;
+    let timeoutId: number | null = null;
+
+    const alignFooter = () => {
+      const scrollContainer = getNearestScrollContainer(footer);
+      if (!scrollContainer) {
+        footer.scrollIntoView({ block: "nearest", inline: "nearest" });
+        return;
+      }
+
+      const footerRect = footer.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const bottomGap = footerRect.bottom - (containerRect.bottom - 16);
+      const topGap = containerRect.top + 16 - footerRect.top;
+
+      if (bottomGap > 6) {
+        scrollContainer.scrollTop += bottomGap;
+        return;
+      }
+      if (topGap > 6) {
+        scrollContainer.scrollTop -= topGap;
+      }
+
+      window.requestAnimationFrame(() => {
+        const nextFooterRect = footer.getBoundingClientRect();
+        const nextContainerRect = scrollContainer.getBoundingClientRect();
+        if (
+          nextFooterRect.bottom > nextContainerRect.bottom - 16 ||
+          nextFooterRect.top < nextContainerRect.top + 16
+        ) {
+          footer.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      });
+    };
+
+    frameId = window.requestAnimationFrame(() => {
+      settleFrameId = window.requestAnimationFrame(() => {
+        timeoutId = window.setTimeout(alignFooter, 120);
+      });
     });
-    return () => window.cancelAnimationFrame(frameId);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.cancelAnimationFrame(settleFrameId);
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, [activeStage]);
   useEffect(() => {
     if (!pendingDetailReveal) return;
@@ -1246,11 +1303,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     "rounded-[24px] border border-white/10 ring-1 ring-white/5 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.92)]";
   const stageShellClass = `${stageSurfaceBaseClass} bg-slate-950/56 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]`;
   const summaryCardClass =
-    `${stageSurfaceBaseClass} bg-white/[0.028] px-4 py-3.5 sm:px-5 sm:py-4 transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out`;
+    `${stageSurfaceBaseClass} bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out`;
   const sharedSurfaceCardClass =
-    `${stageSurfaceBaseClass} bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4`;
-  const compactActionButtonClass = `rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ring-1 ${interactiveControlClass}`;
-  const summaryLinkButtonClass = `inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] ${interactiveControlClass}`;
+    `${stageSurfaceBaseClass} bg-white/[0.032] px-4 py-3.5 sm:px-5 sm:py-4`;
+  const compactActionButtonClass = `rounded-full px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass}`;
+  const summaryLinkButtonClass = `inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] ${interactiveControlClass}`;
+  const summaryStatusTextClass =
+    "hidden text-[10px] uppercase tracking-[0.22em] text-slate-500 sm:inline";
   const genreSurfaceLayoutId = prefersReducedMotion
     ? undefined
     : "setup-genre-surface";
@@ -1401,7 +1460,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         focusRingClass={focusRingClass}
                         onChange={handleGenreChange}
                       />
-                      <span className="hidden text-[10px] uppercase tracking-[0.24em] text-slate-500 sm:inline">
+                      <span className={summaryStatusTextClass}>
                         Step 1 complete
                       </span>
                     </div>
@@ -1442,7 +1501,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                               className={`${compactActionButtonClass} ${
                                 isLocked
                                   ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                                  : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                                  : "bg-white/[0.035] text-slate-300 ring-white/10 hover:bg-white/[0.07] hover:text-white"
                               }`}
                               title="Clear selected style"
                             >
@@ -1457,8 +1516,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             disabled={isLocked || stylesLibrary.length === 0}
                             className={`${compactActionButtonClass} ${
                               isLocked || stylesLibrary.length === 0
-                                ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                                : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                                : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
                             }`}
                           >
                             Shuffle
@@ -1469,8 +1528,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             disabled={isLocked}
                             className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
                               isLocked
-                                ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                                : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                                : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
                             }`}
                             aria-haspopup="dialog"
                             aria-expanded={isStyleLibraryOpen}
@@ -1484,7 +1543,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </AnimatePresence>
                 </m.div>
               )}
-              <AnimatePresence initial={false}>
+              <AnimatePresence initial={false} mode="wait">
               {isGenreStage ? (
                 <m.div
                   key="setup-stage-genre"
@@ -1737,7 +1796,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         focusRingClass={focusRingClass}
                         onChange={handleGenreChange}
                       />
-                      <span className="hidden text-[10px] uppercase tracking-[0.24em] text-slate-500 sm:inline">
+                      <span className={summaryStatusTextClass}>
                         Step 1 complete
                       </span>
                     </div>
@@ -1775,7 +1834,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           className={`${compactActionButtonClass} ${
                             isLocked
                               ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                              : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                              : "bg-white/[0.035] text-slate-300 ring-white/10 hover:bg-white/[0.07] hover:text-white"
                           }`}
                           title="Clear selected style"
                         >
@@ -1790,8 +1849,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         disabled={isLocked || stylesLibrary.length === 0}
                         className={`${compactActionButtonClass} ${
                           isLocked || stylesLibrary.length === 0
-                            ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                            : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                            ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                            : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
                         }`}
                       >
                         Shuffle
@@ -1802,8 +1861,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         disabled={isLocked}
                         className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
                           isLocked
-                            ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
-                            : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                            ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                            : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
                         }`}
                         aria-haspopup="dialog"
                         aria-expanded={isStyleLibraryOpen}
