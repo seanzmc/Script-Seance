@@ -844,6 +844,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [detailRevealSource, setDetailRevealSource] = useState<
     "manual" | "ai" | null
   >(null);
+  const [manualPremiseDraft, setManualPremiseDraft] = useState(() => premise);
+  const [aiPremiseDraft, setAiPremiseDraft] = useState("");
   const [styleSearch, setStyleSearch] = useState("");
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
   const [canHover, setCanHover] = useState(false);
@@ -1005,6 +1007,34 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     setDetailRevealSource("manual");
   }, []);
 
+  const switchPremiseMode = useCallback(
+    (nextMode: "manual" | "ai") => {
+      if (isLocked || detailRevealSource === nextMode) return;
+      setPendingDetailReveal(false);
+      setActiveStage("details");
+      setDetailRevealSource(nextMode);
+      const nextPremise =
+        nextMode === "manual"
+          ? manualPremiseDraft.trim().length > 0
+            ? manualPremiseDraft
+            : premise
+          : aiPremiseDraft.trim().length > 0
+            ? aiPremiseDraft
+            : premise;
+      if (nextPremise !== premise) {
+        updateValue({ premise: nextPremise });
+      }
+    },
+    [
+      aiPremiseDraft,
+      detailRevealSource,
+      isLocked,
+      manualPremiseDraft,
+      premise,
+      updateValue,
+    ],
+  );
+
   const handleEditSetup = () => {
     if (!onEditSetup) return;
     const proceed = window.confirm(
@@ -1067,6 +1097,20 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         : previousStage,
     );
   }, [characters, premise, style, styleId]);
+  useEffect(() => {
+    if (activeStage === "details" && detailRevealSource === null) {
+      setDetailRevealSource("manual");
+    }
+  }, [activeStage, detailRevealSource]);
+  useEffect(() => {
+    if (detailRevealSource === "manual") {
+      setManualPremiseDraft(premise);
+      return;
+    }
+    if (detailRevealSource === "ai") {
+      setAiPremiseDraft(premise);
+    }
+  }, [detailRevealSource, premise]);
   useEffect(() => {
     if (activeStage !== "details") return;
     const footer = detailsFooterRef.current;
@@ -1176,6 +1220,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   }, [isStyleLibraryOpen]);
 
   const trimmedPremise = premise.trim();
+  const premiseMode = detailRevealSource ?? "manual";
   const normalizedStyleSearch = styleSearch.trim().toLowerCase();
   const normalizedStyle = normalizeStyleValue(style);
   const normalizedStyleId =
@@ -1782,14 +1827,83 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     className={`${detailPanelClass} ${detailSectionSurfaceClass}`}
                     data-testid="setup-premise-panel"
                   >
-                    <label className={setupSectionLabelClass}>
-                      Premise
-                    </label>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <label className={setupSectionLabelClass}>
+                        Premise
+                      </label>
+                      <div
+                        role="group"
+                        aria-label="Premise mode"
+                        className="inline-flex rounded-full border border-white/10 bg-slate-950/70 p-1"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => switchPremiseMode("ai")}
+                          disabled={isLocked}
+                          aria-pressed={premiseMode === "ai"}
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,opacity] duration-[220ms] ease-out ${focusRingClass} ${
+                            premiseMode === "ai"
+                              ? "bg-indigo-500/20 text-indigo-100"
+                              : "text-slate-300 hover:bg-white/[0.05] hover:text-slate-100"
+                          } ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                        >
+                          AI premise
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => switchPremiseMode("manual")}
+                          disabled={isLocked}
+                          aria-pressed={premiseMode === "manual"}
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,opacity] duration-[220ms] ease-out ${focusRingClass} ${
+                            premiseMode === "manual"
+                              ? "bg-indigo-500/20 text-indigo-100"
+                              : "text-slate-300 hover:bg-white/[0.05] hover:text-slate-100"
+                          } ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                        >
+                          Write my own
+                        </button>
+                      </div>
+                    </div>
                     <div className="flex flex-1 flex-col gap-2">
+                      {premiseMode === "ai" ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                          <p className="text-xs leading-relaxed text-slate-300/85">
+                            Generate or refresh the premise from the current setup context.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleGenerateSurpriseSetup("manual");
+                            }}
+                            disabled={isLoading || isSurprising || isLocked}
+                            aria-busy={isSurprising || undefined}
+                            aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
+                            className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,opacity] duration-[220ms] ease-out ${focusRingClass} ${
+                              isLoading || isSurprising || isLocked
+                                ? "cursor-not-allowed bg-indigo-500/10 text-slate-300/70 opacity-60"
+                                : "bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
+                            }`}
+                          >
+                            {isSurprising
+                              ? "Generating..."
+                              : trimmedPremise
+                                ? "Regenerate with AI"
+                                : "Generate with AI"}
+                          </button>
+                        </div>
+                      ) : null}
                       <textarea
                         rows={5}
                         value={premise}
-                        onChange={(e) => updateValue({ premise: e.target.value })}
+                        onChange={(e) => {
+                          const nextPremise = e.target.value;
+                          if (premiseMode === "manual") {
+                            setManualPremiseDraft(nextPremise);
+                          } else {
+                            setAiPremiseDraft(nextPremise);
+                          }
+                          updateValue({ premise: nextPremise });
+                        }}
                         className={`w-full flex-1 min-h-[132px] resize-none rounded-[18px] border border-white/8 px-4 py-3.5 pr-3 !bg-slate-950/90 !text-slate-100 caret-indigo-200 placeholder:!text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out text-[15px] sm:text-base leading-relaxed lg:min-h-[118px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
                           justSurprised
                             ? "!bg-slate-950/95 border-indigo-400/30 shadow-[0_0_0_1px_rgba(99,102,241,0.08),0_0_18px_rgba(99,102,241,0.12)]"
@@ -1798,7 +1912,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         placeholder="e.g., A detective discovers his new partner is a ghost..."
                         disabled={isLocked}
                       />
-                      {detailRevealSource === "manual" && (
+                      {premiseMode === "manual" && (
                         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                           {STARTER_IDEAS.map((idea) => (
                             <button

@@ -966,4 +966,134 @@ describe("SetupForm detail reveal timing", () => {
       expect(screen.queryByPlaceholderText(premisePlaceholder)).not.toBeNull();
     });
   });
+
+  it("lets Step 3 switch from manual mode to AI mode and generate in place", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let resolveSurprise: (() => void) | null = null;
+
+    const SurpriseHarness: React.FC = () => {
+      const [setupState, setSetupState] =
+        React.useState<SetupFormState>(blankBaseValue);
+
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+
+      const onRequestSurprise = React.useCallback(async () => {
+        return await new Promise<boolean>((resolve) => {
+          resolveSurprise = () => {
+            setSetupState((prev) => ({
+              ...prev,
+              premise: "An archivist discovers the town's history is being rewritten overnight.",
+              characters: ["Archivist", "Mayor"],
+            }));
+            resolve(true);
+          };
+        });
+      }, []);
+
+      return (
+        <div>
+          <button type="button" onClick={() => resolveSurprise?.()}>
+            Resolve in-step AI
+          </button>
+          <SetupForm
+            value={setupState}
+            onChange={onSetupChange}
+            onRequestSurprise={onRequestSurprise}
+            isLoading={false}
+          />
+        </div>
+      );
+    };
+
+    try {
+      render(<SurpriseHarness />);
+
+      fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+      fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+      fireEvent.change(screen.getByPlaceholderText(premisePlaceholder), {
+        target: { value: "Manual draft premise" },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /^AI premise$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /regenerate with ai/i }));
+      fireEvent.click(screen.getByRole("button", { name: /resolve in-step ai/i }));
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue(/archivist discovers/i)).toBeTruthy();
+      });
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("preserves separate manual and AI premise drafts when Step 3 mode changes", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let resolveSurprise: (() => void) | null = null;
+
+    const DraftHarness: React.FC = () => {
+      const [setupState, setSetupState] =
+        React.useState<SetupFormState>(blankBaseValue);
+
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+
+      const onRequestSurprise = React.useCallback(async () => {
+        return await new Promise<boolean>((resolve) => {
+          resolveSurprise = () => {
+            setSetupState((prev) => ({
+              ...prev,
+              premise: "AI draft premise",
+              characters: ["Pilot", "Witness"],
+            }));
+            resolve(true);
+          };
+        });
+      }, []);
+
+      return (
+        <div>
+          <button type="button" onClick={() => resolveSurprise?.()}>
+            Resolve AI draft
+          </button>
+          <SetupForm
+            value={setupState}
+            onChange={onSetupChange}
+            onRequestSurprise={onRequestSurprise}
+            isLoading={false}
+          />
+        </div>
+      );
+    };
+
+    try {
+      render(<DraftHarness />);
+
+      fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+      fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+
+      const premiseInput = screen.getByPlaceholderText(premisePlaceholder);
+      fireEvent.change(premiseInput, {
+        target: { value: "Manual draft premise" },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /^AI premise$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /regenerate with ai/i }));
+      fireEvent.click(screen.getByRole("button", { name: /resolve ai draft/i }));
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("AI draft premise")).toBeTruthy();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /^Write my own$/i }));
+      expect(screen.getByDisplayValue("Manual draft premise")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: /^AI premise$/i }));
+      expect(screen.getByDisplayValue("AI draft premise")).toBeTruthy();
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
 });
