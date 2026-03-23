@@ -790,6 +790,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       ) : null}
     </AnimatePresence>
   );
+  const setupRailClass = 'mx-auto w-full max-w-[60rem]';
   const setupModal = (
     <AnimatePresence initial={false}>
       {showSetupSurface ? (
@@ -813,38 +814,41 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               exit="exit"
               variants={modalVariants}
             >
-              <div className="relative flex items-center justify-between px-6 py-4 sm:px-7 sm:py-5">
-                <div className="space-y-1">
-                  <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-                  <h2 className={SETUP_UI_TOKENS.title}>
-                    {showSetupHandoffLoading ? 'Starting your script' : 'Start a new script'}
-                  </h2>
-                  <p className={SETUP_UI_TOKENS.subtitle}>
-                    {showSetupHandoffLoading
-                      ? 'Locking in the opening beat and preparing the workspace.'
-                      : 'Pick a genre and let AI shape your opening spark.'}
-                  </p>
-                </div>
-                <div className="flex h-10 w-10 items-center justify-center">
-                  {!showSetupHandoffLoading ? (
-                    <button
-                      type="button"
-                      onClick={onCloseSetup}
-                      className="p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                      aria-label="Close setup"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  ) : (
-                    <span className="h-10 w-10" aria-hidden="true" />
-                  )}
+              <div className="relative border-b border-white/8 px-5 py-4 sm:px-6 sm:py-5">
+                <div className={`${setupRailClass} flex items-start justify-between gap-4`}>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
+                    <h2 className={SETUP_UI_TOKENS.title}>
+                      {showSetupHandoffLoading ? 'Starting your script' : 'Start a new script'}
+                    </h2>
+                    <p className={SETUP_UI_TOKENS.subtitle}>
+                      {showSetupHandoffLoading
+                        ? 'Locking in the opening beat and preparing the workspace.'
+                        : 'Pick a genre and let AI shape your opening spark.'}
+                    </p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center">
+                    {!showSetupHandoffLoading ? (
+                      <button
+                        type="button"
+                        onClick={onCloseSetup}
+                        className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                        aria-label="Close setup"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    ) : (
+                      <span className="h-10 w-10" aria-hidden="true" />
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 sm:pb-6">
+              <div className="relative flex-1 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
                 <AnimatePresence initial={false} mode="wait">
                   {isSetupOpen ? (
                     <m.div
                       key="setup-surface-form"
+                      className={setupRailClass}
                       initial="hidden"
                       animate="visible"
                       exit="exit"
@@ -865,7 +869,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   ) : (
                     <m.div
                       key="setup-surface-loading"
-                      className="flex min-h-[calc(100vh-12rem)] items-center justify-center"
+                      className={`${setupRailClass} flex min-h-[calc(100vh-12rem)] items-center justify-center`}
                       initial="hidden"
                       animate="visible"
                       exit="exit"

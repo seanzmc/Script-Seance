@@ -200,6 +200,10 @@ type LengthCycleWheelProps = {
 const LENGTH_TICK_DURATION_MS = 240;
 const GENRE_TICK_DURATION_MS = 220;
 const WHEEL_DRAG_STEP_PX = 26;
+const GENRE_VALUE_TRANSITION = {
+  duration: 0.18,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   value,
@@ -700,22 +704,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     !prefersReducedMotion && phase !== "idle" && nextValue !== null;
   const incomingValue = nextValue ?? currentValue;
   const isLarge = !compact;
-  const outgoingShiftClass =
-    direction === 1
-      ? phase === "animate"
-        ? "-translate-y-[12px] opacity-0"
-        : "translate-y-0 opacity-100"
-      : phase === "animate"
-        ? "translate-y-[12px] opacity-0"
-        : "translate-y-0 opacity-100";
-  const incomingShiftClass =
-    direction === 1
-      ? phase === "animate"
-        ? "translate-y-0 opacity-100"
-        : "translate-y-[12px] opacity-0"
-      : phase === "animate"
-        ? "translate-y-0 opacity-100"
-        : "-translate-y-[12px] opacity-0";
+  const valueTravel = compact ? 10 : 14;
+  const outgoingY = direction === 1 ? -valueTravel : valueTravel;
+  const incomingStartY = direction === 1 ? valueTravel : -valueTravel;
 
   return (
     <button
@@ -729,54 +720,80 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       disabled={disabled}
-      className={`group relative overflow-hidden rounded-[22px] border border-indigo-200/25 bg-white/[0.03] text-left text-slate-100 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.9)] transition-[transform,box-shadow,border-color,background-color] duration-[240ms] ease-out ${focusRingClass} ${
+      className={`group relative overflow-hidden text-left text-slate-100 transition-[transform,box-shadow,border-color,background-color,color] duration-[240ms] ease-out ${focusRingClass} ${
         isLarge
-          ? "w-full min-w-[13.5rem] max-w-[18rem] px-4 py-3 sm:min-w-[15.5rem] sm:px-5 sm:py-4"
-          : "min-w-[7.75rem] max-w-[10.5rem] px-2.5 py-1.5"
+          ? "w-full min-w-[13.5rem] max-w-[18.5rem] rounded-[22px] border border-indigo-200/25 bg-white/[0.03] px-4 py-3 sm:min-w-[15.5rem] sm:px-5 sm:py-4 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.9)]"
+          : "min-w-[8.25rem] max-w-[11rem] rounded-2xl border border-transparent bg-transparent px-0 py-0 shadow-none"
       } ${
         isDragging
-          ? "border-indigo-300/55 bg-indigo-500/16 shadow-[0_22px_46px_-28px_rgba(99,102,241,0.6)]"
-          : "hover:-translate-y-px hover:border-indigo-200/40 hover:bg-white/[0.045]"
+          ? isLarge
+            ? "border-indigo-300/55 bg-indigo-500/16 shadow-[0_22px_46px_-28px_rgba(99,102,241,0.6)]"
+            : "text-indigo-100"
+          : isLarge
+            ? "hover:-translate-y-px hover:border-indigo-200/40 hover:bg-white/[0.045]"
+            : "hover:text-white"
       } ${disabled ? "cursor-not-allowed opacity-60" : "touch-none select-none"}`}
       aria-label={`Genre: ${incomingValue}. Click to cycle or drag vertically.`}
       aria-roledescription="genre wheel"
       title="Click to cycle genre. Drag vertically to step through genres."
       >
-      <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
-      <span
-        className={`block ${isLarge ? "text-[10px]" : "text-[9px]"} uppercase tracking-[0.34em] text-indigo-100/58`}
-      >
-        Genre
-      </span>
+      {isLarge ? (
+        <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+      ) : null}
+      {isLarge ? (
+        <span className="block text-[10px] uppercase tracking-[0.34em] text-indigo-100/58">
+          Genre
+        </span>
+      ) : null}
       <span
         className={`relative mt-1.5 inline-flex overflow-hidden align-middle ${
           isLarge
             ? "h-[3.2rem] min-w-[9.5rem] w-full max-w-full"
-            : "h-[1.7rem] min-w-[6.25rem] w-full max-w-full"
+            : "h-[1.9rem] min-w-[6.5rem] w-full max-w-full"
         }`}
         data-testid="setup-genre-value-viewport"
       >
         {isAnimating && (
-          <span
-            className={`absolute inset-0 flex items-center font-semibold leading-none transition-[opacity,transform] duration-[220ms] ease-in-out ${
-              isLarge ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]" : "whitespace-nowrap text-[1.25rem]"
-            } ${outgoingShiftClass}`}
+          <m.span
+            initial={false}
+            animate={{
+              y: phase === "animate" ? outgoingY : 0,
+              opacity: phase === "animate" ? 0 : 1,
+            }}
+            transition={GENRE_VALUE_TRANSITION}
+            className={`pointer-events-none absolute inset-0 flex items-center font-semibold leading-none will-change-transform ${
+              isLarge
+                ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]"
+                : "whitespace-nowrap text-[1.55rem] tracking-tight text-slate-200/55"
+            }`}
           >
             {currentValue}
-          </span>
+          </m.span>
         )}
-        <span
+        <m.span
           data-testid="setup-genre-value"
-          className={`absolute inset-0 flex items-center font-semibold leading-none ${
-            isLarge ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]" : "whitespace-nowrap text-[1.25rem]"
-          } ${
-            isAnimating
-              ? `transition-[opacity,transform] duration-[220ms] ease-in-out ${incomingShiftClass}`
-              : "opacity-100"
+          initial={false}
+          animate={{
+            y: isAnimating
+              ? phase === "animate"
+                ? 0
+                : incomingStartY
+              : 0,
+            opacity: isAnimating
+              ? phase === "animate"
+                ? 1
+                : 0
+              : 1,
+          }}
+          transition={GENRE_VALUE_TRANSITION}
+          className={`absolute inset-0 flex items-center font-semibold leading-none will-change-transform ${
+            isLarge
+              ? "whitespace-nowrap text-[2rem] sm:text-[2.3rem]"
+              : "whitespace-nowrap text-[1.55rem] tracking-tight"
           }`}
         >
           {incomingValue}
-        </span>
+        </m.span>
       </span>
       {isLarge && (
         <span className="mt-1 block text-xs text-slate-400 sm:text-sm">
@@ -825,6 +842,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
   const styleLibraryModalRef = useRef<HTMLDivElement | null>(null);
   const styleShufflePulseTimeoutRef = useRef<number | null>(null);
+  const detailsFooterRef = useRef<HTMLDivElement | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -1038,6 +1056,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     );
   }, [characters, premise, style, styleId]);
   useEffect(() => {
+    if (activeStage !== "details") return;
+    const footer = detailsFooterRef.current;
+    if (!footer || typeof footer.scrollIntoView !== "function") return;
+    const frameId = window.requestAnimationFrame(() => {
+      footer.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeStage]);
+  useEffect(() => {
     if (!pendingDetailReveal) return;
     const hasPremise = premise.trim().length > 0;
     const hasCharacter = characters.some((char) => char.trim().length > 0);
@@ -1215,13 +1242,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
-  const stageShellClass =
-    "rounded-[26px] border border-white/10 bg-slate-950/55 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]";
+  const stageSurfaceBaseClass =
+    "rounded-[24px] border border-white/10 ring-1 ring-white/5 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.92)]";
+  const stageShellClass = `${stageSurfaceBaseClass} bg-slate-950/56 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]`;
   const summaryCardClass =
-    "rounded-[20px] border border-white/10 bg-white/[0.025] px-3 py-1.5 shadow-[0_12px_30px_-26px_rgba(15,23,42,0.95)] transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out";
+    `${stageSurfaceBaseClass} bg-white/[0.028] px-4 py-3.5 sm:px-5 sm:py-4 transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out`;
   const sharedSurfaceCardClass =
-    "rounded-[20px] border border-white/10 bg-white/[0.03] px-3.5 py-3 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.88)]";
+    `${stageSurfaceBaseClass} bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4`;
   const compactActionButtonClass = `rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ring-1 ${interactiveControlClass}`;
+  const summaryLinkButtonClass = `inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] ${interactiveControlClass}`;
   const genreSurfaceLayoutId = prefersReducedMotion
     ? undefined
     : "setup-genre-surface";
@@ -1284,7 +1313,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {showSummary && (
         <div className="rounded-2xl bg-slate-900/50 p-4 ring-1 ring-white/10 space-y-3">
           <div className="space-y-1">
@@ -1323,14 +1352,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         <>
           <LayoutGroup id="setup-progression">
             <m.div
-              className="mx-auto flex w-full max-w-[58rem] flex-col gap-2.5"
+              className="flex w-full flex-col gap-3"
               layout="position"
             >
-              {!isGenreStage && (
+              {!isGenreStage && !isDetailsStage && (
                 <m.div
                   layout="position"
-                  className={`grid gap-2.5 transition-[transform,opacity] duration-[260ms] ease-out ${
-                    isDetailsStage ? "md:grid-cols-2" : "max-w-md"
+                  className={`grid gap-3 transition-[transform,opacity] duration-[260ms] ease-out ${
+                    "max-w-md"
                   }`}
                 >
                   <m.div
@@ -1339,10 +1368,31 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     className={`${summaryCardClass} ${styleCardMotionClass}`}
                     data-testid="setup-genre-summary"
                   >
-                    <p className={`${setupSectionLabelClass} text-slate-400`}>
-                      Selected genre
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`${setupSectionLabelClass} text-slate-400`}>
+                          Selected genre
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                          Opening lane locked in.
+                        </p>
+                      </div>
+                      {isStyleStage && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveStage("genre")}
+                          disabled={isLocked}
+                          className={`${summaryLinkButtonClass} shrink-0 ${
+                            isLocked
+                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 opacity-60"
+                              : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white"
+                          }`}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-3 flex items-end justify-between gap-3">
                       <GenreCycleWheel
                         value={genre}
                         disabled={isLocked}
@@ -1351,20 +1401,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         focusRingClass={focusRingClass}
                         onChange={handleGenreChange}
                       />
-                      {isStyleStage && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveStage("genre")}
-                          disabled={isLocked}
-                          className={`${compactActionButtonClass} ${
-                            isLocked
-                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                              : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
-                          }`}
-                        >
-                          Focus
-                        </button>
-                      )}
+                      <span className="hidden text-[10px] uppercase tracking-[0.24em] text-slate-500 sm:inline">
+                        Step 1 complete
+                      </span>
                     </div>
                   </m.div>
 
@@ -1487,7 +1526,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       <m.div
                         layout
                         layoutId={genreSurfaceLayoutId}
-                        className={`${sharedSurfaceCardClass} w-full max-w-[23rem]`}
+                        className={`${sharedSurfaceCardClass} w-full max-w-[24rem]`}
                       >
                         <p className={`${setupSectionLabelClass} text-slate-400`}>
                           Selected genre
@@ -1531,7 +1570,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     <m.div
                       layout
                       layoutId={styleSurfaceLayoutId}
-                      className={`group rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 ${styleCardMotionClass} ${styleCardPulseClass}`}
+                      className={`group ${sharedSurfaceCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
                       aria-live="polite"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1660,7 +1699,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   animate="visible"
                   exit="exit"
                   variants={stageShellVariants}
-                  className={`${stageShellClass} space-y-3.5 px-5 py-4 sm:px-6 sm:py-4`}
+                  className={`${stageShellClass} flex flex-col gap-3 px-5 py-4 sm:px-6 sm:py-4 lg:max-h-[calc(100vh-26.5rem)]`}
                 >
                 <div className="space-y-1.5">
                   <p className={setupSectionLabelClass}>Step 3</p>
@@ -1672,12 +1711,116 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </p>
                 </div>
 
+                <div className="grid gap-3 md:grid-cols-2">
+                  <m.div
+                    layout
+                    layoutId={genreSurfaceLayoutId}
+                    className={`${summaryCardClass} ${styleCardMotionClass}`}
+                    data-testid="setup-genre-summary"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`${setupSectionLabelClass} text-slate-400`}>
+                          Selected genre
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                          Opening lane locked in.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <GenreCycleWheel
+                        value={genre}
+                        disabled={isLocked}
+                        compact
+                        prefersReducedMotion={prefersReducedMotion}
+                        focusRingClass={focusRingClass}
+                        onChange={handleGenreChange}
+                      />
+                      <span className="hidden text-[10px] uppercase tracking-[0.24em] text-slate-500 sm:inline">
+                        Step 1 complete
+                      </span>
+                    </div>
+                  </m.div>
+
+                  <m.div
+                    layout
+                    layoutId={styleSurfaceLayoutId}
+                    className={`group ${summaryCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
+                    aria-live="polite"
+                    data-testid="setup-style-summary"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`${setupSectionLabelClass} text-slate-400`}>
+                          Selected style
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold text-slate-100">
+                            {styleSummaryLabel}
+                          </p>
+                          {selectedStyleCategoryLabel && (
+                            <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
+                              {selectedStyleCategoryLabel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {!isStyleBlank && (
+                        <button
+                          type="button"
+                          onClick={handleClearStyle}
+                          disabled={isLocked}
+                          aria-label="Clear selected style"
+                          className={`${compactActionButtonClass} ${
+                            isLocked
+                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
+                              : "bg-white/[0.04] text-slate-200 ring-white/12 hover:bg-white/[0.08]"
+                          }`}
+                          title="Clear selected style"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleStyleShuffle}
+                        disabled={isLocked || stylesLibrary.length === 0}
+                        className={`${compactActionButtonClass} ${
+                          isLocked || stylesLibrary.length === 0
+                            ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
+                            : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                        }`}
+                      >
+                        Shuffle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openStyleLibrary}
+                        disabled={isLocked}
+                        className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
+                          isLocked
+                            ? "cursor-not-allowed bg-indigo-500/10 text-slate-400 ring-indigo-200/20 opacity-60"
+                            : "bg-indigo-500/18 text-indigo-100 ring-indigo-200/35 hover:bg-indigo-500/24"
+                        }`}
+                        aria-haspopup="dialog"
+                        aria-expanded={isStyleLibraryOpen}
+                      >
+                        <Search className="h-3 w-3" />
+                        Browse
+                      </button>
+                    </div>
+                  </m.div>
+                </div>
+
                 <m.div
                   layout="position"
-                  className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(17.25rem,0.8fr)] md:items-stretch"
+                  className="grid grid-cols-1 gap-3 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1.2fr)_minmax(17.25rem,0.8fr)] md:items-stretch"
                 >
                   <div
-                    className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-3.5 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.9)]`}
+                    className={`${detailPanelClass} flex h-full min-h-0 flex-col rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-3.5 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.9)]`}
                     data-testid="setup-premise-panel"
                   >
                     <label className={setupSectionLabelClass}>
@@ -1685,10 +1828,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     </label>
                     <div className="flex flex-1 flex-col gap-2">
                       <textarea
-                        rows={6}
+                        rows={5}
                         value={premise}
                         onChange={(e) => updateValue({ premise: e.target.value })}
-                        className={`w-full flex-1 min-h-[152px] resize-none rounded-[18px] border border-white/8 px-4 py-3.5 pr-3 !bg-slate-950/90 !text-slate-100 caret-indigo-200 placeholder:!text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out text-[15px] sm:text-base leading-relaxed [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
+                        className={`w-full flex-1 min-h-[132px] resize-none rounded-[18px] border border-white/8 px-4 py-3.5 pr-3 !bg-slate-950/90 !text-slate-100 caret-indigo-200 placeholder:!text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out text-[15px] sm:text-base leading-relaxed lg:min-h-[118px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
                           justSurprised
                             ? "!bg-slate-950/95 border-indigo-400/30 shadow-[0_0_0_1px_rgba(99,102,241,0.08),0_0_18px_rgba(99,102,241,0.12)]"
                             : "shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
@@ -1715,14 +1858,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
 
                   <div
-                    className={`${detailPanelClass} flex h-full flex-col rounded-[22px] border border-white/10 bg-slate-950/42 px-4 py-3.5 shadow-[0_12px_30px_-34px_rgba(15,23,42,0.8)]`}
+                    className={`${detailPanelClass} flex h-full min-h-0 flex-col rounded-[22px] border border-white/10 bg-slate-950/42 px-4 py-3.5 shadow-[0_12px_30px_-34px_rgba(15,23,42,0.8)]`}
                     data-testid="setup-characters-panel"
                   >
                     <div className="flex h-full flex-1 flex-col space-y-1.5">
                       <label className={`${setupSectionLabelClass} flex items-center gap-2`}>
                         <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                       </label>
-                      <div className="min-h-0 flex-1 space-y-1.5">
+                      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.2)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35">
                         <div className="flex items-center gap-2">
                           <div className="flex min-h-[42px] flex-1 items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
                             <div className="min-w-0">
@@ -1800,7 +1943,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
                 </m.div>
 
-                <div className="border-t border-white/8 pt-3">
+                <div
+                  ref={detailsFooterRef}
+                  className="border-t border-white/8 pt-3"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-2.5 text-sm text-slate-400 sm:items-center">
                     <LengthCycleWheel
                       value={normalizedLength}
