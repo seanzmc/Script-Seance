@@ -21,7 +21,7 @@ vi.mock('openai', () => ({
 
 beforeAll(async () => {
   process.env.ADMIN_PASSWORD = 'test-password';
-  process.env.OPENAI_API_KEY = 'test-openai-key';
+  process.env.SCRIPT_SEANCE_OPENAI_API_KEY = 'test-openai-key';
   process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
   process.env.OPENAI_FAST_MODEL = 'gpt-5.4-nano-test-fast';
   process.env.OPENAI_BALANCED_MODEL = 'gpt-5.4-mini-test-balanced';

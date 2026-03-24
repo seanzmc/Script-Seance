@@ -41,9 +41,9 @@ export const createConfigError = (message, code = 'CONFIG_ERROR', details) => {
 };
 
 export const getOpenAIClient = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.SCRIPT_SEANCE_OPENAI_API_KEY;
   if (!apiKey || !apiKey.trim()) {
-    throw createConfigError('Server missing OPENAI_API_KEY.');
+    throw createConfigError('Server missing SCRIPT_SEANCE_OPENAI_API_KEY.');
   }
   if (cachedOpenAiClient) {
     return cachedOpenAiClient;

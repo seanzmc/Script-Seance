@@ -44,13 +44,14 @@ Copy `.env.example` to `.env`.
 Minimal required env vars to run locally:
 
 ```bash
-OPENAI_API_KEY=...
+SCRIPT_SEANCE_OPENAI_API_KEY=...
 ADMIN_PASSWORD=...
 ```
 
 Common optional env vars:
 
 - OpenAI defaults in `.env.example` use the GPT-5.4 family: `OPENAI_MODEL=gpt-5.4`, `OPENAI_BALANCED_MODEL=gpt-5.4-mini`, `OPENAI_FAST_MODEL=gpt-5.4-nano`.
+- Use `SCRIPT_SEANCE_OPENAI_API_KEY` for this app's OpenAI server key so local usage is tracked to the project-specific credential.
 - `ALLOWED_ORIGINS`: comma-separated allowed browser origins for mutating `/api/auth/*` and `/api/ai/*` requests.
 - Inworld TTS requires `INWORLD_API_KEY`, `INWORLD_API_SECRET`, and `INWORLD_WORKSPACE_ID`.
 
