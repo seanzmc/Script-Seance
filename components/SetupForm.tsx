@@ -237,8 +237,7 @@ const GENRE_WHEEL_RETURN_SPRING = {
 };
 const GENRE_WHEEL_DRAG_CLICK_SLOP_PX = 6;
 const GENRE_WHEEL_WINDOW_RADIUS = 3;
-const GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP = 1.8;
-const GENRE_WHEEL_MOMENTUM_FACTOR = 0.2;
+const GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP = 1.4;
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   value,
@@ -563,10 +562,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       peek,
       viewportHeight: itemHeight + peek * 2,
       baseTrackY: peek - itemHeight * GENRE_WHEEL_WINDOW_RADIUS,
-      dragClamp: itemHeight * (compact ? 2.05 : 2.35),
-      projectedClamp: itemHeight * (compact ? 2.2 : 2.55),
-      momentumMs: compact ? 125 : 145,
-      maxSnapSteps: 2,
+      momentumActivationSteps: compact ? 0.9 : 1.1,
+      momentumCarrySteps: compact ? 0.45 : 0.55,
+      maxMomentumCarrySteps: compact ? 2.5 : 3.5,
       minOpacity: compact ? 0.2 : 0.16,
       minScale: compact ? 0.72 : 0.68,
     };
@@ -668,12 +666,8 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         return;
       }
 
-      const clampedSteps = Math.max(
-        -wheelMetrics.maxSnapSteps,
-        Math.min(stepCount, wheelMetrics.maxSnapSteps),
-      );
       const baseValue = currentValueRef.current;
-      const nextGenre = getGenreByOffset(baseValue, clampedSteps);
+      const nextGenre = getGenreByOffset(baseValue, stepCount);
       onChange(nextGenre);
 
       if (prefersReducedMotion) {
@@ -691,7 +685,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       pendingValueRef.current = nextGenre;
       setPhase("animate");
       animateWheelOffset(
-        clampedSteps * wheelMetrics.itemHeight,
+        stepCount * wheelMetrics.itemHeight,
         GENRE_WHEEL_STEP_SPRING,
         () => {
           currentValueRef.current = nextGenre;
@@ -711,7 +705,6 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       springTrackToCenter,
       stopTrackAnimation,
       wheelMetrics.itemHeight,
-      wheelMetrics.maxSnapSteps,
       wheelOffset,
     ],
   );
@@ -783,13 +776,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         pointerStateRef.current.velocityY * 0.72 + velocitySample * 0.28;
       pointerStateRef.current.lastY = event.clientY;
       pointerStateRef.current.lastTime = event.timeStamp;
-      const dragOffset = Math.max(
-        -wheelMetrics.dragClamp,
-        Math.min(
-          event.clientY - pointerStateRef.current.startY,
-          wheelMetrics.dragClamp,
-        ),
-      );
+      const dragOffset = event.clientY - pointerStateRef.current.startY;
       pointerStateRef.current.dragOffset = dragOffset;
       if (Math.abs(dragOffset) >= GENRE_WHEEL_DRAG_CLICK_SLOP_PX) {
         pointerStateRef.current.moved = true;
@@ -798,7 +785,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       if (prefersReducedMotion) return;
       wheelOffset.set(dragOffset);
     },
-    [disabled, prefersReducedMotion, wheelMetrics.dragClamp, wheelOffset],
+    [disabled, prefersReducedMotion, wheelOffset],
   );
 
   const handlePointerEnd = useCallback(
@@ -827,24 +814,21 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         settleGenre(reducedSteps);
         return;
       }
-      const projectedOffset = Math.max(
-        -wheelMetrics.projectedClamp,
+      const dragSteps = dragOffset / wheelMetrics.itemHeight;
+      const momentumWeight =
+        Math.abs(dragSteps) >= wheelMetrics.momentumActivationSteps
+          ? Math.min(Math.abs(dragSteps), 1.35)
+          : 0;
+      const momentumSteps = Math.max(
+        -wheelMetrics.maxMomentumCarrySteps,
         Math.min(
-          dragOffset +
-            velocityY *
-              wheelMetrics.momentumMs *
-              GENRE_WHEEL_MOMENTUM_FACTOR *
-              Math.min(Math.abs(dragOffset) / wheelMetrics.itemHeight, 1.15),
-          wheelMetrics.projectedClamp,
+          velocityY *
+            wheelMetrics.momentumCarrySteps *
+            momentumWeight,
+          wheelMetrics.maxMomentumCarrySteps,
         ),
       );
-      const snapSteps = Math.max(
-        -wheelMetrics.maxSnapSteps,
-        Math.min(
-          Math.round(projectedOffset / wheelMetrics.itemHeight),
-          wheelMetrics.maxSnapSteps,
-        ),
-      );
+      const snapSteps = Math.round(dragSteps + momentumSteps);
       if (snapSteps === 0) {
         springTrackToCenter();
         return;
@@ -857,9 +841,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       settleGenre,
       springTrackToCenter,
       wheelMetrics.itemHeight,
-      wheelMetrics.maxSnapSteps,
-      wheelMetrics.momentumMs,
-      wheelMetrics.projectedClamp,
+      wheelMetrics.momentumActivationSteps,
+      wheelMetrics.maxMomentumCarrySteps,
+      wheelMetrics.momentumCarrySteps,
       wheelOffset,
     ],
   );
@@ -900,8 +884,12 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     [disabled, stepGenre],
   );
 
-  const selectedValue = pendingValue ?? currentValue;
   const isLarge = !compact;
+  const centeredStepOffset = Math.round(renderOffset / wheelMetrics.itemHeight);
+  const normalizedRenderOffset =
+    renderOffset - centeredStepOffset * wheelMetrics.itemHeight;
+  const selectedValue =
+    pendingValue ?? getGenreByOffset(currentValue, centeredStepOffset);
   const visibleItems = useMemo(
     () =>
       Array.from(
@@ -910,11 +898,14 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
           const relativeIndex = itemIndex - GENRE_WHEEL_WINDOW_RADIUS;
           return {
             relativeIndex,
-            value: getGenreByOffset(currentValue, relativeIndex),
+            value: getGenreByOffset(
+              currentValue,
+              centeredStepOffset + relativeIndex,
+            ),
           };
         },
       ),
-    [currentValue],
+    [centeredStepOffset, currentValue],
   );
 
   return (
@@ -931,20 +922,20 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       disabled={disabled}
       className={`group relative overflow-hidden text-left text-slate-100 transition-[transform,box-shadow,border-color,background-color,color] duration-[240ms] ease-out ${focusRingClass} ${
         isLarge
-          ? "w-full min-w-[13.5rem] max-w-[18.5rem] rounded-[22px] border border-indigo-200/25 bg-white/[0.03] px-4 py-3 sm:min-w-[15.5rem] sm:px-5 sm:py-4 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.9)]"
+          ? "w-full min-w-[13.5rem] max-w-[18.5rem] rounded-[22px] border border-indigo-200/20 bg-white/[0.02] px-4 py-3 sm:min-w-[15.5rem] sm:px-5 sm:py-4 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.9)]"
           : "min-w-[8.25rem] max-w-[11rem] rounded-2xl border border-transparent bg-transparent px-0 py-0 shadow-none"
       } ${
         isDragging
           ? isLarge
-            ? "border-indigo-300/55 bg-indigo-500/16 shadow-[0_22px_46px_-28px_rgba(99,102,241,0.6)]"
+            ? "border-indigo-300/45 bg-indigo-500/10 shadow-[0_22px_46px_-28px_rgba(99,102,241,0.45)]"
             : "text-indigo-100"
           : isLarge
-            ? "hover:-translate-y-px hover:border-indigo-200/40 hover:bg-white/[0.045]"
+            ? "hover:border-indigo-200/32 hover:bg-white/[0.03]"
           : "hover:text-white"
       } ${disabled ? "cursor-not-allowed opacity-60" : "touch-none select-none"}`}
       aria-label={`Genre: ${selectedValue}. Click to cycle or drag vertically.`}
       aria-roledescription="genre wheel"
-      title="Click to cycle genre. Drag vertically to step through genres."
+      title="Click to cycle genre. Drag vertically to spin and release to glide."
       >
       {isLarge ? (
         <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
@@ -958,20 +949,26 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         className={`relative mt-1.5 block w-full overflow-hidden align-middle ${
           isLarge ? "min-w-[9.5rem] max-w-full" : "min-w-[6.5rem] max-w-full"
         }`}
-        style={{ height: wheelMetrics.viewportHeight }}
+        style={{
+          height: wheelMetrics.viewportHeight,
+          WebkitMaskImage:
+            "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
+        }}
         data-testid="setup-genre-value-viewport"
         aria-hidden="true"
       >
         <span
           className="absolute inset-x-0 top-0 flex flex-col transform-gpu will-change-transform"
           style={{
-            transform: `translateY(${wheelMetrics.baseTrackY - renderOffset}px)`,
+            transform: `translateY(${wheelMetrics.baseTrackY - normalizedRenderOffset}px)`,
           }}
         >
           {visibleItems.map((item) => {
             const isSelectedItem = item.value === selectedValue;
             const distance = Math.abs(
-              item.relativeIndex * wheelMetrics.itemHeight - renderOffset,
+              item.relativeIndex * wheelMetrics.itemHeight - normalizedRenderOffset,
             );
             const normalizedDistance = Math.min(
               distance / (wheelMetrics.itemHeight * 1.55),
@@ -990,8 +987,8 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
             const textShadowAlpha = 0.05 + easedProminence * 0.16;
 
             return (
-              <span
-                key={`${currentValue}-${item.relativeIndex}-${item.value}`}
+                <span
+                key={`${currentValue}-${centeredStepOffset}-${item.relativeIndex}-${item.value}`}
                 data-testid={isSelectedItem ? "setup-genre-value" : undefined}
                 className={`flex items-center font-semibold leading-none text-slate-50 ${
                   isLarge
@@ -1013,12 +1010,10 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
             );
           })}
         </span>
-        <span className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-slate-950/52 via-slate-950/18 to-transparent" />
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-slate-950/52 via-slate-950/18 to-transparent" />
       </span>
       {isLarge && (
         <span className="mt-1 block text-xs text-slate-400 sm:text-sm">
-          Click to cycle. Hold and drag vertically to step.
+          Click to cycle. Drag vertically to spin and release to glide.
         </span>
       )}
     </button>
