@@ -260,10 +260,13 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   const wheelMetrics = useMemo(
     () => {
       const itemHeight = 26;
+      const viewportHeight = 20;
       return {
         itemHeight,
-        viewportHeight: 20,
-        baseTrackY: -itemHeight * LENGTH_WHEEL_WINDOW_RADIUS,
+        viewportHeight,
+        baseTrackY:
+          -itemHeight * LENGTH_WHEEL_WINDOW_RADIUS +
+          (viewportHeight - itemHeight) / 2,
         momentumActivationSteps: 0.9,
         momentumCarrySteps: 0.2,
         maxMomentumCarrySteps: 0.55,
