@@ -1045,7 +1045,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [activeStage, setActiveStage] = useState<SetupActiveStage>(() =>
     deriveInitialStage({ premise, characters, style, styleId }),
   );
-  const [pendingDetailReveal, setPendingDetailReveal] = useState(false);
   const [detailRevealSource, setDetailRevealSource] = useState<
     "manual" | "ai" | null
   >(null);
@@ -1149,14 +1148,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   const requestDetailsStage = useCallback(
     (source: "manual" | "ai") => {
-      if (activeStage === "details") {
-        setDetailRevealSource(source);
-        return;
-      }
+      setManualStageOverride(null);
       setDetailRevealSource(source);
-      setPendingDetailReveal(true);
+      setActiveStage("details");
     },
-    [activeStage],
+    [],
   );
 
   const triggerSurpriseHighlight = useCallback(() => {
@@ -1220,7 +1216,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   };
 
   const showManualDetails = useCallback(() => {
-    setManualStageOverride(null);
     requestDetailsStage("manual");
   }, [requestDetailsStage]);
 
@@ -1349,21 +1344,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       }
     };
   }, [activeStage]);
-  useEffect(() => {
-    if (!pendingDetailReveal) return;
-    if (detailRevealSource === "manual") {
-      setManualStageOverride(null);
-      setActiveStage("details");
-      setPendingDetailReveal(false);
-      return;
-    }
-    const hasPremise = premise.trim().length > 0;
-    const hasCharacter = characters.some((char) => char.trim().length > 0);
-    if (!hasPremise || !hasCharacter) return;
-    setManualStageOverride(null);
-    setActiveStage("details");
-    setPendingDetailReveal(false);
-  }, [characters, detailRevealSource, pendingDetailReveal, premise]);
   useEffect(() => {
     if (!isStyleLibraryOpen) return;
     const animationId = requestAnimationFrame(() => {
@@ -1623,11 +1603,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     ? "grid gap-3 md:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]"
     : "grid max-w-md gap-3";
   const detailSectionSurfaceClass =
-    "flex h-full min-h-0 flex-col rounded-[18px] border border-white/8 bg-white/[0.024] px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]";
+    "flex h-full min-h-0 flex-col rounded-[16px] border border-white/7 bg-white/[0.02] px-3 py-2.5 sm:px-3.5 sm:py-3";
+  const premisePanelClass = `${detailSectionSurfaceClass} ${detailPanelClass} transition-[border-color,background-color] duration-[220ms] ease-out ${
+    justSurprised
+      ? "border-indigo-300/30 bg-indigo-500/[0.05]"
+      : "focus-within:border-white/10 focus-within:bg-white/[0.03]"
+  }`;
+  const characterPanelClass = `${detailSectionSurfaceClass} ${detailPanelClass}`;
+  const characterRowClass = `flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-[border-color,background-color] duration-[220ms] ease-out ${
+    justSurprised
+      ? "border-indigo-400/35 bg-indigo-500/[0.05]"
+      : "border-white/8 bg-white/[0.02]"
+  } ${isLocked ? "opacity-60" : "focus-within:border-indigo-300/35 focus-within:bg-white/[0.03]"}`;
   const detailsStageShellClass = `${stageShellClass} flex flex-col gap-2.5 overflow-hidden px-4 py-3.5 sm:px-5 sm:py-4 lg:max-h-[calc(100vh-23.5rem)]`;
-  const isDetailStageTransitioning = pendingDetailReveal && activeStage !== "details";
   const detailHeaderCopy =
-    "Refine the premise, cast, and final setup here. To change style or premise path, return to Step 2.";
+    "Go back to Step 2 to change the style or switch between AI and manual premise setup.";
   const genreSurfaceLayoutId = prefersReducedMotion
     ? undefined
     : "setup-genre-surface";
@@ -1655,12 +1645,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   );
   const activateEarlierStage = useCallback((nextStage: SetupEditableStage) => {
     stageFocusTargetRef.current = nextStage;
-    setPendingDetailReveal(false);
+    setDetailRevealSource(null);
     setManualStageOverride(nextStage);
     setActiveStage(nextStage);
   }, []);
   const clearStepThreeSetupDetails = useCallback(() => {
-    setPendingDetailReveal(false);
     setDetailRevealSource(null);
     setJustSurprised(false);
     updateValue({
@@ -1725,16 +1714,14 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         aria-label={`${targetLabel} voice preference: ${meta.label}. Click to cycle.`}
         title={`${targetLabel} voice preference: ${meta.label}`}
         data-testid={options?.testId}
-        className={`inline-flex h-10 min-w-[4rem] shrink-0 flex-col items-center justify-center rounded-lg border border-white/10 bg-slate-900/60 px-1.5 text-slate-200 transition-[opacity,color,border-color,background-color,box-shadow] duration-[220ms] ease-out hover:border-indigo-300/55 hover:bg-indigo-500/18 hover:text-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:min-w-[4.35rem] ${
+        className={`inline-flex h-10 min-w-[2.75rem] shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] px-2 text-slate-200 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-indigo-300/55 hover:bg-indigo-500/18 hover:text-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:min-w-[3.25rem] sm:px-2.5 ${
           isLocked ? "opacity-60 cursor-not-allowed" : ""
-        } ${options?.narrator ? "border-white/12 bg-white/[0.035]" : ""}`}
+        } ${options?.narrator ? "border-white/12" : ""}`}
       >
-        <span className="text-[9px] uppercase tracking-[0.16em] text-slate-400">
-          Voice
-        </span>
-        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold leading-none text-slate-100 sm:text-[11px]">
-          <Icon className="h-3 w-3" />
-          {meta.label}
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold leading-none text-slate-100 sm:text-[11px]">
+          <span className="sr-only">Voice </span>
+          <Icon className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">{meta.label}</span>
         </span>
       </button>
     );
@@ -1795,12 +1782,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     data-testid="setup-genre-summary"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                      <div className="min-w-0 space-y-1.5">
                         <p className={`${setupSectionLabelClass} text-slate-400`}>
-                          Selected genre
+                          Genre
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                          Locked summary. Return to Step 1 to change it.
+                        <p className="text-[1.75rem] font-semibold tracking-tight text-slate-50 sm:text-[2rem]">
+                          {genre}
                         </p>
                       </div>
                       <button
@@ -1819,13 +1806,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         Edit Step 1
                       </button>
                     </div>
-                    <div className="mt-3 flex items-end justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[1.75rem] font-semibold tracking-tight text-slate-50 sm:text-[2rem]">
-                          {genre}
-                        </p>
-                      </div>
-                    </div>
                   </m.div>
 
                   <AnimatePresence initial={false}>
@@ -1839,23 +1819,12 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         data-testid="setup-style-summary"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="min-w-0 space-y-1.5">
                             <p className={`${setupSectionLabelClass} text-slate-400`}>
-                              Selected style
+                              Style
                             </p>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                              <p className="text-base font-semibold text-slate-100">
-                                {styleSummaryLabel}
-                              </p>
-                              {selectedStyleCategoryLabel && (
-                                <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/10">
-                                  {selectedStyleCategoryLabel}
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                              Locked summary. Return to Step 2 to change style or
-                              premise path.
+                            <p className="text-base font-semibold text-slate-100">
+                              {styleSummaryLabel}
                             </p>
                           </div>
                           <button
@@ -1873,11 +1842,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           >
                             Edit Step 2
                           </button>
-                        </div>
-                        <div className="mt-3">
-                          <p className="text-sm leading-relaxed text-slate-300/85">
-                            {styleSummaryDescription}
-                          </p>
                         </div>
                       </m.div>
                     ) : null}
@@ -1955,9 +1919,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   animate="visible"
                   exit="exit"
                   variants={stageShellVariants}
-                  className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5 ${
-                    isDetailStageTransitioning ? "pointer-events-none" : ""
-                  }`}
+                  className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
                 >
                   <div className="space-y-4">
                     <div className="space-y-1">
@@ -2072,9 +2034,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         disabled={isLoading || isSurprising || isLocked}
                         aria-busy={isSurprising || undefined}
                         aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
-                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 disabled:opacity-50 disabled:pointer-events-none ${
-                          isDetailStageTransitioning ? "opacity-70" : ""
-                        }`}
+                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 disabled:opacity-50 disabled:pointer-events-none`}
                       >
                         {isSurprising ? (
                           <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" fill="none" viewBox="0 0 24 24">
@@ -2090,18 +2050,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         onClick={showManualDetails}
                         disabled={isLocked}
                         aria-disabled={isLocked || undefined}
-                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none ${
-                          isDetailStageTransitioning ? "opacity-70" : ""
-                        }`}
+                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none`}
                       >
                         Write My Own Premise
                       </button>
                     </div>
-                    {isDetailStageTransitioning ? (
-                      <p className="text-xs leading-relaxed text-slate-400">
-                        Opening Step 3...
-                      </p>
-                    ) : null}
                   </div>
                 </m.div>
               ) : null}
@@ -2131,11 +2084,11 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   className="grid grid-cols-1 gap-2.5 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1.16fr)_minmax(16.5rem,0.84fr)] md:items-stretch"
                 >
                   <div
-                    className={`${detailPanelClass} ${detailSectionSurfaceClass}`}
+                    className={premisePanelClass}
                     data-testid="setup-premise-panel"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <label className={setupSectionLabelClass}>
                           Premise
                         </label>
@@ -2152,23 +2105,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           const nextPremise = e.target.value;
                           updateValue({ premise: nextPremise });
                         }}
-                        className={`w-full flex-1 min-h-[124px] resize-none rounded-2xl border border-white/7 bg-white/[0.022] px-3.5 py-3 pr-2.5 text-[15px] leading-relaxed text-slate-100 caret-indigo-200 placeholder:text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out sm:text-base lg:min-h-[114px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
-                          justSurprised
-                            ? "border-indigo-400/30 bg-indigo-500/[0.07] shadow-[0_0_0_1px_rgba(99,102,241,0.08),0_0_18px_rgba(99,102,241,0.12)]"
-                            : "shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-                        } ${isLocked ? "cursor-not-allowed bg-white/[0.018] text-slate-400 opacity-60" : "hover:border-white/10 focus:border-indigo-300/40 focus:bg-white/[0.03] focus:shadow-[0_0_0_1px_rgba(99,102,241,0.12)]"}`}
+                        className={`w-full flex-1 min-h-[124px] resize-none border-0 bg-transparent px-0 py-1 pr-1.5 text-[15px] leading-relaxed text-slate-100 caret-indigo-200 placeholder:text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none sm:text-base lg:min-h-[114px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
+                          isLocked ? "cursor-not-allowed text-slate-400" : ""
+                        }`}
                         placeholder="e.g., A detective discovers his new partner is a ghost..."
                         disabled={isLocked}
                       />
                       {activePremiseSource === "manual" && (
-                        <div className="flex gap-1.5 overflow-x-auto pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <div className="flex flex-wrap gap-1 pt-0.5">
                           {STARTER_IDEAS.map((idea) => (
                             <button
                               key={idea}
                               type="button"
                               onClick={() => handleStarterIdeaClick(idea)}
                               disabled={isLocked}
-                              className="max-w-[12rem] shrink-0 rounded-full border border-white/10 bg-slate-900/55 px-3 py-1.5 text-left text-xs text-slate-300 transition-[opacity,color,background-color,border-color] duration-[220ms] ease-out hover:border-indigo-300/50 hover:bg-indigo-500/18 hover:text-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+                              className="rounded-full border border-white/8 bg-transparent px-2.5 py-1 text-left text-[11px] text-slate-400 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-white/14 hover:bg-white/[0.03] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {idea}
                             </button>
@@ -2179,7 +2130,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   </div>
 
                   <div
-                    className={`${detailPanelClass} ${detailSectionSurfaceClass}`}
+                    className={characterPanelClass}
                     data-testid="setup-characters-panel"
                   >
                     <div className="flex h-full flex-1 flex-col space-y-1.5">
@@ -2187,8 +2138,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
                       </label>
                       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.2)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35">
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
-                          <div className="flex min-h-[40px] min-w-0 items-center justify-between rounded-xl border border-white/8 bg-white/[0.024] px-3 py-1.5">
+                        <div className="flex items-center gap-1.5 rounded-lg border border-white/8 bg-white/[0.02] px-2.5 py-1.5">
+                          <div className="min-w-0 flex-1">
                             <div className="min-w-0">
                               <p className="truncate text-sm sm:text-base font-medium text-white">
                                 Narrator
@@ -2210,7 +2161,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         {characters.map((char, idx) => (
                           <div
                             key={idx}
-                            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+                            className={characterRowClass}
                           >
                             <input
                               ref={(el) => {
@@ -2220,11 +2171,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                               onChange={(e) =>
                                 handleCharacterChange(idx, e.target.value)
                               }
-                              className={`min-w-0 w-full rounded-xl border px-3 py-2.25 text-sm text-white transition-[background-color,border-color,box-shadow] duration-[220ms] ease-out placeholder-slate-500 focus:border-transparent focus:ring-2 focus:ring-indigo-500 sm:text-base ${
-                                justSurprised
-                                  ? "bg-indigo-900/25 border-indigo-400/45"
-                                  : "bg-slate-900/60 border-white/10"
-                              } ${isLocked ? "cursor-not-allowed bg-slate-900/50 text-slate-400 opacity-60" : ""}`}
+                              className={`min-w-0 flex-1 bg-transparent px-0 py-1 text-sm text-white placeholder-slate-500 focus:outline-none sm:text-base ${
+                                isLocked ? "cursor-not-allowed text-slate-400" : ""
+                              }`}
                               placeholder={`Character ${idx + 1}`}
                               disabled={isLocked}
                             />
@@ -2244,7 +2193,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                               <button
                                 type="button"
                                 onClick={() => removeCharacter(idx)}
-                                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-transparent text-slate-500 transition-[opacity,color,border-color,background-color] duration-200 hover:border-red-300/35 hover:bg-red-500/10 hover:text-red-300"
+                                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-500 transition-[color,border-color,background-color] duration-200 hover:border-red-300/35 hover:bg-red-500/10 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-400/70 focus:ring-offset-1 focus:ring-offset-slate-950"
                                 aria-label="Remove character"
                                 title="Remove character"
                               >
@@ -2258,7 +2207,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           type="button"
                           onClick={addCharacter}
                           disabled={isLocked}
-                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/18 py-2.25 text-sm font-medium text-slate-300 transition-[opacity,color,border-color,box-shadow] duration-[220ms] ease-out hover:border-indigo-300/55 hover:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/14 py-2 text-sm font-medium text-slate-300 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-white/22 hover:bg-white/[0.03] hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <Plus className="w-3.5 h-3.5" /> Add Character
                         </button>
@@ -2320,7 +2269,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
             {stageReactivationPrompt ? (
               <div className="fixed inset-0 z-[82] flex items-center justify-center px-4">
                 <m.div
-                  className="absolute inset-0 bg-black/72 backdrop-blur-sm"
+                  className="absolute inset-0 bg-black/60"
                   onClick={() => closeStageReactivationPrompt()}
                   initial="hidden"
                   animate="visible"
@@ -2329,7 +2278,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 />
                 <m.div
                   ref={stageReactivationModalRef}
-                  className="relative w-full max-w-md overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
+                  className="relative w-full max-w-sm rounded-xl border border-white/10 bg-slate-900/95 p-5 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.95)]"
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="setup-step-reactivation-title"
@@ -2339,38 +2288,33 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   exit="exit"
                   variants={modalVariants}
                 >
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
-                      Setup Flow
-                    </p>
+                  <div className="space-y-4">
                     <h2
                       id="setup-step-reactivation-title"
                       className="mt-1 text-base font-semibold text-white"
                     >
                       Return to {stageReactivationPrompt === "genre" ? "Step 1" : "Step 2"}?
                     </h2>
-                  </div>
-                  <div className="space-y-4 px-5 py-4">
                     <p
                       id="setup-step-reactivation-description"
                       className="text-sm leading-relaxed text-slate-300"
                     >
                       Going back will clear the current premise and characters so
-                      you can rebuild the setup from that earlier step.
+                      you can rebuild from that earlier step.
                     </p>
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                       <button
                         ref={stageReactivationCancelButtonRef}
                         type="button"
                         onClick={() => closeStageReactivationPrompt()}
-                        className={`rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-200 ${interactiveControlClass}`}
+                        className={`rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-200 ${interactiveControlClass}`}
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={confirmStageReactivation}
-                        className={`rounded-xl border border-indigo-300/35 bg-indigo-500/18 px-4 py-2.5 text-sm font-medium text-indigo-100 shadow-[0_14px_30px_-22px_rgba(99,102,241,0.9)] ${interactiveControlClass}`}
+                        className={`rounded-lg border border-indigo-300/30 bg-indigo-500/14 px-4 py-2.5 text-sm font-medium text-indigo-100 ${interactiveControlClass}`}
                       >
                         Go back and clear setup details
                       </button>
