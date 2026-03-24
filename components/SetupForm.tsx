@@ -140,7 +140,9 @@ type GenreWheelPointerState = {
   pointerId: number | null;
   startY: number;
   lastY: number;
+  lastTime: number;
   dragOffset: number;
+  velocityY: number;
   moved: boolean;
 };
 
@@ -163,13 +165,12 @@ const getAdjacentLengthValue = (
   return SCENE_LENGTH_VALUES[nextIndex] ?? currentValue;
 };
 
-const getAdjacentGenre = (
-  currentGenre: string,
-  direction: GenreWheelDirection,
-): string => {
+const getGenreByOffset = (currentGenre: string, offset: number): string => {
+  if (GENRES.length === 0) return currentGenre;
   const currentIndex = Math.max(0, GENRES.indexOf(currentGenre));
   const nextIndex =
-    (currentIndex + direction + GENRES.length) % GENRES.length;
+    (currentIndex + offset + GENRES.length * Math.max(1, Math.abs(offset))) %
+    GENRES.length;
   return GENRES[nextIndex] ?? GENRES[0] ?? currentGenre;
 };
 
@@ -220,23 +221,24 @@ const LENGTH_TICK_DURATION_MS = 240;
 const WHEEL_DRAG_STEP_PX = 26;
 const GENRE_WHEEL_STEP_SPRING = {
   type: "spring" as const,
-  stiffness: 520,
-  damping: 42,
-  mass: 0.72,
-  restSpeed: 0.5,
-  restDelta: 0.5,
+  stiffness: 500,
+  damping: 40,
+  mass: 0.78,
+  restSpeed: 0.4,
+  restDelta: 0.4,
 };
 const GENRE_WHEEL_RETURN_SPRING = {
   type: "spring" as const,
-  stiffness: 560,
-  damping: 44,
-  mass: 0.7,
-  restSpeed: 0.5,
-  restDelta: 0.5,
+  stiffness: 460,
+  damping: 38,
+  mass: 0.82,
+  restSpeed: 0.4,
+  restDelta: 0.4,
 };
-const GENRE_WHEEL_DRAG_COMMIT_RATIO = 0.4;
-const GENRE_WHEEL_DRAG_CLAMP_RATIO = 0.92;
 const GENRE_WHEEL_DRAG_CLICK_SLOP_PX = 6;
+const GENRE_WHEEL_WINDOW_RADIUS = 3;
+const GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP = 1.8;
+const GENRE_WHEEL_MOMENTUM_FACTOR = 0.2;
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   value,
@@ -537,6 +539,7 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
   const [pendingValue, setPendingValue] = useState<string | null>(null);
   const [phase, setPhase] = useState<LengthTickPhase>("idle");
   const [isDragging, setIsDragging] = useState(false);
+  const [renderOffset, setRenderOffset] = useState(0);
   const suppressClickRef = useRef(false);
   const currentValueRef = useRef(value);
   const pendingValueRef = useRef<string | null>(null);
@@ -546,7 +549,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     pointerId: null,
     startY: 0,
     lastY: 0,
+    lastTime: 0,
     dragOffset: 0,
+    velocityY: 0,
     moved: false,
   });
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -557,12 +562,16 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       itemHeight,
       peek,
       viewportHeight: itemHeight + peek * 2,
-      restY: -itemHeight + peek,
-      dragClamp: itemHeight * GENRE_WHEEL_DRAG_CLAMP_RATIO,
-      commitThreshold: itemHeight * GENRE_WHEEL_DRAG_COMMIT_RATIO,
+      baseTrackY: peek - itemHeight * GENRE_WHEEL_WINDOW_RADIUS,
+      dragClamp: itemHeight * (compact ? 2.05 : 2.35),
+      projectedClamp: itemHeight * (compact ? 2.2 : 2.55),
+      momentumMs: compact ? 125 : 145,
+      maxSnapSteps: 2,
+      minOpacity: compact ? 0.2 : 0.16,
+      minScale: compact ? 0.72 : 0.68,
     };
   }, [compact]);
-  const trackY = useMotionValue(wheelMetrics.restY);
+  const wheelOffset = useMotionValue(0);
 
   const stopTrackAnimation = useCallback(() => {
     animationIdRef.current += 1;
@@ -585,6 +594,15 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
   }, [stopTrackAnimation]);
 
   useEffect(() => {
+    const unsubscribe = wheelOffset.on("change", (latest) => {
+      setRenderOffset(latest);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [wheelOffset]);
+
+  useEffect(() => {
     if (phase !== "idle" || isDragging) return;
     if (currentValueRef.current === value) return;
     stopTrackAnimation();
@@ -592,13 +610,13 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     pendingValueRef.current = null;
     currentValueRef.current = value;
     setCurrentValue(value);
-    trackY.set(wheelMetrics.restY);
-  }, [isDragging, phase, stopTrackAnimation, trackY, value, wheelMetrics.restY]);
+    wheelOffset.set(0);
+  }, [isDragging, phase, stopTrackAnimation, value, wheelOffset]);
 
   useEffect(() => {
     if (phase !== "idle") return;
-    trackY.set(wheelMetrics.restY);
-  }, [phase, trackY, wheelMetrics.restY]);
+    wheelOffset.set(0);
+  }, [phase, wheelOffset]);
 
   const completePendingStep = useCallback(() => {
     const resolvedValue = pendingValueRef.current;
@@ -610,18 +628,18 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       pendingValueRef.current = null;
     }
     setPhase("idle");
-    trackY.set(wheelMetrics.restY);
-  }, [stopTrackAnimation, trackY, wheelMetrics.restY]);
+    wheelOffset.set(0);
+  }, [stopTrackAnimation, wheelOffset]);
 
-  const springTrackTo = useCallback(
+  const animateWheelOffset = useCallback(
     (
-      targetY: number,
+      targetOffset: number,
       transition: typeof GENRE_WHEEL_RETURN_SPRING,
       onComplete?: () => void,
     ) => {
       stopTrackAnimation();
       const animationId = animationIdRef.current;
-      animationRef.current = animate(trackY, targetY, {
+      animationRef.current = animate(wheelOffset, targetOffset, {
         ...transition,
         onComplete: () => {
           if (animationIdRef.current !== animationId) return;
@@ -630,29 +648,32 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         },
       });
     },
-    [stopTrackAnimation, trackY],
+    [stopTrackAnimation, wheelOffset],
   );
 
-  const springTrackToCenter = useCallback(() => {
+  const springTrackToCenter = useCallback((transition = GENRE_WHEEL_RETURN_SPRING) => {
     if (prefersReducedMotion) {
       stopTrackAnimation();
-      trackY.set(wheelMetrics.restY);
+      wheelOffset.set(0);
       return;
     }
-    springTrackTo(wheelMetrics.restY, GENRE_WHEEL_RETURN_SPRING);
-  }, [prefersReducedMotion, springTrackTo, stopTrackAnimation, trackY, wheelMetrics.restY]);
+    animateWheelOffset(0, transition);
+  }, [animateWheelOffset, prefersReducedMotion, stopTrackAnimation, wheelOffset]);
 
-  const stepGenre = useCallback(
-    (
-      stepDirection: GenreWheelDirection,
-      options?: { fromDrag?: boolean },
-    ) => {
+  const settleGenre = useCallback(
+    (stepCount: number) => {
       if (disabled) return;
-      if (!options?.fromDrag) {
-        completePendingStep();
+      if (stepCount === 0) {
+        springTrackToCenter();
+        return;
       }
+
+      const clampedSteps = Math.max(
+        -wheelMetrics.maxSnapSteps,
+        Math.min(stepCount, wheelMetrics.maxSnapSteps),
+      );
       const baseValue = currentValueRef.current;
-      const nextGenre = getAdjacentGenre(baseValue, stepDirection);
+      const nextGenre = getGenreByOffset(baseValue, clampedSteps);
       onChange(nextGenre);
 
       if (prefersReducedMotion) {
@@ -662,15 +683,15 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         setPendingValue(null);
         pendingValueRef.current = null;
         setPhase("idle");
-        trackY.set(wheelMetrics.restY);
+        wheelOffset.set(0);
         return;
       }
 
       setPendingValue(nextGenre);
       pendingValueRef.current = nextGenre;
       setPhase("animate");
-      springTrackTo(
-        wheelMetrics.restY - stepDirection * wheelMetrics.itemHeight,
+      animateWheelOffset(
+        clampedSteps * wheelMetrics.itemHeight,
         GENRE_WHEEL_STEP_SPRING,
         () => {
           currentValueRef.current = nextGenre;
@@ -678,21 +699,30 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
           setPendingValue(null);
           pendingValueRef.current = null;
           setPhase("idle");
-          trackY.set(wheelMetrics.restY);
+          wheelOffset.set(0);
         },
       );
     },
     [
+      animateWheelOffset,
       disabled,
-      completePendingStep,
       onChange,
       prefersReducedMotion,
-      springTrackTo,
+      springTrackToCenter,
       stopTrackAnimation,
-      trackY,
       wheelMetrics.itemHeight,
-      wheelMetrics.restY,
+      wheelMetrics.maxSnapSteps,
+      wheelOffset,
     ],
+  );
+
+  const stepGenre = useCallback(
+    (stepDirection: GenreWheelDirection) => {
+      if (disabled) return;
+      completePendingStep();
+      settleGenre(stepDirection);
+    },
+    [completePendingStep, disabled, settleGenre],
   );
 
   const resetPointerState = useCallback(() => {
@@ -709,7 +739,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       pointerId: null,
       startY: 0,
       lastY: 0,
+      lastTime: 0,
       dragOffset: 0,
+      velocityY: 0,
       moved: false,
     };
     setIsDragging(false);
@@ -723,7 +755,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         pointerId: event.pointerId,
         startY: event.clientY,
         lastY: event.clientY,
+        lastTime: event.timeStamp,
         dragOffset: 0,
+        velocityY: 0,
         moved: false,
       };
       suppressClickRef.current = false;
@@ -739,7 +773,16 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) return;
       if (pointerStateRef.current.pointerId !== event.pointerId) return;
+      const deltaY = event.clientY - pointerStateRef.current.lastY;
+      const deltaTime = Math.max(
+        event.timeStamp - pointerStateRef.current.lastTime,
+        8,
+      );
+      const velocitySample = deltaY / deltaTime;
+      pointerStateRef.current.velocityY =
+        pointerStateRef.current.velocityY * 0.72 + velocitySample * 0.28;
       pointerStateRef.current.lastY = event.clientY;
+      pointerStateRef.current.lastTime = event.timeStamp;
       const dragOffset = Math.max(
         -wheelMetrics.dragClamp,
         Math.min(
@@ -753,32 +796,72 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         suppressClickRef.current = true;
       }
       if (prefersReducedMotion) return;
-      trackY.set(wheelMetrics.restY - dragOffset);
+      wheelOffset.set(dragOffset);
     },
-    [disabled, prefersReducedMotion, trackY, wheelMetrics.dragClamp, wheelMetrics.restY],
+    [disabled, prefersReducedMotion, wheelMetrics.dragClamp, wheelOffset],
   );
 
   const handlePointerEnd = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (pointerStateRef.current.pointerId !== event.pointerId) return;
       const dragOffset = pointerStateRef.current.dragOffset;
+      const velocityY = Math.max(
+        -GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
+        Math.min(
+          pointerStateRef.current.velocityY,
+          GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
+        ),
+      );
       suppressClickRef.current = pointerStateRef.current.moved;
       resetPointerState();
       if (event.type === "pointercancel") {
         springTrackToCenter();
         return;
       }
-      if (dragOffset >= wheelMetrics.commitThreshold) {
-        stepGenre(1, { fromDrag: true });
+      if (prefersReducedMotion) {
+        const reducedSteps = Math.round(dragOffset / wheelMetrics.itemHeight);
+        if (reducedSteps === 0) {
+          wheelOffset.set(0);
+          return;
+        }
+        settleGenre(reducedSteps);
         return;
       }
-      if (dragOffset <= -wheelMetrics.commitThreshold) {
-        stepGenre(-1, { fromDrag: true });
+      const projectedOffset = Math.max(
+        -wheelMetrics.projectedClamp,
+        Math.min(
+          dragOffset +
+            velocityY *
+              wheelMetrics.momentumMs *
+              GENRE_WHEEL_MOMENTUM_FACTOR *
+              Math.min(Math.abs(dragOffset) / wheelMetrics.itemHeight, 1.15),
+          wheelMetrics.projectedClamp,
+        ),
+      );
+      const snapSteps = Math.max(
+        -wheelMetrics.maxSnapSteps,
+        Math.min(
+          Math.round(projectedOffset / wheelMetrics.itemHeight),
+          wheelMetrics.maxSnapSteps,
+        ),
+      );
+      if (snapSteps === 0) {
+        springTrackToCenter();
         return;
       }
-      springTrackToCenter();
+      settleGenre(snapSteps);
     },
-    [resetPointerState, springTrackToCenter, stepGenre, wheelMetrics.commitThreshold],
+    [
+      prefersReducedMotion,
+      resetPointerState,
+      settleGenre,
+      springTrackToCenter,
+      wheelMetrics.itemHeight,
+      wheelMetrics.maxSnapSteps,
+      wheelMetrics.momentumMs,
+      wheelMetrics.projectedClamp,
+      wheelOffset,
+    ],
   );
 
   const handleClick = useCallback(
@@ -788,10 +871,9 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         event.preventDefault();
         return;
       }
-      completePendingStep();
       stepGenre(1);
     },
-    [completePendingStep, stepGenre],
+    [stepGenre],
   );
 
   const handleKeyDown = useCallback(
@@ -803,7 +885,6 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         event.key === "PageDown"
       ) {
         event.preventDefault();
-        completePendingStep();
         stepGenre(1);
         return;
       }
@@ -813,21 +894,26 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         event.key === "PageUp"
       ) {
         event.preventDefault();
-        completePendingStep();
         stepGenre(-1);
       }
     },
-    [completePendingStep, disabled, stepGenre],
+    [disabled, stepGenre],
   );
 
   const selectedValue = pendingValue ?? currentValue;
   const isLarge = !compact;
   const visibleItems = useMemo(
-    () => [
-      { slot: "previous" as const, value: getAdjacentGenre(currentValue, -1) },
-      { slot: "current" as const, value: currentValue },
-      { slot: "next" as const, value: getAdjacentGenre(currentValue, 1) },
-    ],
+    () =>
+      Array.from(
+        { length: GENRE_WHEEL_WINDOW_RADIUS * 2 + 1 },
+        (_, itemIndex) => {
+          const relativeIndex = itemIndex - GENRE_WHEEL_WINDOW_RADIUS;
+          return {
+            relativeIndex,
+            value: getGenreByOffset(currentValue, relativeIndex),
+          };
+        },
+      ),
     [currentValue],
   );
 
@@ -869,57 +955,66 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
         </span>
       ) : null}
       <span
-        className={`relative mt-1.5 inline-flex w-full overflow-hidden rounded-[1.05rem] align-middle ${
-          isLarge
-            ? "min-w-[9.5rem] max-w-full bg-slate-950/22 ring-1 ring-white/8"
-            : "min-w-[6.5rem] max-w-full bg-white/[0.03] ring-1 ring-white/6"
+        className={`relative mt-1.5 block w-full overflow-hidden align-middle ${
+          isLarge ? "min-w-[9.5rem] max-w-full" : "min-w-[6.5rem] max-w-full"
         }`}
         style={{ height: wheelMetrics.viewportHeight }}
         data-testid="setup-genre-value-viewport"
         aria-hidden="true"
       >
-        <m.span
-          style={{ y: trackY }}
+        <span
           className="absolute inset-x-0 top-0 flex flex-col transform-gpu will-change-transform"
+          style={{
+            transform: `translateY(${wheelMetrics.baseTrackY - renderOffset}px)`,
+          }}
         >
           {visibleItems.map((item) => {
             const isSelectedItem = item.value === selectedValue;
-            const slotClass =
-              item.slot === "current"
-                ? isLarge
-                  ? "text-[2rem] sm:text-[2.3rem] text-slate-50"
-                  : "text-[1.5rem] tracking-[-0.01em] text-slate-50"
-                : isLarge
-                  ? "text-[1.15rem] sm:text-[1.25rem] text-slate-300/46"
-                  : "text-[1rem] tracking-[-0.01em] text-slate-300/42";
+            const distance = Math.abs(
+              item.relativeIndex * wheelMetrics.itemHeight - renderOffset,
+            );
+            const normalizedDistance = Math.min(
+              distance / (wheelMetrics.itemHeight * 1.55),
+              1,
+            );
+            const prominence = 1 - normalizedDistance;
+            const easedProminence =
+              prominence * prominence * (3 - 2 * prominence);
+            const opacity =
+              wheelMetrics.minOpacity +
+              (1 - wheelMetrics.minOpacity) * easedProminence;
+            const scale =
+              wheelMetrics.minScale +
+              (1 - wheelMetrics.minScale) * easedProminence;
+            const lift = (1 - easedProminence) * (isLarge ? 1.6 : 0.8);
+            const textShadowAlpha = 0.05 + easedProminence * 0.16;
 
             return (
               <span
-                key={`${currentValue}-${item.slot}-${item.value}`}
+                key={`${currentValue}-${item.relativeIndex}-${item.value}`}
                 data-testid={isSelectedItem ? "setup-genre-value" : undefined}
-                className={`flex items-center font-semibold leading-none ${slotClass}`}
-                style={{ height: wheelMetrics.itemHeight }}
+                className={`flex items-center font-semibold leading-none text-slate-50 ${
+                  isLarge
+                    ? "text-[2rem] sm:text-[2.3rem]"
+                    : "text-[1.5rem] tracking-[-0.01em]"
+                }`}
+                style={{
+                  height: wheelMetrics.itemHeight,
+                  opacity,
+                  transform: `translateY(${lift}px) scale(${scale})`,
+                  transformOrigin: "center left",
+                  textShadow: `0 0 18px rgba(255,255,255,${textShadowAlpha})`,
+                }}
               >
-                <span
-                  className={`block w-full whitespace-nowrap ${
-                    item.slot === "current" ? "" : "translate-y-[0.5px]"
-                  }`}
-                >
+                <span className="block w-full whitespace-nowrap">
                   {item.value}
                 </span>
               </span>
             );
           })}
-        </m.span>
-        <span
-          className="pointer-events-none absolute inset-x-0 rounded-[0.95rem] border border-white/10 bg-white/[0.035]"
-          style={{
-            top: wheelMetrics.peek,
-            height: wheelMetrics.itemHeight,
-          }}
-        />
-        <span className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-slate-950/70 to-transparent" />
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-slate-950/70 to-transparent" />
+        </span>
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-slate-950/52 via-slate-950/18 to-transparent" />
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-slate-950/52 via-slate-950/18 to-transparent" />
       </span>
       {isLarge && (
         <span className="mt-1 block text-xs text-slate-400 sm:text-sm">
