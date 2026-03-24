@@ -129,6 +129,7 @@ export const SETUP_UI_TOKENS = {
 type SceneLengthValue = "Short" | "Medium" | "Long";
 type LengthTickPhase = "idle" | "prep" | "animate";
 type SetupActiveStage = "genre" | "style" | "details";
+type SetupEditableStage = Exclude<SetupActiveStage, "details">;
 type GenreWheelDirection = 1 | -1;
 type WheelPointerState = {
   pointerId: number | null;
@@ -1048,19 +1049,28 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [detailRevealSource, setDetailRevealSource] = useState<
     "manual" | "ai" | null
   >(null);
-  const [manualPremiseDraft, setManualPremiseDraft] = useState(() => premise);
-  const [aiPremiseDraft, setAiPremiseDraft] = useState("");
   const [styleSearch, setStyleSearch] = useState("");
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [styleShufflePulse, setStyleShufflePulse] = useState(false);
+  const [manualStageOverride, setManualStageOverride] =
+    useState<SetupEditableStage | null>(null);
+  const [stageReactivationPrompt, setStageReactivationPrompt] =
+    useState<SetupEditableStage | null>(null);
   const autoSurpriseRef = useRef(false);
   const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
   const styleLibraryModalRef = useRef<HTMLDivElement | null>(null);
   const styleShufflePulseTimeoutRef = useRef<number | null>(null);
   const detailsFooterRef = useRef<HTMLDivElement | null>(null);
+  const stageReactivationModalRef = useRef<HTMLDivElement | null>(null);
+  const stageReactivationCancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const stageFocusTargetRef = useRef<SetupEditableStage | null>(null);
+  const genreContinueButtonRef = useRef<HTMLButtonElement | null>(null);
+  const styleAiButtonRef = useRef<HTMLButtonElement | null>(null);
+  const styleManualButtonRef = useRef<HTMLButtonElement | null>(null);
+  const stageReactivationTriggerRef = useRef<HTMLElement | null>(null);
 
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -1207,37 +1217,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   const showManualDetails = useCallback(() => {
     setPendingDetailReveal(false);
+    setManualStageOverride(null);
     setActiveStage("details");
     setDetailRevealSource("manual");
   }, []);
-
-  const switchPremiseMode = useCallback(
-    (nextMode: "manual" | "ai") => {
-      if (isLocked || detailRevealSource === nextMode) return;
-      setPendingDetailReveal(false);
-      setActiveStage("details");
-      setDetailRevealSource(nextMode);
-      const nextPremise =
-        nextMode === "manual"
-          ? manualPremiseDraft.trim().length > 0
-            ? manualPremiseDraft
-            : premise
-          : aiPremiseDraft.trim().length > 0
-            ? aiPremiseDraft
-            : premise;
-      if (nextPremise !== premise) {
-        updateValue({ premise: nextPremise });
-      }
-    },
-    [
-      aiPremiseDraft,
-      detailRevealSource,
-      isLocked,
-      manualPremiseDraft,
-      premise,
-      updateValue,
-    ],
-  );
 
   const handleEditSetup = () => {
     if (!onEditSetup) return;
@@ -1294,27 +1277,22 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   }, [autoSurprise, handleGenerateSurpriseSetup, isLocked, isSurprising]);
 
   useEffect(() => {
+    if (manualStageOverride) {
+      setActiveStage(manualStageOverride);
+      return;
+    }
     const derivedStage = deriveInitialStage({ premise, characters, style, styleId });
     setActiveStage((previousStage) =>
       getStageRank(derivedStage) > getStageRank(previousStage)
         ? derivedStage
         : previousStage,
     );
-  }, [characters, premise, style, styleId]);
+  }, [characters, manualStageOverride, premise, style, styleId]);
   useEffect(() => {
     if (activeStage === "details" && detailRevealSource === null) {
       setDetailRevealSource("manual");
     }
   }, [activeStage, detailRevealSource]);
-  useEffect(() => {
-    if (detailRevealSource === "manual") {
-      setManualPremiseDraft(premise);
-      return;
-    }
-    if (detailRevealSource === "ai") {
-      setAiPremiseDraft(premise);
-    }
-  }, [detailRevealSource, premise]);
   useEffect(() => {
     if (activeStage !== "details") return;
     const footer = detailsFooterRef.current;
@@ -1374,6 +1352,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     const hasPremise = premise.trim().length > 0;
     const hasCharacter = characters.some((char) => char.trim().length > 0);
     if (!hasPremise || !hasCharacter) return;
+    setManualStageOverride(null);
     setActiveStage("details");
     setDetailRevealSource("ai");
     setPendingDetailReveal(false);
@@ -1422,9 +1401,86 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       window.removeEventListener("keydown", handleModalKeyboard);
     };
   }, [isStyleLibraryOpen]);
+  const closeStageReactivationPrompt = useCallback(
+    (restoreFocus = true) => {
+      setStageReactivationPrompt(null);
+      if (!restoreFocus) return;
+      const triggerElement = stageReactivationTriggerRef.current;
+      if (
+        !triggerElement ||
+        typeof triggerElement.focus !== "function" ||
+        !document.contains(triggerElement)
+      ) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        triggerElement.focus();
+      });
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!stageReactivationPrompt) return;
+    const animationId = requestAnimationFrame(() => {
+      stageReactivationCancelButtonRef.current?.focus();
+    });
+    const handleModalKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeStageReactivationPrompt();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const modalRoot = stageReactivationModalRef.current;
+      if (!modalRoot) return;
+      const focusableElements = modalRoot.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusableElements.length === 0) return;
+      const firstFocusable = focusableElements.item(0);
+      const lastFocusable = focusableElements.item(focusableElements.length - 1);
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (!activeElement || !modalRoot.contains(activeElement)) {
+        event.preventDefault();
+        firstFocusable?.focus();
+        return;
+      }
+      if (event.shiftKey && activeElement === firstFocusable) {
+        event.preventDefault();
+        lastFocusable?.focus();
+        return;
+      }
+      if (!event.shiftKey && activeElement === lastFocusable) {
+        event.preventDefault();
+        firstFocusable?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleModalKeyboard);
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener("keydown", handleModalKeyboard);
+    };
+  }, [closeStageReactivationPrompt, stageReactivationPrompt]);
+  useEffect(() => {
+    const focusTarget = stageFocusTargetRef.current;
+    if (!focusTarget || focusTarget !== activeStage) return;
+    const nextFocusTarget =
+      focusTarget === "genre"
+        ? genreContinueButtonRef.current
+        : styleAiButtonRef.current ?? styleManualButtonRef.current;
+    if (!nextFocusTarget || typeof nextFocusTarget.focus !== "function") {
+      stageFocusTargetRef.current = null;
+      return;
+    }
+    const animationId = requestAnimationFrame(() => {
+      nextFocusTarget.focus();
+    });
+    stageFocusTargetRef.current = null;
+    return () => cancelAnimationFrame(animationId);
+  }, [activeStage]);
 
   const trimmedPremise = premise.trim();
-  const premiseMode = detailRevealSource ?? "manual";
+  const activePremiseSource = detailRevealSource ?? "manual";
   const normalizedStyleSearch = styleSearch.trim().toLowerCase();
   const normalizedStyle = normalizeStyleValue(style);
   const normalizedStyleId =
@@ -1555,7 +1611,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     `${stageSurfaceBaseClass} bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out`;
   const sharedSurfaceCardClass =
     `${stageSurfaceBaseClass} bg-white/[0.032] px-4 py-3.5 sm:px-5 sm:py-4`;
-  const compactActionButtonClass = `rounded-full px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] ring-1 ${interactiveControlClass}`;
   const summaryLinkButtonClass = `inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] ${interactiveControlClass}`;
   const summaryStatusTextClass =
     "hidden text-[10px] uppercase tracking-[0.22em] text-slate-500 sm:inline";
@@ -1571,7 +1626,13 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const styleSurfaceLayoutId = prefersReducedMotion
     ? undefined
     : "setup-style-surface";
+  const hasInvalidatableCharacters = characters.some(
+    (character) => character.trim().length > 0,
+  );
+  const hasInvalidatableSetupDetails =
+    trimmedPremise.length > 0 || hasInvalidatableCharacters;
   const handleGenreAdvance = useCallback(() => {
+    setManualStageOverride(null);
     setActiveStage((previousStage) =>
       getStageRank(previousStage) < getStageRank("style")
         ? "style"
@@ -1584,6 +1645,51 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     },
     [updateValue],
   );
+  const activateEarlierStage = useCallback((nextStage: SetupEditableStage) => {
+    stageFocusTargetRef.current = nextStage;
+    setPendingDetailReveal(false);
+    setManualStageOverride(nextStage);
+    setActiveStage(nextStage);
+  }, []);
+  const clearStepThreeSetupDetails = useCallback(() => {
+    setPendingDetailReveal(false);
+    setDetailRevealSource(null);
+    setJustSurprised(false);
+    updateValue({
+      premise: "",
+      characters: [],
+      characterVoicePreferences: [],
+    });
+  }, [updateValue]);
+  const requestStageReactivation = useCallback(
+    (nextStage: SetupEditableStage, triggerElement: HTMLElement | null) => {
+      if (isLocked) return;
+      if (activeStage === "details" && hasInvalidatableSetupDetails) {
+        stageReactivationTriggerRef.current = triggerElement;
+        setStageReactivationPrompt(nextStage);
+        return;
+      }
+      activateEarlierStage(nextStage);
+    },
+    [
+      activateEarlierStage,
+      activeStage,
+      hasInvalidatableSetupDetails,
+      isLocked,
+    ],
+  );
+  const confirmStageReactivation = useCallback(() => {
+    if (!stageReactivationPrompt) return;
+    const nextStage = stageReactivationPrompt;
+    closeStageReactivationPrompt(false);
+    clearStepThreeSetupDetails();
+    activateEarlierStage(nextStage);
+  }, [
+    activateEarlierStage,
+    clearStepThreeSetupDetails,
+    closeStageReactivationPrompt,
+    stageReactivationPrompt,
+  ]);
   const openStyleLibrary = useCallback(() => {
     setIsStyleLibraryOpen(true);
   }, []);
@@ -1686,33 +1792,34 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                           Selected genre
                         </p>
                         <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                          Opening lane locked in.
+                          Locked summary. Return to Step 1 to change it.
                         </p>
                       </div>
-                      {isStyleStage && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveStage("genre")}
-                          disabled={isLocked}
-                          className={`${summaryLinkButtonClass} shrink-0 ${
-                            isLocked
-                              ? "cursor-not-allowed bg-white/[0.04] text-slate-400 opacity-60"
-                              : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white"
-                          }`}
-                        >
-                          Edit
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(event) =>
+                          requestStageReactivation("genre", event.currentTarget)
+                        }
+                        disabled={isLocked}
+                        className={`${summaryLinkButtonClass} shrink-0 ${
+                          isLocked
+                            ? "cursor-not-allowed bg-white/[0.04] text-slate-400 opacity-60"
+                            : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white"
+                        }`}
+                        title="Go back to Step 1"
+                      >
+                        Edit Step 1
+                      </button>
                     </div>
                     <div className="mt-3 flex items-end justify-between gap-3">
-                      <GenreCycleWheel
-                        value={genre}
-                        disabled={isLocked}
-                        compact
-                        prefersReducedMotion={prefersReducedMotion}
-                        focusRingClass={focusRingClass}
-                        onChange={handleGenreChange}
-                      />
+                      <div className="min-w-0">
+                        <p className="text-[1.75rem] font-semibold tracking-tight text-slate-50 sm:text-[2rem]">
+                          {genre}
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                          Step 1 complete
+                        </p>
+                      </div>
                       <span className={summaryStatusTextClass}>
                         Step 1 complete
                       </span>
@@ -1744,52 +1851,34 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                                 </span>
                               )}
                             </div>
+                            <p className="mt-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                              Locked summary. Return to Step 2 to change style or
+                              premise path.
+                            </p>
                           </div>
-                          {!isStyleBlank && (
-                            <button
-                              type="button"
-                              onClick={handleClearStyle}
-                              disabled={isLocked}
-                              aria-label="Clear selected style"
-                              className={`${compactActionButtonClass} ${
-                                isLocked
-                                  ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                                  : "bg-white/[0.035] text-slate-300 ring-white/10 hover:bg-white/[0.07] hover:text-white"
-                              }`}
-                              title="Clear selected style"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
                           <button
                             type="button"
-                            onClick={handleStyleShuffle}
-                            disabled={isLocked || stylesLibrary.length === 0}
-                            className={`${compactActionButtonClass} ${
-                              isLocked || stylesLibrary.length === 0
-                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                                : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
-                            }`}
-                          >
-                            Shuffle
-                          </button>
-                          <button
-                            type="button"
-                            onClick={openStyleLibrary}
+                            onClick={(event) =>
+                              requestStageReactivation("style", event.currentTarget)
+                            }
                             disabled={isLocked}
-                            className={`inline-flex items-center gap-1.5 ${compactActionButtonClass} ${
+                            className={`${summaryLinkButtonClass} shrink-0 ${
                               isLocked
-                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 ring-white/10 opacity-60"
-                                : "bg-white/[0.035] text-slate-200 ring-white/12 hover:bg-white/[0.07] hover:text-white"
+                                ? "cursor-not-allowed bg-white/[0.04] text-slate-400 opacity-60"
+                                : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white"
                             }`}
-                            aria-haspopup="dialog"
-                            aria-expanded={isStyleLibraryOpen}
+                            title="Go back to Step 2"
                           >
-                            <Search className="h-3 w-3" />
-                            Browse
+                            Edit Step 2
                           </button>
+                        </div>
+                        <div className="mt-3 flex items-end justify-between gap-3">
+                          <p className="text-sm leading-relaxed text-slate-300/85">
+                            {styleSummaryDescription}
+                          </p>
+                          <span className={summaryStatusTextClass}>
+                            Step 2 complete
+                          </span>
                         </div>
                       </m.div>
                     ) : null}
@@ -1821,6 +1910,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         </p>
                       </div>
                       <button
+                        ref={genreContinueButtonRef}
                         type="button"
                         onClick={handleGenreAdvance}
                         disabled={isLocked}
@@ -1875,8 +1965,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         Shape the tone
                       </h3>
                       <p className={setupBodyMutedTextClass}>
-                        Style stays optional. Pick a vibe if it helps, then move
-                        straight into premise and cast.
+                        Style stays optional. Pick a vibe if it helps, then choose
+                        whether AI writes the premise or you do before moving into
+                        the final setup details.
                       </p>
                     </div>
                     <m.div
@@ -1972,6 +2063,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <button
+                        ref={styleAiButtonRef}
                         type="button"
                         onClick={() => {
                           void handleGenerateSurpriseSetup("manual");
@@ -1990,6 +2082,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         Generate AI Premise
                       </button>
                       <button
+                        ref={styleManualButtonRef}
                         type="button"
                         onClick={showManualDetails}
                         disabled={isLocked}
@@ -2032,80 +2125,25 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     data-testid="setup-premise-panel"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <label className={setupSectionLabelClass}>
-                        Premise
-                      </label>
-                      <div
-                        role="group"
-                        aria-label="Premise mode"
-                        className="inline-flex rounded-full border border-white/10 bg-slate-950/70 p-1"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => switchPremiseMode("ai")}
-                          disabled={isLocked}
-                          aria-pressed={premiseMode === "ai"}
-                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,opacity] duration-[220ms] ease-out ${focusRingClass} ${
-                            premiseMode === "ai"
-                              ? "bg-indigo-500/20 text-indigo-100"
-                              : "text-slate-300 hover:bg-white/[0.05] hover:text-slate-100"
-                          } ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
-                        >
-                          AI premise
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => switchPremiseMode("manual")}
-                          disabled={isLocked}
-                          aria-pressed={premiseMode === "manual"}
-                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,opacity] duration-[220ms] ease-out ${focusRingClass} ${
-                            premiseMode === "manual"
-                              ? "bg-indigo-500/20 text-indigo-100"
-                              : "text-slate-300 hover:bg-white/[0.05] hover:text-slate-100"
-                          } ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
-                        >
-                          Write my own
-                        </button>
+                      <div className="min-w-0">
+                        <label className={setupSectionLabelClass}>
+                          Premise
+                        </label>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                          Shape the premise here. To switch between AI and manual
+                          setup paths, return to Step 2.
+                        </p>
                       </div>
+                      <span className="inline-flex rounded-full border border-white/10 bg-slate-950/70 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                        {activePremiseSource === "ai" ? "AI draft" : "Manual draft"}
+                      </span>
                     </div>
                     <div className="flex flex-1 flex-col gap-2">
-                      {premiseMode === "ai" ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2">
-                          <p className="text-xs leading-relaxed text-slate-300/85">
-                            Generate or refresh the premise from the current setup context.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleGenerateSurpriseSetup("manual");
-                            }}
-                            disabled={isLoading || isSurprising || isLocked}
-                            aria-busy={isSurprising || undefined}
-                            aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
-                            className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,opacity] duration-[220ms] ease-out ${focusRingClass} ${
-                              isLoading || isSurprising || isLocked
-                                ? "cursor-not-allowed bg-indigo-500/10 text-slate-300/70 opacity-60"
-                                : "bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
-                            }`}
-                          >
-                            {isSurprising
-                              ? "Generating..."
-                              : trimmedPremise
-                                ? "Regenerate with AI"
-                                : "Generate with AI"}
-                          </button>
-                        </div>
-                      ) : null}
                       <textarea
                         rows={5}
                         value={premise}
                         onChange={(e) => {
                           const nextPremise = e.target.value;
-                          if (premiseMode === "manual") {
-                            setManualPremiseDraft(nextPremise);
-                          } else {
-                            setAiPremiseDraft(nextPremise);
-                          }
                           updateValue({ premise: nextPremise });
                         }}
                         className={`w-full flex-1 min-h-[132px] resize-none rounded-[18px] border border-white/8 px-4 py-3.5 pr-3 !bg-slate-950/90 !text-slate-100 caret-indigo-200 placeholder:!text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none transition-[border-color,background-color,box-shadow] duration-[220ms] ease-out text-[15px] sm:text-base leading-relaxed lg:min-h-[118px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
@@ -2116,7 +2154,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         placeholder="e.g., A detective discovers his new partner is a ghost..."
                         disabled={isLocked}
                       />
-                      {premiseMode === "manual" && (
+                      {activePremiseSource === "manual" && (
                         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                           {STARTER_IDEAS.map((idea) => (
                             <button
@@ -2270,6 +2308,68 @@ export const SetupForm: React.FC<SetupFormProps> = ({
           </LayoutGroup>
 
           <AnimatePresence initial={false}>
+            {stageReactivationPrompt ? (
+              <div className="fixed inset-0 z-[82] flex items-center justify-center px-4">
+                <m.div
+                  className="absolute inset-0 bg-black/72 backdrop-blur-sm"
+                  onClick={() => closeStageReactivationPrompt()}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={overlayVariants}
+                />
+                <m.div
+                  ref={stageReactivationModalRef}
+                  className="relative w-full max-w-md overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="setup-step-reactivation-title"
+                  aria-describedby="setup-step-reactivation-description"
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={modalVariants}
+                >
+                  <div className="border-b border-white/10 px-5 py-4">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
+                      Setup Flow
+                    </p>
+                    <h2
+                      id="setup-step-reactivation-title"
+                      className="mt-1 text-base font-semibold text-white"
+                    >
+                      Return to {stageReactivationPrompt === "genre" ? "Step 1" : "Step 2"}?
+                    </h2>
+                  </div>
+                  <div className="space-y-4 px-5 py-4">
+                    <p
+                      id="setup-step-reactivation-description"
+                      className="text-sm leading-relaxed text-slate-300"
+                    >
+                      Going back will clear the current premise and characters so
+                      you can rebuild the setup from that earlier step.
+                    </p>
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <button
+                        ref={stageReactivationCancelButtonRef}
+                        type="button"
+                        onClick={() => closeStageReactivationPrompt()}
+                        className={`rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-200 ${interactiveControlClass}`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={confirmStageReactivation}
+                        className={`rounded-xl border border-indigo-300/35 bg-indigo-500/18 px-4 py-2.5 text-sm font-medium text-indigo-100 shadow-[0_14px_30px_-22px_rgba(99,102,241,0.9)] ${interactiveControlClass}`}
+                      >
+                        Go back and clear setup details
+                      </button>
+                    </div>
+                  </div>
+                </m.div>
+              </div>
+            ) : null}
             {isStyleLibraryOpen ? (
               <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
                 <m.div

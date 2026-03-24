@@ -529,6 +529,13 @@ describe("SetupForm submit validation", () => {
   });
 
   it("style library selection updates shared context style and bumps prompt revision synchronously", () => {
+    const styleStageValue: SetupFormState = {
+      ...baseValue,
+      premise: "",
+      characters: [],
+      characterVoicePreferences: [],
+    };
+
     const StylePresetHarness: React.FC = () => {
       const [context, setContext] = React.useState<StoryContext | null>({
         title: "Draft",
@@ -539,7 +546,7 @@ describe("SetupForm submit validation", () => {
         style: "",
       });
       const [setupState, setSetupState] =
-        React.useState<SetupFormState>(baseValue);
+        React.useState<SetupFormState>(styleStageValue);
       const [promptContextRevision, setPromptContextRevision] =
         React.useState(0);
 
@@ -647,6 +654,7 @@ describe("SetupForm submit validation", () => {
 
     const selectedStyle = stylesLibrary[0];
     expect(selectedStyle).toBeTruthy();
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(screen.getByRole("button", { name: /browse/i }));
     fireEvent.click(
       screen.getByRole("button", {
@@ -658,17 +666,25 @@ describe("SetupForm submit validation", () => {
       selectedStyle.title,
     );
     expect(screen.getByTestId("prompt-revision").textContent).toBe("1");
-    expect(screen.getByTestId("setup-style-summary").textContent).toContain(
-      selectedStyle.title,
-    );
+    expect(screen.getAllByText(selectedStyle.title).length).toBeGreaterThan(0);
     expect(screen.queryByRole("dialog", { name: /style library/i })).toBeNull();
   });
 
   it("search filters styles by title and description", () => {
     render(
-      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
+      <SetupForm
+        value={{
+          ...baseValue,
+          premise: "",
+          characters: [],
+          characterVoicePreferences: [],
+        }}
+        onChange={vi.fn()}
+        isLoading={false}
+      />,
     );
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(screen.getByRole("button", { name: /browse/i }));
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
@@ -686,7 +702,13 @@ describe("SetupForm submit validation", () => {
     const onChange = vi.fn();
     render(
       <SetupForm
-        value={{ ...baseValue, style: "Fever Dream" }}
+        value={{
+          ...baseValue,
+          premise: "",
+          characters: [],
+          characterVoicePreferences: [],
+          style: "Fever Dream",
+        }}
         onChange={onChange}
         isLoading={false}
       />,
@@ -704,17 +726,34 @@ describe("SetupForm submit validation", () => {
 
   it("does not show inline clear action when no style is selected", () => {
     render(
-      <SetupForm value={baseValue} onChange={vi.fn()} isLoading={false} />,
+      <SetupForm
+        value={{
+          ...baseValue,
+          premise: "",
+          characters: [],
+          characterVoicePreferences: [],
+        }}
+        onChange={vi.fn()}
+        isLoading={false}
+      />,
     );
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     expect(screen.queryByRole("button", { name: /× clear/i })).toBeNull();
   });
 
   it("shuffle picks from full list even when modal search is filtered", () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    const styleStageValue: SetupFormState = {
+      ...baseValue,
+      premise: "",
+      characters: [],
+      characterVoicePreferences: [],
+    };
 
     const SurpriseStyleHarness: React.FC = () => {
-      const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
+      const [setupState, setSetupState] =
+        React.useState<SetupFormState>(styleStageValue);
       const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
         setSetupState((prev) => ({ ...prev, ...next }));
       }, []);
@@ -728,6 +767,7 @@ describe("SetupForm submit validation", () => {
 
     render(<SurpriseStyleHarness />);
 
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(screen.getByRole("button", { name: /browse/i }));
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
@@ -737,9 +777,6 @@ describe("SetupForm submit validation", () => {
     fireEvent.click(screen.getByRole("button", { name: /shuffle/i }));
 
     expect(screen.getByTestId("selected-style").textContent).toBe(
-      stylesLibrary[0]?.title ?? "",
-    );
-    expect(screen.getByTestId("setup-style-summary").textContent).toContain(
       stylesLibrary[0]?.title ?? "",
     );
     expect(randomSpy).toHaveBeenCalledTimes(1);
@@ -755,7 +792,12 @@ describe("SetupForm submit validation", () => {
     });
 
     const SurpriseStyleHarness: React.FC = () => {
-      const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
+      const [setupState, setSetupState] = React.useState<SetupFormState>({
+        ...baseValue,
+        premise: "",
+        characters: [],
+        characterVoicePreferences: [],
+      });
       const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
         setSetupState((prev) => ({ ...prev, ...next }));
       }, []);
@@ -766,6 +808,7 @@ describe("SetupForm submit validation", () => {
 
     try {
       render(<SurpriseStyleHarness />);
+      fireEvent.click(screen.getByTestId("setup-continue-to-style"));
       fireEvent.click(screen.getByRole("button", { name: /browse/i }));
       fireEvent.click(screen.getByRole("button", { name: /shuffle/i }));
 
@@ -975,8 +1018,7 @@ describe("SetupForm detail reveal timing", () => {
     });
   });
 
-  it("lets Step 3 switch from manual mode to AI mode and generate in place", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("routes AI premise generation back through Step 2 after clearing Step 3 details", async () => {
     let resolveSurprise: (() => void) | null = null;
 
     const SurpriseHarness: React.FC = () => {
@@ -1015,31 +1057,34 @@ describe("SetupForm detail reveal timing", () => {
       );
     };
 
-    try {
-      render(<SurpriseHarness />);
+    render(<SurpriseHarness />);
 
-      fireEvent.click(screen.getByTestId("setup-continue-to-style"));
-      fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
-      fireEvent.change(screen.getByPlaceholderText(premisePlaceholder), {
-        target: { value: "Manual draft premise" },
-      });
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+    fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+    fireEvent.change(screen.getByPlaceholderText(premisePlaceholder), {
+      target: { value: "Manual draft premise" },
+    });
 
-      fireEvent.click(screen.getByRole("button", { name: /^AI premise$/i }));
-      fireEvent.click(screen.getByRole("button", { name: /regenerate with ai/i }));
-      fireEvent.click(screen.getByRole("button", { name: /resolve in-step ai/i }));
+    fireEvent.click(screen.getByRole("button", { name: /edit step 2/i }));
+    expect(
+      screen.getByRole("dialog", { name: /return to step 2/i }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: /go back and clear setup details/i }),
+    );
 
-      await waitFor(() => {
-        expect(screen.getByDisplayValue(/archivist discovers/i)).toBeTruthy();
-      });
-    } finally {
-      confirmSpy.mockRestore();
-    }
+    expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /generate ai premise/i }));
+    fireEvent.click(screen.getByRole("button", { name: /resolve in-step ai/i }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(/archivist discovers/i)).toBeTruthy();
+    });
+    expect(screen.getByText("AI draft")).toBeTruthy();
   });
 
-  it("preserves separate manual and AI premise drafts when Step 3 mode changes", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    let resolveSurprise: (() => void) | null = null;
-
+  it("cancels or confirms destructive Step 3 back-navigation without leaving stale details behind", async () => {
     const DraftHarness: React.FC = () => {
       const [setupState, setSetupState] =
         React.useState<SetupFormState>(blankBaseValue);
@@ -1048,60 +1093,53 @@ describe("SetupForm detail reveal timing", () => {
         setSetupState((prev) => ({ ...prev, ...next }));
       }, []);
 
-      const onRequestSurprise = React.useCallback(async () => {
-        return await new Promise<boolean>((resolve) => {
-          resolveSurprise = () => {
-            setSetupState((prev) => ({
-              ...prev,
-              premise: "AI draft premise",
-              characters: ["Pilot", "Witness"],
-            }));
-            resolve(true);
-          };
-        });
-      }, []);
-
       return (
-        <div>
-          <button type="button" onClick={() => resolveSurprise?.()}>
-            Resolve AI draft
-          </button>
-          <SetupForm
-            value={setupState}
-            onChange={onSetupChange}
-            onRequestSurprise={onRequestSurprise}
-            isLoading={false}
-          />
-        </div>
+        <SetupForm
+          value={setupState}
+          onChange={onSetupChange}
+          isLoading={false}
+        />
       );
     };
 
-    try {
-      render(<DraftHarness />);
+    render(<DraftHarness />);
 
-      fireEvent.click(screen.getByTestId("setup-continue-to-style"));
-      fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+    fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
 
-      const premiseInput = screen.getByPlaceholderText(premisePlaceholder);
-      fireEvent.change(premiseInput, {
-        target: { value: "Manual draft premise" },
-      });
+    fireEvent.change(screen.getByPlaceholderText(premisePlaceholder), {
+      target: { value: "Manual draft premise" },
+    });
+    fireEvent.change(screen.getByDisplayValue("Hero"), {
+      target: { value: "Pilot" },
+    });
 
-      fireEvent.click(screen.getByRole("button", { name: /^AI premise$/i }));
-      fireEvent.click(screen.getByRole("button", { name: /regenerate with ai/i }));
-      fireEvent.click(screen.getByRole("button", { name: /resolve ai draft/i }));
+    fireEvent.click(screen.getByRole("button", { name: /edit step 2/i }));
+    expect(
+      screen.getByText(/going back will clear the current premise and characters/i),
+    ).toBeTruthy();
 
-      await waitFor(() => {
-        expect(screen.getByDisplayValue("AI draft premise")).toBeTruthy();
-      });
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(screen.getByDisplayValue("Manual draft premise")).toBeTruthy();
+    expect(screen.getByDisplayValue("Pilot")).toBeTruthy();
 
-      fireEvent.click(screen.getByRole("button", { name: /^Write my own$/i }));
-      expect(screen.getByDisplayValue("Manual draft premise")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /edit step 2/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /go back and clear setup details/i }),
+    );
 
-      fireEvent.click(screen.getByRole("button", { name: /^AI premise$/i }));
-      expect(screen.getByDisplayValue("AI draft premise")).toBeTruthy();
-    } finally {
-      confirmSpy.mockRestore();
-    }
+    expect(screen.getByText(/shape the tone/i)).toBeTruthy();
+    expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(premisePlaceholder)).toBeTruthy();
+    });
+
+    expect(
+      (screen.getByPlaceholderText(premisePlaceholder) as HTMLTextAreaElement).value,
+    ).toBe("");
+    expect(screen.queryByDisplayValue("Pilot")).toBeNull();
   });
 });
