@@ -309,7 +309,7 @@ describe("SetupForm submit validation", () => {
     expect(button.disabled).toBe(false);
   });
 
-  it("cycles scene length by click, keyboard, and drag while animating the incoming text", async () => {
+  it("cycles scene length by click, keyboard, and wheel-style drag", async () => {
     const LengthCycleHarness: React.FC = () => {
       const [setupState, setSetupState] = React.useState<SetupFormState>(baseValue);
       const handleSetupChange = React.useCallback(
@@ -333,25 +333,21 @@ describe("SetupForm submit validation", () => {
     const cycleButton = screen.getByRole("button", {
       name: /scene length:/i,
     });
-    const lengthValue = screen.getByTestId("setup-length-value");
-
-    expect(lengthValue.textContent).toBe("Medium");
+    expect(screen.getByTestId("setup-length-value").textContent).toBe("Medium");
 
     fireEvent.click(cycleButton);
-    expect(lengthValue.textContent).toBe("Long");
-    expect(lengthValue.className).toContain("translate-y-[8px]");
     await waitFor(() => {
-      expect(lengthValue.className).toContain("translate-y-0");
+      expect(screen.getByTestId("setup-length-value").textContent).toBe("Long");
     });
 
     fireEvent.click(cycleButton);
     await waitFor(() => {
-      expect(lengthValue.textContent).toBe("Short");
+      expect(screen.getByTestId("setup-length-value").textContent).toBe("Short");
     });
 
     fireEvent.keyDown(cycleButton, { key: "ArrowDown" });
     await waitFor(() => {
-      expect(lengthValue.textContent).toBe("Medium");
+      expect(screen.getByTestId("setup-length-value").textContent).toBe("Medium");
     });
 
     fireEvent.pointerDown(cycleButton, { pointerId: 1, clientY: 100 });
@@ -359,7 +355,7 @@ describe("SetupForm submit validation", () => {
     fireEvent.pointerUp(cycleButton, { pointerId: 1, clientY: 130 });
 
     await waitFor(() => {
-      expect(lengthValue.textContent).toBe("Long");
+      expect(screen.getByTestId("setup-length-value").textContent).toBe("Long");
     });
 
     fireEvent.pointerDown(cycleButton, { pointerId: 2, clientY: 130 });
@@ -367,7 +363,7 @@ describe("SetupForm submit validation", () => {
     fireEvent.pointerUp(cycleButton, { pointerId: 2, clientY: 100 });
 
     await waitFor(() => {
-      expect(lengthValue.textContent).toBe("Medium");
+      expect(screen.getByTestId("setup-length-value").textContent).toBe("Medium");
     });
   });
 

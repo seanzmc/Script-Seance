@@ -131,12 +131,6 @@ type LengthTickPhase = "idle" | "prep" | "animate";
 type SetupActiveStage = "genre" | "style" | "details";
 type SetupEditableStage = Exclude<SetupActiveStage, "details">;
 type GenreWheelDirection = 1 | -1;
-type WheelPointerState = {
-  pointerId: number | null;
-  lastY: number;
-  carryY: number;
-  moved: boolean;
-};
 type GenreWheelPointerState = {
   pointerId: number | null;
   startY: number;
@@ -152,16 +146,13 @@ const SCENE_LENGTH_VALUES: readonly SceneLengthValue[] = ["Short", "Medium", "Lo
 const normalizeLengthValue = (value: string): SceneLengthValue =>
   value === "Short" || value === "Long" ? value : "Medium";
 
-const getNextLengthValue = (value: SceneLengthValue): SceneLengthValue =>
-  value === "Short" ? "Medium" : value === "Medium" ? "Long" : "Short";
-
-const getAdjacentLengthValue = (
+const getLengthByOffset = (
   currentValue: SceneLengthValue,
-  direction: GenreWheelDirection,
+  offset: number,
 ): SceneLengthValue => {
   const currentIndex = Math.max(0, SCENE_LENGTH_VALUES.indexOf(currentValue));
   const nextIndex =
-    (currentIndex + direction + SCENE_LENGTH_VALUES.length) %
+    (currentIndex + offset + SCENE_LENGTH_VALUES.length * Math.max(1, Math.abs(offset))) %
     SCENE_LENGTH_VALUES.length;
   return SCENE_LENGTH_VALUES[nextIndex] ?? currentValue;
 };
@@ -218,8 +209,6 @@ type LengthCycleWheelProps = {
   onChange: (nextValue: SceneLengthValue) => void;
 };
 
-const LENGTH_TICK_DURATION_MS = 240;
-const WHEEL_DRAG_STEP_PX = 26;
 const GENRE_WHEEL_STEP_SPRING = {
   type: "spring" as const,
   stiffness: 500,
@@ -239,6 +228,7 @@ const GENRE_WHEEL_RETURN_SPRING = {
 const GENRE_WHEEL_DRAG_CLICK_SLOP_PX = 6;
 const GENRE_WHEEL_WINDOW_RADIUS = 3;
 const GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP = 1.4;
+const LENGTH_WHEEL_WINDOW_RADIUS = 1;
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   value,
@@ -248,95 +238,191 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   onChange,
 }) => {
   const [currentValue, setCurrentValue] = useState<SceneLengthValue>(value);
-  const [nextValue, setNextValue] = useState<SceneLengthValue | null>(null);
+  const [pendingValue, setPendingValue] = useState<SceneLengthValue | null>(null);
   const [phase, setPhase] = useState<LengthTickPhase>("idle");
-  const [direction, setDirection] = useState<GenreWheelDirection>(1);
   const [isDragging, setIsDragging] = useState(false);
-  const timeoutRef = useRef<number | null>(null);
-  const frameRef = useRef<number | null>(null);
+  const [renderOffset, setRenderOffset] = useState(0);
   const suppressClickRef = useRef(false);
+  const currentValueRef = useRef(value);
+  const pendingValueRef = useRef<SceneLengthValue | null>(null);
+  const animationIdRef = useRef(0);
+  const animationRef = useRef<ReturnType<typeof animate> | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const pointerStateRef = useRef<WheelPointerState>({
+  const pointerStateRef = useRef<GenreWheelPointerState>({
     pointerId: null,
+    startY: 0,
     lastY: 0,
-    carryY: 0,
+    lastTime: 0,
+    dragOffset: 0,
+    velocityY: 0,
     moved: false,
   });
+  const wheelMetrics = useMemo(
+    () => {
+      const itemHeight = 26;
+      return {
+        itemHeight,
+        viewportHeight: 20,
+        baseTrackY: -itemHeight * LENGTH_WHEEL_WINDOW_RADIUS,
+        momentumActivationSteps: 0.9,
+        momentumCarrySteps: 0.2,
+        maxMomentumCarrySteps: 0.55,
+        minOpacity: 0.2,
+        minScale: 0.78,
+      };
+    },
+    [],
+  );
+  const wheelOffset = useMotionValue(0);
 
-  const clearScheduledAnimation = useCallback(() => {
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-    }
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+  const stopTrackAnimation = useCallback(() => {
+    animationIdRef.current += 1;
+    animationRef.current?.stop();
+    animationRef.current = null;
   }, []);
 
   useEffect(() => {
+    currentValueRef.current = currentValue;
+  }, [currentValue]);
+
+  useEffect(() => {
+    pendingValueRef.current = pendingValue;
+  }, [pendingValue]);
+
+  useEffect(() => {
     return () => {
-      clearScheduledAnimation();
+      stopTrackAnimation();
     };
-  }, [clearScheduledAnimation]);
+  }, [stopTrackAnimation]);
+
+  useEffect(() => {
+    const unsubscribe = wheelOffset.on("change", (latest) => {
+      setRenderOffset(latest);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [wheelOffset]);
+
+  useEffect(() => {
+    if (phase !== "idle" || isDragging) return;
+    if (currentValueRef.current === value) return;
+    stopTrackAnimation();
+    setPendingValue(null);
+    pendingValueRef.current = null;
+    currentValueRef.current = value;
+    setCurrentValue(value);
+    wheelOffset.set(0);
+  }, [isDragging, phase, stopTrackAnimation, value, wheelOffset]);
 
   useEffect(() => {
     if (phase !== "idle") return;
-    if (currentValue === value) return;
-    setCurrentValue(value);
-  }, [currentValue, phase, value]);
+    wheelOffset.set(0);
+  }, [phase, wheelOffset]);
 
-  useEffect(() => {
-    if (!prefersReducedMotion || phase === "idle" || nextValue === null) return;
-    clearScheduledAnimation();
-    setCurrentValue(nextValue);
-    setNextValue(null);
+  const completePendingStep = useCallback(() => {
+    const resolvedValue = pendingValueRef.current;
+    stopTrackAnimation();
+    if (resolvedValue) {
+      currentValueRef.current = resolvedValue;
+      setCurrentValue(resolvedValue);
+      setPendingValue(null);
+      pendingValueRef.current = null;
+    }
     setPhase("idle");
-  }, [clearScheduledAnimation, nextValue, phase, prefersReducedMotion]);
+    wheelOffset.set(0);
+  }, [stopTrackAnimation, wheelOffset]);
+
+  const animateWheelOffset = useCallback(
+    (
+      targetOffset: number,
+      transition: typeof GENRE_WHEEL_RETURN_SPRING,
+      onComplete?: () => void,
+    ) => {
+      stopTrackAnimation();
+      const animationId = animationIdRef.current;
+      animationRef.current = animate(wheelOffset, targetOffset, {
+        ...transition,
+        onComplete: () => {
+          if (animationIdRef.current !== animationId) return;
+          animationRef.current = null;
+          onComplete?.();
+        },
+      });
+    },
+    [stopTrackAnimation, wheelOffset],
+  );
+
+  const springTrackToCenter = useCallback(
+    (transition = GENRE_WHEEL_RETURN_SPRING) => {
+      if (prefersReducedMotion) {
+        stopTrackAnimation();
+        wheelOffset.set(0);
+        return;
+      }
+      animateWheelOffset(0, transition);
+    },
+    [animateWheelOffset, prefersReducedMotion, stopTrackAnimation, wheelOffset],
+  );
+
+  const settleLength = useCallback(
+    (stepCount: number) => {
+      if (disabled) return;
+      if (stepCount === 0) {
+        springTrackToCenter();
+        return;
+      }
+
+      const baseValue = currentValueRef.current;
+      const nextLength = getLengthByOffset(baseValue, stepCount);
+      onChange(nextLength);
+
+      if (prefersReducedMotion) {
+        stopTrackAnimation();
+        currentValueRef.current = nextLength;
+        setCurrentValue(nextLength);
+        setPendingValue(null);
+        pendingValueRef.current = null;
+        setPhase("idle");
+        wheelOffset.set(0);
+        return;
+      }
+
+      setPendingValue(nextLength);
+      pendingValueRef.current = nextLength;
+      setPhase("animate");
+      animateWheelOffset(
+        stepCount * wheelMetrics.itemHeight,
+        GENRE_WHEEL_STEP_SPRING,
+        () => {
+          currentValueRef.current = nextLength;
+          setCurrentValue(nextLength);
+          setPendingValue(null);
+          pendingValueRef.current = null;
+          setPhase("idle");
+          wheelOffset.set(0);
+        },
+      );
+    },
+    [
+      animateWheelOffset,
+      disabled,
+      onChange,
+      prefersReducedMotion,
+      springTrackToCenter,
+      stopTrackAnimation,
+      wheelMetrics.itemHeight,
+      wheelOffset,
+    ],
+  );
 
   const stepLength = useCallback(
     (stepDirection: GenreWheelDirection) => {
       if (disabled) return;
-      const baseValue = nextValue ?? currentValue;
-      const nextLength =
-        stepDirection === 1
-          ? getNextLengthValue(baseValue)
-          : getAdjacentLengthValue(baseValue, -1);
-      setDirection(stepDirection);
-      onChange(nextLength);
-
-      if (prefersReducedMotion) {
-        clearScheduledAnimation();
-        setCurrentValue(nextLength);
-        setNextValue(null);
-        setPhase("idle");
-        return;
-      }
-
-      clearScheduledAnimation();
-      setNextValue(nextLength);
-      setPhase("prep");
-
-      frameRef.current = window.requestAnimationFrame(() => {
-        frameRef.current = null;
-        setPhase("animate");
-      });
-
-      timeoutRef.current = window.setTimeout(() => {
-        setCurrentValue(nextLength);
-        setNextValue(null);
-        setPhase("idle");
-        timeoutRef.current = null;
-      }, LENGTH_TICK_DURATION_MS);
+      completePendingStep();
+      settleLength(stepDirection);
     },
-    [
-      clearScheduledAnimation,
-      currentValue,
-      disabled,
-      nextValue,
-      onChange,
-      prefersReducedMotion,
-    ],
+    [completePendingStep, disabled, settleLength],
   );
 
   const resetPointerState = useCallback(() => {
@@ -351,8 +437,11 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
     }
     pointerStateRef.current = {
       pointerId: null,
+      startY: 0,
       lastY: 0,
-      carryY: 0,
+      lastTime: 0,
+      dragOffset: 0,
+      velocityY: 0,
       moved: false,
     };
     setIsDragging(false);
@@ -361,10 +450,14 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) return;
+      completePendingStep();
       pointerStateRef.current = {
         pointerId: event.pointerId,
+        startY: event.clientY,
         lastY: event.clientY,
-        carryY: 0,
+        lastTime: event.timeStamp,
+        dragOffset: 0,
+        velocityY: 0,
         moved: false,
       };
       suppressClickRef.current = false;
@@ -373,45 +466,88 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
       }
       setIsDragging(true);
     },
-    [disabled],
+    [completePendingStep, disabled],
   );
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) return;
       if (pointerStateRef.current.pointerId !== event.pointerId) return;
-      const delta = event.clientY - pointerStateRef.current.lastY;
+      const deltaY = event.clientY - pointerStateRef.current.lastY;
+      const deltaTime = Math.max(event.timeStamp - pointerStateRef.current.lastTime, 8);
+      const velocitySample = deltaY / deltaTime;
+      pointerStateRef.current.velocityY =
+        pointerStateRef.current.velocityY * 0.72 + velocitySample * 0.28;
       pointerStateRef.current.lastY = event.clientY;
-      pointerStateRef.current.carryY += delta;
-
-      let didStep = false;
-      while (pointerStateRef.current.carryY >= WHEEL_DRAG_STEP_PX) {
-        pointerStateRef.current.carryY -= WHEEL_DRAG_STEP_PX;
+      pointerStateRef.current.lastTime = event.timeStamp;
+      const dragOffset = event.clientY - pointerStateRef.current.startY;
+      pointerStateRef.current.dragOffset = dragOffset;
+      if (Math.abs(dragOffset) >= GENRE_WHEEL_DRAG_CLICK_SLOP_PX) {
         pointerStateRef.current.moved = true;
-        didStep = true;
-        stepLength(1);
-      }
-      while (pointerStateRef.current.carryY <= -WHEEL_DRAG_STEP_PX) {
-        pointerStateRef.current.carryY += WHEEL_DRAG_STEP_PX;
-        pointerStateRef.current.moved = true;
-        didStep = true;
-        stepLength(-1);
-      }
-
-      if (didStep) {
         suppressClickRef.current = true;
       }
+      if (prefersReducedMotion) return;
+      wheelOffset.set(dragOffset);
     },
-    [disabled, stepLength],
+    [disabled, prefersReducedMotion, wheelOffset],
   );
 
   const handlePointerEnd = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (pointerStateRef.current.pointerId !== event.pointerId) return;
+      const dragOffset = pointerStateRef.current.dragOffset;
+      const velocityY = Math.max(
+        -GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
+        Math.min(
+          pointerStateRef.current.velocityY,
+          GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
+        ),
+      );
       suppressClickRef.current = pointerStateRef.current.moved;
       resetPointerState();
+      if (event.type === "pointercancel") {
+        springTrackToCenter();
+        return;
+      }
+      if (prefersReducedMotion) {
+        const reducedSteps = Math.round(dragOffset / wheelMetrics.itemHeight);
+        if (reducedSteps === 0) {
+          wheelOffset.set(0);
+          return;
+        }
+        settleLength(reducedSteps);
+        return;
+      }
+      const dragSteps = dragOffset / wheelMetrics.itemHeight;
+      const momentumWeight =
+        Math.abs(dragSteps) >= wheelMetrics.momentumActivationSteps
+          ? Math.min(Math.abs(dragSteps), 1)
+          : 0;
+      const momentumSteps = Math.max(
+        -wheelMetrics.maxMomentumCarrySteps,
+        Math.min(
+          velocityY * wheelMetrics.momentumCarrySteps * momentumWeight,
+          wheelMetrics.maxMomentumCarrySteps,
+        ),
+      );
+      const snapSteps = Math.round(dragSteps + momentumSteps);
+      if (snapSteps === 0) {
+        springTrackToCenter();
+        return;
+      }
+      settleLength(snapSteps);
     },
-    [resetPointerState],
+    [
+      prefersReducedMotion,
+      resetPointerState,
+      settleLength,
+      springTrackToCenter,
+      wheelMetrics.itemHeight,
+      wheelMetrics.maxMomentumCarrySteps,
+      wheelMetrics.momentumActivationSteps,
+      wheelMetrics.momentumCarrySteps,
+      wheelOffset,
+    ],
   );
 
   const handleClick = useCallback(
@@ -450,24 +586,22 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
     [disabled, stepLength],
   );
 
-  const isAnimating = !prefersReducedMotion && phase !== "idle" && nextValue !== null;
-  const incomingValue = nextValue ?? currentValue;
-  const outgoingShiftClass =
-    direction === 1
-      ? phase === "animate"
-        ? "-translate-y-[8px] opacity-0"
-        : "translate-y-0 opacity-100"
-      : phase === "animate"
-        ? "translate-y-[8px] opacity-0"
-        : "translate-y-0 opacity-100";
-  const incomingShiftClass =
-    direction === 1
-      ? phase === "animate"
-        ? "translate-y-0 opacity-100"
-        : "translate-y-[8px] opacity-0"
-      : phase === "animate"
-        ? "translate-y-0 opacity-100"
-        : "-translate-y-[8px] opacity-0";
+  const centeredStepOffset = Math.round(renderOffset / wheelMetrics.itemHeight);
+  const normalizedRenderOffset =
+    renderOffset - centeredStepOffset * wheelMetrics.itemHeight;
+  const selectedValue = pendingValue ?? getLengthByOffset(currentValue, centeredStepOffset);
+  const visibleItems = useMemo(
+    () =>
+      Array.from({ length: LENGTH_WHEEL_WINDOW_RADIUS * 2 + 1 }, (_, itemIndex) => {
+        const relativeIndex = itemIndex - LENGTH_WHEEL_WINDOW_RADIUS;
+        return {
+          relativeIndex,
+          value: getLengthByOffset(currentValue, centeredStepOffset + relativeIndex),
+        };
+      }),
+    [centeredStepOffset, currentValue],
+  );
+  const accessibilityValue = pendingValue ?? currentValue;
 
   return (
     <button
@@ -481,13 +615,14 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
       onClick={handleClick}
       disabled={disabled}
       data-testid="setup-length-wheel"
-      className={`inline-flex min-w-[7.9rem] items-center justify-between gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-left text-slate-100 transition-[transform,box-shadow,border-color,background-color] duration-[220ms] ease-out ${focusRingClass} ${
+      className={`inline-flex min-w-[7.9rem] items-center justify-between gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-left text-slate-100 transition-[box-shadow,border-color,background-color,color] duration-[220ms] ease-out ${focusRingClass} ${
         isDragging
           ? "border-indigo-300/55 bg-indigo-500/14 shadow-[0_18px_32px_-24px_rgba(99,102,241,0.65)]"
-          : "hover:-translate-y-px hover:border-indigo-200/35 hover:bg-white/[0.05]"
+          : "hover:border-indigo-200/35 hover:bg-white/[0.05]"
       } ${disabled ? "opacity-60 cursor-not-allowed" : "touch-none select-none"}`}
-      aria-label={`Scene length: ${incomingValue}. Click to cycle or drag vertically.`}
-      title="Click to cycle scene length. Drag vertically to step through lengths."
+      aria-label={`Scene length: ${accessibilityValue}. Click to cycle or drag vertically.`}
+      aria-roledescription="length wheel"
+      title="Click to cycle scene length. Drag vertically to spin and release to glide."
     >
       <span className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
         Length
@@ -495,23 +630,49 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
       <span
         className="relative inline-flex h-[1.25rem] min-w-[4.4rem] flex-1 overflow-hidden align-middle text-right"
         data-testid="setup-length-value-viewport"
+        aria-hidden="true"
       >
-        {isAnimating && (
-          <span
-            className={`absolute inset-0 flex items-center justify-end leading-none transition-[opacity,transform] duration-[240ms] ease-in-out ${outgoingShiftClass}`}
-          >
-            {currentValue}
-          </span>
-        )}
         <span
-          data-testid="setup-length-value"
-          className={`absolute inset-0 flex items-center justify-end leading-none ${
-            isAnimating
-              ? `transition-[opacity,transform] duration-[240ms] ease-in-out ${incomingShiftClass}`
-              : "opacity-100"
-          }`}
+          className="absolute inset-x-0 top-0 flex flex-col justify-start transform-gpu will-change-transform"
+          style={{
+            transform: `translateY(${wheelMetrics.baseTrackY - normalizedRenderOffset}px)`,
+          }}
         >
-          {incomingValue}
+          {visibleItems.map((item) => {
+            const isSelectedItem = item.value === selectedValue;
+            const distance = Math.abs(
+              item.relativeIndex * wheelMetrics.itemHeight - normalizedRenderOffset,
+            );
+            const normalizedDistance = Math.min(
+              distance / (wheelMetrics.itemHeight * 1.2),
+              1,
+            );
+            const prominence = 1 - normalizedDistance;
+            const easedProminence =
+              prominence * prominence * (3 - 2 * prominence);
+            const opacity =
+              wheelMetrics.minOpacity +
+              (1 - wheelMetrics.minOpacity) * easedProminence;
+            const scale =
+              wheelMetrics.minScale +
+              (1 - wheelMetrics.minScale) * easedProminence;
+
+            return (
+              <span
+                key={`${currentValue}-${centeredStepOffset}-${item.relativeIndex}-${item.value}`}
+                data-testid={isSelectedItem ? "setup-length-value" : undefined}
+                className="flex items-center justify-end whitespace-nowrap font-medium leading-none text-slate-100"
+                style={{
+                  height: wheelMetrics.itemHeight,
+                  opacity,
+                  transform: `scale(${scale})`,
+                  transformOrigin: "center right",
+                }}
+              >
+                {item.value}
+              </span>
+            );
+          })}
         </span>
       </span>
     </button>
