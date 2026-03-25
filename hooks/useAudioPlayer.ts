@@ -8,7 +8,24 @@ type BlockAudioStatus = 'notGenerated' | 'generating' | 'ready' | 'error';
 
 const PLAYABLE_BLOCKS = [BlockType.DIALOGUE, BlockType.ACTION, BlockType.TRANSITION];
 const normalizeCharacterName = (value: string) =>
-  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+  value
+    .replace(/\s*\(.*?\)\s*/g, ' ')
+    .replace(/\s*[:\-–—]+\s*$/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+const getDialogueSpeakerName = (block: ScriptBlock) => {
+  if (block.type !== BlockType.DIALOGUE) {
+    return undefined;
+  }
+  const legacySpeaker = (block as ScriptBlock & { speaker?: string | null }).speaker;
+  const speaker = typeof block.character === 'string' && block.character.trim().length > 0
+    ? block.character
+    : typeof legacySpeaker === 'string' && legacySpeaker.trim().length > 0
+      ? legacySpeaker
+      : undefined;
+  return speaker?.trim() || undefined;
+};
 
 export type AudioOrchestrationContext = {
   scriptId?: string;
@@ -139,22 +156,22 @@ export const useAudioPlayer = (
   }, []);
 
   const getVoiceConfigForBlock = useCallback((block: ScriptBlock) => {
-    let charName = block.character;
-    if (!charName || block.type !== BlockType.DIALOGUE) {
-      charName = 'Narrator';
-    }
+    const narratorConfig = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
+    const charName = getDialogueSpeakerName(block) || 'Narrator';
     const normalized = normalizeCharacterName(charName);
-    const existing = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === normalized)
-      || voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
+    const existing = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === normalized);
     const isNarrator = normalized === 'narrator';
     const preference = isNarrator
       ? narratorVoicePreferenceRef.current
       : characterVoicePreferencesRef.current[normalized] || 'random';
+    const baseConfig = existing
+      || (isNarrator ? narratorConfig : undefined)
+      || { name: charName, ...DEFAULT_VOICE_CONFIG };
     return {
-      ...(existing || { name: charName, ...DEFAULT_VOICE_CONFIG }),
-      name: existing?.name || charName,
+      ...baseConfig,
+      name: existing?.name || baseConfig.name || charName,
       voiceId: sanitizeVoiceIdForUsage({
-        voiceId: existing?.voiceId || '',
+        voiceId: existing?.voiceId || baseConfig.voiceId || '',
         voices: availableVoicesRef.current,
         isNarrator,
         preference,

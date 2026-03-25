@@ -118,6 +118,52 @@ describe('ScriptEngine', () => {
     );
   });
 
+  it('uses the assigned character voice when dialogue speaker labels include trailing punctuation', async () => {
+    const engine = new ScriptEngine();
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A:' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'olivia-voice', speed: 1, pitch: 0 }
+    ];
+
+    await engine.start(blocks, voiceConfigs);
+
+    expect(createGenerateSpeechRequest).toHaveBeenCalledWith(
+      'Hello',
+      'olivia-voice',
+      undefined,
+      expect.any(Object)
+    );
+  });
+
+  it('uses the assigned character voice when legacy speaker field is present', async () => {
+    const engine = new ScriptEngine();
+    const blocks = [
+      {
+        id: 'block-1',
+        type: BlockType.DIALOGUE,
+        text: 'Hello',
+        blockRevision: 1,
+        speaker: 'A'
+      }
+    ] as unknown as ScriptBlock[];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'olivia-voice', speed: 1, pitch: 0 }
+    ];
+
+    await engine.start(blocks, voiceConfigs);
+
+    expect(createGenerateSpeechRequest).toHaveBeenCalledWith(
+      'Hello',
+      'olivia-voice',
+      undefined,
+      expect.any(Object)
+    );
+  });
+
   it('surfaces preview 429 as RATE_LIMITED and not REQUEST_ABORTED', async () => {
     const engine = new ScriptEngine();
     const previewPromise = engine.generateSingle('Hello', 'inworld-voice-1');

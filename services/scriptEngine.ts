@@ -12,7 +12,24 @@ const TTS_MODEL_ID = 'inworld-tts-1.5-max';
 const TTS_AUDIO_ENCODING = 'LINEAR16';
 const TTS_SAMPLE_RATE_HZ = 24000;
 const normalizeCharacterName = (value: string) =>
-  value.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+  value
+    .replace(/\s*\(.*?\)\s*/g, ' ')
+    .replace(/\s*[:\-–—]+\s*$/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+const getDialogueSpeakerName = (block: ScriptBlock) => {
+  if (block.type !== BlockType.DIALOGUE) {
+    return undefined;
+  }
+  const legacySpeaker = (block as ScriptBlock & { speaker?: string | null }).speaker;
+  const speaker = typeof block.character === 'string' && block.character.trim().length > 0
+    ? block.character
+    : typeof legacySpeaker === 'string' && legacySpeaker.trim().length > 0
+      ? legacySpeaker
+      : undefined;
+  return speaker?.trim() || undefined;
+};
 const resolveNarratorFallbackVoiceId = (voiceConfigs: VoiceConfig[]) => {
   const narrator = voiceConfigs.find((config) => normalizeCharacterName(config.name) === 'narrator');
   if (typeof narrator?.voiceId === 'string' && narrator.voiceId.trim().length > 0) {
@@ -111,14 +128,18 @@ export class ScriptEngine {
     const narratorFallbackVoiceId = resolveNarratorFallbackVoiceId(voiceConfigs);
     this.queue = playableBlocks.map(block => {
       let config: VoiceConfig | undefined;
-      
-      if (block.type === BlockType.DIALOGUE && block.character) {
-        const target = normalizeCharacterName(block.character);
+
+      const speakerName = getDialogueSpeakerName(block);
+      const normalizedSpeaker = speakerName ? normalizeCharacterName(speakerName) : '';
+      const isNarratorBlock = !speakerName || normalizedSpeaker === 'narrator';
+
+      if (speakerName) {
+        const target = normalizedSpeaker;
         config = voiceConfigs.find(v => normalizeCharacterName(v.name) === target);
       }
-      
-      // Fallback for narrator or missing config
-      if (!config) {
+
+      // Fallback for narrator or truly unresolved dialogue speaker.
+      if (!config && isNarratorBlock) {
         config = voiceConfigs.find(v => normalizeCharacterName(v.name) === 'narrator');
       }
 

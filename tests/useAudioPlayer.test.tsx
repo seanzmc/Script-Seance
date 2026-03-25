@@ -674,6 +674,70 @@ describe('useAudioPlayer', () => {
     );
   });
 
+  it('uses the assigned character voice for retry when a dialogue speaker label has trailing punctuation', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Retry me', blockRevision: 1, character: 'A:' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'olivia-voice', speed: 1, pitch: 0 }
+    ];
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Masculine'
+      },
+      {
+        id: 'olivia-voice',
+        displayName: 'Olivia',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Feminine'
+      }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={blocks}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        availableVoices={availableVoices}
+        characterVoicePreferences={{ a: 'female' }}
+        narratorVoicePreference="male"
+      />
+    );
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    await act(async () => {
+      ref.current.pause();
+    });
+
+    getEngine().generateSingle.mockResolvedValueOnce(new ArrayBuffer(12));
+    await act(async () => {
+      await ref.current.retryCurrentBlock();
+    });
+
+    expect(getEngine().generateSingle).toHaveBeenCalledWith(
+      'Retry me',
+      'olivia-voice',
+      expect.objectContaining({ requestId: expect.stringContaining('retry:block-1:') })
+    );
+  });
+
   it('surfaces preview 429 as RATE_LIMITED and not REQUEST_ABORTED', async () => {
     const voiceConfigs: VoiceConfig[] = [
       { name: 'Narrator', voiceId: 'inworld-voice-1', speed: 1, pitch: 0 }
