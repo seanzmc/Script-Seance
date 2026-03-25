@@ -18,6 +18,48 @@ const normalizeCharacterName = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+const splitCharacterTokens = (value: string) => (
+  normalizeCharacterName(value)
+    .split(' ')
+    .map((token) => token.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+    .filter(Boolean)
+);
+const hasTrailingTokenMatch = (sourceTokens: string[], candidateTokens: string[]) => {
+  if (candidateTokens.length === 0 || candidateTokens.length >= sourceTokens.length) {
+    return false;
+  }
+  return candidateTokens.every(
+    (token, index) => sourceTokens[sourceTokens.length - candidateTokens.length + index] === token
+  );
+};
+const findVoiceConfigForSpeaker = (configs: VoiceConfig[], speakerName: string) => {
+  const normalizedSpeaker = normalizeCharacterName(speakerName);
+  if (!normalizedSpeaker) {
+    return undefined;
+  }
+
+  const exactMatch = configs.find((config) => normalizeCharacterName(config.name) === normalizedSpeaker);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const speakerTokens = splitCharacterTokens(speakerName);
+  let bestAliasMatch: VoiceConfig | undefined;
+  let bestAliasTokenCount = 0;
+
+  configs.forEach((config) => {
+    const configTokens = splitCharacterTokens(config.name);
+    if (!hasTrailingTokenMatch(speakerTokens, configTokens)) {
+      return;
+    }
+    if (configTokens.length > bestAliasTokenCount) {
+      bestAliasMatch = config;
+      bestAliasTokenCount = configTokens.length;
+    }
+  });
+
+  return bestAliasMatch;
+};
 const getDialogueSpeakerName = (block: ScriptBlock) => {
   if (block.type !== BlockType.DIALOGUE) {
     return undefined;
@@ -134,8 +176,7 @@ export class ScriptEngine {
       const isNarratorBlock = !speakerName || normalizedSpeaker === 'narrator';
 
       if (speakerName) {
-        const target = normalizedSpeaker;
-        config = voiceConfigs.find(v => normalizeCharacterName(v.name) === target);
+        config = findVoiceConfigForSpeaker(voiceConfigs, speakerName);
       }
 
       // Fallback for narrator or truly unresolved dialogue speaker.

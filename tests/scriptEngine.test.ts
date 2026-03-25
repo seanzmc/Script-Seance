@@ -138,6 +138,26 @@ describe('ScriptEngine', () => {
     );
   });
 
+  it('uses the assigned character voice when dialogue speaker labels include title prefixes', async () => {
+    const engine = new ScriptEngine();
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'DR. ALEX' }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'mark-voice', speed: 1, pitch: 0 },
+      { name: 'Alex', voiceId: 'olivia-voice', speed: 1, pitch: 0 }
+    ];
+
+    await engine.start(blocks, voiceConfigs);
+
+    expect(createGenerateSpeechRequest).toHaveBeenCalledWith(
+      'Hello',
+      'olivia-voice',
+      undefined,
+      expect.any(Object)
+    );
+  });
+
   it('uses the assigned character voice when legacy speaker field is present', async () => {
     const engine = new ScriptEngine();
     const blocks = [

@@ -14,6 +14,48 @@ const normalizeCharacterName = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+const splitCharacterTokens = (value: string) => (
+  normalizeCharacterName(value)
+    .split(' ')
+    .map((token) => token.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+    .filter(Boolean)
+);
+const hasTrailingTokenMatch = (sourceTokens: string[], candidateTokens: string[]) => {
+  if (candidateTokens.length === 0 || candidateTokens.length >= sourceTokens.length) {
+    return false;
+  }
+  return candidateTokens.every(
+    (token, index) => sourceTokens[sourceTokens.length - candidateTokens.length + index] === token
+  );
+};
+const findVoiceConfigForSpeaker = (configs: VoiceConfig[], speakerName: string) => {
+  const normalizedSpeaker = normalizeCharacterName(speakerName);
+  if (!normalizedSpeaker) {
+    return undefined;
+  }
+
+  const exactMatch = configs.find((config) => normalizeCharacterName(config.name) === normalizedSpeaker);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const speakerTokens = splitCharacterTokens(speakerName);
+  let bestAliasMatch: VoiceConfig | undefined;
+  let bestAliasTokenCount = 0;
+
+  configs.forEach((config) => {
+    const configTokens = splitCharacterTokens(config.name);
+    if (!hasTrailingTokenMatch(speakerTokens, configTokens)) {
+      return;
+    }
+    if (configTokens.length > bestAliasTokenCount) {
+      bestAliasMatch = config;
+      bestAliasTokenCount = configTokens.length;
+    }
+  });
+
+  return bestAliasMatch;
+};
 const getDialogueSpeakerName = (block: ScriptBlock) => {
   if (block.type !== BlockType.DIALOGUE) {
     return undefined;
@@ -159,7 +201,7 @@ export const useAudioPlayer = (
     const narratorConfig = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === 'narrator');
     const charName = getDialogueSpeakerName(block) || 'Narrator';
     const normalized = normalizeCharacterName(charName);
-    const existing = voiceConfigsRef.current.find((config) => normalizeCharacterName(config.name) === normalized);
+    const existing = findVoiceConfigForSpeaker(voiceConfigsRef.current, charName);
     const isNarrator = normalized === 'narrator';
     const preference = isNarrator
       ? narratorVoicePreferenceRef.current
