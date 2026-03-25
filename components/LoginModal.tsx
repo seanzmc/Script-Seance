@@ -35,7 +35,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   return (
     <AnimatePresence initial={false}>
       {isOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-app-modal flex items-center justify-center p-4">
           <m.div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             initial="hidden"

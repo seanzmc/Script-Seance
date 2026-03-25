@@ -9,6 +9,7 @@ import { AnimatePresence, LayoutGroup, animate, useMotionValue } from "motion/re
 import * as m from "motion/react-m";
 import { GENRES } from "../types";
 import { Button } from "./Button";
+import { SETUP_UI_TOKENS } from "./setupUiTokens";
 import { Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
 import {
@@ -113,18 +114,6 @@ const VOICE_PREFERENCE_META: Record<
   female: { icon: Venus, label: "Female" },
   random: { icon: Shuffle, label: "Random" },
 };
-
-export const SETUP_UI_TOKENS = {
-  title: "text-xl sm:text-2xl md:text-[26px] font-semibold tracking-tight text-white",
-  subtitle: "text-sm sm:text-base leading-relaxed text-slate-300/80",
-  sectionLabel:
-    "text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-slate-300",
-  bodyText: "text-sm sm:text-base leading-relaxed text-slate-300",
-  bodyMutedText: "text-sm sm:text-base leading-relaxed text-slate-400",
-  panelSurface: "rounded-xl bg-white/[0.02]",
-  buttonText: "text-sm font-semibold uppercase tracking-[0.2em]",
-  metaText: "text-xs sm:text-sm text-slate-400",
-} as const;
 
 type SceneLengthValue = "Short" | "Medium" | "Long";
 type LengthTickPhase = "idle" | "prep" | "animate";
@@ -2482,9 +2471,9 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
           <AnimatePresence initial={false}>
             {stageReactivationPrompt ? (
-              <div className="fixed inset-0 z-[82] flex items-center justify-center px-4">
+              <div className="fixed inset-0 z-content-modal flex items-center justify-center px-4">
                 <m.div
-                  className="absolute inset-0 bg-black/60"
+                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
                   onClick={() => closeStageReactivationPrompt()}
                   initial="hidden"
                   animate="visible"
@@ -2539,7 +2528,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               </div>
             ) : null}
             {isStyleLibraryOpen ? (
-              <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+              <div className="fixed inset-0 z-content-modal flex items-center justify-center px-4">
                 <m.div
                   className="absolute inset-0 bg-black/70 backdrop-blur-sm"
                   onClick={() => setIsStyleLibraryOpen(false)}

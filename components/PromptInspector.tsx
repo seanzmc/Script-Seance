@@ -27,7 +27,7 @@ export const PromptInspector: React.FC<PromptInspectorProps> = ({ traces, onClea
   }
 
   return createPortal(
-    <div className="fixed bottom-4 right-4 z-[120] w-[min(96vw,720px)] max-h-[78vh] overflow-hidden rounded-xl border border-emerald-400/35 bg-gray-950/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur">
+    <div className="fixed bottom-4 right-4 z-library w-[min(96vw,720px)] max-h-[78vh] overflow-hidden rounded-xl border border-emerald-400/35 bg-gray-950/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-300">
           Prompt Inspector

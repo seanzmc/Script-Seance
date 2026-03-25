@@ -41,7 +41,7 @@ export const TitleEditModal: React.FC<TitleEditModalProps> = ({
   return (
     <AnimatePresence initial={false}>
       {isOpen ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-content-modal flex items-center justify-center px-4">
           <m.div
             key="edit-title-backdrop"
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"

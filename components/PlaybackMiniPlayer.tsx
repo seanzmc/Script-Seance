@@ -75,7 +75,7 @@ export const PlaybackMiniPlayer: React.FC<PlaybackMiniPlayerProps> = ({
   return (
     <div
       data-testid="playback-mini-player"
-      className="fixed inset-x-3 bottom-3 z-[94] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[min(24rem,calc(100vw-2rem))]"
+      className="fixed inset-x-3 bottom-3 z-mini-player sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[min(24rem,calc(100vw-2rem))]"
     >
       <div className="rounded-2xl border border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.96),rgba(10,15,28,0.94))] px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.4)] backdrop-blur">
         <div className="flex items-start justify-between gap-3">

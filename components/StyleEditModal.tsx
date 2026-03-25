@@ -47,9 +47,9 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
     <>
       <AnimatePresence initial={false}>
         {isOpen ? (
-          <div className="fixed inset-x-0 bottom-0 top-24 z-[110] flex items-start justify-center overflow-y-auto px-4 py-4 sm:top-28 sm:py-6">
+          <div className="fixed inset-x-0 bottom-0 top-24 z-editor-modal flex items-start justify-center overflow-y-auto px-4 py-4 sm:top-28 sm:py-6">
             <m.div
-              className="absolute inset-0 bg-black/72"
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
               onClick={onClose}
               initial="hidden"
               animate="visible"

@@ -1,6 +1,6 @@
 // Shared class names for the anchored cream-paper editor family only.
 export const paperPopoverShellClassName =
-  'rounded-2xl border border-[#d6cdbd] bg-[#f6f1e7] p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)]';
+  'rounded-2xl border border-paper-border bg-paper-surface p-4 shadow-[0_20px_54px_rgba(15,23,42,0.24)]';
 
 export const paperPopoverAnimatedShellClassName =
   `${paperPopoverShellClassName} transition-[opacity,transform,box-shadow] duration-200 ease-out`;

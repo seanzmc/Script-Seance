@@ -354,7 +354,7 @@ describe('ScriptPane header generation and audio drawer', () => {
     const dialog = screen.getByRole('dialog', { name: 'Edit style' });
     const overlay = dialog.parentElement as HTMLElement;
 
-    expect(overlay.className).toContain('z-[110]');
+    expect(overlay.className).toContain('z-editor-modal');
     expect(overlay.className).toContain('top-24');
     expect(overlay.className).toContain('overflow-y-auto');
     expect(dialog.className).toContain('max-h-[calc(100vh-8rem)]');
@@ -368,7 +368,7 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     const libraryDialog = screen.getByRole('dialog', { name: 'Style Library' });
     const libraryOverlay = libraryDialog.parentElement as HTMLElement;
-    expect(libraryOverlay.className).toContain('z-[120]');
+    expect(libraryOverlay.className).toContain('z-library');
   });
 
   it('shows plot twist progress without shifting the generate button into loading mode', () => {

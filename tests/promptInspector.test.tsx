@@ -36,7 +36,7 @@ describe('PromptInspector overlay behavior', () => {
 
     const overlayRoot = title.closest('div.fixed');
     expect(overlayRoot).toBeTruthy();
-    expect(overlayRoot?.className).toContain('z-[120]');
+    expect(overlayRoot?.className).toContain('z-library');
     expect(overlayRoot?.className).toContain('max-h-[78vh]');
   });
 

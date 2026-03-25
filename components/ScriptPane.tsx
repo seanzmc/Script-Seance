@@ -15,13 +15,13 @@ import {
 import {
   SetupForm,
   SetupFormState,
-  SETUP_UI_TOKENS,
   STYLE_PRESETS
 } from './SetupForm';
 import { PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
 import { PlaybackMiniPlayer } from './PlaybackMiniPlayer';
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
+import { SETUP_UI_TOKENS } from './setupUiTokens';
 import { useScriptController } from '../hooks/useScriptController';
 import {
   createAfterBlockAnchor,
@@ -137,7 +137,7 @@ const InlineTooltip = ({ label, children, wrapperClassName }: InlineTooltipProps
     {children}
     <span
       role="tooltip"
-      className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-[6] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+      className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-6 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
     >
       {label}
     </span>
@@ -686,7 +686,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <>
           <m.div
             key="scene-outline-backdrop"
-            className="fixed inset-0 z-[96] bg-black/45 backdrop-blur-[2px]"
+            className="fixed inset-0 z-drawer-backdrop bg-black/45 backdrop-blur-[2px]"
             onClick={handleCloseOutline}
             aria-hidden="true"
             initial="hidden"
@@ -699,7 +699,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             role="dialog"
             aria-label="Scene outline"
             data-testid="scene-outline-drawer"
-            className="fixed z-[97] flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
+            className="fixed z-drawer flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -738,7 +738,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <>
             <m.div
               key="generate-menu-mobile-backdrop"
-              className="fixed inset-0 z-[84] bg-black/45 backdrop-blur-[1px]"
+              className="fixed inset-0 z-popover-backdrop bg-black/45 backdrop-blur-[2px]"
               onClick={() => setIsGenerateMenuOpen(false)}
               aria-hidden="true"
               initial="hidden"
@@ -750,7 +750,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               key="generate-menu-mobile-panel"
               role="dialog"
               aria-label="Generate menu"
-              className="fixed inset-x-0 bottom-0 z-[85] p-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]"
+              className="fixed inset-x-0 bottom-0 z-popover p-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]"
               initial="hidden"
               animate="visible"
               exit="exit"
@@ -778,7 +778,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             key="generate-menu-desktop-panel"
             role="dialog"
             aria-label="Generate menu"
-            className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] w-[min(28rem,calc(100vw-1.5rem))]"
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-popover w-[min(28rem,calc(100vw-1.5rem))]"
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -796,7 +796,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       {showSetupSurface ? (
         <m.div
           key="setup-screen"
-          className="fixed inset-0 z-[98] overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
+          className="fixed inset-0 z-screen-overlay overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
           role="region"
           aria-label="Setup"
           data-testid="setup-screen"
@@ -964,7 +964,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#17181c]">
       {context && (
-        <div className="relative z-[95] shrink-0 border-b border-gray-800/70 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(15,23,42,0.38))] backdrop-blur">
+        <div className="relative z-header shrink-0 border-b border-gray-800/70 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(15,23,42,0.38))] backdrop-blur">
           <div className="relative max-w-[1240px] mx-auto px-6 max-[900px]:px-4 max-[640px]:px-3 py-4 sm:py-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 space-y-2">
@@ -1062,7 +1062,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                       <div
                         role="menu"
                         aria-label="Export options"
-                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[85] min-w-[12rem] rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
+                        className="absolute right-0 top-[calc(100%+0.5rem)] z-popover min-w-[12rem] rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
                       >
                         <div className="space-y-1">
                           <button
@@ -1175,7 +1175,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
                   {isGenerating ? (
                     <m.div
                       key="writing-indicator"
-                      className="pointer-events-none absolute right-0 top-full z-[6] mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2"
+                      className="pointer-events-none absolute right-0 top-full z-6 mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2"
                       initial="hidden"
                       animate="visible"
                       exit="exit"
@@ -1275,7 +1275,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <>
             <m.div
               key="audio-drawer-backdrop"
-              className="fixed inset-0 z-[96] bg-black/55 backdrop-blur-[2px]"
+              className="fixed inset-0 z-drawer-backdrop bg-black/45 backdrop-blur-[2px]"
               onClick={() => {
                 setIsAudioDrawerOpen(false);
                 focusScriptScroll();
@@ -1291,7 +1291,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               role="dialog"
               aria-label="Audio drawer"
               data-testid="audio-drawer"
-              className="fixed inset-y-0 right-0 z-[97] flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
+              className="fixed inset-y-0 right-0 z-drawer flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
               initial="hidden"
               animate="visible"
               exit="exit"

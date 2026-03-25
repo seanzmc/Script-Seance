@@ -296,6 +296,6 @@ describe('script view style editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Browse library' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Style Library' });
-    expect(dialog.parentElement?.className).toContain('z-[120]');
+    expect(dialog.parentElement?.className).toContain('z-library');
   });
 });

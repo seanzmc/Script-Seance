@@ -195,7 +195,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
 
   const containerClassName = embedded
     ? 'w-full'
-    : 'fixed inset-0 z-[60] flex items-center justify-center p-4';
+    : 'fixed inset-0 z-app-modal flex items-center justify-center p-4';
   const contentClassName = embedded
     ? 'relative w-full rounded-xl border border-gray-800 bg-gray-900 flex flex-col overflow-hidden'
     : 'relative bg-gray-900 w-full max-w-4xl h-[85vh] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200';

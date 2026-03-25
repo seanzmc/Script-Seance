@@ -7,19 +7,3 @@ body {
   background-color: #111827;
   color: #f3f4f6;
 }
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #e7dece;
-}
-::-webkit-scrollbar-thumb {
-  background: #b8ab95;
-  border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #9e9078;
-}

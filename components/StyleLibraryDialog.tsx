@@ -123,9 +123,9 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
   return (
     <AnimatePresence initial={false}>
       {isOpen ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto px-4 py-4 sm:py-6">
+        <div className="fixed inset-0 z-library flex items-center justify-center overflow-y-auto px-4 py-4 sm:py-6">
           <m.div
-            className="absolute inset-0 bg-black/72"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={onClose}
             initial="hidden"
             animate="visible"
