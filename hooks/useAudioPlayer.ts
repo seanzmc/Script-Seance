@@ -83,29 +83,15 @@ export const useAudioPlayer = (
   }, []);
 
   const voiceConfigsRef = useRef(voiceConfigs);
-  useEffect(() => {
-    voiceConfigsRef.current = voiceConfigs;
-  }, [voiceConfigs]);
   const availableVoicesRef = useRef(orchestrationContext?.availableVoices ?? []);
-  useEffect(() => {
-    availableVoicesRef.current = orchestrationContext?.availableVoices ?? [];
-  }, [orchestrationContext?.availableVoices]);
   const characterVoicePreferencesRef = useRef(orchestrationContext?.characterVoicePreferences ?? {});
-  useEffect(() => {
-    characterVoicePreferencesRef.current = orchestrationContext?.characterVoicePreferences ?? {};
-  }, [orchestrationContext?.characterVoicePreferences]);
   const narratorVoicePreferenceRef = useRef(orchestrationContext?.narratorVoicePreference ?? 'male');
-  useEffect(() => {
-    narratorVoicePreferenceRef.current = orchestrationContext?.narratorVoicePreference ?? 'male';
-  }, [orchestrationContext?.narratorVoicePreference]);
-
-  useEffect(() => {
-    scriptIdRef.current = orchestrationContext?.scriptId || 'local-script';
-  }, [orchestrationContext?.scriptId]);
-
-  useEffect(() => {
-    voiceContextRevisionRef.current = orchestrationContext?.voiceContextRevision ?? 0;
-  }, [orchestrationContext?.voiceContextRevision]);
+  voiceConfigsRef.current = voiceConfigs;
+  availableVoicesRef.current = orchestrationContext?.availableVoices ?? [];
+  characterVoicePreferencesRef.current = orchestrationContext?.characterVoicePreferences ?? {};
+  narratorVoicePreferenceRef.current = orchestrationContext?.narratorVoicePreference ?? 'male';
+  scriptIdRef.current = orchestrationContext?.scriptId || 'local-script';
+  voiceContextRevisionRef.current = orchestrationContext?.voiceContextRevision ?? 0;
 
   const currentBlockRevisionMap = useMemo(() => {
     const nextMap = new Map<string, number>();

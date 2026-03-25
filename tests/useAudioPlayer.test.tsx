@@ -1,5 +1,7 @@
 import React, { forwardRef, useImperativeHandle } from 'react';
 import { act, cleanup, render } from '@testing-library/react';
+import { flushSync } from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { BlockType, ScriptBlock, VoiceConfig, TtsVoice } from '../types';
@@ -243,6 +245,120 @@ describe('useAudioPlayer', () => {
     });
 
     expect(ref.current.blockStatuses['block-1']).toBe('generating');
+  });
+
+  it('uses the latest character assignment when playback starts immediately after rerender', () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }
+    ];
+    const initialVoices: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'narrator-voice', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'old-character-voice', speed: 1, pitch: 0 }
+    ];
+    const updatedVoices: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'narrator-voice', speed: 1, pitch: 0 },
+      { name: 'A', voiceId: 'new-character-voice', speed: 1, pitch: 0 }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    try {
+      flushSync(() => {
+        root.render(
+          <Harness
+            ref={ref}
+            voiceConfigs={initialVoices}
+            blocks={blocks}
+            scriptId="script-1"
+            voiceContextRevision={1}
+          />
+        );
+      });
+
+      flushSync(() => {
+        root.render(
+          <Harness
+            ref={ref}
+            voiceConfigs={updatedVoices}
+            blocks={blocks}
+            scriptId="script-1"
+            voiceContextRevision={2}
+          />
+        );
+      });
+
+      ref.current?.playScript(blocks);
+      vi.runAllTimers();
+
+      expect(getEngine().start).toHaveBeenCalledWith(
+        blocks,
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'A', voiceId: 'new-character-voice' })
+        ]),
+        expect.objectContaining({ voiceContextRevision: 2 })
+      );
+    } finally {
+      flushSync(() => {
+        root.unmount();
+      });
+    }
+  });
+
+  it('uses the latest narrator assignment for non-dialogue playback when playback starts immediately after rerender', () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.ACTION, text: 'A cold wind moves through the hall.', blockRevision: 1 }
+    ];
+    const initialVoices: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'old-narrator-voice', speed: 1, pitch: 0 }
+    ];
+    const updatedVoices: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'new-narrator-voice', speed: 1, pitch: 0 }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    try {
+      flushSync(() => {
+        root.render(
+          <Harness
+            ref={ref}
+            voiceConfigs={initialVoices}
+            blocks={blocks}
+            scriptId="script-1"
+            voiceContextRevision={1}
+          />
+        );
+      });
+
+      flushSync(() => {
+        root.render(
+          <Harness
+            ref={ref}
+            voiceConfigs={updatedVoices}
+            blocks={blocks}
+            scriptId="script-1"
+            voiceContextRevision={2}
+          />
+        );
+      });
+
+      ref.current?.playScript(blocks);
+      vi.runAllTimers();
+
+      expect(getEngine().start).toHaveBeenCalledWith(
+        blocks,
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'Narrator', voiceId: 'new-narrator-voice' })
+        ]),
+        expect.objectContaining({ voiceContextRevision: 2 })
+      );
+    } finally {
+      flushSync(() => {
+        root.unmount();
+      });
+    }
   });
 
   it('drops stale playback chunk when playbackRunId changes', async () => {
