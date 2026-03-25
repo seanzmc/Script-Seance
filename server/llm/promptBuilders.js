@@ -363,7 +363,8 @@ export const buildSurpriseSetupPrompt = ({ targetGenre, genres, style }) => {
       'Return a JSON object with:',
       `'genre' (string)${targetGenre ? ' - Use the exact requested genre string.' : ''},`,
       "'premise' (string, 1-2 sentences),",
-      "'characters' (array of 3 character names with brief role description, e.g. \"John (The Detective)\")."
+      "'characters' (array of exactly 3 plain strings with brief role description, e.g. \"John (The Detective)\").",
+      "Do not use objects, nested fields, numbering, or extra wrapper keys inside 'characters'."
     ],
     input: [
       styleHeading,

@@ -10,7 +10,7 @@ import * as m from "motion/react-m";
 import { GENRES } from "../types";
 import { Button } from "./Button";
 import { SETUP_UI_TOKENS } from "./setupUiTokens";
-import { Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
+import { AlertCircle, Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
 import {
   modalVariants,
@@ -78,6 +78,34 @@ export const STYLE_PRESETS = [
 const normalizeStyleValue = (value: string) => value.trim().toLowerCase();
 const isVoicePreference = (value: unknown): value is VoicePreference =>
   value === "male" || value === "female" || value === "random";
+const getSurpriseSetupErrorMessage = (error: unknown, fallbackMessage: string) => {
+  if (!error || typeof error !== "object") {
+    return fallbackMessage;
+  }
+
+  const record = error as {
+    code?: unknown;
+    status?: unknown;
+    message?: unknown;
+  };
+  const code = typeof record.code === "string" ? record.code : "";
+  const status = typeof record.status === "number" ? record.status : null;
+  const message = typeof record.message === "string" ? record.message.trim() : "";
+
+  if (code === "REQUEST_TIMEOUT" || code === "UPSTREAM_TIMEOUT") {
+    return "AI premise generation timed out. Try again or write your own premise.";
+  }
+  if (status === 429) {
+    return "AI premise generation is rate limited right now. Wait a moment, then try again.";
+  }
+  if (status === 401) {
+    return "Your session expired. Log in again, then retry AI premise generation.";
+  }
+  if (code === "INVALID_AI_RESPONSE") {
+    return "The AI premise draft came back incomplete. Try again or write your own premise.";
+  }
+  return message || fallbackMessage;
+};
 const normalizeVoicePreference = (
   value: unknown,
   fallback: VoicePreference,
@@ -1228,6 +1256,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     narratorVoicePreference = DEFAULT_NARRATOR_VOICE_PREFERENCE,
   } = value;
   const [isSurprising, setIsSurprising] = useState(false);
+  const [surpriseError, setSurpriseError] = useState<string | null>(null);
   const [justSurprised, setJustSurprised] = useState(false);
   const [activeStage, setActiveStage] = useState<SetupActiveStage>(() =>
     deriveInitialStage({ premise, characters, style, styleId }),
@@ -1352,8 +1381,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       if (isLocked) return;
       if (!confirmSetupOverwrite()) return;
 
+      setSurpriseError(null);
       setIsSurprising(true);
       const targetGenre = genre;
+      const fallbackMessage = "Failed to generate a surprise setup.";
 
       try {
         let committed = false;
@@ -1372,13 +1403,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
         triggerSurpriseHighlight();
       } catch (e) {
         console.error("Surprise generation failed", e);
-        const handled = onError?.(e, "Failed to generate a surprise setup.");
-        if (handled) {
-          return;
-        }
-        applyFallbackSurpriseSetup(targetGenre);
-        requestDetailsStage("ai");
-        triggerSurpriseHighlight();
+        onError?.(e, fallbackMessage);
+        setSurpriseError(getSurpriseSetupErrorMessage(e, fallbackMessage));
       } finally {
         setIsSurprising(false);
       }
@@ -1403,6 +1429,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   };
 
   const showManualDetails = useCallback(() => {
+    setSurpriseError(null);
     requestDetailsStage("manual");
   }, [requestDetailsStage]);
 
@@ -2256,6 +2283,50 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         Write My Own Premise
                       </button>
                     </div>
+
+                    {surpriseError ? (
+                      <div
+                        role="alert"
+                        className="rounded-[20px] border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
+                      >
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                          <div className="min-w-0 space-y-2">
+                            <p className="font-medium leading-relaxed">
+                              {surpriseError}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleGenerateSurpriseSetup("manual");
+                                }}
+                                disabled={isLoading || isSurprising || isLocked}
+                                className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] ${
+                                  isLoading || isSurprising || isLocked
+                                    ? "cursor-not-allowed bg-rose-200/10 text-rose-100/60"
+                                    : "bg-rose-200/15 text-rose-50 hover:bg-rose-200/25"
+                                }`}
+                              >
+                                Try Again
+                              </button>
+                              <button
+                                type="button"
+                                onClick={showManualDetails}
+                                disabled={isLocked}
+                                className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] ${
+                                  isLocked
+                                    ? "cursor-not-allowed bg-white/[0.06] text-slate-400"
+                                    : "bg-white/[0.08] text-slate-100 hover:bg-white/[0.14]"
+                                }`}
+                              >
+                                Switch to Manual Premise
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </m.div>
               ) : null}

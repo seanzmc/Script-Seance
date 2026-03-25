@@ -1366,6 +1366,7 @@ export default function App() {
     const scopeKey = params.mode === 'auto'
       ? scopeKeys.setupAutoSurprise(startedSetupSessionId)
       : scopeKeys.setupSurprise(startedSetupSessionId);
+    setError(null);
 
     const resolvedStyleSelection = resolveSetupStyleSelection(setupStateRef.current);
     const surpriseSetupContext = {
@@ -1411,7 +1412,7 @@ export default function App() {
 
     if (outcome.kind === 'failed') {
       handleAiError(outcome.error, 'Failed to generate a surprise setup.');
-      return false;
+      throw outcome.error;
     }
     return outcome.kind === 'committed';
   }, [handleAiError, updateSetupState]);

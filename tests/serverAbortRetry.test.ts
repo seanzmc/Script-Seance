@@ -241,6 +241,80 @@ describe('server abort and retry reliability', () => {
     expect((mockResponsesCreate.mock.calls[1]?.[0] as { model?: string })?.model).toBe('gpt-5.4-test-primary');
   });
 
+  it('normalizes recoverable surprise setup character objects into strings', async () => {
+    mockResponsesCreate.mockResolvedValueOnce({
+      output_text: JSON.stringify({
+        genre: 'Noir',
+        premise: 'A vanished magician is forced back for one impossible final con.',
+        characters: [
+          { name: 'Mara', role: 'Illusionist' },
+          { name: 'Denton', description: 'Fixer' },
+          { character: 'Lena', briefRole: 'Reporter' }
+        ]
+      })
+    });
+
+    const req = {
+      body: {
+        kind: 'generateSurpriseSetup',
+        context: {
+          targetGenre: 'Noir'
+        }
+      }
+    } as any;
+    const res = createMockRes();
+
+    await handleAiGenerate(req, res as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body?.data).toEqual({
+      genre: 'Noir',
+      premise: 'A vanished magician is forced back for one impossible final con.',
+      characters: ['Mara (Illusionist)', 'Denton (Fixer)', 'Lena (Reporter)']
+    });
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns INVALID_AI_RESPONSE when surprise setup characters cannot be normalized safely', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const invalidPayload = {
+        output_text: JSON.stringify({
+          genre: 'Noir',
+          premise: 'A vanished magician is forced back for one impossible final con.',
+          characters: [
+            { label: 'Mara', role: 'Illusionist' },
+            { name: 'Denton', role: 'Fixer' },
+            { name: 'Lena', role: 'Reporter' }
+          ]
+        })
+      };
+
+      mockResponsesCreate
+        .mockResolvedValueOnce(invalidPayload)
+        .mockResolvedValueOnce(invalidPayload);
+
+      const req = {
+        body: {
+          kind: 'generateSurpriseSetup',
+          context: {
+            targetGenre: 'Noir'
+          }
+        }
+      } as any;
+      const res = createMockRes();
+
+      await handleAiGenerate(req, res as any);
+
+      expect(res.statusCode).toBe(502);
+      expect((res.body as any)?.error?.code).toBe('INVALID_AI_RESPONSE');
+      expect((res.body as any)?.error?.details?.reason).toBe('Characters missing or invalid.');
+      expect(mockResponsesCreate).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('promotes insert-block generation only once on invalid output and then returns INVALID_AI_RESPONSE', async () => {
     const invalidInsert = 'x'.repeat(5001);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});

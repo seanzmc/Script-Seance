@@ -1085,6 +1085,107 @@ describe("SetupForm detail reveal timing", () => {
     });
   });
 
+  it("shows an inline error, clears loading, and allows retry after AI premise failure", async () => {
+    const SurpriseFailureHarness: React.FC = () => {
+      const [setupState, setSetupState] =
+        React.useState<SetupFormState>(blankBaseValue);
+      const attemptRef = React.useRef(0);
+
+      const onSetupChange = React.useCallback((next: Partial<SetupFormState>) => {
+        setSetupState((prev) => ({ ...prev, ...next }));
+      }, []);
+
+      const onRequestSurprise = React.useCallback(async () => {
+        attemptRef.current += 1;
+        if (attemptRef.current === 1) {
+          const error = new Error("AI response did not match expected format.") as Error & {
+            code?: string;
+            status?: number;
+          };
+          error.code = "INVALID_AI_RESPONSE";
+          error.status = 502;
+          throw error;
+        }
+
+        setSetupState((prev) => ({
+          ...prev,
+          premise: "A disgraced medium gets one final chance to expose a fraud.",
+          characters: ["Medium", "Producer", "Skeptic"],
+        }));
+        return true;
+      }, []);
+
+      return (
+        <SetupForm
+          value={setupState}
+          onChange={onSetupChange}
+          onRequestSurprise={onRequestSurprise}
+          isLoading={false}
+        />
+      );
+    };
+
+    render(<SurpriseFailureHarness />);
+
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+
+    const generateButton = screen.getByRole("button", {
+      name: /generate ai premise/i,
+    }) as HTMLButtonElement;
+    fireEvent.click(generateButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(screen.getByText(/ai premise draft came back incomplete/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /switch to manual premise/i }),
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(generateButton.disabled).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(/disgraced medium/i)).toBeTruthy();
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("AI draft")).toBeTruthy();
+  });
+
+  it("lets the user switch to manual premise entry after AI premise failure", async () => {
+    const failureError = Object.assign(
+      new Error("AI response did not match expected format."),
+      { code: "INVALID_AI_RESPONSE", status: 502 },
+    );
+
+    render(
+      <SetupForm
+        value={blankBaseValue}
+        onChange={vi.fn()}
+        onRequestSurprise={vi.fn().mockRejectedValue(failureError)}
+        isLoading={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+    fireEvent.click(screen.getByRole("button", { name: /generate ai premise/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/ai premise draft came back incomplete/i)).toBeTruthy();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /switch to manual premise/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText(premisePlaceholder)).not.toBeNull();
+    });
+  });
+
   it("routes AI premise generation back through Step 2 after clearing Step 3 details", async () => {
     let resolveSurprise: (() => void) | null = null;
 

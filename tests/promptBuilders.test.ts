@@ -152,6 +152,8 @@ describe('promptBuilders style injection', () => {
     expect(prompt.input).toContain('Style guidance: Every spoken line should rhyme while remaining natural enough for performance.');
     expect(prompt.instructions).toContain('Make the premise concrete rather than generic or cliche.');
     expect(prompt.instructions).toContain('Make the three characters clearly distinct from one another in role and energy.');
+    expect(prompt.instructions).toContain('array of exactly 3 plain strings');
+    expect(prompt.instructions).toContain("Do not use objects, nested fields, numbering, or extra wrapper keys inside 'characters'.");
   });
 
   it('omits surprise setup style block when no style is provided', () => {

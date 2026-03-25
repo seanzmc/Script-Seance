@@ -117,21 +117,30 @@ const buildSceneJsonSchema = (lengthProfile) => ({
   required: ['heading', 'summary', 'blocks']
 });
 
-const SURPRISE_SETUP_JSON_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    genre: { type: 'string' },
-    premise: { type: 'string' },
-    characters: { type: 'array', items: { type: 'string' } }
-  },
-  required: ['genre', 'premise', 'characters']
-};
 const MAX_VALIDATED_TEXT_CHARS = 4000;
 const MAX_VALIDATED_GENRE_CHARS = 120;
 const MAX_VALIDATED_PREMISE_CHARS = 4000;
 const MAX_VALIDATED_CHARACTERS = 12;
 const MAX_VALIDATED_CHARACTER_CHARS = 120;
+const SURPRISE_SETUP_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    genre: { type: 'string', minLength: 1, maxLength: MAX_VALIDATED_GENRE_CHARS },
+    premise: { type: 'string', minLength: 1, maxLength: MAX_VALIDATED_PREMISE_CHARS },
+    characters: {
+      type: 'array',
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: 'string',
+        minLength: 1,
+        maxLength: MAX_VALIDATED_CHARACTER_CHARS
+      }
+    }
+  },
+  required: ['genre', 'premise', 'characters']
+};
 
 const createInvalidAiResponseError = (kind, reason) => {
   const error = new Error('AI response did not match expected format.');
@@ -154,37 +163,102 @@ const validateGeneratedTextResponse = (kind, rawText) => {
   }
   return text;
 };
-const validateSurpriseSetupResponseData = (kind, data) => {
+const normalizeWhitespace = (value) => (
+  typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
+);
+const SURPRISE_SETUP_CHARACTER_ROLE_FIELDS = ['role', 'briefRole', 'description', 'occupation'];
+const SURPRISE_SETUP_CHARACTER_NAME_FIELDS = ['name', 'character'];
+
+const normalizeSurpriseCharacterEntry = (entry) => {
+  if (typeof entry === 'string') {
+    return normalizeWhitespace(entry);
+  }
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return null;
+  }
+
+  const record = entry;
+  const name = SURPRISE_SETUP_CHARACTER_NAME_FIELDS
+    .map((field) => normalizeWhitespace(record[field]))
+    .find(Boolean) || '';
+  if (!name) {
+    return null;
+  }
+
+  const role = SURPRISE_SETUP_CHARACTER_ROLE_FIELDS
+    .map((field) => normalizeWhitespace(record[field]))
+    .find(Boolean) || '';
+  const normalized = role ? `${name} (${role})` : name;
+  return normalized.length <= MAX_VALIDATED_CHARACTER_CHARS ? normalized : null;
+};
+
+const normalizeSurpriseSetupResponseData = (data) => {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return data;
+  }
+
+  const normalizedGenre = normalizeWhitespace(data.genre);
+  const normalizedPremise = normalizeWhitespace(data.premise);
+  let normalizedCharacters = data.characters;
+
+  if (Array.isArray(data.characters)) {
+    const recoveredCharacters = [];
+    for (const character of data.characters) {
+      const normalizedCharacter = normalizeSurpriseCharacterEntry(character);
+      if (!normalizedCharacter) {
+        recoveredCharacters.length = 0;
+        normalizedCharacters = data.characters;
+        break;
+      }
+      recoveredCharacters.push(normalizedCharacter);
+    }
+
+    if (recoveredCharacters.length === data.characters.length) {
+      normalizedCharacters = recoveredCharacters;
+    }
+  }
+
+  return {
+    ...data,
+    genre: normalizedGenre,
+    premise: normalizedPremise,
+    characters: normalizedCharacters
+  };
+};
+
+const validateSurpriseSetupResponseData = (kind, data) => {
+  const normalizedData = normalizeSurpriseSetupResponseData(data);
+
+  if (!normalizedData || typeof normalizedData !== 'object' || Array.isArray(normalizedData)) {
     throw createInvalidAiResponseError(kind, 'Response was not an object.');
   }
   if (
-    typeof data.genre !== 'string' ||
-    !data.genre.trim() ||
-    data.genre.length > MAX_VALIDATED_GENRE_CHARS
+    typeof normalizedData.genre !== 'string' ||
+    !normalizedData.genre ||
+    normalizedData.genre.length > MAX_VALIDATED_GENRE_CHARS
   ) {
     throw createInvalidAiResponseError(kind, 'Genre missing or too long.');
   }
   if (
-    typeof data.premise !== 'string' ||
-    !data.premise.trim() ||
-    data.premise.length > MAX_VALIDATED_PREMISE_CHARS
+    typeof normalizedData.premise !== 'string' ||
+    !normalizedData.premise ||
+    normalizedData.premise.length > MAX_VALIDATED_PREMISE_CHARS
   ) {
     throw createInvalidAiResponseError(kind, 'Premise missing or too long.');
   }
   if (
-    !Array.isArray(data.characters) ||
-    data.characters.length === 0 ||
-    data.characters.length > MAX_VALIDATED_CHARACTERS ||
-    data.characters.some((character) => (
+    !Array.isArray(normalizedData.characters) ||
+    normalizedData.characters.length === 0 ||
+    normalizedData.characters.length > MAX_VALIDATED_CHARACTERS ||
+    normalizedData.characters.some((character) => (
       typeof character !== 'string' ||
-      !character.trim() ||
+      !character ||
       character.length > MAX_VALIDATED_CHARACTER_CHARS
     ))
   ) {
     throw createInvalidAiResponseError(kind, 'Characters missing or invalid.');
   }
-  return data;
+  return normalizedData;
 };
 
 const stripJsonFormatting = (value) => {
