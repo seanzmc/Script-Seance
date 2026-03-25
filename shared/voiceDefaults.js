@@ -169,7 +169,16 @@ export const sanitizeVoiceIdForUsage = ({
   }
 
   if (isNarrator) {
-    return resolveDefaultNarratorVoiceId(selectableVoices) || resolveSafestValidVoiceId(selectableVoices);
+    const preferredNarratorVoiceId = (preference === 'male' || preference === 'female')
+      ? resolveAutomaticVoiceId({
+          voices: selectableVoices,
+          preference,
+          seedKey
+        })
+      : '';
+    return preferredNarratorVoiceId
+      || resolveDefaultNarratorVoiceId(selectableVoices)
+      || resolveSafestValidVoiceId(selectableVoices);
   }
 
   return resolveAutomaticVoiceId({

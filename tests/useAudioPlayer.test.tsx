@@ -879,6 +879,61 @@ describe('useAudioPlayer', () => {
     );
   });
 
+  it('uses the narrator preference-aware pool for invalid narrator playback voices', async () => {
+    const blocks: ScriptBlock[] = [
+      { id: 'block-1', type: BlockType.ACTION, text: 'A cold wind moves through the hall.', blockRevision: 1 }
+    ];
+    const voiceConfigs: VoiceConfig[] = [
+      { name: 'Narrator', voiceId: 'missing-voice', speed: 1, pitch: 0 }
+    ];
+    const availableVoices: TtsVoice[] = [
+      {
+        id: 'mark-voice',
+        displayName: 'Mark',
+        source: 'inworld-premade',
+        labels: ['narrator', 'professional'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Masculine'
+      },
+      {
+        id: 'female-auto',
+        displayName: 'Olivia',
+        source: 'inworld-premade',
+        labels: ['feminine'],
+        isCustom: false,
+        autoAssignable: true,
+        gender: 'Feminine'
+      }
+    ];
+    const ref = React.createRef<ReturnType<typeof useAudioPlayer>>();
+
+    render(
+      <Harness
+        ref={ref}
+        voiceConfigs={voiceConfigs}
+        blocks={blocks}
+        scriptId="script-1"
+        voiceContextRevision={1}
+        availableVoices={availableVoices}
+        narratorVoicePreference="female"
+      />
+    );
+
+    await act(async () => {
+      ref.current.playScript(blocks);
+      vi.runAllTimers();
+    });
+
+    expect(getEngine().start).toHaveBeenCalledWith(
+      blocks,
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Narrator', voiceId: 'female-auto' })
+      ]),
+      expect.any(Object)
+    );
+  });
+
   it('sanitizes invalid character playback voices using the preference-aware auto pool', async () => {
     const blocks: ScriptBlock[] = [
       { id: 'block-1', type: BlockType.DIALOGUE, text: 'Hello', blockRevision: 1, character: 'A' }
