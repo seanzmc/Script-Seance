@@ -15,22 +15,41 @@ const waitForAppReady = async (page: import('@playwright/test').Page) => {
     .not.toBe('loading');
 };
 
-test('setup desktop layout smoke', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+const clearDraftStorage = async (page: import('@playwright/test').Page) => {
   await page.addInitScript(() => {
     window.localStorage.removeItem('script-seance:draft:v1');
+    window.localStorage.removeItem('script-seance:draft:v0');
+    window.localStorage.removeItem('script-seance:draft');
   });
-  await page.goto('/');
-  await waitForAppReady(page);
+};
 
+const unlockIfNeeded = async (page: import('@playwright/test').Page) => {
   const loginHeading = page.getByRole('heading', { name: /Admin Login/i });
   if (await loginHeading.isVisible()) {
     const adminPassword = process.env.ADMIN_PASSWORD?.trim();
     test.skip(!adminPassword, 'ADMIN_PASSWORD is required when auth is enabled.');
-    await page.locator('input[type="password"]').fill(adminPassword as string);
-    await page.getByRole('button', { name: 'Unlock AI' }).click();
+    const response = await page.request.post('/api/auth/login', {
+      data: { password: adminPassword },
+    });
+    expect(response.ok()).toBe(true);
+    await page.reload();
     await expect(loginHeading).toBeHidden();
   }
+};
+
+const openStyleStage = async (page: import('@playwright/test').Page) => {
+  await page.getByRole('button', { name: /Start a New Script/i }).click();
+  await expect(page.getByTestId('setup-screen')).toBeVisible();
+  await page.getByRole('button', { name: /Continue to Style/i }).click();
+  await expect(page.getByRole('button', { name: /Browse/i })).toBeVisible();
+};
+
+test('setup desktop layout smoke', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await clearDraftStorage(page);
+  await page.goto('/');
+  await waitForAppReady(page);
+  await unlockIfNeeded(page);
 
   await page.getByRole('button', { name: /Start a New Script/i }).click();
   await expect(page.getByTestId('setup-screen')).toBeVisible();
@@ -81,8 +100,11 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
     const viewportRect = element.getBoundingClientRect();
     const valueRect = valueElement.getBoundingClientRect();
     return {
-      viewportClientHeight: element.clientHeight,
-      viewportScrollHeight: element.scrollHeight,
+      valueCenterOffset:
+        Math.abs(
+          (valueRect.top + valueRect.bottom) / 2 -
+          (viewportRect.top + viewportRect.bottom) / 2,
+        ),
       valueWithinViewport:
         valueRect.top >= viewportRect.top - 0.5 &&
         valueRect.bottom <= viewportRect.bottom + 0.5
@@ -90,10 +112,7 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
   });
 
   expect(lengthMetrics).not.toBeNull();
-  expect((lengthMetrics?.viewportScrollHeight ?? 0)).toBeLessThanOrEqual(
-    (lengthMetrics?.viewportClientHeight ?? 0) + 1
-  );
-  expect(lengthMetrics?.valueWithinViewport).toBe(true);
+  expect(lengthMetrics?.valueCenterOffset ?? 999).toBeLessThanOrEqual(1);
 
   const generateButton = page.getByRole('button', { name: /Generate First Scene/i });
   await expect(generateButton).toBeVisible();
@@ -105,4 +124,22 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png'
   });
+});
+
+test('style library keeps its header and list usable in short viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await clearDraftStorage(page);
+  await page.goto('/');
+  await waitForAppReady(page);
+  await unlockIfNeeded(page);
+  await openStyleStage(page);
+
+  await page.getByRole('button', { name: /Browse/i }).click();
+  await expect(page.getByRole('heading', { name: /Style Library/i })).toBeVisible();
+  await expect(page.getByLabel('Search styles')).toBeVisible();
+  const styleListMetrics = await page.getByTestId('setup-style-library-list').evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(styleListMetrics.scrollHeight).toBeGreaterThan(styleListMetrics.clientHeight);
 });

@@ -229,6 +229,37 @@ const GENRE_WHEEL_DRAG_CLICK_SLOP_PX = 6;
 const GENRE_WHEEL_WINDOW_RADIUS = 3;
 const GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP = 1.4;
 const LENGTH_WHEEL_WINDOW_RADIUS = 1;
+const SETUP_WHEEL_METRICS = {
+  length: {
+    itemHeight: 26,
+    viewportHeight: 20,
+    momentumActivationSteps: 0.9,
+    momentumCarrySteps: 0.2,
+    maxMomentumCarrySteps: 0.55,
+    minOpacity: 0.2,
+    minScale: 0.78,
+  },
+  genre: {
+    regular: {
+      itemHeight: 46,
+      peek: 12,
+      momentumActivationSteps: 1.1,
+      momentumCarrySteps: 0.55,
+      maxMomentumCarrySteps: 3.5,
+      minOpacity: 0.16,
+      minScale: 0.68,
+    },
+    compact: {
+      itemHeight: 30,
+      peek: 8,
+      momentumActivationSteps: 0.9,
+      momentumCarrySteps: 0.45,
+      maxMomentumCarrySteps: 2.5,
+      minOpacity: 0.2,
+      minScale: 0.72,
+    },
+  },
+} as const;
 
 const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   value,
@@ -259,19 +290,20 @@ const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
   });
   const wheelMetrics = useMemo(
     () => {
-      const itemHeight = 26;
-      const viewportHeight = 20;
+      const { itemHeight, viewportHeight } = SETUP_WHEEL_METRICS.length;
       return {
         itemHeight,
         viewportHeight,
         baseTrackY:
           -itemHeight * LENGTH_WHEEL_WINDOW_RADIUS +
           (viewportHeight - itemHeight) / 2,
-        momentumActivationSteps: 0.9,
-        momentumCarrySteps: 0.2,
-        maxMomentumCarrySteps: 0.55,
-        minOpacity: 0.2,
-        minScale: 0.78,
+        momentumActivationSteps:
+          SETUP_WHEEL_METRICS.length.momentumActivationSteps,
+        momentumCarrySteps: SETUP_WHEEL_METRICS.length.momentumCarrySteps,
+        maxMomentumCarrySteps:
+          SETUP_WHEEL_METRICS.length.maxMomentumCarrySteps,
+        minOpacity: SETUP_WHEEL_METRICS.length.minOpacity,
+        minScale: SETUP_WHEEL_METRICS.length.minScale,
       };
     },
     [],
@@ -720,18 +752,20 @@ const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
   });
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const wheelMetrics = useMemo(() => {
-    const itemHeight = compact ? 30 : 46;
-    const peek = compact ? 8 : 12;
+    const metrics = compact
+      ? SETUP_WHEEL_METRICS.genre.compact
+      : SETUP_WHEEL_METRICS.genre.regular;
+    const { itemHeight, peek } = metrics;
     return {
       itemHeight,
       peek,
       viewportHeight: itemHeight + peek * 2,
       baseTrackY: peek - itemHeight * GENRE_WHEEL_WINDOW_RADIUS,
-      momentumActivationSteps: compact ? 0.9 : 1.1,
-      momentumCarrySteps: compact ? 0.45 : 0.55,
-      maxMomentumCarrySteps: compact ? 2.5 : 3.5,
-      minOpacity: compact ? 0.2 : 0.16,
-      minScale: compact ? 0.72 : 0.68,
+      momentumActivationSteps: metrics.momentumActivationSteps,
+      momentumCarrySteps: metrics.momentumCarrySteps,
+      maxMomentumCarrySteps: metrics.maxMomentumCarrySteps,
+      minOpacity: metrics.minOpacity,
+      minScale: metrics.minScale,
     };
   }, [compact]);
   const wheelOffset = useMotionValue(0);
@@ -1779,7 +1813,21 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       ? "border-indigo-400/35 bg-indigo-500/[0.05]"
       : "border-white/8 bg-white/[0.02]"
   } ${isLocked ? "opacity-60" : "focus-within:border-indigo-300/35 focus-within:bg-white/[0.03]"}`;
-  const detailsStageShellClass = `${stageShellClass} flex flex-col gap-2.5 overflow-hidden px-4 py-3.5 sm:px-5 sm:py-4 lg:max-h-[calc(100vh-23.5rem)]`;
+  // Step 3 layout contract:
+  // - below `lg`, the page owns scrolling and the details shell must grow naturally.
+  // - at `lg+`, the shell is the only clipped surface; the grid inside must shrink so
+  //   the premise and characters panels can keep their own scroll regions.
+  //
+  // 19.25rem = 1.5rem setup overlay top padding + 7.5rem modal header +
+  // 1.25rem setup body top padding + 6.75rem parked summary rail +
+  // 0.75rem gap before Step 3 + 1.5rem setup overlay bottom padding.
+  const detailsStageMaxHeightClass = "lg:max-h-[calc(100vh-19.25rem)]";
+  const detailsStageShellClass = `${stageShellClass} flex min-h-0 flex-col gap-2.5 overflow-hidden px-4 py-3.5 sm:px-5 sm:py-4 ${detailsStageMaxHeightClass}`;
+  // Keep the character column at 16.5rem on narrow `md` widths: it fits at 768px
+  // without horizontal overflow and prevents the voice-preference controls from
+  // collapsing into the input field.
+  const detailsStageGridClass =
+    "grid grid-cols-1 gap-2.5 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1.16fr)_minmax(16.5rem,0.84fr)] md:items-stretch";
   const detailHeaderCopy =
     "Go back to Step 2 to change the style or switch between AI and manual premise setup.";
   const genreSurfaceLayoutId = prefersReducedMotion
@@ -2232,6 +2280,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                   exit="exit"
                   variants={stageShellVariants}
                   className={detailsStageShellClass}
+                  data-testid="setup-details-stage-shell"
                 >
                 <div className="space-y-1">
                   <p className={setupSectionLabelClass}>Step 3</p>
@@ -2245,7 +2294,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
                 <m.div
                   layout="position"
-                  className="grid grid-cols-1 gap-2.5 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1.16fr)_minmax(16.5rem,0.84fr)] md:items-stretch"
+                  className={detailsStageGridClass}
                 >
                   <div
                     className={premisePanelClass}
@@ -2261,35 +2310,37 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="flex flex-1 flex-col gap-1.5">
-                      <textarea
-                        rows={5}
-                        value={premise}
-                        onChange={(e) => {
-                          const nextPremise = e.target.value;
-                          updateValue({ premise: nextPremise });
-                        }}
-                        className={`w-full flex-1 min-h-[124px] resize-none border-0 bg-transparent px-0 py-1 pr-1.5 text-[15px] leading-relaxed text-slate-100 caret-indigo-200 placeholder:text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none sm:text-base lg:min-h-[114px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
-                          isLocked ? "cursor-not-allowed text-slate-400" : ""
-                        }`}
-                        placeholder="e.g., A detective discovers his new partner is a ghost..."
-                        disabled={isLocked}
-                      />
-                      {activePremiseSource === "manual" && (
-                        <div className="flex flex-wrap gap-1 pt-0.5">
-                          {STARTER_IDEAS.map((idea) => (
-                            <button
-                              key={idea}
-                              type="button"
-                              onClick={() => handleStarterIdeaClick(idea)}
-                              disabled={isLocked}
-                              className="rounded-full border border-white/8 bg-transparent px-2.5 py-1 text-left text-[11px] text-slate-400 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-white/14 hover:bg-white/[0.03] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {idea}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.2)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35">
+                        <textarea
+                          rows={5}
+                          value={premise}
+                          onChange={(e) => {
+                            const nextPremise = e.target.value;
+                            updateValue({ premise: nextPremise });
+                          }}
+                          className={`w-full flex-1 min-h-[124px] resize-none border-0 bg-transparent px-0 py-1 pr-1.5 text-[15px] leading-relaxed text-slate-100 caret-indigo-200 placeholder:text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none sm:text-base lg:min-h-[114px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
+                            isLocked ? "cursor-not-allowed text-slate-400" : ""
+                          }`}
+                          placeholder="e.g., A detective discovers his new partner is a ghost..."
+                          disabled={isLocked}
+                        />
+                        {activePremiseSource === "manual" && (
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {STARTER_IDEAS.map((idea) => (
+                              <button
+                                key={idea}
+                                type="button"
+                                onClick={() => handleStarterIdeaClick(idea)}
+                                disabled={isLocked}
+                                className="rounded-full border border-white/8 bg-transparent px-2.5 py-1 text-left text-[11px] text-slate-400 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-white/14 hover:bg-white/[0.03] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {idea}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -2499,7 +2550,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 />
                 <m.div
                   ref={styleLibraryModalRef}
-                  className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
+                  className="relative flex w-full max-w-2xl max-h-[88vh] flex-col overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
                   role="dialog"
                   aria-modal="true"
                   aria-label="Style Library"
@@ -2526,7 +2577,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="space-y-3 p-4">
+                  <div className="flex min-h-0 flex-1 flex-col space-y-3 p-4">
                     <input
                       ref={styleLibrarySearchInputRef}
                       value={styleSearch}
@@ -2536,7 +2587,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       aria-label="Search styles"
                       disabled={isLocked}
                     />
-                    <div className="max-h-[58vh] overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10">
+                    <div
+                      className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10"
+                      data-testid="setup-style-library-list"
+                    >
                       <div className="p-2">
                         <button
                           type="button"

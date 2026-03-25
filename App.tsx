@@ -69,6 +69,8 @@ interface DraftPayload {
   savedAt: string;
 }
 
+type DraftStorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
 type DebugWindow = Window & {
   __SS_DEBUG_PROMPTS__?: boolean;
   __SS_PROMPT_CONTEXT_REVISION__?: number;
@@ -76,6 +78,7 @@ type DebugWindow = Window & {
 };
 
 const DRAFT_STORAGE_KEY = 'script-seance:draft:v1';
+const LEGACY_DRAFT_STORAGE_KEYS = ['script-seance:draft:v0', 'script-seance:draft'] as const;
 const DRAFT_DEBOUNCE_MS = 800;
 const DEFAULT_TITLE = 'Untitled Screenplay';
 const DEFAULT_SETUP_STATE: SetupFormState = {
@@ -142,6 +145,49 @@ const isStoryContext = (value: unknown): value is StoryContext => {
     styleIdOk &&
     targetLengthOk
   );
+};
+
+const parseStoredDraft = (rawDraft: string | null): DraftPayload | null => {
+  if (!rawDraft) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(rawDraft) as DraftPayload;
+    return parsed && isStoryContext(parsed.context) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+export const readStoredDraftPayload = (storage: DraftStorageLike): DraftPayload | null => {
+  const currentDraft = parseStoredDraft(storage.getItem(DRAFT_STORAGE_KEY));
+  if (currentDraft) {
+    return currentDraft;
+  }
+  if (storage.getItem(DRAFT_STORAGE_KEY)) {
+    storage.removeItem(DRAFT_STORAGE_KEY);
+  }
+
+  for (const legacyKey of LEGACY_DRAFT_STORAGE_KEYS) {
+    const legacyRawDraft = storage.getItem(legacyKey);
+    if (!legacyRawDraft) {
+      continue;
+    }
+    const legacyDraft = parseStoredDraft(legacyRawDraft);
+    if (!legacyDraft) {
+      storage.removeItem(legacyKey);
+      continue;
+    }
+    try {
+      storage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(legacyDraft));
+    } catch {
+      // Hydration can still proceed even if the legacy payload cannot be re-saved.
+    }
+    storage.removeItem(legacyKey);
+    return legacyDraft;
+  }
+
+  return null;
 };
 
 const getErrorMeta = (err: unknown) => {
@@ -919,30 +965,20 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    const storedDraft = readStoredDraftPayload(window.localStorage);
     if (!storedDraft) {
       didHydrateDraftRef.current = true;
       return;
     }
-    try {
-      const parsed = JSON.parse(storedDraft) as DraftPayload;
-      if (parsed && isStoryContext(parsed.context)) {
-        const hydratedContext: StoryContext = {
-          ...parsed.context,
-          scenes: parsed.context.scenes.map(scene => normalizeSceneCharacters(scene, parsed.context.characters))
-        };
-        applyContextMutation(hydratedContext);
-        if (typeof parsed.userInstruction === 'string') {
-          setUserInstruction(parsed.userInstruction);
-        }
-      } else {
-        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-      }
-    } catch {
-      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    } finally {
-      didHydrateDraftRef.current = true;
+    const hydratedContext: StoryContext = {
+      ...storedDraft.context,
+      scenes: storedDraft.context.scenes.map(scene => normalizeSceneCharacters(scene, storedDraft.context.characters))
+    };
+    applyContextMutation(hydratedContext);
+    if (typeof storedDraft.userInstruction === 'string') {
+      setUserInstruction(storedDraft.userInstruction);
     }
+    didHydrateDraftRef.current = true;
   }, [applyContextMutation]);
 
   useEffect(() => {

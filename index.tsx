@@ -6,9 +6,14 @@ import App from "./App";
 import { AppMotionProvider } from "./components/motion/AppMotionProvider";
 import "./index.css";
 
+type DebugWindow = Window & {
+  __SS_DEBUG_PROMPTS__?: boolean;
+  __SS_DEBUG_AI_ABORTS__?: boolean;
+};
+
 if (import.meta.env.DEV) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w = window as any;
+  // Keep these debug toggles out of production bundles and sessions.
+  const w = window as DebugWindow;
   if (import.meta.env.VITE_SS_DEBUG_PROMPTS === "1")
     w.__SS_DEBUG_PROMPTS__ = true;
   if (import.meta.env.VITE_SS_DEBUG_AI_ABORTS === "1")

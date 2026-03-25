@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildScriptTextExport,
   normalizeSceneCharacters,
+  readStoredDraftPayload,
   sanitizeGeneratedInsertText,
 } from "../App";
 import {
@@ -256,6 +257,76 @@ describe("sanitizeGeneratedInsertText", () => {
 
     expect(result).toBe("Keep your voice down.");
     expect(result.startsWith("Dialogue:")).toBe(false);
+  });
+});
+
+describe("readStoredDraftPayload", () => {
+  const createStorage = (entries: Record<string, string>) => {
+    const storageMap = new Map(Object.entries(entries));
+    return {
+      getItem: vi.fn((key: string) => storageMap.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        storageMap.set(key, value);
+      }),
+      removeItem: vi.fn((key: string) => {
+        storageMap.delete(key);
+      }),
+    };
+  };
+
+  const draftPayload = {
+    context: {
+      title: "Midnight Caller",
+      genre: "Noir",
+      premise: "A detective answers a phone that should not ring.",
+      characters: ["Alex"],
+      scenes: [],
+      style: "Dry humor",
+      styleId: "dry-humor",
+      targetLength: "Medium",
+    } satisfies StoryContext,
+    userInstruction: "Push the tension.",
+    savedAt: "2026-03-25T00:00:00.000Z",
+  };
+
+  it("returns the canonical v1 draft payload when present", () => {
+    const storage = createStorage({
+      "script-seance:draft:v1": JSON.stringify(draftPayload),
+    });
+
+    const result = readStoredDraftPayload(storage);
+
+    expect(result).toEqual(draftPayload);
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
+  it("migrates an unversioned legacy draft into the v1 key", () => {
+    const storage = createStorage({
+      "script-seance:draft": JSON.stringify(draftPayload),
+    });
+
+    const result = readStoredDraftPayload(storage);
+
+    expect(result).toEqual(draftPayload);
+    expect(storage.setItem).toHaveBeenCalledWith(
+      "script-seance:draft:v1",
+      JSON.stringify(draftPayload),
+    );
+    expect(storage.removeItem).toHaveBeenCalledWith("script-seance:draft");
+  });
+
+  it("drops invalid stored payloads instead of hydrating them", () => {
+    const storage = createStorage({
+      "script-seance:draft:v1": "{bad json",
+      "script-seance:draft:v0": JSON.stringify({ nope: true }),
+    });
+
+    const result = readStoredDraftPayload(storage);
+
+    expect(result).toBeNull();
+    expect(storage.removeItem).toHaveBeenCalledWith("script-seance:draft:v1");
+    expect(storage.removeItem).toHaveBeenCalledWith("script-seance:draft:v0");
   });
 });
 
