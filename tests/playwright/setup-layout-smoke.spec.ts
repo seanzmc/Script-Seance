@@ -137,9 +137,58 @@ test('style library keeps its header and list usable in short viewports', async 
   await page.getByRole('button', { name: /Browse/i }).click();
   await expect(page.getByRole('heading', { name: /Style Library/i })).toBeVisible();
   await expect(page.getByLabel('Search styles')).toBeVisible();
-  const styleListMetrics = await page.getByTestId('setup-style-library-list').evaluate((element) => ({
+  const styleList = page.getByTestId('setup-style-library-list');
+  const styleListMetrics = await styleList.evaluate((element) => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
   }));
   expect(styleListMetrics.scrollHeight).toBeGreaterThan(styleListMetrics.clientHeight);
+  const scrollTop = await styleList.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return element.scrollTop;
+  });
+  expect(scrollTop).toBeGreaterThan(0);
+  await expect(page.getByRole('heading', { name: /Style Library/i })).toBeVisible();
+  await expect(page.getByLabel('Search styles')).toBeVisible();
+});
+
+test('style library traps setup focus and overlays Step 2 content', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await clearDraftStorage(page);
+  await page.goto('/');
+  await waitForAppReady(page);
+  await unlockIfNeeded(page);
+  await openStyleStage(page);
+
+  const manualPremiseButton = page.getByRole('button', { name: /Write My Own Premise/i });
+  const manualPremiseBox = await manualPremiseButton.boundingBox();
+  expect(manualPremiseBox).not.toBeNull();
+
+  await page.getByRole('button', { name: /Browse/i }).click();
+
+  const searchInput = page.getByLabel('Search styles');
+  const closeButton = page.getByRole('button', { name: /Close style library/i });
+  await expect(page.getByRole('heading', { name: /Style Library/i })).toBeVisible();
+  await expect(searchInput).toBeFocused();
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(closeButton).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(searchInput).toBeFocused();
+
+  const overlayTarget = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y) as HTMLElement | null;
+    if (!element) return null;
+    return {
+      text: element.textContent ?? '',
+      role: element.getAttribute('role'),
+      ariaLabel: element.getAttribute('aria-label'),
+    };
+  }, {
+    x: (manualPremiseBox?.x ?? 0) + (manualPremiseBox?.width ?? 0) / 2,
+    y: (manualPremiseBox?.y ?? 0) + (manualPremiseBox?.height ?? 0) / 2,
+  });
+
+  expect(overlayTarget?.text ?? '').not.toMatch(/Write My Own Premise/i);
+  expect(overlayTarget?.ariaLabel ?? '').not.toMatch(/Write My Own Premise/i);
 });

@@ -14,6 +14,7 @@ export interface StyleLibraryDialogProps {
   disabled?: boolean;
   title?: string;
   subtitle?: string;
+  listTestId?: string;
 }
 
 const normalizeStyleValue = (value: string | null | undefined) => value?.trim().toLowerCase() ?? '';
@@ -40,7 +41,8 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
   onSelect,
   disabled = false,
   title = 'Style Library',
-  subtitle = 'Pick the same tone module used in setup.'
+  subtitle = 'Pick the same tone module used in setup.',
+  listTestId,
 }) => {
   const [search, setSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -171,7 +173,10 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
                   disabled={disabled}
                 />
               </div>
-              <div className="max-h-[58vh] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/80">
+              <div
+                className="max-h-[58vh] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/80"
+                data-testid={listTestId}
+              >
                 <div className="p-2">
                   <button
                     type="button"

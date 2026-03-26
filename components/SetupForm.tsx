@@ -5,17 +5,20 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { AnimatePresence, LayoutGroup, animate, useMotionValue } from "motion/react";
+import { AnimatePresence, LayoutGroup } from "motion/react";
 import * as m from "motion/react-m";
-import { GENRES } from "../types";
 import { Button } from "./Button";
 import { SETUP_UI_TOKENS } from "./setupUiTokens";
-import { AlertCircle, Users, Plus, Search, Trash2, X, Mars, Venus, Shuffle } from "lucide-react";
 import { STYLE_CATEGORIES, stylesLibrary } from "../stylesLibrary";
+import { normalizeLengthValue } from "./LengthCycleWheel";
+import { StyleLibraryDialog, resolveSelectedLibraryStyle } from "./StyleLibraryDialog";
+import { DetailsStage } from "./setup/DetailsStage";
+import { GenreWheelStage } from "./setup/GenreWheelStage";
+import { GENRE_SURFACE_LAYOUT_ID, STYLE_SURFACE_LAYOUT_ID } from "./setup/setupLayoutIds";
+import { StyleSelectionStage } from "./setup/StyleSelectionStage";
 import {
   modalVariants,
   overlayVariants,
-  stageShellVariants,
 } from "./motion/primitives";
 
 export type VoicePreference = "male" | "female" | "random";
@@ -55,13 +58,6 @@ export interface SetupFormProps {
   autoSurprise?: boolean;
 }
 
-const STARTER_IDEAS = [
-  "Two rivals are forced to work together",
-  "A secret threatens to unravel everything",
-  "A normal day goes very wrong",
-  "One mistake rewrites the entire future",
-];
-
 export const STYLE_PRESETS = [
   "Dry humor",
   "Dark humor",
@@ -75,7 +71,6 @@ export const STYLE_PRESETS = [
   "Dead serious documentary tone",
 ];
 
-const normalizeStyleValue = (value: string) => value.trim().toLowerCase();
 const isVoicePreference = (value: unknown): value is VoicePreference =>
   value === "male" || value === "female" || value === "random";
 const getSurpriseSetupErrorMessage = (error: unknown, fallbackMessage: string) => {
@@ -131,57 +126,8 @@ const getNextVoicePreference = (
   value: VoicePreference,
 ): VoicePreference =>
   value === "male" ? "female" : value === "female" ? "random" : "male";
-const VOICE_PREFERENCE_META: Record<
-  VoicePreference,
-  {
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-  }
-> = {
-  male: { icon: Mars, label: "Male" },
-  female: { icon: Venus, label: "Female" },
-  random: { icon: Shuffle, label: "Random" },
-};
-
-type SceneLengthValue = "Short" | "Medium" | "Long";
-type LengthTickPhase = "idle" | "prep" | "animate";
 type SetupActiveStage = "genre" | "style" | "details";
 type SetupEditableStage = Exclude<SetupActiveStage, "details">;
-type GenreWheelDirection = 1 | -1;
-type GenreWheelPointerState = {
-  pointerId: number | null;
-  startY: number;
-  lastY: number;
-  lastTime: number;
-  dragOffset: number;
-  velocityY: number;
-  moved: boolean;
-};
-
-const SCENE_LENGTH_VALUES: readonly SceneLengthValue[] = ["Short", "Medium", "Long"];
-
-const normalizeLengthValue = (value: string): SceneLengthValue =>
-  value === "Short" || value === "Long" ? value : "Medium";
-
-const getLengthByOffset = (
-  currentValue: SceneLengthValue,
-  offset: number,
-): SceneLengthValue => {
-  const currentIndex = Math.max(0, SCENE_LENGTH_VALUES.indexOf(currentValue));
-  const nextIndex =
-    (currentIndex + offset + SCENE_LENGTH_VALUES.length * Math.max(1, Math.abs(offset))) %
-    SCENE_LENGTH_VALUES.length;
-  return SCENE_LENGTH_VALUES[nextIndex] ?? currentValue;
-};
-
-const getGenreByOffset = (currentGenre: string, offset: number): string => {
-  if (GENRES.length === 0) return currentGenre;
-  const currentIndex = Math.max(0, GENRES.indexOf(currentGenre));
-  const nextIndex =
-    (currentIndex + offset + GENRES.length * Math.max(1, Math.abs(offset))) %
-    GENRES.length;
-  return GENRES[nextIndex] ?? GENRES[0] ?? currentGenre;
-};
 
 const getStageRank = (stage: SetupActiveStage): number =>
   stage === "genre" ? 0 : stage === "style" ? 1 : 2;
@@ -218,1024 +164,6 @@ const deriveInitialStage = ({
   return "genre";
 };
 
-type LengthCycleWheelProps = {
-  value: SceneLengthValue;
-  disabled?: boolean;
-  prefersReducedMotion: boolean;
-  focusRingClass: string;
-  onChange: (nextValue: SceneLengthValue) => void;
-};
-
-const GENRE_WHEEL_STEP_SPRING = {
-  type: "spring" as const,
-  stiffness: 500,
-  damping: 40,
-  mass: 0.78,
-  restSpeed: 0.4,
-  restDelta: 0.4,
-};
-const GENRE_WHEEL_RETURN_SPRING = {
-  type: "spring" as const,
-  stiffness: 460,
-  damping: 38,
-  mass: 0.82,
-  restSpeed: 0.4,
-  restDelta: 0.4,
-};
-const GENRE_WHEEL_DRAG_CLICK_SLOP_PX = 6;
-const GENRE_WHEEL_WINDOW_RADIUS = 3;
-const GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP = 1.4;
-const LENGTH_WHEEL_WINDOW_RADIUS = 1;
-const SETUP_WHEEL_METRICS = {
-  length: {
-    itemHeight: 26,
-    viewportHeight: 20,
-    momentumActivationSteps: 0.9,
-    momentumCarrySteps: 0.2,
-    maxMomentumCarrySteps: 0.55,
-    minOpacity: 0.2,
-    minScale: 0.78,
-  },
-  genre: {
-    regular: {
-      itemHeight: 46,
-      peek: 12,
-      momentumActivationSteps: 1.1,
-      momentumCarrySteps: 0.55,
-      maxMomentumCarrySteps: 3.5,
-      minOpacity: 0.16,
-      minScale: 0.68,
-    },
-    compact: {
-      itemHeight: 30,
-      peek: 8,
-      momentumActivationSteps: 0.9,
-      momentumCarrySteps: 0.45,
-      maxMomentumCarrySteps: 2.5,
-      minOpacity: 0.2,
-      minScale: 0.72,
-    },
-  },
-} as const;
-
-const LengthCycleWheel: React.FC<LengthCycleWheelProps> = ({
-  value,
-  disabled = false,
-  prefersReducedMotion,
-  focusRingClass,
-  onChange,
-}) => {
-  const [currentValue, setCurrentValue] = useState<SceneLengthValue>(value);
-  const [pendingValue, setPendingValue] = useState<SceneLengthValue | null>(null);
-  const [phase, setPhase] = useState<LengthTickPhase>("idle");
-  const [isDragging, setIsDragging] = useState(false);
-  const [renderOffset, setRenderOffset] = useState(0);
-  const suppressClickRef = useRef(false);
-  const currentValueRef = useRef(value);
-  const pendingValueRef = useRef<SceneLengthValue | null>(null);
-  const animationIdRef = useRef(0);
-  const animationRef = useRef<ReturnType<typeof animate> | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const pointerStateRef = useRef<GenreWheelPointerState>({
-    pointerId: null,
-    startY: 0,
-    lastY: 0,
-    lastTime: 0,
-    dragOffset: 0,
-    velocityY: 0,
-    moved: false,
-  });
-  const wheelMetrics = useMemo(
-    () => {
-      const { itemHeight, viewportHeight } = SETUP_WHEEL_METRICS.length;
-      return {
-        itemHeight,
-        viewportHeight,
-        baseTrackY:
-          -itemHeight * LENGTH_WHEEL_WINDOW_RADIUS +
-          (viewportHeight - itemHeight) / 2,
-        momentumActivationSteps:
-          SETUP_WHEEL_METRICS.length.momentumActivationSteps,
-        momentumCarrySteps: SETUP_WHEEL_METRICS.length.momentumCarrySteps,
-        maxMomentumCarrySteps:
-          SETUP_WHEEL_METRICS.length.maxMomentumCarrySteps,
-        minOpacity: SETUP_WHEEL_METRICS.length.minOpacity,
-        minScale: SETUP_WHEEL_METRICS.length.minScale,
-      };
-    },
-    [],
-  );
-  const wheelOffset = useMotionValue(0);
-
-  const stopTrackAnimation = useCallback(() => {
-    animationIdRef.current += 1;
-    animationRef.current?.stop();
-    animationRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    currentValueRef.current = currentValue;
-  }, [currentValue]);
-
-  useEffect(() => {
-    pendingValueRef.current = pendingValue;
-  }, [pendingValue]);
-
-  useEffect(() => {
-    return () => {
-      stopTrackAnimation();
-    };
-  }, [stopTrackAnimation]);
-
-  useEffect(() => {
-    const unsubscribe = wheelOffset.on("change", (latest) => {
-      setRenderOffset(latest);
-    });
-    return () => {
-      unsubscribe();
-    };
-  }, [wheelOffset]);
-
-  useEffect(() => {
-    if (phase !== "idle" || isDragging) return;
-    if (currentValueRef.current === value) return;
-    stopTrackAnimation();
-    setPendingValue(null);
-    pendingValueRef.current = null;
-    currentValueRef.current = value;
-    setCurrentValue(value);
-    wheelOffset.set(0);
-  }, [isDragging, phase, stopTrackAnimation, value, wheelOffset]);
-
-  useEffect(() => {
-    if (phase !== "idle") return;
-    wheelOffset.set(0);
-  }, [phase, wheelOffset]);
-
-  const completePendingStep = useCallback(() => {
-    const resolvedValue = pendingValueRef.current;
-    stopTrackAnimation();
-    if (resolvedValue) {
-      currentValueRef.current = resolvedValue;
-      setCurrentValue(resolvedValue);
-      setPendingValue(null);
-      pendingValueRef.current = null;
-    }
-    setPhase("idle");
-    wheelOffset.set(0);
-  }, [stopTrackAnimation, wheelOffset]);
-
-  const animateWheelOffset = useCallback(
-    (
-      targetOffset: number,
-      transition: typeof GENRE_WHEEL_RETURN_SPRING,
-      onComplete?: () => void,
-    ) => {
-      stopTrackAnimation();
-      const animationId = animationIdRef.current;
-      animationRef.current = animate(wheelOffset, targetOffset, {
-        ...transition,
-        onComplete: () => {
-          if (animationIdRef.current !== animationId) return;
-          animationRef.current = null;
-          onComplete?.();
-        },
-      });
-    },
-    [stopTrackAnimation, wheelOffset],
-  );
-
-  const springTrackToCenter = useCallback(
-    (transition = GENRE_WHEEL_RETURN_SPRING) => {
-      if (prefersReducedMotion) {
-        stopTrackAnimation();
-        wheelOffset.set(0);
-        return;
-      }
-      animateWheelOffset(0, transition);
-    },
-    [animateWheelOffset, prefersReducedMotion, stopTrackAnimation, wheelOffset],
-  );
-
-  const settleLength = useCallback(
-    (stepCount: number) => {
-      if (disabled) return;
-      if (stepCount === 0) {
-        springTrackToCenter();
-        return;
-      }
-
-      const baseValue = currentValueRef.current;
-      const nextLength = getLengthByOffset(baseValue, stepCount);
-      onChange(nextLength);
-
-      if (prefersReducedMotion) {
-        stopTrackAnimation();
-        currentValueRef.current = nextLength;
-        setCurrentValue(nextLength);
-        setPendingValue(null);
-        pendingValueRef.current = null;
-        setPhase("idle");
-        wheelOffset.set(0);
-        return;
-      }
-
-      setPendingValue(nextLength);
-      pendingValueRef.current = nextLength;
-      setPhase("animate");
-      animateWheelOffset(
-        stepCount * wheelMetrics.itemHeight,
-        GENRE_WHEEL_STEP_SPRING,
-        () => {
-          currentValueRef.current = nextLength;
-          setCurrentValue(nextLength);
-          setPendingValue(null);
-          pendingValueRef.current = null;
-          setPhase("idle");
-          wheelOffset.set(0);
-        },
-      );
-    },
-    [
-      animateWheelOffset,
-      disabled,
-      onChange,
-      prefersReducedMotion,
-      springTrackToCenter,
-      stopTrackAnimation,
-      wheelMetrics.itemHeight,
-      wheelOffset,
-    ],
-  );
-
-  const stepLength = useCallback(
-    (stepDirection: GenreWheelDirection) => {
-      if (disabled) return;
-      completePendingStep();
-      settleLength(stepDirection);
-    },
-    [completePendingStep, disabled, settleLength],
-  );
-
-  const resetPointerState = useCallback(() => {
-    const pointerId = pointerStateRef.current.pointerId;
-    if (
-      pointerId !== null &&
-      buttonRef.current &&
-      typeof buttonRef.current.releasePointerCapture === "function" &&
-      buttonRef.current.hasPointerCapture(pointerId)
-    ) {
-      buttonRef.current.releasePointerCapture(pointerId);
-    }
-    pointerStateRef.current = {
-      pointerId: null,
-      startY: 0,
-      lastY: 0,
-      lastTime: 0,
-      dragOffset: 0,
-      velocityY: 0,
-      moved: false,
-    };
-    setIsDragging(false);
-  }, []);
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      completePendingStep();
-      pointerStateRef.current = {
-        pointerId: event.pointerId,
-        startY: event.clientY,
-        lastY: event.clientY,
-        lastTime: event.timeStamp,
-        dragOffset: 0,
-        velocityY: 0,
-        moved: false,
-      };
-      suppressClickRef.current = false;
-      if (typeof event.currentTarget.setPointerCapture === "function") {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
-      setIsDragging(true);
-    },
-    [completePendingStep, disabled],
-  );
-
-  const handlePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      if (pointerStateRef.current.pointerId !== event.pointerId) return;
-      const deltaY = event.clientY - pointerStateRef.current.lastY;
-      const deltaTime = Math.max(event.timeStamp - pointerStateRef.current.lastTime, 8);
-      const velocitySample = deltaY / deltaTime;
-      pointerStateRef.current.velocityY =
-        pointerStateRef.current.velocityY * 0.72 + velocitySample * 0.28;
-      pointerStateRef.current.lastY = event.clientY;
-      pointerStateRef.current.lastTime = event.timeStamp;
-      const dragOffset = event.clientY - pointerStateRef.current.startY;
-      pointerStateRef.current.dragOffset = dragOffset;
-      if (Math.abs(dragOffset) >= GENRE_WHEEL_DRAG_CLICK_SLOP_PX) {
-        pointerStateRef.current.moved = true;
-        suppressClickRef.current = true;
-      }
-      if (prefersReducedMotion) return;
-      wheelOffset.set(dragOffset);
-    },
-    [disabled, prefersReducedMotion, wheelOffset],
-  );
-
-  const handlePointerEnd = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (pointerStateRef.current.pointerId !== event.pointerId) return;
-      const dragOffset = pointerStateRef.current.dragOffset;
-      const velocityY = Math.max(
-        -GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
-        Math.min(
-          pointerStateRef.current.velocityY,
-          GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
-        ),
-      );
-      suppressClickRef.current = pointerStateRef.current.moved;
-      resetPointerState();
-      if (event.type === "pointercancel") {
-        springTrackToCenter();
-        return;
-      }
-      if (prefersReducedMotion) {
-        const reducedSteps = Math.round(dragOffset / wheelMetrics.itemHeight);
-        if (reducedSteps === 0) {
-          wheelOffset.set(0);
-          return;
-        }
-        settleLength(reducedSteps);
-        return;
-      }
-      const dragSteps = dragOffset / wheelMetrics.itemHeight;
-      const momentumWeight =
-        Math.abs(dragSteps) >= wheelMetrics.momentumActivationSteps
-          ? Math.min(Math.abs(dragSteps), 1)
-          : 0;
-      const momentumSteps = Math.max(
-        -wheelMetrics.maxMomentumCarrySteps,
-        Math.min(
-          velocityY * wheelMetrics.momentumCarrySteps * momentumWeight,
-          wheelMetrics.maxMomentumCarrySteps,
-        ),
-      );
-      const snapSteps = Math.round(dragSteps + momentumSteps);
-      if (snapSteps === 0) {
-        springTrackToCenter();
-        return;
-      }
-      settleLength(snapSteps);
-    },
-    [
-      prefersReducedMotion,
-      resetPointerState,
-      settleLength,
-      springTrackToCenter,
-      wheelMetrics.itemHeight,
-      wheelMetrics.maxMomentumCarrySteps,
-      wheelMetrics.momentumActivationSteps,
-      wheelMetrics.momentumCarrySteps,
-      wheelOffset,
-    ],
-  );
-
-  const handleClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (suppressClickRef.current) {
-        suppressClickRef.current = false;
-        event.preventDefault();
-        return;
-      }
-      stepLength(1);
-    },
-    [stepLength],
-  );
-
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      if (
-        event.key === "ArrowDown" ||
-        event.key === "ArrowRight" ||
-        event.key === "PageDown"
-      ) {
-        event.preventDefault();
-        stepLength(1);
-        return;
-      }
-      if (
-        event.key === "ArrowUp" ||
-        event.key === "ArrowLeft" ||
-        event.key === "PageUp"
-      ) {
-        event.preventDefault();
-        stepLength(-1);
-      }
-    },
-    [disabled, stepLength],
-  );
-
-  const centeredStepOffset = Math.round(renderOffset / wheelMetrics.itemHeight);
-  const normalizedRenderOffset =
-    renderOffset - centeredStepOffset * wheelMetrics.itemHeight;
-  const selectedValue = pendingValue ?? getLengthByOffset(currentValue, centeredStepOffset);
-  const visibleItems = useMemo(
-    () =>
-      Array.from({ length: LENGTH_WHEEL_WINDOW_RADIUS * 2 + 1 }, (_, itemIndex) => {
-        const relativeIndex = itemIndex - LENGTH_WHEEL_WINDOW_RADIUS;
-        return {
-          relativeIndex,
-          value: getLengthByOffset(currentValue, centeredStepOffset + relativeIndex),
-        };
-      }),
-    [centeredStepOffset, currentValue],
-  );
-  const accessibilityValue = pendingValue ?? currentValue;
-
-  return (
-    <button
-      ref={buttonRef}
-      type="button"
-      onKeyDown={handleKeyDown}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onClick={handleClick}
-      disabled={disabled}
-      data-testid="setup-length-wheel"
-      className={`inline-flex min-w-[7.9rem] items-center justify-between gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-left text-slate-100 transition-[box-shadow,border-color,background-color,color] duration-[220ms] ease-out ${focusRingClass} ${
-        isDragging
-          ? "border-indigo-300/55 bg-indigo-500/14 shadow-[0_18px_32px_-24px_rgba(99,102,241,0.65)]"
-          : "hover:border-indigo-200/35 hover:bg-white/[0.05]"
-      } ${disabled ? "opacity-60 cursor-not-allowed" : "touch-none select-none"}`}
-      aria-label={`Scene length: ${accessibilityValue}. Click to cycle or drag vertically.`}
-      aria-roledescription="length wheel"
-      title="Click to cycle scene length. Drag vertically to spin and release to glide."
-    >
-      <span className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
-        Length
-      </span>
-      <span
-        className="relative inline-flex h-[1.25rem] min-w-[4.4rem] flex-1 overflow-hidden align-middle text-right"
-        data-testid="setup-length-value-viewport"
-        aria-hidden="true"
-      >
-        <span
-          className="absolute inset-x-0 top-0 flex flex-col justify-start transform-gpu will-change-transform"
-          style={{
-            transform: `translateY(${wheelMetrics.baseTrackY - normalizedRenderOffset}px)`,
-          }}
-        >
-          {visibleItems.map((item) => {
-            const isSelectedItem = item.value === selectedValue;
-            const distance = Math.abs(
-              item.relativeIndex * wheelMetrics.itemHeight - normalizedRenderOffset,
-            );
-            const normalizedDistance = Math.min(
-              distance / (wheelMetrics.itemHeight * 1.2),
-              1,
-            );
-            const prominence = 1 - normalizedDistance;
-            const easedProminence =
-              prominence * prominence * (3 - 2 * prominence);
-            const opacity =
-              wheelMetrics.minOpacity +
-              (1 - wheelMetrics.minOpacity) * easedProminence;
-            const scale =
-              wheelMetrics.minScale +
-              (1 - wheelMetrics.minScale) * easedProminence;
-
-            return (
-              <span
-                key={`${currentValue}-${centeredStepOffset}-${item.relativeIndex}-${item.value}`}
-                data-testid={isSelectedItem ? "setup-length-value" : undefined}
-                className="flex items-center justify-end whitespace-nowrap font-medium leading-none text-slate-100"
-                style={{
-                  height: wheelMetrics.itemHeight,
-                  opacity,
-                  transform: `scale(${scale})`,
-                  transformOrigin: "center right",
-                }}
-              >
-                {item.value}
-              </span>
-            );
-          })}
-        </span>
-      </span>
-    </button>
-  );
-};
-
-type GenreCycleWheelProps = {
-  value: string;
-  disabled?: boolean;
-  compact?: boolean;
-  prefersReducedMotion: boolean;
-  focusRingClass: string;
-  onChange: (nextValue: string) => void;
-};
-
-const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
-  value,
-  disabled = false,
-  compact = false,
-  prefersReducedMotion,
-  focusRingClass,
-  onChange,
-}) => {
-  const [currentValue, setCurrentValue] = useState(value);
-  const [pendingValue, setPendingValue] = useState<string | null>(null);
-  const [phase, setPhase] = useState<LengthTickPhase>("idle");
-  const [isDragging, setIsDragging] = useState(false);
-  const [renderOffset, setRenderOffset] = useState(0);
-  const suppressClickRef = useRef(false);
-  const currentValueRef = useRef(value);
-  const pendingValueRef = useRef<string | null>(null);
-  const animationIdRef = useRef(0);
-  const animationRef = useRef<ReturnType<typeof animate> | null>(null);
-  const pointerStateRef = useRef<GenreWheelPointerState>({
-    pointerId: null,
-    startY: 0,
-    lastY: 0,
-    lastTime: 0,
-    dragOffset: 0,
-    velocityY: 0,
-    moved: false,
-  });
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const wheelMetrics = useMemo(() => {
-    const metrics = compact
-      ? SETUP_WHEEL_METRICS.genre.compact
-      : SETUP_WHEEL_METRICS.genre.regular;
-    const { itemHeight, peek } = metrics;
-    return {
-      itemHeight,
-      peek,
-      viewportHeight: itemHeight + peek * 2,
-      baseTrackY: peek - itemHeight * GENRE_WHEEL_WINDOW_RADIUS,
-      momentumActivationSteps: metrics.momentumActivationSteps,
-      momentumCarrySteps: metrics.momentumCarrySteps,
-      maxMomentumCarrySteps: metrics.maxMomentumCarrySteps,
-      minOpacity: metrics.minOpacity,
-      minScale: metrics.minScale,
-    };
-  }, [compact]);
-  const wheelOffset = useMotionValue(0);
-
-  const stopTrackAnimation = useCallback(() => {
-    animationIdRef.current += 1;
-    animationRef.current?.stop();
-    animationRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    currentValueRef.current = currentValue;
-  }, [currentValue]);
-
-  useEffect(() => {
-    pendingValueRef.current = pendingValue;
-  }, [pendingValue]);
-
-  useEffect(() => {
-    return () => {
-      stopTrackAnimation();
-    };
-  }, [stopTrackAnimation]);
-
-  useEffect(() => {
-    const unsubscribe = wheelOffset.on("change", (latest) => {
-      setRenderOffset(latest);
-    });
-    return () => {
-      unsubscribe();
-    };
-  }, [wheelOffset]);
-
-  useEffect(() => {
-    if (phase !== "idle" || isDragging) return;
-    if (currentValueRef.current === value) return;
-    stopTrackAnimation();
-    setPendingValue(null);
-    pendingValueRef.current = null;
-    currentValueRef.current = value;
-    setCurrentValue(value);
-    wheelOffset.set(0);
-  }, [isDragging, phase, stopTrackAnimation, value, wheelOffset]);
-
-  useEffect(() => {
-    if (phase !== "idle") return;
-    wheelOffset.set(0);
-  }, [phase, wheelOffset]);
-
-  const completePendingStep = useCallback(() => {
-    const resolvedValue = pendingValueRef.current;
-    stopTrackAnimation();
-    if (resolvedValue) {
-      currentValueRef.current = resolvedValue;
-      setCurrentValue(resolvedValue);
-      setPendingValue(null);
-      pendingValueRef.current = null;
-    }
-    setPhase("idle");
-    wheelOffset.set(0);
-  }, [stopTrackAnimation, wheelOffset]);
-
-  const animateWheelOffset = useCallback(
-    (
-      targetOffset: number,
-      transition: typeof GENRE_WHEEL_RETURN_SPRING,
-      onComplete?: () => void,
-    ) => {
-      stopTrackAnimation();
-      const animationId = animationIdRef.current;
-      animationRef.current = animate(wheelOffset, targetOffset, {
-        ...transition,
-        onComplete: () => {
-          if (animationIdRef.current !== animationId) return;
-          animationRef.current = null;
-          onComplete?.();
-        },
-      });
-    },
-    [stopTrackAnimation, wheelOffset],
-  );
-
-  const springTrackToCenter = useCallback((transition = GENRE_WHEEL_RETURN_SPRING) => {
-    if (prefersReducedMotion) {
-      stopTrackAnimation();
-      wheelOffset.set(0);
-      return;
-    }
-    animateWheelOffset(0, transition);
-  }, [animateWheelOffset, prefersReducedMotion, stopTrackAnimation, wheelOffset]);
-
-  const settleGenre = useCallback(
-    (stepCount: number) => {
-      if (disabled) return;
-      if (stepCount === 0) {
-        springTrackToCenter();
-        return;
-      }
-
-      const baseValue = currentValueRef.current;
-      const nextGenre = getGenreByOffset(baseValue, stepCount);
-      onChange(nextGenre);
-
-      if (prefersReducedMotion) {
-        stopTrackAnimation();
-        currentValueRef.current = nextGenre;
-        setCurrentValue(nextGenre);
-        setPendingValue(null);
-        pendingValueRef.current = null;
-        setPhase("idle");
-        wheelOffset.set(0);
-        return;
-      }
-
-      setPendingValue(nextGenre);
-      pendingValueRef.current = nextGenre;
-      setPhase("animate");
-      animateWheelOffset(
-        stepCount * wheelMetrics.itemHeight,
-        GENRE_WHEEL_STEP_SPRING,
-        () => {
-          currentValueRef.current = nextGenre;
-          setCurrentValue(nextGenre);
-          setPendingValue(null);
-          pendingValueRef.current = null;
-          setPhase("idle");
-          wheelOffset.set(0);
-        },
-      );
-    },
-    [
-      animateWheelOffset,
-      disabled,
-      onChange,
-      prefersReducedMotion,
-      springTrackToCenter,
-      stopTrackAnimation,
-      wheelMetrics.itemHeight,
-      wheelOffset,
-    ],
-  );
-
-  const stepGenre = useCallback(
-    (stepDirection: GenreWheelDirection) => {
-      if (disabled) return;
-      completePendingStep();
-      settleGenre(stepDirection);
-    },
-    [completePendingStep, disabled, settleGenre],
-  );
-
-  const resetPointerState = useCallback(() => {
-    const pointerId = pointerStateRef.current.pointerId;
-    if (
-      pointerId !== null &&
-      buttonRef.current &&
-      typeof buttonRef.current.releasePointerCapture === "function" &&
-      buttonRef.current.hasPointerCapture(pointerId)
-    ) {
-      buttonRef.current.releasePointerCapture(pointerId);
-    }
-    pointerStateRef.current = {
-      pointerId: null,
-      startY: 0,
-      lastY: 0,
-      lastTime: 0,
-      dragOffset: 0,
-      velocityY: 0,
-      moved: false,
-    };
-    setIsDragging(false);
-  }, []);
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      completePendingStep();
-      pointerStateRef.current = {
-        pointerId: event.pointerId,
-        startY: event.clientY,
-        lastY: event.clientY,
-        lastTime: event.timeStamp,
-        dragOffset: 0,
-        velocityY: 0,
-        moved: false,
-      };
-      suppressClickRef.current = false;
-      if (typeof event.currentTarget.setPointerCapture === "function") {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
-      setIsDragging(true);
-    },
-    [completePendingStep, disabled],
-  );
-
-  const handlePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      if (pointerStateRef.current.pointerId !== event.pointerId) return;
-      const deltaY = event.clientY - pointerStateRef.current.lastY;
-      const deltaTime = Math.max(
-        event.timeStamp - pointerStateRef.current.lastTime,
-        8,
-      );
-      const velocitySample = deltaY / deltaTime;
-      pointerStateRef.current.velocityY =
-        pointerStateRef.current.velocityY * 0.72 + velocitySample * 0.28;
-      pointerStateRef.current.lastY = event.clientY;
-      pointerStateRef.current.lastTime = event.timeStamp;
-      const dragOffset = event.clientY - pointerStateRef.current.startY;
-      pointerStateRef.current.dragOffset = dragOffset;
-      if (Math.abs(dragOffset) >= GENRE_WHEEL_DRAG_CLICK_SLOP_PX) {
-        pointerStateRef.current.moved = true;
-        suppressClickRef.current = true;
-      }
-      if (prefersReducedMotion) return;
-      wheelOffset.set(dragOffset);
-    },
-    [disabled, prefersReducedMotion, wheelOffset],
-  );
-
-  const handlePointerEnd = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (pointerStateRef.current.pointerId !== event.pointerId) return;
-      const dragOffset = pointerStateRef.current.dragOffset;
-      const velocityY = Math.max(
-        -GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
-        Math.min(
-          pointerStateRef.current.velocityY,
-          GENRE_WHEEL_MOMENTUM_VELOCITY_CLAMP,
-        ),
-      );
-      suppressClickRef.current = pointerStateRef.current.moved;
-      resetPointerState();
-      if (event.type === "pointercancel") {
-        springTrackToCenter();
-        return;
-      }
-      if (prefersReducedMotion) {
-        const reducedSteps = Math.round(dragOffset / wheelMetrics.itemHeight);
-        if (reducedSteps === 0) {
-          wheelOffset.set(0);
-          return;
-        }
-        settleGenre(reducedSteps);
-        return;
-      }
-      const dragSteps = dragOffset / wheelMetrics.itemHeight;
-      const momentumWeight =
-        Math.abs(dragSteps) >= wheelMetrics.momentumActivationSteps
-          ? Math.min(Math.abs(dragSteps), 1.35)
-          : 0;
-      const momentumSteps = Math.max(
-        -wheelMetrics.maxMomentumCarrySteps,
-        Math.min(
-          velocityY *
-            wheelMetrics.momentumCarrySteps *
-            momentumWeight,
-          wheelMetrics.maxMomentumCarrySteps,
-        ),
-      );
-      const snapSteps = Math.round(dragSteps + momentumSteps);
-      if (snapSteps === 0) {
-        springTrackToCenter();
-        return;
-      }
-      settleGenre(snapSteps);
-    },
-    [
-      prefersReducedMotion,
-      resetPointerState,
-      settleGenre,
-      springTrackToCenter,
-      wheelMetrics.itemHeight,
-      wheelMetrics.momentumActivationSteps,
-      wheelMetrics.maxMomentumCarrySteps,
-      wheelMetrics.momentumCarrySteps,
-      wheelOffset,
-    ],
-  );
-
-  const handleClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (suppressClickRef.current) {
-        suppressClickRef.current = false;
-        event.preventDefault();
-        return;
-      }
-      stepGenre(1);
-    },
-    [stepGenre],
-  );
-
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (disabled) return;
-      if (
-        event.key === "ArrowDown" ||
-        event.key === "ArrowRight" ||
-        event.key === "PageDown"
-      ) {
-        event.preventDefault();
-        stepGenre(1);
-        return;
-      }
-      if (
-        event.key === "ArrowUp" ||
-        event.key === "ArrowLeft" ||
-        event.key === "PageUp"
-      ) {
-        event.preventDefault();
-        stepGenre(-1);
-      }
-    },
-    [disabled, stepGenre],
-  );
-
-  const isLarge = !compact;
-  const centeredStepOffset = Math.round(renderOffset / wheelMetrics.itemHeight);
-  const normalizedRenderOffset =
-    renderOffset - centeredStepOffset * wheelMetrics.itemHeight;
-  const selectedValue =
-    pendingValue ?? getGenreByOffset(currentValue, centeredStepOffset);
-  const visibleItems = useMemo(
-    () =>
-      Array.from(
-        { length: GENRE_WHEEL_WINDOW_RADIUS * 2 + 1 },
-        (_, itemIndex) => {
-          const relativeIndex = itemIndex - GENRE_WHEEL_WINDOW_RADIUS;
-          return {
-            relativeIndex,
-            value: getGenreByOffset(
-              currentValue,
-              centeredStepOffset + relativeIndex,
-            ),
-          };
-        },
-      ),
-    [centeredStepOffset, currentValue],
-  );
-
-  return (
-    <button
-      ref={buttonRef}
-      type="button"
-      data-testid={compact ? "setup-genre-wheel-compact" : "setup-genre-wheel"}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      disabled={disabled}
-      className={`group relative overflow-hidden text-left text-slate-100 transition-[transform,box-shadow,border-color,background-color,color] duration-[240ms] ease-out ${focusRingClass} ${
-        isLarge
-          ? "w-full min-w-[13.5rem] max-w-[18.5rem] rounded-[22px] border border-indigo-200/20 bg-white/[0.02] px-4 py-3 sm:min-w-[15.5rem] sm:px-5 sm:py-4 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.9)]"
-          : "min-w-[8.25rem] max-w-[11rem] rounded-2xl border border-transparent bg-transparent px-0 py-0 shadow-none"
-      } ${
-        isDragging
-          ? isLarge
-            ? "border-indigo-300/45 bg-indigo-500/10 shadow-[0_22px_46px_-28px_rgba(99,102,241,0.45)]"
-            : "text-indigo-100"
-          : isLarge
-            ? "hover:border-indigo-200/32 hover:bg-white/[0.03]"
-          : "hover:text-white"
-      } ${disabled ? "cursor-not-allowed opacity-60" : "touch-none select-none"}`}
-      aria-label={`Genre: ${selectedValue}. Click to cycle or drag vertically.`}
-      aria-roledescription="genre wheel"
-      title="Click to cycle genre. Drag vertically to spin and release to glide."
-      >
-      {isLarge ? (
-        <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
-      ) : null}
-      {isLarge ? (
-        <span className="block text-[10px] uppercase tracking-[0.34em] text-indigo-100/58">
-          Genre
-        </span>
-      ) : null}
-      <span
-        className={`relative mt-1.5 block w-full overflow-hidden align-middle ${
-          isLarge ? "min-w-[9.5rem] max-w-full" : "min-w-[6.5rem] max-w-full"
-        }`}
-        style={{
-          height: wheelMetrics.viewportHeight,
-          WebkitMaskImage:
-            "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
-          maskImage:
-            "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
-        }}
-        data-testid="setup-genre-value-viewport"
-        aria-hidden="true"
-      >
-        <span
-          className="absolute inset-x-0 top-0 flex flex-col transform-gpu will-change-transform"
-          style={{
-            transform: `translateY(${wheelMetrics.baseTrackY - normalizedRenderOffset}px)`,
-          }}
-        >
-          {visibleItems.map((item) => {
-            const isSelectedItem = item.value === selectedValue;
-            const distance = Math.abs(
-              item.relativeIndex * wheelMetrics.itemHeight - normalizedRenderOffset,
-            );
-            const normalizedDistance = Math.min(
-              distance / (wheelMetrics.itemHeight * 1.55),
-              1,
-            );
-            const prominence = 1 - normalizedDistance;
-            const easedProminence =
-              prominence * prominence * (3 - 2 * prominence);
-            const opacity =
-              wheelMetrics.minOpacity +
-              (1 - wheelMetrics.minOpacity) * easedProminence;
-            const scale =
-              wheelMetrics.minScale +
-              (1 - wheelMetrics.minScale) * easedProminence;
-            const lift = (1 - easedProminence) * (isLarge ? 1.6 : 0.8);
-            const textShadowAlpha = 0.05 + easedProminence * 0.16;
-
-            return (
-                <span
-                key={`${currentValue}-${centeredStepOffset}-${item.relativeIndex}-${item.value}`}
-                data-testid={isSelectedItem ? "setup-genre-value" : undefined}
-                className={`flex items-center font-semibold leading-none text-slate-50 ${
-                  isLarge
-                    ? "text-[2rem] sm:text-[2.3rem]"
-                    : "text-[1.5rem] tracking-[-0.01em]"
-                }`}
-                style={{
-                  height: wheelMetrics.itemHeight,
-                  opacity,
-                  transform: `translateY(${lift}px) scale(${scale})`,
-                  transformOrigin: "center left",
-                  textShadow: `0 0 18px rgba(255,255,255,${textShadowAlpha})`,
-                }}
-              >
-                <span className="block w-full whitespace-nowrap">
-                  {item.value}
-                </span>
-              </span>
-            );
-          })}
-        </span>
-      </span>
-      {isLarge && (
-        <span className="mt-1 block text-xs text-slate-400 sm:text-sm">
-          Click to cycle. Drag vertically to spin and release to glide.
-        </span>
-      )}
-    </button>
-  );
-};
-
 export const SetupForm: React.FC<SetupFormProps> = ({
   value,
   onChange,
@@ -1264,7 +192,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [detailRevealSource, setDetailRevealSource] = useState<
     "manual" | "ai" | null
   >(null);
-  const [styleSearch, setStyleSearch] = useState("");
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -1274,9 +201,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const [stageReactivationPrompt, setStageReactivationPrompt] =
     useState<SetupEditableStage | null>(null);
   const autoSurpriseRef = useRef(false);
-  const styleRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const styleLibrarySearchInputRef = useRef<HTMLInputElement | null>(null);
-  const styleLibraryModalRef = useRef<HTMLDivElement | null>(null);
   const styleShufflePulseTimeoutRef = useRef<number | null>(null);
   const detailsFooterRef = useRef<HTMLDivElement | null>(null);
   const stageReactivationModalRef = useRef<HTMLDivElement | null>(null);
@@ -1290,6 +214,15 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const characterInputs = useRef<(HTMLInputElement | null)[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const setupUi = SETUP_UI_TOKENS;
+  const synchronizedVoicePreferences = useMemo(
+    () =>
+      synchronizeSetupVoicePreferences({
+        characters,
+        characterVoicePreferences,
+        narratorVoicePreference,
+      }),
+    [characters, characterVoicePreferences, narratorVoicePreference],
+  );
 
   useEffect(() => {
     if (focusIndex !== null && characterInputs.current[focusIndex]) {
@@ -1321,11 +254,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const removeCharacter = (index: number) =>
     updateValue({ characters: characters.filter((_, i) => i !== index) });
   const cycleCharacterVoicePreference = (index: number) => {
-    const nextPreferences = synchronizeSetupVoicePreferences({
-      characters,
-      characterVoicePreferences,
-      narratorVoicePreference,
-    }).characterVoicePreferences;
+    const nextPreferences = [...synchronizedVoicePreferences.characterVoicePreferences];
     nextPreferences[index] = getNextVoicePreference(nextPreferences[index]);
     updateValue({ characterVoicePreferences: nextPreferences });
   };
@@ -1558,50 +487,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       }
     };
   }, [activeStage]);
-  useEffect(() => {
-    if (!isStyleLibraryOpen) return;
-    const animationId = requestAnimationFrame(() => {
-      styleLibrarySearchInputRef.current?.focus();
-    });
-    return () => cancelAnimationFrame(animationId);
-  }, [isStyleLibraryOpen]);
-  useEffect(() => {
-    if (!isStyleLibraryOpen) return;
-    const handleModalKeyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsStyleLibraryOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const modalRoot = styleLibraryModalRef.current;
-      if (!modalRoot) return;
-      const focusableElements = modalRoot.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusableElements.length === 0) return;
-      const firstFocusable = focusableElements.item(0);
-      const lastFocusable = focusableElements.item(focusableElements.length - 1);
-      const activeElement = document.activeElement as HTMLElement | null;
-      if (!activeElement || !modalRoot.contains(activeElement)) {
-        event.preventDefault();
-        firstFocusable?.focus();
-        return;
-      }
-      if (event.shiftKey && activeElement === firstFocusable) {
-        event.preventDefault();
-        lastFocusable?.focus();
-        return;
-      }
-      if (!event.shiftKey && activeElement === lastFocusable) {
-        event.preventDefault();
-        firstFocusable?.focus();
-      }
-    };
-    window.addEventListener("keydown", handleModalKeyboard);
-    return () => {
-      window.removeEventListener("keydown", handleModalKeyboard);
-    };
-  }, [isStyleLibraryOpen]);
   const closeStageReactivationPrompt = useCallback(
     (restoreFocus = true) => {
       setStageReactivationPrompt(null);
@@ -1682,41 +567,10 @@ export const SetupForm: React.FC<SetupFormProps> = ({
 
   const trimmedPremise = premise.trim();
   const activePremiseSource = detailRevealSource ?? "manual";
-  const normalizedStyleSearch = styleSearch.trim().toLowerCase();
-  const normalizedStyle = normalizeStyleValue(style);
-  const normalizedStyleId =
-    typeof styleId === "string" && styleId.trim().length > 0
-      ? styleId.trim()
-      : "";
-  const filteredStyles = useMemo(() => {
-    if (!normalizedStyleSearch) return stylesLibrary;
-    return stylesLibrary.filter((item) => {
-      return (
-        item.title.toLowerCase().includes(normalizedStyleSearch) ||
-        item.description.toLowerCase().includes(normalizedStyleSearch)
-      );
-    });
-  }, [normalizedStyleSearch]);
-  const groupedFilteredStyles = useMemo(
-    () =>
-      STYLE_CATEGORIES.map((category) => ({
-        ...category,
-        items: filteredStyles.filter((item) => item.category === category.id),
-      })).filter((group) => group.items.length > 0),
-    [filteredStyles],
+  const selectedLibraryStyle = useMemo(
+    () => resolveSelectedLibraryStyle(styleId, style),
+    [styleId, style],
   );
-  const selectedLibraryStyle = useMemo(() => {
-    const byId = normalizedStyleId
-      ? stylesLibrary.find((item) => item.id === normalizedStyleId) ?? null
-      : null;
-    if (byId) return byId;
-    // Legacy fallback for persisted title-only setups.
-    return (
-      stylesLibrary.find(
-        (item) => normalizeStyleValue(item.title) === normalizedStyle,
-      ) ?? null
-    );
-  }, [normalizedStyle, normalizedStyleId]);
   const selectedStyleCategoryLabel = useMemo(() => {
     if (!selectedLibraryStyle) return null;
     return (
@@ -1725,25 +579,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
       )?.label ?? null
     );
   }, [selectedLibraryStyle]);
-  useEffect(() => {
-    if (!isStyleLibraryOpen) return;
-    if (!selectedLibraryStyle) return;
-    const isVisibleInFilteredStyles = filteredStyles.some(
-      (item) => item.id === selectedLibraryStyle.id,
-    );
-    if (!isVisibleInFilteredStyles) return;
-    const selectedButton = styleRowRefs.current[selectedLibraryStyle.id];
-    if (
-      !selectedButton ||
-      typeof selectedButton.scrollIntoView !== "function"
-    ) {
-      return;
-    }
-    selectedButton.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
-  }, [filteredStyles, isStyleLibraryOpen, selectedLibraryStyle]);
   const handleStyleShuffle = useCallback(() => {
     if (isLocked || stylesLibrary.length === 0) return;
     const randomIndex = Math.floor(Math.random() * stylesLibrary.length);
@@ -1781,7 +616,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const showSummary = isLocked || isSummaryOnly;
   const hasValidCharacter = characters.some((char) => char.trim().length > 0);
   const normalizedLength = normalizeLengthValue(length);
-  const characterCount = characters.length;
   const showDetails = activeStage === "details";
   const isGenreStage = activeStage === "genre";
   const isStyleStage = activeStage === "style";
@@ -1795,63 +629,24 @@ export const SetupForm: React.FC<SetupFormProps> = ({
   const focusRingClass =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const interactiveControlClass = `${motionBaseClass} ${pressFeedbackClass} ${focusRingClass}`;
-  const detailPanelClass = "space-y-2.5";
   const setupSectionLabelClass = setupUi.sectionLabel;
-  const setupBodyTextClass = setupUi.bodyText;
-  const setupBodyMutedTextClass = setupUi.bodyMutedText;
-  const setupMetaTextClass = setupUi.metaText;
-  const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow,background-color] duration-[220ms] ease-out hover:-translate-y-px active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
-  const styleActionButtonBaseClass = `rounded-lg px-3 py-2 ${setupUi.buttonText} ring-1 ${interactiveControlClass}`;
   const styleCardPulseClass = styleShufflePulse
     ? "shadow-[0_14px_34px_-26px_rgba(129,140,248,0.85)]"
     : "shadow-none";
   const stageSurfaceBaseClass =
     "rounded-[24px] border border-white/10 ring-1 ring-white/5 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.92)]";
-  const stageShellClass = `${stageSurfaceBaseClass} bg-slate-950/56 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]`;
   const summaryCardClass =
     `${stageSurfaceBaseClass} bg-white/[0.03] px-4 py-3.5 sm:px-5 sm:py-4 transition-[border-color,background-color,box-shadow,transform] duration-[240ms] ease-out`;
-  const sharedSurfaceCardClass =
-    `${stageSurfaceBaseClass} bg-white/[0.032] px-4 py-3.5 sm:px-5 sm:py-4`;
   const summaryLinkButtonClass = `inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] ${interactiveControlClass}`;
   const parkedRailClass = isDetailsStage
     ? "grid gap-3 md:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]"
     : "grid max-w-md gap-3";
-  const detailSectionSurfaceClass =
-    "flex h-full min-h-0 flex-col rounded-[16px] border border-white/7 bg-white/[0.02] px-3 py-2.5 sm:px-3.5 sm:py-3";
-  const premisePanelClass = `${detailSectionSurfaceClass} ${detailPanelClass} transition-[border-color,background-color] duration-[220ms] ease-out ${
-    justSurprised
-      ? "border-indigo-300/30 bg-indigo-500/[0.05]"
-      : "focus-within:border-white/10 focus-within:bg-white/[0.03]"
-  }`;
-  const characterPanelClass = `${detailSectionSurfaceClass} ${detailPanelClass}`;
-  const characterRowClass = `flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-[border-color,background-color] duration-[220ms] ease-out ${
-    justSurprised
-      ? "border-indigo-400/35 bg-indigo-500/[0.05]"
-      : "border-white/8 bg-white/[0.02]"
-  } ${isLocked ? "opacity-60" : "focus-within:border-indigo-300/35 focus-within:bg-white/[0.03]"}`;
-  // Step 3 layout contract:
-  // - below `lg`, the page owns scrolling and the details shell must grow naturally.
-  // - at `lg+`, the shell is the only clipped surface; the grid inside must shrink so
-  //   the premise and characters panels can keep their own scroll regions.
-  //
-  // 19.25rem = 1.5rem setup overlay top padding + 7.5rem modal header +
-  // 1.25rem setup body top padding + 6.75rem parked summary rail +
-  // 0.75rem gap before Step 3 + 1.5rem setup overlay bottom padding.
-  const detailsStageMaxHeightClass = "lg:max-h-[calc(100vh-19.25rem)]";
-  const detailsStageShellClass = `${stageShellClass} flex min-h-0 flex-col gap-2.5 overflow-hidden px-4 py-3.5 sm:px-5 sm:py-4 ${detailsStageMaxHeightClass}`;
-  // Keep the character column at 16.5rem on narrow `md` widths: it fits at 768px
-  // without horizontal overflow and prevents the voice-preference controls from
-  // collapsing into the input field.
-  const detailsStageGridClass =
-    "grid grid-cols-1 gap-2.5 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1.16fr)_minmax(16.5rem,0.84fr)] md:items-stretch";
-  const detailHeaderCopy =
-    "Go back to Step 2 to change the style or switch between AI and manual premise setup.";
   const genreSurfaceLayoutId = prefersReducedMotion
     ? undefined
-    : "setup-genre-surface";
+    : GENRE_SURFACE_LAYOUT_ID;
   const styleSurfaceLayoutId = prefersReducedMotion
     ? undefined
-    : "setup-style-surface";
+    : STYLE_SURFACE_LAYOUT_ID;
   const hasInvalidatableCharacters = characters.some(
     (character) => character.trim().length > 0,
   );
@@ -1926,34 +721,6 @@ export const SetupForm: React.FC<SetupFormProps> = ({
     : isStyleBlank
       ? "Using default tone settings."
       : "Custom style selected.";
-  const renderVoicePreferenceButton = (
-    preference: VoicePreference,
-    onClick: () => void,
-    options?: { testId?: string; narrator?: boolean },
-  ) => {
-    const meta = VOICE_PREFERENCE_META[preference];
-    const Icon = meta.icon;
-    const targetLabel = options?.narrator ? "Narrator" : "Character";
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={isLocked}
-        aria-label={`${targetLabel} voice preference: ${meta.label}. Click to cycle.`}
-        title={`${targetLabel} voice preference: ${meta.label}`}
-        data-testid={options?.testId}
-        className={`inline-flex h-10 min-w-[2.75rem] shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] px-2 text-slate-200 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-indigo-300/55 hover:bg-indigo-500/18 hover:text-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:min-w-[3.25rem] sm:px-2.5 ${
-          isLocked ? "opacity-60 cursor-not-allowed" : ""
-        } ${options?.narrator ? "border-white/12" : ""}`}
-      >
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold leading-none text-slate-100 sm:text-[11px]">
-          <span className="sr-only">Voice </span>
-          <Icon className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">{meta.label}</span>
-        </span>
-      </button>
-    );
-  };
 
   return (
     <div className="space-y-4">
@@ -2077,472 +844,90 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </m.div>
               )}
               <AnimatePresence initial={false} mode="wait">
-              {isGenreStage ? (
-                <m.div
-                  key="setup-stage-genre"
-                  layout="position"
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  variants={stageShellVariants}
-                  className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
-                >
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_auto] lg:items-center">
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <p className={setupSectionLabelClass}>Step 1</p>
-                        <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
-                          Start with a genre
-                        </h3>
-                        <p className={setupBodyMutedTextClass}>
-                          Keep one decision in front of you. Click to step
-                          forward, or hold and drag vertically for a slot-style
-                          scrub.
-                        </p>
-                      </div>
-                      <button
-                        ref={genreContinueButtonRef}
-                        type="button"
-                        onClick={handleGenreAdvance}
-                        disabled={isLocked}
-                        data-testid="setup-continue-to-style"
-                        className={`${setupActionButtonBaseClass} ${focusRingClass} max-w-xs ${
-                          isLocked
-                            ? "cursor-not-allowed bg-indigo-500/12 text-slate-400 opacity-60"
-                            : "bg-indigo-600 text-white ring-1 ring-indigo-400/50 shadow-[0_12px_24px_-8px_rgba(99,102,241,0.55)] hover:bg-indigo-500"
-                        }`}
-                      >
-                        Continue to Style
-                      </button>
-                    </div>
-                    <div className="flex justify-start lg:justify-end">
-                      <m.div
-                        layout
-                        layoutId={genreSurfaceLayoutId}
-                        className={`${sharedSurfaceCardClass} w-full max-w-[24rem]`}
-                      >
-                        <p className={`${setupSectionLabelClass} text-slate-400`}>
-                          Selected genre
-                        </p>
-                        <div className="mt-2 flex items-center justify-between gap-3">
-                          <GenreCycleWheel
-                            value={genre}
-                            disabled={isLocked}
-                            prefersReducedMotion={prefersReducedMotion}
-                            focusRingClass={focusRingClass}
-                            onChange={handleGenreChange}
-                          />
-                        </div>
-                      </m.div>
-                    </div>
-                  </div>
-                </m.div>
-              ) : null}
+                {isGenreStage ? (
+                  <GenreWheelStage
+                    key="setup-stage-genre"
+                    genre={genre}
+                    isLocked={Boolean(isLocked)}
+                    prefersReducedMotion={prefersReducedMotion}
+                    layoutId={genreSurfaceLayoutId}
+                    continueButtonRef={genreContinueButtonRef}
+                    onGenreChange={handleGenreChange}
+                    onAdvance={handleGenreAdvance}
+                  />
+                ) : null}
 
-              {isStyleStage ? (
-                <m.div
-                  key="setup-stage-style"
-                  layout="position"
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  variants={stageShellVariants}
-                  className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
-                >
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <p className={setupSectionLabelClass}>Step 2</p>
-                      <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-                        Shape the tone
-                      </h3>
-                      <p className={setupBodyMutedTextClass}>
-                        Style stays optional. Pick a vibe if it helps, then choose
-                        whether AI writes the premise or you do before moving into
-                        the final setup details.
-                      </p>
-                    </div>
-                    <m.div
-                      layout
-                      layoutId={styleSurfaceLayoutId}
-                      className={`group ${sharedSurfaceCardClass} ${styleCardMotionClass} ${styleCardPulseClass}`}
-                      aria-live="polite"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className={`${setupSectionLabelClass} text-slate-400`}>
-                            Selected style
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            <p className="text-xl font-semibold leading-tight text-slate-100">
-                              {styleSummaryLabel}
-                            </p>
-                            {selectedStyleCategoryLabel && (
-                              <span className="rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 ring-1 ring-white/12">
-                                {selectedStyleCategoryLabel}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {!isStyleBlank && (
-                          <button
-                            type="button"
-                            onClick={handleClearStyle}
-                            disabled={isLocked}
-                            aria-label="Clear selected style"
-                            className={`rounded-md px-1.5 py-0.5 text-xs sm:text-sm font-medium text-slate-300 hover:text-indigo-100 hover:underline hover:bg-indigo-500/15 ${interactiveControlClass} ${
-                              canHover
-                                ? "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
-                                : "opacity-100"
-                            } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                            title="Clear selected style"
-                          >
-                            × Clear
-                          </button>
-                        )}
-                      </div>
+                {isStyleStage ? (
+                  <StyleSelectionStage
+                    key="setup-stage-style"
+                    selectedLibraryStyle={selectedLibraryStyle}
+                    selectedStyleCategoryLabel={selectedStyleCategoryLabel}
+                    styleSummaryLabel={styleSummaryLabel}
+                    styleSummaryDescription={styleSummaryDescription}
+                    isStyleBlank={isStyleBlank}
+                    isStyleLibraryOpen={isStyleLibraryOpen}
+                    isLoading={isLoading}
+                    isLocked={Boolean(isLocked)}
+                    isSurprising={isSurprising}
+                    styleShufflePulse={styleShufflePulse}
+                    surpriseError={surpriseError}
+                    canHover={canHover}
+                    layoutId={styleSurfaceLayoutId}
+                    aiButtonRef={styleAiButtonRef}
+                    manualButtonRef={styleManualButtonRef}
+                    onClearStyle={handleClearStyle}
+                    onOpenStyleLibrary={openStyleLibrary}
+                    onShuffleStyle={handleStyleShuffle}
+                    onAdvance={showManualDetails}
+                    onSurprise={() => {
+                      void handleGenerateSurpriseSetup("manual");
+                    }}
+                    onTryAgain={() => {
+                      void handleGenerateSurpriseSetup("manual");
+                    }}
+                    onSwitchToManual={showManualDetails}
+                  />
+                ) : null}
 
-                      {selectedLibraryStyle ? (
-                        <div className="mt-2.5 grid gap-3 lg:grid-cols-[minmax(0,0.94fr)_minmax(12.5rem,0.66fr)]">
-                          <p className={`${setupBodyTextClass} leading-relaxed`}>
-                            {selectedLibraryStyle.description}
-                          </p>
-                          <div className="rounded-[18px] border border-white/10 bg-slate-950/55 px-3 py-2.5">
-                            <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
-                              Sample line
-                            </p>
-                            <p className="mt-2 text-sm leading-relaxed text-slate-200">
-                              {selectedLibraryStyle.sampleLine}
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className={`${setupBodyTextClass} mt-2.5`}>
-                          {styleSummaryDescription}
-                        </p>
-                      )}
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={handleStyleShuffle}
-                          disabled={isLocked || stylesLibrary.length === 0}
-                          className={`shrink-0 ${styleActionButtonBaseClass} ${
-                            isLocked || stylesLibrary.length === 0
-                              ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
-                              : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
-                          }`}
-                        >
-                          Shuffle
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openStyleLibrary}
-                          disabled={isLocked}
-                          className={`inline-flex items-center gap-1.5 ${styleActionButtonBaseClass} ${
-                            isLocked
-                              ? "opacity-60 cursor-not-allowed text-slate-300/70 bg-indigo-500/10 ring-indigo-200/25"
-                              : "text-slate-100 bg-indigo-500/20 ring-indigo-200/40 hover:opacity-95 hover:shadow-[0_10px_24px_-18px_rgba(129,140,248,0.9)]"
-                          }`}
-                          aria-haspopup="dialog"
-                          aria-expanded={isStyleLibraryOpen}
-                        >
-                          <Search className="h-3.5 w-3.5" />
-                          Browse
-                        </button>
-                      </div>
-                    </m.div>
-
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      <button
-                        ref={styleAiButtonRef}
-                        type="button"
-                        onClick={() => {
-                          void handleGenerateSurpriseSetup("manual");
-                        }}
-                        disabled={isLoading || isSurprising || isLocked}
-                        aria-busy={isSurprising || undefined}
-                        aria-disabled={(isLoading || isSurprising || isLocked) || undefined}
-                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-100 disabled:opacity-50 disabled:pointer-events-none`}
-                      >
-                        {isSurprising ? (
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : null}
-                        Generate AI Premise
-                      </button>
-                      <button
-                        ref={styleManualButtonRef}
-                        type="button"
-                        onClick={showManualDetails}
-                        disabled={isLocked}
-                        aria-disabled={isLocked || undefined}
-                        className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none`}
-                      >
-                        Write My Own Premise
-                      </button>
-                    </div>
-
-                    {surpriseError ? (
-                      <div
-                        role="alert"
-                        className="rounded-[20px] border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
-                      >
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                          <div className="min-w-0 space-y-2">
-                            <p className="font-medium leading-relaxed">
-                              {surpriseError}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void handleGenerateSurpriseSetup("manual");
-                                }}
-                                disabled={isLoading || isSurprising || isLocked}
-                                className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] ${
-                                  isLoading || isSurprising || isLocked
-                                    ? "cursor-not-allowed bg-rose-200/10 text-rose-100/60"
-                                    : "bg-rose-200/15 text-rose-50 hover:bg-rose-200/25"
-                                }`}
-                              >
-                                Try Again
-                              </button>
-                              <button
-                                type="button"
-                                onClick={showManualDetails}
-                                disabled={isLocked}
-                                className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] ${
-                                  isLocked
-                                    ? "cursor-not-allowed bg-white/[0.06] text-slate-400"
-                                    : "bg-white/[0.08] text-slate-100 hover:bg-white/[0.14]"
-                                }`}
-                              >
-                                Switch to Manual Premise
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </m.div>
-              ) : null}
-
-              {showDetails ? (
-                <m.div
-                  key="setup-stage-details"
-                  layout="position"
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  variants={stageShellVariants}
-                  className={detailsStageShellClass}
-                  data-testid="setup-details-stage-shell"
-                >
-                <div className="space-y-1">
-                  <p className={setupSectionLabelClass}>Step 3</p>
-                  <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-                    Build the opening spark
-                  </h3>
-                  <p className="text-sm leading-relaxed text-slate-300/85">
-                    {detailHeaderCopy}
-                  </p>
-                </div>
-
-                <m.div
-                  layout="position"
-                  className={detailsStageGridClass}
-                >
-                  <div
-                    className={premisePanelClass}
-                    data-testid="setup-premise-panel"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <label className={setupSectionLabelClass}>
-                          Premise
-                        </label>
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          {activePremiseSource === "ai" ? "AI draft" : "Manual draft"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.2)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35">
-                        <textarea
-                          rows={5}
-                          value={premise}
-                          onChange={(e) => {
-                            const nextPremise = e.target.value;
-                            updateValue({ premise: nextPremise });
-                          }}
-                          className={`w-full flex-1 min-h-[124px] resize-none border-0 bg-transparent px-0 py-1 pr-1.5 text-[15px] leading-relaxed text-slate-100 caret-indigo-200 placeholder:text-slate-500 selection:bg-indigo-500/35 selection:text-white focus:outline-none sm:text-base lg:min-h-[114px] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.32)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/45 ${
-                            isLocked ? "cursor-not-allowed text-slate-400" : ""
-                          }`}
-                          placeholder="e.g., A detective discovers his new partner is a ghost..."
-                          disabled={isLocked}
-                        />
-                        {activePremiseSource === "manual" && (
-                          <div className="flex flex-wrap gap-1 pt-0.5">
-                            {STARTER_IDEAS.map((idea) => (
-                              <button
-                                key={idea}
-                                type="button"
-                                onClick={() => handleStarterIdeaClick(idea)}
-                                disabled={isLocked}
-                                className="rounded-full border border-white/8 bg-transparent px-2.5 py-1 text-left text-[11px] text-slate-400 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-white/14 hover:bg-white/[0.03] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {idea}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className={characterPanelClass}
-                    data-testid="setup-characters-panel"
-                  >
-                    <div className="flex h-full flex-1 flex-col space-y-1.5">
-                      <label className={`${setupSectionLabelClass} flex items-center gap-2`}>
-                        <Users className="w-3.5 h-3.5 text-indigo-300" /> Characters
-                      </label>
-                      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.2)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35">
-                        <div className="flex items-center gap-1.5 rounded-lg border border-white/8 bg-white/[0.02] px-2.5 py-1.5">
-                          <div className="min-w-0 flex-1">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm sm:text-base font-medium text-white">
-                                Narrator
-                              </p>
-                              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                                Built in
-                              </p>
-                            </div>
-                          </div>
-                          {renderVoicePreferenceButton(
-                            narratorVoicePreference,
-                            cycleNarratorVoicePreference,
-                            {
-                              testId: "setup-narrator-preference",
-                              narrator: true,
-                            },
-                          )}
-                        </div>
-                        {characters.map((char, idx) => (
-                          <div
-                            key={idx}
-                            className={characterRowClass}
-                          >
-                            <input
-                              ref={(el) => {
-                                characterInputs.current[idx] = el;
-                              }}
-                              value={char}
-                              onChange={(e) =>
-                                handleCharacterChange(idx, e.target.value)
-                              }
-                              className={`min-w-0 flex-1 bg-transparent px-0 py-1 text-sm text-white placeholder-slate-500 focus:outline-none sm:text-base ${
-                                isLocked ? "cursor-not-allowed text-slate-400" : ""
-                              }`}
-                              placeholder={`Character ${idx + 1}`}
-                              disabled={isLocked}
-                            />
-                            {renderVoicePreferenceButton(
-                              synchronizeSetupVoicePreferences({
-                                characters,
-                                characterVoicePreferences,
-                                narratorVoicePreference,
-                              }).characterVoicePreferences[idx] ??
-                                DEFAULT_CHARACTER_VOICE_PREFERENCE,
-                              () => cycleCharacterVoicePreference(idx),
-                              {
-                                testId: `setup-character-preference-${idx}`,
-                              },
-                            )}
-                            {characters.length > 1 && !isLocked && (
-                              <button
-                                type="button"
-                                onClick={() => removeCharacter(idx)}
-                                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-500 transition-[color,border-color,background-color] duration-200 hover:border-red-300/35 hover:bg-red-500/10 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-400/70 focus:ring-offset-1 focus:ring-offset-slate-950"
-                                aria-label="Remove character"
-                                title="Remove character"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-
-                        <button
-                          type="button"
-                          onClick={addCharacter}
-                          disabled={isLocked}
-                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/14 py-2 text-sm font-medium text-slate-300 transition-[opacity,color,border-color,background-color] duration-[220ms] ease-out hover:border-white/22 hover:bg-white/[0.03] hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Plus className="w-3.5 h-3.5" /> Add Character
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </m.div>
-
-                <div
-                  ref={detailsFooterRef}
-                  className="mt-0.5 pt-1.5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2.5 text-sm text-slate-400 sm:items-center">
-                    <LengthCycleWheel
-                      value={normalizedLength}
-                      disabled={isLocked}
-                      prefersReducedMotion={prefersReducedMotion}
-                      focusRingClass={focusRingClass}
-                      onChange={(nextLength) => updateValue({ length: nextLength })}
-                    />
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
-                        Cast
-                      </span>
-                      <p className={setupMetaTextClass}>
-                        {characterCount}{" "}
-                        {characterCount === 1 ? "character" : "characters"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {showSubmit && onStart && (
-                    <Button
-                      variant="primary"
-                      onClick={onStart}
-                      className="mt-2.5 w-full !bg-indigo-600/95 py-3.5 text-base font-medium shadow-[0_18px_34px_-24px_rgba(99,102,241,0.82)] transition-all hover:!bg-indigo-500"
-                      loading={isLoading}
-                      size="md"
-                      disabled={
-                        !premise.trim() ||
-                        !hasValidCharacter ||
-                        isLoading ||
-                        isSurprising ||
-                        isLocked
-                      }
-                      title="Generate your opening scene"
-                    >
-                      Generate First Scene
-                    </Button>
-                  )}
-                </div>
-                </m.div>
-              ) : null}
+                {showDetails ? (
+                  <DetailsStage
+                    key="setup-stage-details"
+                    premise={premise}
+                    characters={characters}
+                    characterVoicePreferences={synchronizedVoicePreferences.characterVoicePreferences}
+                    narratorVoicePreference={synchronizedVoicePreferences.narratorVoicePreference}
+                    length={normalizedLength}
+                    isLoading={isLoading}
+                    isLocked={Boolean(isLocked)}
+                    isSurprising={isSurprising}
+                    justSurprised={justSurprised}
+                    activePremiseSource={activePremiseSource}
+                    showSubmit={showSubmit}
+                    prefersReducedMotion={prefersReducedMotion}
+                    hasValidCharacter={hasValidCharacter}
+                    detailsFooterRef={detailsFooterRef}
+                    characterInputsRef={characterInputs}
+                    onPremiseChange={(nextPremise) => updateValue({ premise: nextPremise })}
+                    onCharacterChange={handleCharacterChange}
+                    onLengthChange={(nextLength) => updateValue({ length: nextLength })}
+                    onNarratorVoiceChange={cycleNarratorVoicePreference}
+                    onCharacterVoiceChange={cycleCharacterVoicePreference}
+                    onAddCharacter={addCharacter}
+                    onRemoveCharacter={removeCharacter}
+                    onStarterIdeaClick={handleStarterIdeaClick}
+                    onStart={onStart}
+                  />
+                ) : null}
               </AnimatePresence>
             </m.div>
           </LayoutGroup>
 
           <AnimatePresence initial={false}>
             {stageReactivationPrompt ? (
-              <div className="fixed inset-0 z-content-modal flex items-center justify-center px-4">
+              <div
+                key="setup-stage-reactivation-prompt"
+                className="fixed inset-0 z-content-modal flex items-center justify-center px-4"
+              >
                 <m.div
                   className="absolute inset-0 bg-black/70 backdrop-blur-sm"
                   onClick={() => closeStageReactivationPrompt()}
@@ -2598,134 +983,16 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                 </m.div>
               </div>
             ) : null}
-            {isStyleLibraryOpen ? (
-              <div className="fixed inset-0 z-content-modal flex items-center justify-center px-4">
-                <m.div
-                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                  onClick={() => setIsStyleLibraryOpen(false)}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  variants={overlayVariants}
-                />
-                <m.div
-                  ref={styleLibraryModalRef}
-                  className="relative flex w-full max-w-2xl max-h-[88vh] flex-col overflow-hidden rounded-2xl border border-indigo-300/20 bg-slate-950 shadow-2xl"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Style Library"
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  variants={modalVariants}
-                >
-                  <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
-                        Style
-                      </p>
-                      <h2 className="text-sm font-semibold text-indigo-100">
-                        Style Library
-                      </h2>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsStyleLibraryOpen(false)}
-                      className={`rounded-lg p-1.5 text-indigo-100/80 hover:text-indigo-100 hover:bg-indigo-500/20 ${interactiveControlClass}`}
-                      aria-label="Close style library"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="flex min-h-0 flex-1 flex-col space-y-3 p-4">
-                    <input
-                      ref={styleLibrarySearchInputRef}
-                      value={styleSearch}
-                      onChange={(event) => setStyleSearch(event.target.value)}
-                      className="w-full rounded-lg px-3 py-2 text-sm text-white placeholder-indigo-100/55 bg-slate-900/70 ring-1 ring-indigo-200/25 focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-[box-shadow,opacity] duration-[220ms] ease-in-out"
-                      placeholder="Search styles..."
-                      aria-label="Search styles"
-                      disabled={isLocked}
-                    />
-                    <div
-                      className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-slate-950/70 ring-1 ring-white/10"
-                      data-testid="setup-style-library-list"
-                    >
-                      <div className="p-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleSelectStyleFromLibrary({
-                              styleId: null,
-                              style: "",
-                            })
-                          }
-                          disabled={isLocked}
-                          aria-pressed={isStyleBlank}
-                          className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
-                            isStyleBlank
-                              ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                              : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
-                          } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                          title="Use no style"
-                        >
-                          None (no style)
-                        </button>
-                      </div>
-                      {groupedFilteredStyles.length > 0 ? (
-                        groupedFilteredStyles.map((group) => (
-                          <div
-                            key={group.id}
-                            className="border-t border-white/10 px-2 py-2 space-y-1.5"
-                          >
-                            <p className="px-2 text-[10px] uppercase tracking-[0.26em] text-indigo-100/50">
-                              {group.label}
-                            </p>
-                            {group.items.map((item) => {
-                              const isSelected = selectedLibraryStyle?.id === item.id;
-                              return (
-                                <button
-                                  key={item.id}
-                                  ref={(element) => {
-                                    styleRowRefs.current[item.id] = element;
-                                  }}
-                                  type="button"
-                                  onClick={() =>
-                                    handleSelectStyleFromLibrary({
-                                      styleId: item.id,
-                                      style: item.title,
-                                    })
-                                  }
-                                  disabled={isLocked}
-                                  aria-pressed={isSelected}
-                                  className={`w-full rounded-lg px-3 py-2 text-left ring-1 ${interactiveControlClass} ${
-                                    isSelected
-                                      ? "bg-indigo-500/30 ring-indigo-100/55 text-indigo-100"
-                                      : "bg-white/[0.02] ring-white/10 text-slate-200 hover:opacity-95 hover:shadow-[0_10px_20px_-18px_rgba(148,163,184,0.9)]"
-                                  } ${isLocked ? "opacity-60 cursor-not-allowed" : ""}`}
-                                  title={`Use style: ${item.title}`}
-                                >
-                                  <p className="text-xs font-semibold">
-                                    {item.title}
-                                  </p>
-                                  <p className="mt-0.5 text-[11px] text-indigo-100/75">
-                                    {item.description}
-                                  </p>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="px-4 py-4 text-xs text-slate-300">
-                          No styles match your search.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </m.div>
-              </div>
-            ) : null}
+            <StyleLibraryDialog
+              key="setup-style-library-dialog"
+              isOpen={isStyleLibraryOpen}
+              selectedStyleId={styleId}
+              selectedStyleTitle={style}
+              onClose={() => setIsStyleLibraryOpen(false)}
+              onSelect={handleSelectStyleFromLibrary}
+              disabled={Boolean(isLocked)}
+              listTestId="setup-style-library-list"
+            />
           </AnimatePresence>
         </>
       )}
