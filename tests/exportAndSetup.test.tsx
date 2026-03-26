@@ -8,11 +8,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  buildScriptTextExport,
-  normalizeSceneCharacters,
-  readStoredDraftPayload,
   sanitizeGeneratedInsertText,
-} from "../App";
+} from "../services/scriptController";
+import { buildScriptTextExport } from "../services/scriptExport";
+import { readStoredDraftPayload } from "../services/draftStorage";
+import { normalizeSceneCharacters } from "../services/storyContext";
 import {
   SetupForm,
   SetupFormState,

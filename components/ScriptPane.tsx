@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { BlockType, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
@@ -6,23 +6,18 @@ import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
 import { RewriteComposerPopover } from './RewriteComposerPopover';
 import { DraftComposerPanel } from './workspace/DraftComposerPanel';
-import { DraftOutlinePanel } from './workspace/DraftOutlinePanel';
 import { Button } from './Button';
 import {
   paperPopoverFieldClassName,
   paperPopoverShellClassName
 } from './paperPopoverStyles';
-import {
-  SetupForm,
-  SetupFormState,
-  STYLE_PRESETS
-} from './SetupForm';
+import { SetupFormState, STYLE_PRESETS } from './SetupForm';
 import { PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
 import { PlaybackMiniPlayer } from './PlaybackMiniPlayer';
 import { TitleEditModal } from './TitleEditModal';
 import { StyleEditModal } from './StyleEditModal';
-import { SETUP_UI_TOKENS } from './setupUiTokens';
 import { useScriptController } from '../hooks/useScriptController';
+import { useWorkspaceChrome } from '../hooks/useWorkspaceChrome';
 import {
   createAfterBlockAnchor,
   createBeforeBlockAnchor,
@@ -30,28 +25,13 @@ import {
 } from '../services/scriptController';
 import {
   AlertCircle,
-  ChevronDown,
-  Download,
-  FileDown,
-  List,
-  Loader2,
-  Pencil,
   PlusCircle,
-  Sparkles,
-  Speech,
-  Trash2,
-  Undo2,
-  Redo2,
-  X
 } from 'lucide-react';
-import {
-  bottomSheetVariants,
-  drawerLeftVariants,
-  drawerRightVariants,
-  fadeSlideYVariants,
-  modalVariants,
-  overlayVariants
-} from './motion/primitives';
+import { fadeSlideYVariants } from './motion/primitives';
+import { SceneOutlineDrawer } from './workspace/SceneOutlineDrawer';
+import { WorkspaceAudioDrawer } from './workspace/WorkspaceAudioDrawer';
+import { WorkspaceHeader } from './workspace/WorkspaceHeader';
+import { WorkspaceSetupOverlay } from './workspace/WorkspaceSetupOverlay';
 
 export interface ScriptPaneProps {
   context: StoryContext | null;
@@ -124,26 +104,6 @@ export interface ScriptPaneProps {
   insertScrollToken: number;
 }
 
-type InlineTooltipProps = {
-  label: string;
-  children: React.ReactNode;
-  wrapperClassName?: string;
-};
-
-const MOBILE_DIALOG_BREAKPOINT = 768;
-
-const InlineTooltip = ({ label, children, wrapperClassName }: InlineTooltipProps) => (
-  <span className={`group relative inline-flex ${wrapperClassName ?? ''}`.trim()}>
-    {children}
-    <span
-      role="tooltip"
-      className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-6 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-gray-700 bg-gray-950/95 px-2 py-1 text-[10px] font-medium text-gray-100 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-    >
-      {label}
-    </span>
-  </span>
-);
-
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
   context,
   titleInputRef,
@@ -194,23 +154,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   insertScrollTargetId,
   insertScrollToken
 }) => {
-  const [isGenerateMenuOpen, setIsGenerateMenuOpen] = useState(false);
-  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
-  const [isAudioDrawerOpen, setIsAudioDrawerOpen] = useState(false);
-  const [isMobileDialogViewport, setIsMobileDialogViewport] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth < MOBILE_DIALOG_BREAKPOINT : false
-  ));
-  const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
-  const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
-  const [styleDraft, setStyleDraft] = useState('');
   const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
   const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);
   const [headingDraft, setHeadingDraft] = useState('');
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const [lastNavigatedSceneId, setLastNavigatedSceneId] = useState<string | null>(null);
-  const generateMenuRef = useRef<HTMLDivElement | null>(null);
-  const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const scriptController = useScriptController({
     context,
     insertModeActive: false,
@@ -225,22 +171,50 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   });
   const rateLimitHint = error?.toLowerCase().includes('rate limit');
   const previewClassName = 'w-full';
-  const genreLabel = context?.genre ?? 'Genre';
   const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
-  const styleLabel = context?.style?.trim() || '';
-  const headerMetaLabelClass = 'font-semibold text-gray-100';
-  const headerMetaItemClass = 'inline-flex items-center gap-2 whitespace-nowrap';
-  const headerMetaBulletClass = 'text-gray-500';
-  const headerActionSlotClass = 'min-w-0 flex-1 xl:min-w-fit xl:flex-none';
-  const headerToolButtonClass = 'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/55 px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-gray-300 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 xl:w-auto max-[1279px]:px-2.5 max-[820px]:h-10 max-[820px]:px-0';
-  const headerToolTextClass = 'max-[820px]:sr-only';
-  const headerPrimaryToolButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100 transition-colors hover:bg-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
-  const headerAudioButtonClass = 'inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-700 bg-gray-900/55 px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-200 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 sm:px-5 sm:text-sm xl:w-auto max-[1279px]:px-3 max-[820px]:h-10 max-[820px]:px-0';
-  const headerActionRowsClass = 'flex w-full items-stretch gap-2 xl:w-auto xl:items-center';
   const showStartScreen = !context && !isGenerating;
   const showInitialGeneration = !context && isGenerating;
   const showSetupHandoffLoading = !isSetupOpen && showInitialGeneration;
   const showSetupSurface = isSetupOpen || showSetupHandoffLoading;
+  const focusScriptScroll = useCallback(() => {
+    requestAnimationFrame(() => {
+      const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
+      scrollContainer?.focus({ preventScroll: true });
+    });
+  }, []);
+  const {
+    isGenerateMenuOpen,
+    isOutlineOpen,
+    isAudioDrawerOpen,
+    isMobileDialogViewport,
+    isTitleModalOpen,
+    titleDraft,
+    setTitleDraft,
+    isStyleModalOpen,
+    styleDraft,
+    setStyleDraft,
+    isExportMenuOpen,
+    lastNavigatedSceneId,
+    setLastNavigatedSceneId,
+    generateMenuRef,
+    exportMenuRef,
+    toggleGenerateMenu,
+    closeGenerateMenu,
+    toggleExportMenu,
+    closeExportMenu,
+    toggleOutline,
+    closeOutline,
+    openAudioDrawer,
+    closeAudioDrawer,
+    openTitleModal,
+    closeTitleModal,
+    openStyleModal,
+    closeStyleModal
+  } = useWorkspaceChrome({
+    context,
+    focusScriptScroll,
+    isPlaying
+  });
   const activeSceneId = useMemo(() => {
     if (!context || context.scenes.length === 0) {
       return null;
@@ -296,24 +270,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           </Button>
         </div>
       </div>
-    </m.div>
-  );
-  const startGenerationCard = (
-    <m.div
-      className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]"
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      variants={fadeSlideYVariants}
-    >
-      <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto" />
-      <div className="space-y-2">
-        <p className="text-xl font-semibold text-white">Generating your opening scene...</p>
-        <p className="text-base text-indigo-100/80">Gathering the writers room and shaping the first beat.</p>
-      </div>
-      <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
-        Cancel
-      </Button>
     </m.div>
   );
   const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
@@ -547,48 +503,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     }
   }, [context, editingHeadingSceneId]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const updateViewport = () => {
-      setIsMobileDialogViewport(window.innerWidth < MOBILE_DIALOG_BREAKPOINT);
-    };
-    updateViewport();
-    window.addEventListener('resize', updateViewport);
-    return () => window.removeEventListener('resize', updateViewport);
-  }, []);
-
-  useEffect(() => {
-    if (context?.scenes.some((scene) => scene.id === lastNavigatedSceneId)) {
-      return;
-    }
-    setLastNavigatedSceneId(null);
-  }, [context, lastNavigatedSceneId]);
-
-  useEffect(() => {
-    if (context) return;
-    setIsOutlineOpen(false);
-  }, [context]);
-
-  const focusScriptScroll = useCallback(() => {
-    requestAnimationFrame(() => {
-      const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
-      scrollContainer?.focus({ preventScroll: true });
-    });
-  }, []);
-  const handleOpenOutline = useCallback(() => {
-    setIsGenerateMenuOpen(false);
-    setIsAudioDrawerOpen(false);
-    setIsOutlineOpen((previous) => !previous);
-  }, []);
-  const handleCloseOutline = useCallback(() => {
-    setIsOutlineOpen(false);
-  }, []);
   const handleSelectOutlineScene = useCallback((sceneId: string) => {
     setLastNavigatedSceneId(sceneId);
     setInsertPlacementTarget(null);
     setEditingHeadingSceneId(null);
     scriptController.selectSceneHeading(sceneId);
-    setIsOutlineOpen(false);
+    closeOutline();
     requestAnimationFrame(() => {
       const sceneHeading = document.getElementById(`scene-heading-${sceneId}`);
       const sceneContainer = document.getElementById(`scene-${sceneId}`);
@@ -597,37 +517,15 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
       }
     });
-  }, [scriptController]);
-  const handleOpenTitleModal = () => {
-    if (isTitleModalOpen) {
-      setIsTitleModalOpen(false);
-      return;
-    }
-    setTitleDraft(context?.title ?? '');
-    setIsTitleModalOpen(true);
-  };
-  const handleCloseTitleModal = () => {
-    setIsTitleModalOpen(false);
-  };
-  const handleOpenStyleModal = () => {
-    if (isStyleModalOpen) {
-      setIsStyleModalOpen(false);
-      return;
-    }
-    setStyleDraft(context?.style ?? '');
-    setIsStyleModalOpen(true);
-  };
-  const handleCloseStyleModal = () => {
-    setIsStyleModalOpen(false);
-  };
+  }, [closeOutline, scriptController, setLastNavigatedSceneId]);
   const handleSaveStyle = () => {
     onSaveStyle?.(styleDraft);
-    setIsStyleModalOpen(false);
+    closeStyleModal();
   };
   const handleSaveTitle = () => {
     const nextTitle = titleDraft.trim() || 'Untitled Screenplay';
     onTitleChange(nextTitle);
-    setIsTitleModalOpen(false);
+    closeTitleModal();
   };
   const sceneEndAnchor = useMemo(() => {
     if (!context || context.scenes.length === 0) return null;
@@ -651,19 +549,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   );
   const contentWrapperClassName = 'max-w-[1240px] mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-5 h-full min-h-0 flex flex-col gap-4';
   const handleGenerateNext = useCallback(() => {
-    setIsGenerateMenuOpen(false);
+    closeGenerateMenu();
     void scriptController.generateNextScene();
-  }, [scriptController]);
+  }, [closeGenerateMenu, scriptController]);
   const handleGeneratePlotTwist = useCallback(() => {
     onPlotTwist();
   }, [onPlotTwist]);
   const handleInsertSceneBeat = useCallback(() => {
     if (!sceneEndAnchor) return;
-    setIsGenerateMenuOpen(false);
+    closeGenerateMenu();
     setInsertPlacementTarget(null);
     scriptController.requestInsert(sceneEndAnchor);
     focusScriptScroll();
-  }, [focusScriptScroll, sceneEndAnchor, scriptController]);
+  }, [closeGenerateMenu, focusScriptScroll, sceneEndAnchor, scriptController]);
   const composerPanelNode = (
     <DraftComposerPanel
       userInstruction={userInstruction}
@@ -680,528 +578,43 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       sceneCountLabel={sceneCountLabel}
     />
   );
-  const outlineDrawer = (
-    <AnimatePresence initial={false}>
-      {context && isOutlineOpen ? (
-        <>
-          <m.div
-            key="scene-outline-backdrop"
-            className="fixed inset-0 z-drawer-backdrop bg-black/45 backdrop-blur-[2px]"
-            onClick={handleCloseOutline}
-            aria-hidden="true"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            variants={overlayVariants}
-          />
-          <m.aside
-            key="scene-outline-panel"
-            role="dialog"
-            aria-label="Scene outline"
-            data-testid="scene-outline-drawer"
-            className="fixed z-drawer flex flex-col border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[24px_0_48px_rgba(0,0,0,0.42)] md:inset-y-0 md:left-0 md:w-full md:max-w-[24rem] md:border-r max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[75vh] max-md:rounded-t-[1.75rem] max-md:border-t"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            variants={isMobileDialogViewport ? bottomSheetVariants : drawerLeftVariants}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-gray-800/80 px-3 py-3 sm:px-4">
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Scene Outline</p>
-                <h2 className="text-base font-semibold text-white">Navigate the draft</h2>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseOutline}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-700 bg-gray-900/50 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-                aria-label="Close scene outline"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-2.5 py-2.5 sm:px-3 sm:py-3">
-              <DraftOutlinePanel
-                scenes={context.scenes}
-                activeSceneId={activeSceneId}
-                onSelectScene={handleSelectOutlineScene}
-              />
-            </div>
-          </m.aside>
-        </>
-      ) : null}
-    </AnimatePresence>
-  );
-  const generateMenuDialog = (
-    <AnimatePresence initial={false}>
-      {isGenerateMenuOpen ? (
-        isMobileDialogViewport ? (
-          <>
-            <m.div
-              key="generate-menu-mobile-backdrop"
-              className="fixed inset-0 z-popover-backdrop bg-black/45 backdrop-blur-[2px]"
-              onClick={() => setIsGenerateMenuOpen(false)}
-              aria-hidden="true"
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              variants={overlayVariants}
-            />
-            <m.div
-              key="generate-menu-mobile-panel"
-              role="dialog"
-              aria-label="Generate menu"
-              className="fixed inset-x-0 bottom-0 z-popover p-3 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]"
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              variants={bottomSheetVariants}
-            >
-              <div className="mb-2 flex items-center justify-between gap-3 rounded-[1.35rem] border border-[#d6cdbd] bg-[#f6f1e7] px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.16)]">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">Generate</p>
-                  <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.16em] text-gray-800">Draft Composer</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGenerateMenuOpen(false)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-800"
-                  aria-label="Close generate menu"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              {composerPanelNode}
-            </m.div>
-          </>
-        ) : (
-          <m.div
-            key="generate-menu-desktop-panel"
-            role="dialog"
-            aria-label="Generate menu"
-            className="absolute right-0 top-[calc(100%+0.5rem)] z-popover w-[min(28rem,calc(100vw-1.5rem))]"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            variants={fadeSlideYVariants}
-          >
-            {composerPanelNode}
-          </m.div>
-        )
-      ) : null}
-    </AnimatePresence>
-  );
-  const setupRailClass = 'mx-auto w-full max-w-[60rem]';
-  const setupModal = (
-    <AnimatePresence initial={false}>
-      {showSetupSurface ? (
-        <m.div
-          key="setup-screen"
-          className="fixed inset-0 z-screen-overlay overflow-y-auto bg-gradient-to-b from-slate-950 via-[#050a18] to-[#04070f]"
-          role="region"
-          aria-label="Setup"
-          data-testid="setup-screen"
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          variants={overlayVariants}
-        >
-          <div className="pointer-events-none absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.24),_transparent_42%)]" />
-          <div className="relative mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
-            <m.div
-              className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl bg-slate-950/60 shadow-[0_35px_120px_rgba(2,6,23,0.75)] backdrop-blur-md sm:min-h-[calc(100vh-3rem)]"
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              variants={modalVariants}
-            >
-              <div className="relative border-b border-white/8 px-5 py-4 sm:px-6 sm:py-5">
-                <div className={`${setupRailClass} flex items-start justify-between gap-4`}>
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-[0.42em] text-indigo-200/70">Setup</p>
-                    <h2 className={SETUP_UI_TOKENS.title}>
-                      {showSetupHandoffLoading ? 'Starting your script' : 'Start a new script'}
-                    </h2>
-                    <p className={SETUP_UI_TOKENS.subtitle}>
-                      {showSetupHandoffLoading
-                        ? 'Locking in the opening beat and preparing the workspace.'
-                        : 'Pick a genre and let AI shape your opening spark.'}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center">
-                    {!showSetupHandoffLoading ? (
-                      <button
-                        type="button"
-                        onClick={onCloseSetup}
-                        className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
-                        aria-label="Close setup"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    ) : (
-                      <span className="h-10 w-10" aria-hidden="true" />
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="relative flex-1 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
-                <AnimatePresence initial={false} mode="wait">
-                  {isSetupOpen ? (
-                    <m.div
-                      key="setup-surface-form"
-                      className={setupRailClass}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      variants={fadeSlideYVariants}
-                    >
-                      <SetupForm
-                        value={setupState}
-                        onChange={onSetupChange}
-                        onRequestSurprise={onSetupSurprise}
-                        onStart={onStartSetup}
-                        isLoading={isGenerating}
-                        onError={onSetupError}
-                        isLocked={false}
-                        showSubmit
-                        autoSurprise={setupAutoSurprise}
-                      />
-                    </m.div>
-                  ) : (
-                    <m.div
-                      key="setup-surface-loading"
-                      className={`${setupRailClass} flex min-h-[calc(100vh-12rem)] items-center justify-center`}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      variants={fadeSlideYVariants}
-                    >
-                      <div className="w-full max-w-2xl">
-                        {startGenerationCard}
-                      </div>
-                    </m.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </m.div>
-          </div>
-        </m.div>
-      ) : null}
-    </AnimatePresence>
-  );
-
-  useEffect(() => {
-    if (!isExportMenuOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      const targetNode = event.target as Node | null;
-      if (!targetNode) return;
-      if (exportMenuRef.current?.contains(targetNode)) return;
-      setIsExportMenuOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsExportMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown, true);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown, true);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isExportMenuOpen]);
-
-  useEffect(() => {
-    if (!isGenerateMenuOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      const targetNode = event.target as Node | null;
-      if (!targetNode) return;
-      if (generateMenuRef.current?.contains(targetNode)) return;
-      setIsGenerateMenuOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsGenerateMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown, true);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown, true);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isGenerateMenuOpen]);
-
-  useEffect(() => {
-    if (!isOutlineOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOutlineOpen(false);
-        focusScriptScroll();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusScriptScroll, isOutlineOpen]);
-
-  useEffect(() => {
-    if (!isAudioDrawerOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsAudioDrawerOpen(false);
-        focusScriptScroll();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusScriptScroll, isAudioDrawerOpen]);
-
-  useEffect(() => {
-    if (!isPlaying || !isAudioDrawerOpen) return;
-    setIsAudioDrawerOpen(false);
-    focusScriptScroll();
-  }, [focusScriptScroll, isAudioDrawerOpen, isPlaying]);
-
   return (
     <section className="flex-1 min-h-0 h-full flex flex-col overflow-hidden bg-[#17181c]">
       {context && (
-        <div className="relative z-header shrink-0 border-b border-gray-800/70 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(15,23,42,0.38))] backdrop-blur">
-          <div className="relative max-w-[1240px] mx-auto px-6 max-[900px]:px-4 max-[640px]:px-3 py-4 sm:py-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="min-w-0 space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.36em] text-indigo-200/80">Script Seance</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-semibold tracking-[0.08em] text-white sm:text-2xl">
-                    {context.title?.trim() ? context.title : 'Untitled Screenplay'}
-                  </h1>
-                  <button
-                    type="button"
-                    onClick={handleOpenTitleModal}
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300 transition-colors hover:text-indigo-200"
-                    title="Edit title"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Edit Title
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
-                  <span className={headerMetaItemClass}>
-                    <span><span className={headerMetaLabelClass}>Genre:</span> {genreLabel}</span>
-                  </span>
-                  <span className={headerMetaItemClass}>
-                    <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span><span className={headerMetaLabelClass}>Style:</span> {styleLabel || 'No style set'}</span>
-                      {onSaveStyle && (
-                        <button
-                          type="button"
-                          onClick={handleOpenStyleModal}
-                          className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300 transition-colors hover:text-indigo-200"
-                          title="Edit style"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Edit Style
-                        </button>
-                      )}
-                    </span>
-                  </span>
-                  {autosaveError && (
-                    <span className={headerMetaItemClass}>
-                      <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
-                      <span className="text-amber-400">{autosaveError}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="relative flex w-full flex-col items-stretch gap-2 xl:w-auto xl:items-end xl:justify-start">
-                <div className={headerActionRowsClass}>
-                  <div className={headerActionSlotClass}>
-                    <InlineTooltip label="Undo" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={onUndo}
-                        disabled={!canUndo}
-                        className={headerToolButtonClass}
-                        aria-label="Undo"
-                      >
-                        <Undo2 className="h-3.5 w-3.5" />
-                        <span className={headerToolTextClass}>Undo</span>
-                      </button>
-                    </InlineTooltip>
-                  </div>
-                  <div className={headerActionSlotClass}>
-                    <InlineTooltip label="Redo" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => onRedo?.()}
-                        disabled={!canRedo || !onRedo}
-                        className={headerToolButtonClass}
-                        aria-label="Redo"
-                      >
-                        <Redo2 className="h-3.5 w-3.5" />
-                        <span className={headerToolTextClass}>Redo</span>
-                      </button>
-                    </InlineTooltip>
-                  </div>
-                  <div className={`relative ${headerActionSlotClass}`} ref={exportMenuRef}>
-                    <InlineTooltip label="Export" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => setIsExportMenuOpen((previous) => !previous)}
-                        disabled={!canExport}
-                        className={headerToolButtonClass}
-                        aria-haspopup="menu"
-                        aria-expanded={isExportMenuOpen}
-                        aria-label="Open export menu"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        <span className={headerToolTextClass}>Export</span>
-                      </button>
-                    </InlineTooltip>
-                    {isExportMenuOpen && (
-                      <div
-                        role="menu"
-                        aria-label="Export options"
-                        className="absolute right-0 top-[calc(100%+0.5rem)] z-popover min-w-[12rem] rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
-                      >
-                        <div className="space-y-1">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              onExportTxt();
-                              setIsExportMenuOpen(false);
-                            }}
-                            disabled={!canExport}
-                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Export script as a .txt file"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            Export Script (.txt)
-                          </button>
-                          {onExportPdf && (
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() => {
-                                onExportPdf();
-                                setIsExportMenuOpen(false);
-                              }}
-                              disabled={!canExport}
-                              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                              title="Export script as a PDF via print dialog"
-                            >
-                              <FileDown className="h-3.5 w-3.5" />
-                              Export PDF
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className={headerActionSlotClass}>
-                    <InlineTooltip label="Clear Draft" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={onClearDraft}
-                        disabled={!context}
-                        className={`${headerToolButtonClass} border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 disabled:opacity-60`}
-                        aria-label="Clear Draft"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span className={headerToolTextClass}>Clear Draft</span>
-                      </button>
-                    </InlineTooltip>
-                  </div>
-                </div>
-                <div className={headerActionRowsClass}>
-                  <div className={`relative ${headerActionSlotClass}`} ref={generateMenuRef}>
-                    <InlineTooltip label="Generate Next Scene" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsOutlineOpen(false);
-                          setIsGenerateMenuOpen((previous) => !previous);
-                        }}
-                        disabled={isPlaying}
-                        className={headerPrimaryToolButtonClass}
-                        aria-haspopup="dialog"
-                        aria-expanded={isGenerateMenuOpen}
-                        aria-label="Open generate menu"
-                      >
-                        <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className={headerToolTextClass}>GENERATE NEXT SCENE</span>
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform max-[940px]:hidden ${isGenerateMenuOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                    </InlineTooltip>
-                    {generateMenuDialog}
-                  </div>
-                  <div className={headerActionSlotClass}>
-                    <InlineTooltip label="Scene outline" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={handleOpenOutline}
-                        disabled={!context}
-                        className={headerAudioButtonClass}
-                        aria-haspopup="dialog"
-                        aria-expanded={isOutlineOpen}
-                        aria-label="Open scene outline"
-                      >
-                        <List className="h-4 w-4" />
-                        <span className={headerToolTextClass}>Outline</span>
-                      </button>
-                    </InlineTooltip>
-                  </div>
-                  <div className={headerActionSlotClass}>
-                    <InlineTooltip label="Audio" wrapperClassName="flex w-full xl:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsOutlineOpen(false);
-                          setIsAudioDrawerOpen(true);
-                        }}
-                        className={headerAudioButtonClass}
-                        aria-haspopup="dialog"
-                        aria-expanded={isAudioDrawerOpen}
-                        aria-label="Open audio drawer"
-                      >
-                        <Speech className="h-4 w-4" />
-                        <span className={headerToolTextClass}>Audio</span>
-                      </button>
-                    </InlineTooltip>
-                  </div>
-                </div>
-                <AnimatePresence initial={false}>
-                  {isGenerating ? (
-                    <m.div
-                      key="writing-indicator"
-                      className="pointer-events-none absolute right-0 top-full z-6 mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2"
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      variants={fadeSlideYVariants}
-                    >
-                      <div
-                        aria-live="polite"
-                        className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-100 shadow-[0_14px_28px_rgba(15,23,42,0.24)]"
-                      >
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Writing
-                        <button
-                          type="button"
-                          onClick={onCancelGenerate}
-                          className="rounded-full border border-indigo-300/30 px-2 py-0.5 text-[9px] tracking-[0.16em] text-indigo-100 transition-colors hover:bg-indigo-400/10"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </m.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-        </div>
+        <WorkspaceHeader
+          context={context}
+          autosaveError={autosaveError}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          canExport={canExport}
+          isPlaying={isPlaying}
+          isGenerating={isGenerating}
+          isGenerateMenuOpen={isGenerateMenuOpen}
+          isOutlineOpen={isOutlineOpen}
+          isAudioDrawerOpen={isAudioDrawerOpen}
+          isExportMenuOpen={isExportMenuOpen}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          onClearDraft={onClearDraft}
+          onExportTxt={() => {
+            onExportTxt();
+            closeExportMenu();
+          }}
+          onExportPdf={onExportPdf ? () => {
+            onExportPdf();
+            closeExportMenu();
+          } : undefined}
+          onOpenTitleModal={() => openTitleModal(context.title ?? '')}
+          onOpenStyleModal={onSaveStyle ? () => openStyleModal(context.style ?? '') : undefined}
+          onToggleExportMenu={toggleExportMenu}
+          onToggleGenerateMenu={toggleGenerateMenu}
+          onOpenOutline={toggleOutline}
+          onOpenAudioDrawer={openAudioDrawer}
+          onCancelGenerate={onCancelGenerate}
+          exportMenuRef={exportMenuRef}
+          generateMenuRef={generateMenuRef}
+          composerPanel={composerPanelNode}
+        />
       )}
 
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
@@ -1262,79 +675,34 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               onPrev={playbackProps.onPrev}
               onNext={playbackProps.onNext}
               onOpenAudioDrawer={() => {
-                setIsOutlineOpen(false);
-                setIsAudioDrawerOpen(true);
+                openAudioDrawer();
               }}
             />
           </m.div>
         ) : null}
       </AnimatePresence>
-      {outlineDrawer}
-      <AnimatePresence initial={false}>
-        {context && isAudioDrawerOpen ? (
-          <>
-            <m.div
-              key="audio-drawer-backdrop"
-              className="fixed inset-0 z-drawer-backdrop bg-black/45 backdrop-blur-[2px]"
-              onClick={() => {
-                setIsAudioDrawerOpen(false);
-                focusScriptScroll();
-              }}
-              aria-hidden="true"
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              variants={overlayVariants}
-            />
-            <m.aside
-              key="audio-drawer-panel"
-              role="dialog"
-              aria-label="Audio drawer"
-              data-testid="audio-drawer"
-              className="fixed inset-y-0 right-0 z-drawer flex w-full max-w-[28rem] flex-col border-l border-gray-800 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(10,15,28,0.96))] shadow-[-24px_0_48px_rgba(0,0,0,0.42)]"
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              variants={drawerRightVariants}
-            >
-              <div className="flex items-start justify-between gap-3 border-b border-gray-800 px-3.5 py-3 sm:px-4">
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Audio</p>
-                  <h2 className="text-base font-semibold text-white">Playback and Voice Utility</h2>
-                  <p className="text-[11px] text-gray-400">Assign voices, control playback, and tune follow-along behavior.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAudioDrawerOpen(false);
-                    focusScriptScroll();
-                  }}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-900/55 text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-                  aria-label="Close audio drawer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">
-                <div className="space-y-3">
-                  <section>
-                    {playbackContent}
-                  </section>
-                  <section className="rounded-xl border border-gray-800/80 bg-gray-950/20 px-3 py-2.5">
-                    {voicesContent ?? <p className="text-[11px] text-gray-500">Voice controls unavailable.</p>}
-                  </section>
-                </div>
-              </div>
-            </m.aside>
-          </>
-        ) : null}
-      </AnimatePresence>
+      {context ? (
+        <SceneOutlineDrawer
+          scenes={context.scenes}
+          activeSceneId={activeSceneId}
+          isOpen={isOutlineOpen}
+          isMobileDialogViewport={isMobileDialogViewport}
+          onClose={() => closeOutline()}
+          onSelectScene={handleSelectOutlineScene}
+        />
+      ) : null}
+      <WorkspaceAudioDrawer
+        isOpen={Boolean(context && isAudioDrawerOpen)}
+        onClose={() => closeAudioDrawer({ focus: true })}
+        playbackContent={playbackContent}
+        voicesContent={voicesContent}
+      />
       <TitleEditModal
         isOpen={isTitleModalOpen}
         value={titleDraft}
         onChange={setTitleDraft}
         onSave={handleSaveTitle}
-        onClose={handleCloseTitleModal}
+        onClose={closeTitleModal}
         inputRef={titleInputRef}
       />
       <StyleEditModal
@@ -1343,9 +711,22 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         presets={STYLE_PRESETS}
         onChange={setStyleDraft}
         onSave={handleSaveStyle}
-        onClose={handleCloseStyleModal}
+        onClose={closeStyleModal}
       />
-      {setupModal}
+      <WorkspaceSetupOverlay
+        showSetupSurface={showSetupSurface}
+        showSetupHandoffLoading={showSetupHandoffLoading}
+        isSetupOpen={isSetupOpen}
+        setupState={setupState}
+        isGenerating={isGenerating}
+        setupAutoSurprise={setupAutoSurprise}
+        onCloseSetup={onCloseSetup}
+        onCancelGenerate={onCancelGenerate}
+        onSetupChange={onSetupChange}
+        onSetupSurprise={onSetupSurprise}
+        onStartSetup={onStartSetup}
+        onSetupError={onSetupError}
+      />
     </section>
   );
 };
