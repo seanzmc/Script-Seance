@@ -31,6 +31,7 @@ type DebugWindow = Window & {
 };
 
 const isAbortDebugEnabled = () =>
+  import.meta.env.DEV &&
   typeof window !== 'undefined' &&
   Boolean((window as DebugWindow).__SS_DEBUG_AI_ABORTS__);
 

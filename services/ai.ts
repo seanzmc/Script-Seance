@@ -136,9 +136,9 @@ const debugAbortLog = (event: string, details: Record<string, unknown>) => {
 };
 
 const isPromptDebugEnabled = () =>
+  import.meta.env.DEV &&
   typeof window !== 'undefined' &&
-  Boolean((window as DebugWindow).__SS_DEBUG_PROMPTS__) &&
-  (typeof process === 'undefined' || process.env.NODE_ENV !== 'production');
+  Boolean((window as DebugWindow).__SS_DEBUG_PROMPTS__);
 
 const isPromptDebugTrace = (value: unknown): value is PromptDebugTrace => {
   if (!value || typeof value !== 'object') {
@@ -791,7 +791,7 @@ const buildGenerateSpeechContext = (
     typeof extraContext?.voiceName === 'string' ? extraContext.voiceName.trim() : '';
   const resolvedVoiceName = voiceName?.trim() || extraVoice || DEFAULT_VOICE_NAME;
 
-  if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  if (import.meta.env.DEV) {
     if (!voiceName || !voiceName.trim()) {
       console.debug('[generateSpeech] missing voiceName, falling back to', resolvedVoiceName);
     }

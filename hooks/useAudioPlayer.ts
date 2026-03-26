@@ -136,7 +136,7 @@ export const useAudioPlayer = (
   const activeRetryScopeRef = useRef<string | null>(null);
 
   const debug = useCallback((...args: unknown[]) => {
-    if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    if (import.meta.env.DEV) {
       console.debug('[playback]', ...args);
     }
   }, []);

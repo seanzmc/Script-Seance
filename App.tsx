@@ -491,7 +491,7 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') return;
+    if (!import.meta.env.DEV) return;
     const debugWindow = window as DebugWindow;
     setIsPromptDebugEnabled(Boolean(debugWindow.__SS_DEBUG_PROMPTS__));
     debugWindow.__SS_PROMPT_CONTEXT_REVISION__ = promptContextRevisionRef.current;
