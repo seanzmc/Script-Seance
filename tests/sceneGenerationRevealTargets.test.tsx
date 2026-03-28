@@ -2,7 +2,7 @@ import React, { createRef } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useStoryWorkspace } from '../hooks/useStoryWorkspace';
-import { BlockType, Scene, StoryContext } from '../types';
+import { BlockType, RevealScrollMode, Scene, StoryContext } from '../types';
 import { createScriptMutationController } from '../services/scriptController';
 import { GenerationOrchestrator } from '../services/orchestration';
 
@@ -137,6 +137,7 @@ function WorkspaceHarness() {
         Next
       </button>
       <div data-testid="reveal-target">{workspace.revealScrollTargetId ?? ''}</div>
+      <div data-testid="reveal-mode">{workspace.revealScrollMode}</div>
       <div data-testid="scene-count">{workspace.context?.scenes.length ?? 0}</div>
     </div>
   );
@@ -159,12 +160,14 @@ describe('scene generation reveal targets', () => {
     await waitFor(() => {
       expect(screen.getByTestId('scene-count').textContent).toBe('1');
       expect(screen.getByTestId('reveal-target').textContent).toBe('scene-heading-scene-opening');
+      expect(screen.getByTestId('reveal-mode').textContent).toBe('scene-generation-opening');
     });
   });
 
   it('uses the newly generated later scene heading as the reveal target', async () => {
     const contextRef = { current: existingContext as StoryContext | null };
     const setRevealScrollTargetId = vi.fn();
+    const setRevealScrollMode = vi.fn<(mode: RevealScrollMode) => void>();
     const setRevealScrollToken = vi.fn();
 
     executeGenerateSceneMock.mockResolvedValueOnce(nextScene);
@@ -190,6 +193,7 @@ describe('scene generation reveal targets', () => {
       activeGenerationScopeRef: { current: null },
       orchestratorRef: { current: new GenerationOrchestrator() },
       setRevealScrollTargetId,
+      setRevealScrollMode,
       setRevealScrollToken,
       setInsertCompleteToken: vi.fn(),
       setUserInstruction: vi.fn(),
@@ -205,6 +209,7 @@ describe('scene generation reveal targets', () => {
     });
 
     expect(setRevealScrollTargetId).toHaveBeenCalledWith('scene-heading-scene-next');
+    expect(setRevealScrollMode).toHaveBeenCalledWith('scene-generation-later');
     expect(setRevealScrollToken).toHaveBeenCalledTimes(1);
   });
 });

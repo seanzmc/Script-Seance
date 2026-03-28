@@ -4,6 +4,7 @@ import {
   BlockType,
   INSERT_BOTTOM_ID,
   INSERT_TOP_ID,
+  RevealScrollMode,
   Scene,
   ScriptAnchor,
   ScriptBlock,
@@ -34,6 +35,7 @@ export interface ScriptDisplayProps {
   className?: string;
   scrollable?: boolean;
   revealScrollTargetId?: string | null;
+  revealScrollMode?: RevealScrollMode;
   revealScrollToken?: number;
   selectedTarget?: ScriptSelectionTarget | null;
   selectedBlockTarget?: { sceneId: string; blockId: string } | null;
@@ -267,6 +269,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   className = '',
   scrollable = false,
   revealScrollTargetId,
+  revealScrollMode = 'default',
   revealScrollToken,
   selectedTarget = null,
   selectedBlockTarget = null,
@@ -455,7 +458,19 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     const isGenerationReveal = revealScrollTargetId.startsWith('scene-heading-');
     requestAnimationFrame(() => {
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (revealScrollMode === 'scene-generation-later') {
+          const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
+          if (scrollContainer) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const elementRect = el.getBoundingClientRect();
+            const nextTop = scrollContainer.scrollTop + (elementRect.top - containerRect.top);
+            scrollContainer.scrollTo({ top: nextTop, behavior: 'smooth' });
+          } else {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        } else {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       } else {
         if (!isGenerationReveal) {
           const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
@@ -474,7 +489,7 @@ export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         el.classList.remove(...highlightClasses);
       }, 1600);
     });
-  }, [revealScrollTargetId, revealScrollToken]);
+  }, [revealScrollMode, revealScrollTargetId, revealScrollToken]);
 
   useEffect(() => {
     if (isInsertMode || !selectedTarget || !onClearBlockTarget) return;

@@ -68,6 +68,7 @@ const createControllerHarness = (context = buildContext()) => {
     activeGenerationScopeRef: { current: null },
     orchestratorRef: { current: new GenerationOrchestrator() },
     setRevealScrollTargetId: vi.fn(),
+    setRevealScrollMode: vi.fn(),
     setRevealScrollToken: vi.fn(),
     setInsertCompleteToken: vi.fn(),
     setUserInstruction: vi.fn(),

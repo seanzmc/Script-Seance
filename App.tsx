@@ -71,6 +71,7 @@ export default function App() {
         playbackProps={workspace.playbackProps}
         voicesContent={workspace.voicesContent}
         revealScrollTargetId={workspace.revealScrollTargetId}
+        revealScrollMode={workspace.revealScrollMode}
         revealScrollToken={workspace.revealScrollToken}
       />
 

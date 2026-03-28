@@ -93,6 +93,11 @@ export type ScriptSelectionTarget =
       sceneId: string;
     };
 
+export type RevealScrollMode =
+  | 'default'
+  | 'scene-generation-opening'
+  | 'scene-generation-later';
+
 export interface TtsVoice {
   id: string;
   displayName: string;

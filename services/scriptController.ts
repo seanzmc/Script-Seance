@@ -5,6 +5,7 @@ import {
   BlockType,
   INSERT_BOTTOM_ID,
   INSERT_TOP_ID,
+  RevealScrollMode,
   Scene,
   SceneMeta,
   ScriptAnchor,
@@ -294,6 +295,7 @@ export interface CreateScriptMutationControllerDeps {
   orchestratorRef: RefValue<GenerationOrchestrator>;
 
   setRevealScrollTargetId: (targetId: string | null) => void;
+  setRevealScrollMode: (mode: RevealScrollMode) => void;
   setRevealScrollToken: NumberStateSetter;
   setInsertCompleteToken: NumberStateSetter;
   setUserInstruction: (value: string) => void;
@@ -422,6 +424,7 @@ export const createScriptMutationController = (
     if (!deps.contextRef.current) return;
     deps.clearRedo();
     deps.setRevealScrollTargetId(`block-${block.id}`);
+    deps.setRevealScrollMode('default');
     deps.setRevealScrollToken((token) => token + 1);
 
     deps.applyContextMutation((previous) => {
@@ -566,6 +569,7 @@ export const createScriptMutationController = (
     const [inserted] = insertedBlocks;
     if (!inserted) return;
     deps.setRevealScrollTargetId(`block-${inserted.id}`);
+    deps.setRevealScrollMode('default');
     deps.setRevealScrollToken((token) => token + 1);
     deps.setInsertCompleteToken((token) => token + 1);
   };
@@ -717,6 +721,7 @@ export const createScriptMutationController = (
     });
     if (!applied) return;
     deps.setRevealScrollTargetId(`block-${params.blockId}`);
+    deps.setRevealScrollMode('default');
     deps.setRevealScrollToken((token) => token + 1);
   };
 
@@ -823,6 +828,7 @@ export const createScriptMutationController = (
           throw new Error('Insertion point is no longer available.');
         }
         deps.setRevealScrollTargetId(`block-${inserted.id}`);
+        deps.setRevealScrollMode('default');
         deps.setRevealScrollToken((token) => token + 1);
         deps.setInsertCompleteToken((token) => token + 1);
       }
@@ -977,6 +983,7 @@ export const createScriptMutationController = (
             };
           });
           deps.setRevealScrollTargetId(`scene-heading-${normalizedScene.id}`);
+          deps.setRevealScrollMode('scene-generation-later');
           deps.setRevealScrollToken((token) => token + 1);
           deps.setUserInstruction('');
         }

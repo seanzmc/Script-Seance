@@ -6,7 +6,7 @@ import type { PlaybackPanelProps } from '../components/PlaybackPanel';
 import { VoiceCastingModal } from '../components/VoiceCastingModal';
 import { VoicesPanel } from '../components/VoicesPanel';
 import { executeGenerateScene, executeSuggestPlotTwist, executeGenerateScriptElement, executeGenerateSurpriseSetup } from '../services/ai';
-import { Scene, StoryContext, VoiceConfig, ScriptBlock, ScriptAnchor, BlockType, GENRES } from '../types';
+import { Scene, StoryContext, VoiceConfig, ScriptBlock, ScriptAnchor, BlockType, GENRES, RevealScrollMode } from '../types';
 import { DEFAULT_VOICE_CONFIG, sanitizeVoiceIdForUsage } from '../shared/voiceDefaults.js';
 import { fadeSlideYVariants } from '../components/motion/primitives';
 import { useAudioPlayer } from './useAudioPlayer';
@@ -118,6 +118,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
   const [revealScrollToken, setRevealScrollToken] = useState(0);
   const [revealScrollTargetId, setRevealScrollTargetId] = useState<string | null>(null);
+  const [revealScrollMode, setRevealScrollMode] = useState<RevealScrollMode>('default');
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [setupAutoSurprise, setSetupAutoSurprise] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
@@ -417,6 +418,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     activeGenerationScopeRef,
     orchestratorRef,
     setRevealScrollTargetId,
+    setRevealScrollMode,
     setRevealScrollToken,
     setInsertCompleteToken,
     setUserInstruction,
@@ -788,6 +790,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
             scenes: [normalizedFirstScene]
           });
           setRevealScrollTargetId(`scene-heading-${normalizedFirstScene.id}`);
+          setRevealScrollMode('scene-generation-opening');
           setRevealScrollToken(token => token + 1);
         }
       });
@@ -1426,6 +1429,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     playbackProps,
     voicesContent,
     revealScrollTargetId,
+    revealScrollMode,
     revealScrollToken,
     handleTitleChange,
     isPromptDebugEnabled,

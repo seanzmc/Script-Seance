@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
-import { BlockType, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
+import { BlockType, RevealScrollMode, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
 import { ScriptDisplay } from './ScriptDisplay';
 import { InsertComposerPopover } from './InsertComposerPopover';
 import { RewriteComposerPopover } from './RewriteComposerPopover';
@@ -101,6 +101,7 @@ export interface ScriptPaneProps {
   playbackProps?: PlaybackPanelProps;
   voicesContent?: React.ReactNode;
   revealScrollTargetId: string | null;
+  revealScrollMode?: RevealScrollMode;
   revealScrollToken: number;
 }
 
@@ -152,6 +153,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   playbackProps,
   voicesContent,
   revealScrollTargetId,
+  revealScrollMode = 'default',
   revealScrollToken
 }) => {
   const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
@@ -488,6 +490,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       className={previewClassName}
       scrollable
       revealScrollTargetId={revealScrollTargetId}
+      revealScrollMode={revealScrollMode}
       revealScrollToken={revealScrollToken}
     />
   ) : null;

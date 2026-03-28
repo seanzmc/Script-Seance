@@ -46,6 +46,7 @@ const createProps = () => ({
   showHighlights: true,
   autoScroll: false,
   revealScrollTargetId: null,
+  revealScrollMode: 'default' as const,
   revealScrollToken: 0,
   onSelectInsertTarget: vi.fn(),
   onChangeSpeaker: vi.fn(),
@@ -138,7 +139,7 @@ describe('ScriptDisplay playback follow behavior', () => {
     });
   });
 
-  it('scrolls a generation reveal to the scene heading anchor', async () => {
+  it('keeps opening scene generation heading reveals on the existing nearest-anchor path', async () => {
     const scrollIntoView = vi.fn();
     const scrollTo = vi.fn();
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
@@ -153,6 +154,7 @@ describe('ScriptDisplay playback follow behavior', () => {
         <ScriptDisplay
           {...createProps()}
           revealScrollTargetId="scene-heading-scene-1"
+          revealScrollMode="scene-generation-opening"
           revealScrollToken={1}
         />
       );
@@ -172,6 +174,72 @@ describe('ScriptDisplay playback follow behavior', () => {
     }
   });
 
+  it('top-aligns later scene generation heading reveals within the script scroll container', async () => {
+    const scrollIntoView = vi.fn();
+    const scrollTo = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: scrollTo
+    });
+
+    try {
+      const { rerender } = render(
+        <ScriptDisplay
+          {...createProps()}
+          revealScrollTargetId="scene-heading-scene-1"
+          revealScrollMode="scene-generation-later"
+          revealScrollToken={0}
+        />
+      );
+
+      const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLDivElement;
+      const headingElement = document.getElementById('scene-heading-scene-1') as HTMLDivElement;
+
+      Object.defineProperty(scrollContainer, 'scrollTop', { value: 120, writable: true });
+      Object.defineProperty(scrollContainer, 'getBoundingClientRect', {
+        value: () => createRect(100, 400),
+        configurable: true
+      });
+      Object.defineProperty(headingElement, 'getBoundingClientRect', {
+        value: () => createRect(260, 32),
+        configurable: true
+      });
+
+      rerender(
+        <ScriptDisplay
+          {...createProps()}
+          revealScrollTargetId="scene-heading-scene-1"
+          revealScrollMode="scene-generation-later"
+          revealScrollToken={1}
+        />
+      );
+
+      await waitFor(() => {
+        expect(scrollTo).toHaveBeenCalledWith({
+          top: 280,
+          behavior: 'smooth'
+        });
+      });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        value: originalScrollIntoView
+      });
+      Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+        configurable: true,
+        value: originalScrollTo
+      });
+    }
+  });
+
   it('does not fall back to container-bottom scrolling for missing generation heading anchors', async () => {
     const scrollTo = vi.fn();
 
@@ -179,6 +247,7 @@ describe('ScriptDisplay playback follow behavior', () => {
       <ScriptDisplay
         {...createProps()}
         revealScrollTargetId="scene-heading-scene-missing"
+        revealScrollMode="scene-generation-later"
         revealScrollToken={1}
       />
     );
