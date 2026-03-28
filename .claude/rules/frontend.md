@@ -1,14 +1,12 @@
 ---
 paths:
-  [
-    "components/**",
-    "app/**",
-    "pages/**",
-    "hooks/**",
-    "styles/**",
-    "domain/**",
-    "*.tsx",
-  ]
+  - "components/**"
+  - "app/**"
+  - "pages/**"
+  - "hooks/**"
+  - "styles/**"
+  - "domain/**"
+  - "*.tsx"
 ---
 
 # Frontend rules

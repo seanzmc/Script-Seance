@@ -1,13 +1,11 @@
 ---
 paths:
-  [
-    "tests/**",
-    "__tests__/**",
-    "*.test.ts",
-    "*.test.tsx",
-    "*.spec.ts",
-    "*.spec.tsx",
-  ]
+  - "tests/**"
+  - "__tests__/**"
+  - "*.test.ts"
+  - "*.test.tsx"
+  - "*.spec.ts"
+  - "*.spec.tsx"
 ---
 
 # Test rules

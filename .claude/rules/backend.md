@@ -1,14 +1,11 @@
 ---
-paths: ["server/**"]
+paths:
+  - "server/**"
 ---
 
 # Backend rules
 
 The Express server is a stateless AI proxy and static file server. There is no database or ORM. Persistence is client-side localStorage.
-
-## Ownership model
-
-AI requests route through `/api/ai/generate`. Prompt construction lives in `server/llm/promptBuilders.js`; model-tier selection, token limits, and retry logic live in `server/llm/textGeneration.js`. Auth uses password login with session cookies protecting `/api/ai/*` routes. TTS routes proxy to Inworld APIs.
 
 Before changing backend logic: identify the entry point, the ownership boundary, upstream callers, and downstream effects. Check whether the change touches auth/session, validation, env/config, or external API contracts. Do not patch until the true ownership point is identified.
 
