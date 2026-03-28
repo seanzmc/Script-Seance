@@ -1,110 +1,69 @@
 # CLAUDE.md
 
-## Role
-Act as a senior engineer inside Script Seance.
-Make the smallest safe change that improves the product without destabilizing working flows.
+## Project
+Script Seance — an AI-assisted screenplay drafting workspace.
+React 19 · TypeScript · Vite 6 · Express 5 · Tailwind CSS · Motion (`motion/react`)
+OpenAI SDK for text generation · Inworld APIs for TTS and voice catalog
+Vitest + Testing Library · Playwright
 
-## What matters in this repo
-Script Seance benefits most from:
-- clean, readable workspace UI
-- coherent pane-to-pane design language
-- obvious interaction affordances
-- stable state ownership
-- minimal architectural churn
+See README.md for env var documentation, debug flags, and deployment notes.
 
-Assume the wiring is usually mostly correct.
-For many tasks, the best fix is visual, structural, or cleanup-oriented rather than architectural.
+## Commands
+Run all commands from the repository root using `pnpm` (not `npm` or `yarn`).
+
+- `pnpm start` — client + Express server together
+- `pnpm dev` — Vite dev server (localhost:3000)
+- `pnpm run server` — Express API server (localhost:3001)
+- `pnpm build` — production build (Express serves dist/)
+- `pnpm typecheck` — type check
+- `pnpm lint` — lint
+- `pnpm test` — unit/integration tests (Vitest)
+- `pnpm test:playwright` — E2E tests (Playwright)
+- `pnpm start:debug` — both, with `SS_DEBUG_PROMPTS=1` enabled
+- `pnpm docs:refresh` — regenerate TypeDoc + dependency graph
+
+## Architecture
+Workspace state is coordinated by `hooks/useStoryWorkspace.tsx`. AI requests flow through `services/orchestration/generationOrchestrator.ts`, which enforces latest-wins behavior per `scopeKey` — each run carries a receipt (`opId`, `opType`, `scopeKey`, `startedAt`, `status`, `metadata`) and stale or superseded results are discarded.
+
+All AI requests route through `/api/ai/generate`. Prompt construction lives in `server/llm/promptBuilders.js`; model-tier selection, token limits, and retry logic live in `server/llm/textGeneration.js`. The `generateScriptElement` action uses a `purpose` discriminator to route title suggestions to the fast model tier and insert generation to the balanced tier.
+
+TTS playback flows through `hooks/useAudioPlayer.ts`, `services/scriptEngine.ts`, and `services/ttsCacheKeys.ts`. Auth uses password login with session cookies protecting `/api/ai/*` routes.
 
 ## Working rules
+Make the smallest safe change that improves the product without destabilizing working flows. Assume wiring is usually mostly correct — for many tasks the best fix is visual, structural, or cleanup-oriented rather than architectural.
+
 - Inspect relevant files before proposing changes.
 - Prefer existing patterns over new abstractions.
-- Keep diffs tight and reviewable.
-- Do not touch unrelated code.
+- Keep diffs tight and reviewable. Do not touch unrelated code.
 - Do not add dependencies unless necessary.
 - Do not create wrappers, helper components, or layers unless they clearly reduce complexity.
-
-## Search and inspection rules
-- Use `rg` as the default tool for codebase search instead of `grep`.
-- Start with narrow, intentional searches before expanding scope.
-- Prefer searching by component name, exported symbol, prop name, route, hook, or feature flag before reading whole directories.
-- When auditing stale systems, search imports, types, config, env, provider wiring, tests, docs, and UI labels separately.
-- Do not scan large portions of the repo without a clear reason.
-
-## UI rules
-- Avoid over-containerization.
-- Reduce padding before adding more layout structure.
-- Preserve density appropriate for a writing workspace.
-- Make controls read clearly as controls.
-- Do not let adjacent components feel like different products.
-- Prefer revealing content simply rather than burying it behind more chrome.
-
-## Local UI polish rule
-For UI tasks, prefer the smallest coherent local polish pass over a literal symptom-only patch.
-When a requested fix clearly exposes adjacent inconsistency in the same pane, same control family, or same interaction flow, include that cleanup in scope.
-Do not broaden into unrelated redesign or app-wide refactor.
-
-## Cleanup rules
-When removing stale references or old framework residue:
-- inspect imports, branches, config, env, tests, docs, labels, and provider wiring
-- separate active vs dead vs ambiguous
-- remove only what is clearly dead
-- flag uncertain items instead of guessing
-
-## Separation of concerns for tasks
-- Keep visual consistency work separate from behavior/regression fixes unless the same ownership point clearly requires both.
-- Do not mix setup-flow styling cleanup with generation pipeline changes in one patch unless explicitly requested.
+- Keep visual consistency work separate from behavior/regression fixes unless the same ownership point requires both.
+- Do not mix setup-flow styling cleanup with generation pipeline changes unless explicitly requested.
 
 ## Planning
-For non-trivial work, first determine:
-- true ownership point
-- direct change files
-- surrounding context files
-- smallest safe patch path
+For non-trivial work, inspect first then write a spec covering: true ownership point, direct change files, surrounding context, and smallest safe patch path. Wait for approval before implementing.
 
-Default to targeted refinement, not broad refactor.
+## Search
+Use `rg` (not `grep`). Start with narrow searches — component name, exported symbol, prop, hook, feature flag — before expanding scope. Do not scan large portions of the repo without a clear reason.
+
+## UI conventions
+Script Seance is a dense writing workspace. Adjacent panes must feel like one product.
+
+- Reduce padding before adding layout structure. Avoid over-containerization.
+- Make controls read clearly as controls. Reveal content simply rather than burying it behind chrome.
+- For UI tasks, prefer the smallest coherent local polish pass. When a fix exposes adjacent inconsistency in the same pane or control family, include that cleanup. Do not broaden into unrelated redesign.
+
+## Cleanup
+When removing stale references or old framework residue: inspect imports, branches, config, env, tests, docs, labels, and provider wiring separately. Remove only what is clearly dead. Flag uncertain items instead of guessing.
+
 ## Avoid by default
-- broad component rewrites
-- moving state ownership without clear need
-- introducing new visual systems
-- wrapper inflation
-- cleanup mixed into unrelated feature work
+Broad component rewrites, moving state ownership without clear need, introducing new visual systems, wrapper inflation, cleanup mixed into unrelated feature work.
 
-## Repo execution rules
-- Run commands from the repository root.
-- Use `pnpm`, not `npm` or `yarn`.
-- Use repo-relative paths in responses and handoffs.
-- For non-trivial work, default to spec-first: inspect, write the spec, then wait for approval.
-- Do not claim completion unless validation commands were actually run and reported explicitly.
+## Validation
+After completing work, run these commands exactly as written:
 
-## Validation expectations
-For completed tasks, report the exact command(s) run.
-If a task is claimed complete, final validation should include:
 - `pnpm typecheck`
 - `pnpm lint`
 - `pnpm test`
 
-## Validation command rules
-- For final validation, run the repo scripts exactly as written:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm test`
-- Do not wrap, pipe, redirect, truncate, or chain these final validation commands.
-- Do not replace repo validation scripts with underlying tool commands.
-- Commands like `2>&1 | head -40`, `tee`, `tail`, or custom `tsc --noEmit` invocations are debug-only and do not count as final validation.
-- `pnpm typecheck 2>&1 | head -40` does not count as running `pnpm typecheck`.
-
-If any of these are unrun or failing, say so explicitly.
-
-## Validation
-Run the narrowest relevant checks first and report:
-- what ran
-- what passed/failed
-- what remains unverified
-
-## Response format
-### Diagnosis
-### Files inspected
-### Plan
-### Risks
-### Patch summary
-### Validation
+Do not pipe, redirect, truncate, or chain these commands. Debug-only invocations (`2>&1 | head -40`, `tee`, custom `tsc --noEmit`) do not count as final validation. Do not claim completion unless all three ran and results are reported. If any are unrun or failing, say so explicitly.
