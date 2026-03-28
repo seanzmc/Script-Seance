@@ -70,8 +70,8 @@ export default function App() {
         canExport={Boolean(workspace.context)}
         playbackProps={workspace.playbackProps}
         voicesContent={workspace.voicesContent}
-        insertScrollTargetId={workspace.insertScrollTargetId}
-        insertScrollToken={workspace.insertScrollToken}
+        revealScrollTargetId={workspace.revealScrollTargetId}
+        revealScrollToken={workspace.revealScrollToken}
       />
 
       {workspace.isPromptDebugEnabled && (

@@ -100,8 +100,8 @@ export interface ScriptPaneProps {
   canExport: boolean;
   playbackProps?: PlaybackPanelProps;
   voicesContent?: React.ReactNode;
-  insertScrollTargetId: string | null;
-  insertScrollToken: number;
+  revealScrollTargetId: string | null;
+  revealScrollToken: number;
 }
 
 export const ScriptPane: React.FC<ScriptPaneProps> = ({
@@ -151,8 +151,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   canExport,
   playbackProps,
   voicesContent,
-  insertScrollTargetId,
-  insertScrollToken
+  revealScrollTargetId,
+  revealScrollToken
 }) => {
   const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
   const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);
@@ -487,8 +487,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       headingEditor={headingEditorNode}
       className={previewClassName}
       scrollable
-      insertScrollTargetId={insertScrollTargetId}
-      insertScrollToken={insertScrollToken}
+      revealScrollTargetId={revealScrollTargetId}
+      revealScrollToken={revealScrollToken}
     />
   ) : null;
 

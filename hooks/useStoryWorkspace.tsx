@@ -116,8 +116,8 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
 
   const [setupState, setSetupState] = useState<SetupFormState>(DEFAULT_SETUP_STATE);
   const [insertCompleteToken, setInsertCompleteToken] = useState(0);
-  const [insertScrollToken, setInsertScrollToken] = useState(0);
-  const [insertScrollTargetId, setInsertScrollTargetId] = useState<string | null>(null);
+  const [revealScrollToken, setRevealScrollToken] = useState(0);
+  const [revealScrollTargetId, setRevealScrollTargetId] = useState<string | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [setupAutoSurprise, setSetupAutoSurprise] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
@@ -242,7 +242,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     context,
     userInstruction,
     debounceMs: DRAFT_DEBOUNCE_MS,
-    onHydrate: (storedDraft) => {
+    onHydrate: useCallback((storedDraft) => {
       const hydratedContext: StoryContext = {
         ...storedDraft.context,
         scenes: storedDraft.context.scenes.map((scene) => (
@@ -253,7 +253,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
       if (typeof storedDraft.userInstruction === 'string') {
         setUserInstruction(storedDraft.userInstruction);
       }
-    }
+    }, [applyContextMutation])
   });
 
   const applySetupStateMutation = useCallback((
@@ -416,8 +416,8 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     scriptIdRef,
     activeGenerationScopeRef,
     orchestratorRef,
-    setInsertScrollTargetId,
-    setInsertScrollToken,
+    setRevealScrollTargetId,
+    setRevealScrollToken,
     setInsertCompleteToken,
     setUserInstruction,
     setIsGenerating,
@@ -783,13 +783,12 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
           !contextRef.current,
         commit: (firstScene) => {
           const normalizedFirstScene = normalizeSceneCharacters(firstScene, initialContext.characters);
-          const initialFirstBlockId = normalizedFirstScene.blocks[0]?.id ?? null;
           applyContextMutation({
             ...initialContext,
             scenes: [normalizedFirstScene]
           });
-          setInsertScrollTargetId(initialFirstBlockId);
-          setInsertScrollToken(token => token + 1);
+          setRevealScrollTargetId(`scene-heading-${normalizedFirstScene.id}`);
+          setRevealScrollToken(token => token + 1);
         }
       });
 
@@ -1426,8 +1425,8 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     handleExportPdf,
     playbackProps,
     voicesContent,
-    insertScrollTargetId,
-    insertScrollToken,
+    revealScrollTargetId,
+    revealScrollToken,
     handleTitleChange,
     isPromptDebugEnabled,
     promptDebugTraces,

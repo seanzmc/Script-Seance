@@ -116,8 +116,8 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   canExport: true,
   playbackProps: createPlaybackProps(),
   voicesContent: <div>Voices panel body</div>,
-  insertScrollTargetId: null,
-  insertScrollToken: 0,
+  revealScrollTargetId: null,
+  revealScrollToken: 0,
   ...overrides
 });
 

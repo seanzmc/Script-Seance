@@ -129,8 +129,8 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onExportPdf: vi.fn(),
   canExport: true,
   voicesContent: <div>Voices panel body</div>,
-  insertScrollTargetId: null,
-  insertScrollToken: 0,
+  revealScrollTargetId: null,
+  revealScrollToken: 0,
   ...overrides
 });
 

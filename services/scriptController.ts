@@ -293,8 +293,8 @@ export interface CreateScriptMutationControllerDeps {
   activeGenerationScopeRef: RefValue<string | null>;
   orchestratorRef: RefValue<GenerationOrchestrator>;
 
-  setInsertScrollTargetId: (targetId: string | null) => void;
-  setInsertScrollToken: NumberStateSetter;
+  setRevealScrollTargetId: (targetId: string | null) => void;
+  setRevealScrollToken: NumberStateSetter;
   setInsertCompleteToken: NumberStateSetter;
   setUserInstruction: (value: string) => void;
   setIsGenerating: (value: boolean) => void;
@@ -421,8 +421,8 @@ export const createScriptMutationController = (
   const addBlock = (block: ScriptBlock) => {
     if (!deps.contextRef.current) return;
     deps.clearRedo();
-    deps.setInsertScrollTargetId(block.id);
-    deps.setInsertScrollToken((token) => token + 1);
+    deps.setRevealScrollTargetId(`block-${block.id}`);
+    deps.setRevealScrollToken((token) => token + 1);
 
     deps.applyContextMutation((previous) => {
       if (!previous) return null;
@@ -565,8 +565,8 @@ export const createScriptMutationController = (
     const insertedBlocks = applyGeneratedBlocks(anchor, [block]);
     const [inserted] = insertedBlocks;
     if (!inserted) return;
-    deps.setInsertScrollTargetId(inserted.id);
-    deps.setInsertScrollToken((token) => token + 1);
+    deps.setRevealScrollTargetId(`block-${inserted.id}`);
+    deps.setRevealScrollToken((token) => token + 1);
     deps.setInsertCompleteToken((token) => token + 1);
   };
 
@@ -716,8 +716,8 @@ export const createScriptMutationController = (
       clearRedo: true
     });
     if (!applied) return;
-    deps.setInsertScrollTargetId(params.blockId);
-    deps.setInsertScrollToken((token) => token + 1);
+    deps.setRevealScrollTargetId(`block-${params.blockId}`);
+    deps.setRevealScrollToken((token) => token + 1);
   };
 
   const generateInsertAtAnchor = async (params: {
@@ -822,8 +822,8 @@ export const createScriptMutationController = (
         if (!inserted) {
           throw new Error('Insertion point is no longer available.');
         }
-        deps.setInsertScrollTargetId(inserted.id);
-        deps.setInsertScrollToken((token) => token + 1);
+        deps.setRevealScrollTargetId(`block-${inserted.id}`);
+        deps.setRevealScrollToken((token) => token + 1);
         deps.setInsertCompleteToken((token) => token + 1);
       }
     });
@@ -955,7 +955,6 @@ export const createScriptMutationController = (
             ...deps.normalizeSceneCharacters(nextScene, params.context?.characters ?? []),
             meta: { source: 'ai' as const, placeholder: false }
           };
-          const lastBlockId = normalizedScene.blocks[normalizedScene.blocks.length - 1]?.id;
           deps.applyContextMutation((previous) => {
             if (!previous) return null;
             const lastScene = previous.scenes[previous.scenes.length - 1];
@@ -977,8 +976,8 @@ export const createScriptMutationController = (
               scenes: [...previous.scenes, normalizedScene]
             };
           });
-          deps.setInsertScrollTargetId(lastBlockId ?? 'bottom');
-          deps.setInsertScrollToken((token) => token + 1);
+          deps.setRevealScrollTargetId(`scene-heading-${normalizedScene.id}`);
+          deps.setRevealScrollToken((token) => token + 1);
           deps.setUserInstruction('');
         }
       });

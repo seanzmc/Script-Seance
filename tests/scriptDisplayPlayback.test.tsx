@@ -45,6 +45,8 @@ const createProps = () => ({
   blockStatuses: {},
   showHighlights: true,
   autoScroll: false,
+  revealScrollTargetId: null,
+  revealScrollToken: 0,
   onSelectInsertTarget: vi.fn(),
   onChangeSpeaker: vi.fn(),
   characters: ['Alex']
@@ -134,5 +136,59 @@ describe('ScriptDisplay playback follow behavior', () => {
     await waitFor(() => {
       expect(scrollTo).not.toHaveBeenCalled();
     });
+  });
+
+  it('scrolls a generation reveal to the scene heading anchor', async () => {
+    const scrollIntoView = vi.fn();
+    const scrollTo = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView
+    });
+
+    try {
+      render(
+        <ScriptDisplay
+          {...createProps()}
+          revealScrollTargetId="scene-heading-scene-1"
+          revealScrollToken={1}
+        />
+      );
+
+      const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLDivElement;
+      Object.defineProperty(scrollContainer, 'scrollTo', { value: scrollTo, configurable: true });
+
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+      });
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        value: originalScrollIntoView
+      });
+    }
+  });
+
+  it('does not fall back to container-bottom scrolling for missing generation heading anchors', async () => {
+    const scrollTo = vi.fn();
+
+    render(
+      <ScriptDisplay
+        {...createProps()}
+        revealScrollTargetId="scene-heading-scene-missing"
+        revealScrollToken={1}
+      />
+    );
+
+    const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLDivElement;
+    Object.defineProperty(scrollContainer, 'scrollTo', { value: scrollTo, configurable: true });
+
+    await waitFor(() => {
+      expect(window.requestAnimationFrame).toHaveBeenCalled();
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });
