@@ -12,11 +12,9 @@ const loadCanonicalGenres = (value) => {
 
 export const CANONICAL_GENRES = loadCanonicalGenres(sharedGenres);
 
-export const CANONICAL_GENRE_SET = new Set(CANONICAL_GENRES);
+const CANONICAL_GENRE_SET = new Set(CANONICAL_GENRES);
 
-export const listGenres = () => CANONICAL_GENRES;
-
-export const validateGenre = (value) => (
+const validateGenre = (value) => (
   typeof value === 'string' && CANONICAL_GENRE_SET.has(value)
 );
 
