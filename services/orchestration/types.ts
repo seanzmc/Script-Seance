@@ -1,4 +1,4 @@
-export type OperationType =
+type OperationType =
   | 'titleSuggestion'
   | 'generateOpeningScene'
   | 'generateNextScene'
@@ -12,9 +12,9 @@ export type OperationType =
   | 'ttsPreview'
   | 'ttsBlockRetry';
 
-export type OperationTrigger = 'user' | 'system';
+type OperationTrigger = 'user' | 'system';
 
-export type ReceiptStatus =
+type ReceiptStatus =
   | 'started'
   | 'resolved'
   | 'committed'
@@ -44,25 +44,25 @@ export type RunOptions<T> = {
   commit: (value: T, receipt: Receipt) => void | Promise<void>;
 };
 
-export type CommittedOutcome<T> = {
+type CommittedOutcome<T> = {
   kind: 'committed';
   value: T;
   receipt: Receipt;
 };
 
-export type DroppedOutcome = {
+type DroppedOutcome = {
   kind: 'dropped';
   reason: 'stale' | 'superseded';
   receipt: Receipt;
 };
 
-export type AbortedOutcome = {
+type AbortedOutcome = {
   kind: 'aborted';
   reason: 'cancelled' | 'superseded' | 'aborted';
   receipt: Receipt;
 };
 
-export type FailedOutcome = {
+type FailedOutcome = {
   kind: 'failed';
   error: unknown;
   receipt: Receipt;
