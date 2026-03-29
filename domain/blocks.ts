@@ -27,7 +27,7 @@ type NormalizeSceneBlockOptions = {
 
 const VALID_META_ORIGINS = new Set<ScriptBlockOrigin>(['ai', 'user', 'rewrite']);
 
-export const BLOCK_TYPE_FIELD_RULES: Record<BlockType, BlockFieldRule> = {
+const BLOCK_TYPE_FIELD_RULES: Record<BlockType, BlockFieldRule> = {
   [BlockType.HEADING]: {
     storedInSceneBlocks: false,
     requiresCharacter: false,
