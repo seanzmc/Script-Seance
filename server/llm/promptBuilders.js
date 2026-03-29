@@ -67,7 +67,7 @@ const normalizeSceneLength = (value) => {
   return 'medium';
 };
 
-export const getSceneLengthProfile = (targetLength, isFirstScene) => {
+const getSceneLengthProfile = (targetLength, isFirstScene) => {
   const key = normalizeSceneLength(targetLength);
   const profile = SCENE_LENGTH_PROFILES[key];
   const blockRange = isFirstScene ? profile.openingBlocks : profile.nextBlocks;

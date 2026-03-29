@@ -31,7 +31,7 @@ export const resolveTextGenerationModels = (kind, context = undefined) => {
   };
 };
 
-export const createConfigError = (message, code = 'CONFIG_ERROR', details) => {
+const createConfigError = (message, code = 'CONFIG_ERROR', details) => {
   const error = new Error(message);
   error.code = code;
   if (details && typeof details === 'object') {

@@ -3,7 +3,7 @@ const DISALLOWED_VOICE_KEYS = new Set(['hades']);
 const MASCULINE_VOICE_LABELS = new Set(['masculine', 'male']);
 const FEMININE_VOICE_LABELS = new Set(['feminine', 'female']);
 
-export const DEFAULT_NARRATOR_VOICE_KEY = 'mark';
+const DEFAULT_NARRATOR_VOICE_KEY = 'mark';
 
 export const DEFAULT_VOICE_CONFIG = Object.freeze({
   speed: 1,
@@ -35,9 +35,9 @@ const hasVoiceLabel = (voice, labels) => {
   return candidates.some((value) => labels.has(String(value).trim().toLowerCase()));
 };
 
-export const isDisallowedVoiceId = (voiceId) => DISALLOWED_VOICE_KEYS.has(normalizeVoiceToken(voiceId));
+const isDisallowedVoiceId = (voiceId) => DISALLOWED_VOICE_KEYS.has(normalizeVoiceToken(voiceId));
 
-export const getSelectableVoices = (voices) =>
+const getSelectableVoices = (voices) =>
   Array.isArray(voices)
     ? voices.filter((voice) => (
       typeof voice?.id === 'string' &&
@@ -46,10 +46,10 @@ export const getSelectableVoices = (voices) =>
     ))
     : [];
 
-export const getAutoAssignableVoices = (voices) =>
+const getAutoAssignableVoices = (voices) =>
   getSelectableVoices(voices).filter((voice) => voice.autoAssignable === true);
 
-export const getVoiceAssignmentPools = (voices) => {
+const getVoiceAssignmentPools = (voices) => {
   const selectableVoices = getSelectableVoices(voices);
   const combinedAutoAssignableVoices = getAutoAssignableVoices(voices);
   const maleAutoAssignableVoices = combinedAutoAssignableVoices.filter((voice) =>
@@ -115,13 +115,13 @@ export const resolveDefaultNarratorVoiceId = (voices) => {
   return typeof selectableVoices[0]?.id === 'string' ? selectableVoices[0].id : '';
 };
 
-export const resolveSafestValidVoiceId = (voices) => {
+const resolveSafestValidVoiceId = (voices) => {
   const selectableVoices = getSelectableVoices(voices);
   return resolveDefaultNarratorVoiceId(selectableVoices)
     || (typeof selectableVoices[0]?.id === 'string' ? selectableVoices[0].id : '');
 };
 
-export const resolveAutomaticVoiceId = ({
+const resolveAutomaticVoiceId = ({
   voices,
   preference = 'random',
   seedKey = '',
