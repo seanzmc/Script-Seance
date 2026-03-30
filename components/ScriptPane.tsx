@@ -32,6 +32,11 @@ import { SceneOutlineDrawer } from './workspace/SceneOutlineDrawer';
 import { WorkspaceAudioDrawer } from './workspace/WorkspaceAudioDrawer';
 import { WorkspaceHeader } from './workspace/WorkspaceHeader';
 import { WorkspaceSetupOverlay } from './workspace/WorkspaceSetupOverlay';
+import {
+  DEFAULT_SCENE_GENERATION_LOADING_COPY_TIER,
+  SCENE_GENERATION_LOADING_COPY,
+  SCENE_GENERATION_LOADING_COPY_INTERVAL_MS
+} from './workspace/sceneGenerationLoadingCopy';
 
 export interface ScriptPaneProps {
   context: StoryContext | null;
@@ -156,6 +161,8 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   revealScrollMode = 'default',
   revealScrollToken
 }) => {
+  const sceneGenerationLoadingMessages = SCENE_GENERATION_LOADING_COPY[DEFAULT_SCENE_GENERATION_LOADING_COPY_TIER];
+  const [sceneGenerationLoadingCopyIndex, setSceneGenerationLoadingCopyIndex] = useState(0);
   const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
   const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);
   const [headingDraft, setHeadingDraft] = useState('');
@@ -178,6 +185,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const showInitialGeneration = !context && isGenerating;
   const showSetupHandoffLoading = !isSetupOpen && showInitialGeneration;
   const showSetupSurface = isSetupOpen || showSetupHandoffLoading;
+  const sceneGenerationLoadingMessage = isGenerating
+    ? sceneGenerationLoadingMessages[sceneGenerationLoadingCopyIndex] ?? sceneGenerationLoadingMessages[0]
+    : null;
   const focusScriptScroll = useCallback(() => {
     requestAnimationFrame(() => {
       const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
@@ -496,6 +506,26 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   ) : null;
 
   useEffect(() => {
+    if (!isGenerating) {
+      setSceneGenerationLoadingCopyIndex(0);
+      return;
+    }
+    setSceneGenerationLoadingCopyIndex(0);
+    if (sceneGenerationLoadingMessages.length <= 1) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      setSceneGenerationLoadingCopyIndex((currentIndex) =>
+        (currentIndex + 1) % sceneGenerationLoadingMessages.length
+      );
+    }, SCENE_GENERATION_LOADING_COPY_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isGenerating, sceneGenerationLoadingMessages]);
+
+  useEffect(() => {
     if (scriptController.activeInsertAnchor) return;
     setInsertPlacementTarget(null);
   }, [scriptController.activeInsertAnchor]);
@@ -576,6 +606,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       isPlaying={isPlaying}
       onCancelGenerate={onCancelGenerate}
       error={error}
+      loadingMessage={sceneGenerationLoadingMessage ?? undefined}
       insertSceneBeatDisabled={!sceneEndAnchor}
       onOpenPrivacy={onOpenPrivacy}
       sceneCountLabel={sceneCountLabel}
@@ -722,6 +753,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         isSetupOpen={isSetupOpen}
         setupState={setupState}
         isGenerating={isGenerating}
+        loadingMessage={sceneGenerationLoadingMessage ?? undefined}
         setupAutoSurprise={setupAutoSurprise}
         onCloseSetup={onCloseSetup}
         onCancelGenerate={onCancelGenerate}

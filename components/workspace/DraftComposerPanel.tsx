@@ -20,6 +20,7 @@ export interface DraftComposerPanelProps {
   isPlaying: boolean;
   onCancelGenerate: () => void;
   error: string | null;
+  loadingMessage?: string;
   insertSceneBeatDisabled: boolean;
   onOpenPrivacy: () => void;
   sceneCountLabel: string;
@@ -36,6 +37,7 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
   isPlaying,
   onCancelGenerate,
   error,
+  loadingMessage,
   insertSceneBeatDisabled,
   onOpenPrivacy,
   sceneCountLabel,
@@ -126,9 +128,16 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
 
         {isGenerating ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-[#d6cdbd] bg-white/85 px-3 py-2 text-[11px] text-gray-700">
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
-              <span className="font-medium">Generating...</span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                <span className="font-medium">Generating...</span>
+              </span>
+              {loadingMessage ? (
+                <span className="pl-[1.375rem] text-[10px] text-gray-500" aria-live="polite">
+                  {loadingMessage}
+                </span>
+              ) : null}
             </span>
             <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
               Cancel

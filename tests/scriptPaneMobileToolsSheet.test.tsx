@@ -1,10 +1,11 @@
 import React, { createRef } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScriptPane, ScriptPaneProps } from '../components/ScriptPane';
 import { SetupFormState } from '../components/SetupForm';
 import { PlaybackPanelProps } from '../components/PlaybackPanel';
 import { BlockType, StoryContext } from '../types';
+import { SCENE_GENERATION_LOADING_COPY_INTERVAL_MS } from '../components/workspace/sceneGenerationLoadingCopy';
 
 const contextFixture: StoryContext = {
   title: 'Header Controls Draft',
@@ -124,6 +125,7 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe('ScriptPane header generation and audio drawer', () => {
@@ -377,7 +379,35 @@ describe('ScriptPane header generation and audio drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
 
     expect(screen.getByText('Generating...')).toBeTruthy();
+    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /continue/i }).getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('rotates scene-generation loading copy deterministically and resets when generation stops', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <ScriptPane {...createProps({ context: null, isGenerating: true, isSetupOpen: false })} />
+    );
+
+    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(SCENE_GENERATION_LOADING_COPY_INTERVAL_MS);
+    });
+    expect(screen.getByText('Arguing about motivation. Again.')).toBeTruthy();
+
+    rerender(<ScriptPane {...createProps({ context: null, isGenerating: false, isSetupOpen: false })} />);
+    expect(screen.queryByText('Arguing about motivation. Again.')).toBeNull();
+
+    rerender(<ScriptPane {...createProps({ context: null, isGenerating: true, isSetupOpen: false })} />);
+    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
+  });
+
+  it('shows the same scene-generation loading copy in the setup handoff state', () => {
+    render(<ScriptPane {...createProps({ context: null, isGenerating: true, isSetupOpen: false })} />);
+
+    expect(screen.getByText('Generating your opening scene...')).toBeTruthy();
+    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
   });
 
   it('opens the scene outline and routes selection through existing scene heading navigation', async () => {

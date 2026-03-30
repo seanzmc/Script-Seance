@@ -13,6 +13,7 @@ export interface WorkspaceSetupOverlayProps {
   isSetupOpen: boolean;
   setupState: SetupFormState;
   isGenerating: boolean;
+  loadingMessage?: string;
   setupAutoSurprise: boolean;
   onCloseSetup: () => void;
   onCancelGenerate: () => void;
@@ -28,6 +29,7 @@ export const WorkspaceSetupOverlay: React.FC<WorkspaceSetupOverlayProps> = ({
   isSetupOpen,
   setupState,
   isGenerating,
+  loadingMessage,
   setupAutoSurprise,
   onCloseSetup,
   onCancelGenerate,
@@ -49,6 +51,11 @@ export const WorkspaceSetupOverlay: React.FC<WorkspaceSetupOverlayProps> = ({
       <div className="space-y-2">
         <p className="text-xl font-semibold text-white">Generating your opening scene...</p>
         <p className="text-base text-indigo-100/80">Gathering the writers room and shaping the first beat.</p>
+        {loadingMessage ? (
+          <p className="text-sm text-indigo-100/70" aria-live="polite">
+            {loadingMessage}
+          </p>
+        ) : null}
       </div>
       <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
         Cancel
