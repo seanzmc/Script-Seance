@@ -4,6 +4,10 @@ import * as m from 'motion/react-m';
 import { Search, X } from 'lucide-react';
 import { STYLE_CATEGORIES, StyleItem, stylesLibrary } from '../stylesLibrary';
 import { modalVariants, overlayVariants } from './motion/primitives';
+import {
+  styleDialogInsetScrollerClassName,
+  styleDialogShellClassName
+} from './styleDialogShellStyles';
 
 export interface StyleLibraryDialogProps {
   isOpen: boolean;
@@ -136,7 +140,7 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
           />
           <m.div
             ref={modalRef}
-            className="relative w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl border border-white/12 bg-slate-950 shadow-[0_26px_70px_rgba(2,6,23,0.72)] sm:max-h-[88vh]"
+            className={`${styleDialogShellClassName} max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col sm:max-h-[88vh]`}
             role="dialog"
             aria-modal="true"
             aria-label={title}
@@ -145,7 +149,7 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
             exit="exit"
             variants={modalVariants}
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div className="relative z-[1] flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
               <div className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-100/60">Style</p>
                 <h2 className="text-base font-semibold text-white">{title}</h2>
@@ -160,70 +164,72 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-3 p-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input
-                  ref={searchInputRef}
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-slate-900 px-10 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  placeholder="Search styles..."
-                  aria-label="Search styles"
-                  disabled={disabled}
-                />
-              </div>
-              <div
-                className="max-h-[58vh] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/80"
-                data-testid={listTestId}
-              >
-                <div className="p-2">
-                  <button
-                    type="button"
-                    onClick={() => onSelect({ styleId: null, style: '' })}
+            <div className={styleDialogInsetScrollerClassName}>
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-white/10 bg-slate-900 px-10 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    placeholder="Search styles..."
+                    aria-label="Search styles"
                     disabled={disabled}
-                    aria-pressed={isStyleBlank}
-                    className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                      isStyleBlank
-                        ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
-                        : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    None (default style)
-                  </button>
+                  />
                 </div>
-                {groupedFilteredStyles.length > 0 ? groupedFilteredStyles.map((group) => (
-                  <div key={group.id} className="border-t border-white/10 px-2 py-2 space-y-1.5">
-                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-100/55">
-                      {group.label}
-                    </p>
-                    {group.items.map((item) => {
-                      const isSelected = selectedLibraryStyle?.id === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          ref={(node) => {
-                            rowRefs.current[item.id] = node;
-                          }}
-                          type="button"
-                          onClick={() => onSelect({ styleId: item.id, style: item.title })}
-                          disabled={disabled}
-                          aria-pressed={isSelected}
-                          className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                            isSelected
-                              ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
-                              : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
-                          }`}
-                        >
-                          <p className="text-sm font-semibold">{item.title}</p>
-                          <p className="mt-0.5 text-xs text-slate-300">{item.description}</p>
-                        </button>
-                      );
-                    })}
+                <div
+                  className="max-h-[58vh] overflow-y-auto rounded-[1.15rem] border border-white/8 bg-slate-950/72 p-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.24)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/26"
+                  data-testid={listTestId}
+                >
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      onClick={() => onSelect({ styleId: null, style: '' })}
+                      disabled={disabled}
+                      aria-pressed={isStyleBlank}
+                      className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                        isStyleBlank
+                          ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
+                          : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      None (default style)
+                    </button>
                   </div>
-                )) : (
-                  <p className="px-4 py-4 text-sm text-slate-300">No styles match your search.</p>
-                )}
+                  {groupedFilteredStyles.length > 0 ? groupedFilteredStyles.map((group) => (
+                    <div key={group.id} className="border-t border-white/10 px-2 py-2 space-y-1.5">
+                      <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-100/55">
+                        {group.label}
+                      </p>
+                      {group.items.map((item) => {
+                        const isSelected = selectedLibraryStyle?.id === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            ref={(node) => {
+                              rowRefs.current[item.id] = node;
+                            }}
+                            type="button"
+                            onClick={() => onSelect({ styleId: item.id, style: item.title })}
+                            disabled={disabled}
+                            aria-pressed={isSelected}
+                            className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                              isSelected
+                                ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
+                                : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <p className="text-sm font-semibold">{item.title}</p>
+                            <p className="mt-0.5 text-xs text-slate-300">{item.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )) : (
+                    <p className="px-4 py-4 text-sm text-slate-300">No styles match your search.</p>
+                  )}
+                </div>
               </div>
             </div>
           </m.div>

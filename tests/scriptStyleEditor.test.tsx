@@ -298,4 +298,41 @@ describe('script view style editor', () => {
     const dialog = screen.getByRole('dialog', { name: 'Style Library' });
     expect(dialog.parentElement?.className).toContain('z-library');
   });
+
+  it('uses an inset internal scroller for the style editor shell', () => {
+    const context: StoryContext = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A detective uncovers a conspiracy.',
+      characters: ['Alex', 'Sam'],
+      style: 'Unhinged',
+      scenes: [
+        {
+          id: 'scene-1',
+          heading: 'INT. OFFICE - NIGHT',
+          summary: 'Alex studies evidence.',
+          blocks: [
+            {
+              id: 'block-1',
+              type: BlockType.ACTION,
+              text: 'Alex studies the evidence board.',
+              blockRevision: 1
+            }
+          ]
+        }
+      ]
+    };
+
+    render(<ScriptPane {...createPaneProps(context, vi.fn())} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /edit style/i }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit style' });
+    expect(dialog.className).toContain('overflow-hidden');
+    expect(dialog.className).not.toContain('overflow-y-auto');
+
+    const scroller = dialog.querySelector('div[class*="[scrollbar-gutter:stable]"]');
+    expect(scroller).toBeTruthy();
+    expect(scroller?.className).toContain('overflow-y-auto');
+  });
 });
