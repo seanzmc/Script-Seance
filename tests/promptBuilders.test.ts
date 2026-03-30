@@ -5,19 +5,28 @@ import {
   buildScriptElementPrompt,
   buildRegenerateBlockPrompt,
   buildSurpriseSetupPrompt,
-  formatStyleBlock
 } from '../server/llm/promptBuilders.js';
+
+const baseBlockParams = {
+  type: 'action' as const,
+  character: undefined,
+  genre: 'Noir',
+  premise: 'A detective unravels a conspiracy.',
+  text: 'He stares at the board.',
+  rewriteGuidance: ''
+};
 
 describe('promptBuilders style injection', () => {
   it('formats style by trimming, collapsing whitespace, capping at 500 chars, and preserving case', () => {
-    const formatted = formatStyleBlock('  Mixed   CASE   Style   Cue  ');
-    expect(formatted).toBe('Style Theme: Mixed CASE Style Cue');
-    expect(formatted).toContain('Mixed CASE');
+    const { input } = buildRegenerateBlockPrompt({ ...baseBlockParams, style: '  Mixed   CASE   Style   Cue  ' });
+    expect(input).toContain('Style Theme: Mixed CASE Style Cue');
+    expect(input).toContain('Mixed CASE');
 
     const longStyle = `AB${' x'.repeat(600)}`;
-    const capped = formatStyleBlock(longStyle);
-    expect(capped.startsWith('Style Theme: ')).toBe(true);
-    const payload = capped.replace(/^Style Theme:\s*/, '');
+    const { input: cappedInput } = buildRegenerateBlockPrompt({ ...baseBlockParams, style: longStyle });
+    expect(cappedInput).toContain('Style Theme: ');
+    const styleLine = cappedInput.split('\n').find((line: string) => line.startsWith('Style Theme:')) ?? '';
+    const payload = styleLine.replace(/^Style Theme:\s*/, '');
     expect(payload.length).toBeLessThanOrEqual(500);
   });
 

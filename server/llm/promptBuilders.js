@@ -28,7 +28,7 @@ const createPromptParts = ({ instructions, input }) => {
   };
 };
 
-export const formatStyleBlock = (style) => {
+const formatStyleBlock = (style) => {
   if (typeof style !== 'string') return '';
   const normalized = collapseWhitespace(style);
   if (!normalized) return '';
