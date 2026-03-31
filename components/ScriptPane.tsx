@@ -33,8 +33,7 @@ import { WorkspaceAudioDrawer } from './workspace/WorkspaceAudioDrawer';
 import { WorkspaceHeader } from './workspace/WorkspaceHeader';
 import { WorkspaceSetupOverlay } from './workspace/WorkspaceSetupOverlay';
 import {
-  DEFAULT_SCENE_GENERATION_LOADING_COPY_TIER,
-  SCENE_GENERATION_LOADING_COPY,
+  getSceneGenerationLoadingMessages,
   SCENE_GENERATION_LOADING_COPY_INTERVAL_MS
 } from './workspace/sceneGenerationLoadingCopy';
 
@@ -161,7 +160,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   revealScrollMode = 'default',
   revealScrollToken
 }) => {
-  const sceneGenerationLoadingMessages = SCENE_GENERATION_LOADING_COPY[DEFAULT_SCENE_GENERATION_LOADING_COPY_TIER];
+  const activeLoadingGenre = context?.genre ?? setupState.genre;
+  const sceneGenerationLoadingMessages = useMemo(
+    () => getSceneGenerationLoadingMessages(activeLoadingGenre),
+    [activeLoadingGenre]
+  );
   const [sceneGenerationLoadingCopyIndex, setSceneGenerationLoadingCopyIndex] = useState(0);
   const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
   const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);

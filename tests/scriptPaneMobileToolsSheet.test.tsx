@@ -379,7 +379,7 @@ describe('ScriptPane header generation and audio drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
 
     expect(screen.getByText('Generating...')).toBeTruthy();
-    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
+    expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
     expect(screen.getByRole('button', { name: /continue/i }).getAttribute('aria-busy')).toBeNull();
   });
 
@@ -389,25 +389,63 @@ describe('ScriptPane header generation and audio drawer', () => {
       <ScriptPane {...createProps({ context: null, isGenerating: true, isSetupOpen: false })} />
     );
 
-    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
+    expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
 
     act(() => {
       vi.advanceTimersByTime(SCENE_GENERATION_LOADING_COPY_INTERVAL_MS);
     });
-    expect(screen.getByText('Arguing about motivation. Again.')).toBeTruthy();
+    expect(screen.getByText("It said 'delve.' It always says 'delve.'")).toBeTruthy();
 
     rerender(<ScriptPane {...createProps({ context: null, isGenerating: false, isSetupOpen: false })} />);
-    expect(screen.queryByText('Arguing about motivation. Again.')).toBeNull();
+    expect(screen.queryByText("It said 'delve.' It always says 'delve.'")).toBeNull();
 
     rerender(<ScriptPane {...createProps({ context: null, isGenerating: true, isSetupOpen: false })} />);
-    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
+    expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
   });
 
   it('shows the same scene-generation loading copy in the setup handoff state', () => {
     render(<ScriptPane {...createProps({ context: null, isGenerating: true, isSetupOpen: false })} />);
 
     expect(screen.getByText('Generating your opening scene...')).toBeTruthy();
-    expect(screen.getByText('Breaking the scene until it works.')).toBeTruthy();
+    expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
+  });
+
+  it('uses setup genre before context exists and then prefers the workspace context genre', () => {
+    const { rerender } = render(
+      <ScriptPane
+        {...createProps({
+          context: null,
+          isGenerating: true,
+          isSetupOpen: false,
+          setupState: {
+            ...setupStateFixture,
+            genre: 'Sci-Fi'
+          }
+        })}
+      />
+    );
+
+    expect(screen.getByText('Rebooting the timeline. Again.')).toBeTruthy();
+
+    rerender(
+      <ScriptPane
+        {...createProps({
+          context: {
+            ...contextFixture,
+            genre: 'Sci-Fi'
+          },
+          isGenerating: true,
+          isSetupOpen: false,
+          setupState: {
+            ...setupStateFixture,
+            genre: 'Noir'
+          }
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
+    expect(screen.getByText('Rebooting the timeline. Again.')).toBeTruthy();
   });
 
   it('opens the scene outline and routes selection through existing scene heading navigation', async () => {
