@@ -1,11 +1,29 @@
 import React from 'react';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
-import { Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Button } from '../Button';
 import { SetupForm, type SetupFormState } from '../SetupForm';
 import { SETUP_UI_TOKENS } from '../setupUiTokens';
 import { fadeSlideYVariants, modalVariants, overlayVariants } from '../motion/primitives';
+
+const writingAnimStyle = `
+  @keyframes ss-write {
+    0%   { stroke-dashoffset: 70; opacity: 0; }
+    10%  { opacity: 1; }
+    75%  { stroke-dashoffset: 0; opacity: 1; }
+    90%  { stroke-dashoffset: 0; opacity: 0; }
+    100% { stroke-dashoffset: 70; opacity: 0; }
+  }
+  @keyframes ss-cursor {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ss-write-path { animation: none !important; stroke-dashoffset: 0; opacity: 1; }
+    .ss-cursor-blink { animation: none !important; opacity: 1; }
+  }
+`;
 
 export interface WorkspaceSetupOverlayProps {
   showSetupSurface: boolean;
@@ -41,23 +59,44 @@ export const WorkspaceSetupOverlay: React.FC<WorkspaceSetupOverlayProps> = ({
   const setupRailClass = 'mx-auto w-full max-w-[60rem]';
   const startGenerationCard = (
     <m.div
-      className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-4 shadow-[0_0_40px_rgba(79,70,229,0.2)]"
+      className="w-full max-w-2xl rounded-3xl border border-indigo-500/30 bg-indigo-500/10 px-10 py-12 text-center space-y-6 shadow-[0_0_40px_rgba(79,70,229,0.2)]"
       initial="hidden"
       animate="visible"
       exit="exit"
       variants={fadeSlideYVariants}
     >
-      <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto" />
-      <div className="space-y-2">
-        <p className="text-xl font-semibold text-white">Generating your opening scene...</p>
-        <p className="text-base text-indigo-100/80">Gathering the writers room and shaping the first beat.</p>
-        {loadingMessage ? (
-          <p className="text-sm text-indigo-100/70" aria-live="polite">
-            {loadingMessage}
-          </p>
-        ) : null}
+      <style>{writingAnimStyle}</style>
+      <div className="flex items-center justify-center gap-1.5 h-7" aria-hidden="true">
+        <svg width="48" height="14" viewBox="0 0 48 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            className="ss-write-path"
+            d="M2 11 C8 3, 16 3, 22 8 S38 3, 46 6"
+            stroke="#818cf8"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="70"
+            strokeDashoffset="70"
+            style={{ animation: 'ss-write 2.4s ease-in-out infinite' }}
+          />
+        </svg>
+        <span
+          className="ss-cursor-blink text-indigo-400/90 text-base font-light leading-none select-none"
+          style={{ animation: 'ss-cursor 1s step-end infinite' }}
+        >|</span>
       </div>
-      <Button variant="ghost" size="sm" onClick={onCancelGenerate}>
+      <p className="text-xl font-semibold text-white">Generating your opening scene...</p>
+      {loadingMessage ? (
+        <p className="text-base text-indigo-100/80" aria-live="polite">
+          {loadingMessage}
+        </p>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onCancelGenerate}
+        className="border border-indigo-400/40 text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100 rounded-lg"
+      >
         Cancel
       </Button>
     </m.div>
@@ -141,13 +180,13 @@ export const WorkspaceSetupOverlay: React.FC<WorkspaceSetupOverlayProps> = ({
                   ) : (
                     <m.div
                       key="setup-surface-loading"
-                      className={`${setupRailClass} flex min-h-[calc(100vh-12rem)] items-center justify-center`}
+                      className={`${setupRailClass} pt-10`}
                       initial="hidden"
                       animate="visible"
                       exit="exit"
                       variants={fadeSlideYVariants}
                     >
-                      <div className="w-full max-w-2xl">
+                      <div className="w-full max-w-2xl mx-auto">
                         {startGenerationCard}
                       </div>
                     </m.div>
