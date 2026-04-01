@@ -1,41 +1,45 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence } from 'motion/react';
-import * as m from 'motion/react-m';
-import { BlockType, RevealScrollMode, ScriptAnchor, ScriptBlock, ScriptSelectionTarget, StoryContext } from '../types';
-import { ScriptDisplay } from './ScriptDisplay';
-import { InsertComposerPopover } from './InsertComposerPopover';
-import { RewriteComposerPopover } from './RewriteComposerPopover';
-import { DraftComposerPanel } from './workspace/DraftComposerPanel';
-import { Button } from './Button';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "motion/react";
+import * as m from "motion/react-m";
+import {
+  BlockType,
+  RevealScrollMode,
+  ScriptAnchor,
+  ScriptBlock,
+  ScriptSelectionTarget,
+  StoryContext,
+} from "../types";
+import { ScriptDisplay } from "./ScriptDisplay";
+import { InsertComposerPopover } from "./InsertComposerPopover";
+import { RewriteComposerPopover } from "./RewriteComposerPopover";
+import { DraftComposerPanel } from "./workspace/DraftComposerPanel";
+import { Button } from "./Button";
 import {
   paperPopoverFieldClassName,
-  paperPopoverShellClassName
-} from './paperPopoverStyles';
-import { SetupFormState, STYLE_PRESETS } from './SetupForm';
-import { PlaybackPanel, PlaybackPanelProps } from './PlaybackPanel';
-import { PlaybackMiniPlayer } from './PlaybackMiniPlayer';
-import { TitleEditModal } from './TitleEditModal';
-import { StyleEditModal } from './StyleEditModal';
-import { useScriptController } from '../hooks/useScriptController';
-import { useWorkspaceChrome } from '../hooks/useWorkspaceChrome';
+  paperPopoverShellClassName,
+} from "./paperPopoverStyles";
+import { SetupFormState, STYLE_PRESETS } from "./SetupForm";
+import { PlaybackPanel, PlaybackPanelProps } from "./PlaybackPanel";
+import { PlaybackMiniPlayer } from "./PlaybackMiniPlayer";
+import { TitleEditModal } from "./TitleEditModal";
+import { StyleEditModal } from "./StyleEditModal";
+import { useScriptController } from "../hooks/useScriptController";
+import { useWorkspaceChrome } from "../hooks/useWorkspaceChrome";
 import {
   createAfterBlockAnchor,
   createBeforeBlockAnchor,
-  createSceneTopAnchor
-} from '../services/scriptController';
-import {
-  AlertCircle,
-  PlusCircle,
-} from 'lucide-react';
-import { fadeSlideYVariants } from './motion/primitives';
-import { SceneOutlineDrawer } from './workspace/SceneOutlineDrawer';
-import { WorkspaceAudioDrawer } from './workspace/WorkspaceAudioDrawer';
-import { WorkspaceHeader } from './workspace/WorkspaceHeader';
-import { WorkspaceSetupOverlay } from './workspace/WorkspaceSetupOverlay';
+  createSceneTopAnchor,
+} from "../services/scriptController";
+import { AlertCircle, PlusCircle } from "lucide-react";
+import { fadeSlideYVariants } from "./motion/primitives";
+import { SceneOutlineDrawer } from "./workspace/SceneOutlineDrawer";
+import { WorkspaceAudioDrawer } from "./workspace/WorkspaceAudioDrawer";
+import { WorkspaceHeader } from "./workspace/WorkspaceHeader";
+import { WorkspaceSetupOverlay } from "./workspace/WorkspaceSetupOverlay";
 import {
   getSceneGenerationLoadingMessages,
-  SCENE_GENERATION_LOADING_COPY_INTERVAL_MS
-} from './workspace/sceneGenerationLoadingCopy';
+  SCENE_GENERATION_LOADING_COPY_INTERVAL_MS,
+} from "./workspace/sceneGenerationLoadingCopy";
 
 export interface ScriptPaneProps {
   context: StoryContext | null;
@@ -58,7 +62,11 @@ export interface ScriptPaneProps {
   canUndo?: boolean;
   canRedo?: boolean;
   insertCompleteToken: number;
-  onChangeSpeaker: (sceneId: string, blockId: string, character: string) => void;
+  onChangeSpeaker: (
+    sceneId: string,
+    blockId: string,
+    character: string,
+  ) => void;
   onInsertError: (error: unknown) => void;
   onGenerateRewritePreview?: (params: {
     sceneId: string;
@@ -85,7 +93,10 @@ export interface ScriptPaneProps {
   onCancelGenerate: () => void;
   currentBlockId: string | null;
   currentBlockIndex: number;
-  blockStatuses: Record<string, 'notGenerated' | 'generating' | 'ready' | 'error'>;
+  blockStatuses: Record<
+    string,
+    "notGenerated" | "generating" | "ready" | "error"
+  >;
   showHighlights: boolean;
   autoScroll: boolean;
   onOpenPrivacy: () => void;
@@ -94,8 +105,14 @@ export interface ScriptPaneProps {
   isSetupOpen: boolean;
   onCloseSetup: () => void;
   setupState: SetupFormState;
-  onSetupChange: (next: Partial<SetupFormState>, meta?: { source?: 'user' | 'system' }) => void;
-  onSetupSurprise?: (params: { mode: 'manual' | 'auto'; targetGenre: string }) => Promise<boolean>;
+  onSetupChange: (
+    next: Partial<SetupFormState>,
+    meta?: { source?: "user" | "system" },
+  ) => void;
+  onSetupSurprise?: (params: {
+    mode: "manual" | "auto";
+    targetGenre: string;
+  }) => Promise<boolean>;
   onStartSetup: () => void;
   setupAutoSurprise: boolean;
   onSetupError?: (error: unknown, fallbackMessage: string) => boolean;
@@ -157,18 +174,22 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   playbackProps,
   voicesContent,
   revealScrollTargetId,
-  revealScrollMode = 'default',
-  revealScrollToken
+  revealScrollMode = "default",
+  revealScrollToken,
 }) => {
   const activeLoadingGenre = context?.genre ?? setupState.genre;
   const sceneGenerationLoadingMessages = useMemo(
     () => getSceneGenerationLoadingMessages(activeLoadingGenre),
-    [activeLoadingGenre]
+    [activeLoadingGenre],
   );
-  const [sceneGenerationLoadingCopyIndex, setSceneGenerationLoadingCopyIndex] = useState(0);
-  const [insertPlacementTarget, setInsertPlacementTarget] = useState<ScriptSelectionTarget | null>(null);
-  const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<string | null>(null);
-  const [headingDraft, setHeadingDraft] = useState('');
+  const [sceneGenerationLoadingCopyIndex, setSceneGenerationLoadingCopyIndex] =
+    useState(0);
+  const [insertPlacementTarget, setInsertPlacementTarget] =
+    useState<ScriptSelectionTarget | null>(null);
+  const [editingHeadingSceneId, setEditingHeadingSceneId] = useState<
+    string | null
+  >(null);
+  const [headingDraft, setHeadingDraft] = useState("");
   const scriptController = useScriptController({
     context,
     insertModeActive: false,
@@ -179,21 +200,26 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     onInsertAtAnchor,
     onGenerateInsertAtAnchor,
     onGenerateRewritePreview,
-    onApplyRewritePreview
+    onApplyRewritePreview,
   });
-  const rateLimitHint = error?.toLowerCase().includes('rate limit');
-  const previewClassName = 'w-full';
-  const sceneCountLabel = context ? `${context.scenes.length} scenes` : '0 scenes';
+  const rateLimitHint = error?.toLowerCase().includes("rate limit");
+  const previewClassName = "w-full";
+  const sceneCountLabel = context
+    ? `${context.scenes.length} scenes`
+    : "0 scenes";
   const showStartScreen = !context && !isGenerating;
   const showInitialGeneration = !context && isGenerating;
   const showSetupHandoffLoading = !isSetupOpen && showInitialGeneration;
   const showSetupSurface = isSetupOpen || showSetupHandoffLoading;
   const sceneGenerationLoadingMessage = isGenerating
-    ? sceneGenerationLoadingMessages[sceneGenerationLoadingCopyIndex] ?? sceneGenerationLoadingMessages[0]
+    ? (sceneGenerationLoadingMessages[sceneGenerationLoadingCopyIndex] ??
+      sceneGenerationLoadingMessages[0])
     : null;
   const focusScriptScroll = useCallback(() => {
     requestAnimationFrame(() => {
-      const scrollContainer = document.querySelector('[data-script-scroll="true"]') as HTMLElement | null;
+      const scrollContainer = document.querySelector(
+        '[data-script-scroll="true"]',
+      ) as HTMLElement | null;
       scrollContainer?.focus({ preventScroll: true });
     });
   }, []);
@@ -224,11 +250,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     openTitleModal,
     closeTitleModal,
     openStyleModal,
-    closeStyleModal
+    closeStyleModal,
   } = useWorkspaceChrome({
     context,
     focusScriptScroll,
-    isPlaying
+    isPlaying,
   });
   const activeSceneId = useMemo(() => {
     if (!context || context.scenes.length === 0) {
@@ -237,7 +263,10 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     if (scriptController.selectedTarget?.sceneId) {
       return scriptController.selectedTarget.sceneId;
     }
-    if (lastNavigatedSceneId && context.scenes.some((scene) => scene.id === lastNavigatedSceneId)) {
+    if (
+      lastNavigatedSceneId &&
+      context.scenes.some((scene) => scene.id === lastNavigatedSceneId)
+    ) {
       return lastNavigatedSceneId;
     }
     return context.scenes[0]?.id ?? null;
@@ -248,7 +277,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <div className="space-y-1">
         <p className="text-sm font-medium">{error}</p>
         {rateLimitHint && (
-          <p className="text-[11px] text-red-200/70">Rate limits reset after a short wait. Try again in ~30s.</p>
+          <p className="text-[11px] text-red-200/70">
+            Rate limits reset after a short wait. Try again in ~30s.
+          </p>
         )}
       </div>
     </div>
@@ -268,9 +299,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="relative space-y-5">
         <div className="space-y-3">
-          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white">SCRIPT SEANCE</h1>
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white">
+            SCRIPT SEANCE
+          </h1>
           <p className="text-base md:text-lg text-gray-300">
-            Summon a writers room to draft cinematic scenes, one beat at a time.
+            Summon a writers room to draft cinematic scenes.
           </p>
         </div>
         <div className="flex flex-col items-center gap-3">
@@ -286,41 +319,54 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       </div>
     </m.div>
   );
-  const handleSelectRewriteTarget = useCallback((target: { sceneId: string; blockId: string }) => {
-    scriptController.selectBlockTarget(target);
-  }, [scriptController]);
-  const handleSelectBlockTarget = useCallback((target: { sceneId: string; blockId: string }) => {
-    const isInsertComposerAnchoredToBlock = scriptController.activeInsertAnchor?.kind === 'block'
-      && scriptController.activeInsertAnchor.blockId === target.blockId;
-    const isSameSelectedBlock = scriptController.selectedTarget?.kind === 'block'
-      && scriptController.selectedTarget.sceneId === target.sceneId
-      && scriptController.selectedTarget.blockId === target.blockId;
-    if (isInsertComposerAnchoredToBlock) {
-      setInsertPlacementTarget(null);
-      scriptController.closeInsertComposer();
-      if (isSameSelectedBlock) {
+  const handleSelectRewriteTarget = useCallback(
+    (target: { sceneId: string; blockId: string }) => {
+      scriptController.selectBlockTarget(target);
+    },
+    [scriptController],
+  );
+  const handleSelectBlockTarget = useCallback(
+    (target: { sceneId: string; blockId: string }) => {
+      const isInsertComposerAnchoredToBlock =
+        scriptController.activeInsertAnchor?.kind === "block" &&
+        scriptController.activeInsertAnchor.blockId === target.blockId;
+      const isSameSelectedBlock =
+        scriptController.selectedTarget?.kind === "block" &&
+        scriptController.selectedTarget.sceneId === target.sceneId &&
+        scriptController.selectedTarget.blockId === target.blockId;
+      if (isInsertComposerAnchoredToBlock) {
+        setInsertPlacementTarget(null);
+        scriptController.closeInsertComposer();
+        if (isSameSelectedBlock) {
+          scriptController.clearBlockTarget();
+          return;
+        }
+      }
+      scriptController.selectBlockTarget(target);
+    },
+    [scriptController],
+  );
+  const handleSelectSceneHeading = useCallback(
+    (sceneId: string) => {
+      const isSameSelectedHeading =
+        scriptController.selectedTarget?.kind === "scene-heading" &&
+        scriptController.selectedTarget.sceneId === sceneId;
+      const isInsertComposerAnchoredToScene =
+        scriptController.activeInsertAnchor?.kind === "scene" &&
+        scriptController.activeInsertAnchor.sceneId === sceneId;
+      if (isInsertComposerAnchoredToScene) {
+        setInsertPlacementTarget(null);
+        scriptController.closeInsertComposer();
+      }
+      if (isSameSelectedHeading) {
+        setEditingHeadingSceneId(null);
         scriptController.clearBlockTarget();
         return;
       }
-    }
-    scriptController.selectBlockTarget(target);
-  }, [scriptController]);
-  const handleSelectSceneHeading = useCallback((sceneId: string) => {
-    const isSameSelectedHeading = scriptController.selectedTarget?.kind === 'scene-heading'
-      && scriptController.selectedTarget.sceneId === sceneId;
-    const isInsertComposerAnchoredToScene = scriptController.activeInsertAnchor?.kind === 'scene'
-      && scriptController.activeInsertAnchor.sceneId === sceneId;
-    if (isInsertComposerAnchoredToScene) {
-      setInsertPlacementTarget(null);
-      scriptController.closeInsertComposer();
-    }
-    if (isSameSelectedHeading) {
-      setEditingHeadingSceneId(null);
-      scriptController.clearBlockTarget();
-      return;
-    }
-    scriptController.selectSceneHeading(sceneId);
-  }, [scriptController]);
+      scriptController.selectSceneHeading(sceneId);
+    },
+    [scriptController],
+  );
   const handleLegacyInsertTargetSelection = useCallback(() => {
     // Legacy insert mode is deprecated; inline anchor composer is the primary path.
   }, []);
@@ -328,45 +374,60 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     setEditingHeadingSceneId(null);
     scriptController.clearBlockTarget();
   }, [scriptController]);
-  const handleRequestInsertFromSlot = useCallback((anchor: ScriptAnchor) => {
-    setInsertPlacementTarget(null);
-    setEditingHeadingSceneId(null);
-    scriptController.clearBlockTarget();
-    scriptController.requestInsert(anchor);
-  }, [scriptController]);
-  const handleOpenInsertFromSelection = useCallback((target: ScriptSelectionTarget) => {
-    setInsertPlacementTarget(target);
-    if (target.kind === 'scene-heading') {
-      scriptController.requestInsert(createSceneTopAnchor(target.sceneId));
-      return;
-    }
-    scriptController.requestInsert(createAfterBlockAnchor(target.blockId));
-  }, [scriptController]);
+  const handleRequestInsertFromSlot = useCallback(
+    (anchor: ScriptAnchor) => {
+      setInsertPlacementTarget(null);
+      setEditingHeadingSceneId(null);
+      scriptController.clearBlockTarget();
+      scriptController.requestInsert(anchor);
+    },
+    [scriptController],
+  );
+  const handleOpenInsertFromSelection = useCallback(
+    (target: ScriptSelectionTarget) => {
+      setInsertPlacementTarget(target);
+      if (target.kind === "scene-heading") {
+        scriptController.requestInsert(createSceneTopAnchor(target.sceneId));
+        return;
+      }
+      scriptController.requestInsert(createAfterBlockAnchor(target.blockId));
+    },
+    [scriptController],
+  );
   const handleCloseInsertComposer = useCallback(() => {
     setInsertPlacementTarget(null);
     scriptController.closeInsertComposer();
   }, [scriptController]);
-  const handleInsertPlacementChange = useCallback((next: 'before' | 'after') => {
-    if (!insertPlacementTarget || insertPlacementTarget.kind !== 'block') return;
-    const currentPlacement = scriptController.activeInsertAnchor?.kind === 'block'
-      && scriptController.activeInsertAnchor.blockId === insertPlacementTarget.blockId
-      ? scriptController.activeInsertAnchor.position
-      : null;
-    if (currentPlacement === next) {
-      return;
-    }
-    scriptController.requestInsert(
-      next === 'before'
-        ? createBeforeBlockAnchor(insertPlacementTarget.blockId)
-        : createAfterBlockAnchor(insertPlacementTarget.blockId)
-    );
-  }, [insertPlacementTarget, scriptController]);
-  const handleStartHeadingEdit = useCallback((sceneId: string, heading: string) => {
-    scriptController.selectSceneHeading(sceneId);
-    setHeadingDraft(heading);
-    setEditingHeadingSceneId(sceneId);
-    setInsertPlacementTarget(null);
-  }, [scriptController]);
+  const handleInsertPlacementChange = useCallback(
+    (next: "before" | "after") => {
+      if (!insertPlacementTarget || insertPlacementTarget.kind !== "block")
+        return;
+      const currentPlacement =
+        scriptController.activeInsertAnchor?.kind === "block" &&
+        scriptController.activeInsertAnchor.blockId ===
+          insertPlacementTarget.blockId
+          ? scriptController.activeInsertAnchor.position
+          : null;
+      if (currentPlacement === next) {
+        return;
+      }
+      scriptController.requestInsert(
+        next === "before"
+          ? createBeforeBlockAnchor(insertPlacementTarget.blockId)
+          : createAfterBlockAnchor(insertPlacementTarget.blockId),
+      );
+    },
+    [insertPlacementTarget, scriptController],
+  );
+  const handleStartHeadingEdit = useCallback(
+    (sceneId: string, heading: string) => {
+      scriptController.selectSceneHeading(sceneId);
+      setHeadingDraft(heading);
+      setEditingHeadingSceneId(sceneId);
+      setInsertPlacementTarget(null);
+    },
+    [scriptController],
+  );
   const handleCancelHeadingEdit = useCallback(() => {
     setEditingHeadingSceneId(null);
   }, []);
@@ -379,12 +440,19 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [editingHeadingSceneId, headingDraft, onUpdateSceneHeading]);
   const composerCharacters = context?.characters ?? [];
   const totalScriptBlocks = useMemo(
-    () => context?.scenes.reduce((count, scene) => count + scene.blocks.length, 0) ?? 0,
-    [context]
+    () =>
+      context?.scenes.reduce(
+        (count, scene) => count + scene.blocks.length,
+        0,
+      ) ?? 0,
+    [context],
   );
-  const dialogueCharacterUnavailable = scriptController.composerBlockType === BlockType.DIALOGUE && composerCharacters.length === 0;
+  const dialogueCharacterUnavailable =
+    scriptController.composerBlockType === BlockType.DIALOGUE &&
+    composerCharacters.length === 0;
   const isBottomInsertSlotActive =
-    scriptController.activeInsertIndex !== null && scriptController.activeInsertIndex === totalScriptBlocks;
+    scriptController.activeInsertIndex !== null &&
+    scriptController.activeInsertIndex === totalScriptBlocks;
   const insertComposerNode = scriptController.activeInsertAnchor ? (
     <InsertComposerPopover
       blockType={scriptController.composerBlockType}
@@ -409,36 +477,54 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       generateNextSceneDisabled={isPlaying || isGenerating}
       actionsDisabled={dialogueCharacterUnavailable}
       errorMessage={scriptController.composerError}
-      showPlacementControls={insertPlacementTarget?.kind === 'block'}
-      placement={scriptController.activeInsertAnchor?.kind === 'block' && scriptController.activeInsertAnchor.position === 'before' ? 'before' : 'after'}
-      onPlacementChange={insertPlacementTarget?.kind === 'block' ? handleInsertPlacementChange : undefined}
+      showPlacementControls={insertPlacementTarget?.kind === "block"}
+      placement={
+        scriptController.activeInsertAnchor?.kind === "block" &&
+        scriptController.activeInsertAnchor.position === "before"
+          ? "before"
+          : "after"
+      }
+      onPlacementChange={
+        insertPlacementTarget?.kind === "block"
+          ? handleInsertPlacementChange
+          : undefined
+      }
     />
   ) : null;
   const rewriteComposerBlock = useMemo(() => {
     if (!context || !scriptController.rewriteComposerTarget) return null;
-    const scene = context.scenes.find((entry) => entry.id === scriptController.rewriteComposerTarget?.sceneId);
-    const block = scene?.blocks.find((entry) => entry.id === scriptController.rewriteComposerTarget?.blockId);
+    const scene = context.scenes.find(
+      (entry) => entry.id === scriptController.rewriteComposerTarget?.sceneId,
+    );
+    const block = scene?.blocks.find(
+      (entry) => entry.id === scriptController.rewriteComposerTarget?.blockId,
+    );
     return block ?? null;
   }, [context, scriptController.rewriteComposerTarget]);
-  const rewriteComposerNode = scriptController.rewriteComposerTarget && rewriteComposerBlock ? (
-    <RewriteComposerPopover
-      blockType={rewriteComposerBlock.type}
-      snippet={rewriteComposerBlock.text.replace(/\s+/g, ' ').trim() || '(No text)'}
-      instructions={scriptController.rewriteInstructions}
-      onInstructionsChange={scriptController.setRewriteInstructions}
-      candidateText={scriptController.rewriteCandidateText}
-      onGenerate={() => {
-        void scriptController.generateRewritePreview();
-      }}
-      onApply={scriptController.applyRewritePreview}
-      onCancel={scriptController.closeRewriteComposer}
-      isGenerating={scriptController.isRewriteComposerGenerating}
-      errorMessage={scriptController.rewriteComposerError}
-    />
-  ) : null;
-  const editingHeading = editingHeadingSceneId && context
-    ? context.scenes.find((scene) => scene.id === editingHeadingSceneId) ?? null
-    : null;
+  const rewriteComposerNode =
+    scriptController.rewriteComposerTarget && rewriteComposerBlock ? (
+      <RewriteComposerPopover
+        blockType={rewriteComposerBlock.type}
+        snippet={
+          rewriteComposerBlock.text.replace(/\s+/g, " ").trim() || "(No text)"
+        }
+        instructions={scriptController.rewriteInstructions}
+        onInstructionsChange={scriptController.setRewriteInstructions}
+        candidateText={scriptController.rewriteCandidateText}
+        onGenerate={() => {
+          void scriptController.generateRewritePreview();
+        }}
+        onApply={scriptController.applyRewritePreview}
+        onCancel={scriptController.closeRewriteComposer}
+        isGenerating={scriptController.isRewriteComposerGenerating}
+        errorMessage={scriptController.rewriteComposerError}
+      />
+    ) : null;
+  const editingHeading =
+    editingHeadingSceneId && context
+      ? (context.scenes.find((scene) => scene.id === editingHeadingSceneId) ??
+        null)
+      : null;
   const headingEditorNode = editingHeading ? (
     <div
       role="dialog"
@@ -447,8 +533,12 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
     >
       <div className="space-y-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">Scene Heading</p>
-          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-gray-800">Edit Scene Heading</h3>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">
+            Scene Heading
+          </p>
+          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-gray-800">
+            Edit Scene Heading
+          </h3>
         </div>
         <input
           value={headingDraft}
@@ -517,8 +607,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       return;
     }
     const intervalId = window.setInterval(() => {
-      setSceneGenerationLoadingCopyIndex((currentIndex) =>
-        (currentIndex + 1) % sceneGenerationLoadingMessages.length
+      setSceneGenerationLoadingCopyIndex(
+        (currentIndex) =>
+          (currentIndex + 1) % sceneGenerationLoadingMessages.length,
       );
     }, SCENE_GENERATION_LOADING_COPY_INTERVAL_MS);
 
@@ -533,32 +624,44 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   }, [scriptController.activeInsertAnchor]);
 
   useEffect(() => {
-    if (!editingHeadingSceneId || !context?.scenes.some((scene) => scene.id === editingHeadingSceneId)) {
+    if (
+      !editingHeadingSceneId ||
+      !context?.scenes.some((scene) => scene.id === editingHeadingSceneId)
+    ) {
       setEditingHeadingSceneId(null);
     }
   }, [context, editingHeadingSceneId]);
 
-  const handleSelectOutlineScene = useCallback((sceneId: string) => {
-    setLastNavigatedSceneId(sceneId);
-    setInsertPlacementTarget(null);
-    setEditingHeadingSceneId(null);
-    scriptController.selectSceneHeading(sceneId);
-    closeOutline();
-    requestAnimationFrame(() => {
-      const sceneHeading = document.getElementById(`scene-heading-${sceneId}`);
-      const sceneContainer = document.getElementById(`scene-${sceneId}`);
-      const scrollTarget = sceneHeading ?? sceneContainer;
-      if (scrollTarget && typeof scrollTarget.scrollIntoView === 'function') {
-        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
-      }
-    });
-  }, [closeOutline, scriptController, setLastNavigatedSceneId]);
+  const handleSelectOutlineScene = useCallback(
+    (sceneId: string) => {
+      setLastNavigatedSceneId(sceneId);
+      setInsertPlacementTarget(null);
+      setEditingHeadingSceneId(null);
+      scriptController.selectSceneHeading(sceneId);
+      closeOutline();
+      requestAnimationFrame(() => {
+        const sceneHeading = document.getElementById(
+          `scene-heading-${sceneId}`,
+        );
+        const sceneContainer = document.getElementById(`scene-${sceneId}`);
+        const scrollTarget = sceneHeading ?? sceneContainer;
+        if (scrollTarget && typeof scrollTarget.scrollIntoView === "function") {
+          scrollTarget.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+            inline: "nearest",
+          });
+        }
+      });
+    },
+    [closeOutline, scriptController, setLastNavigatedSceneId],
+  );
   const handleSaveStyle = () => {
     onSaveStyle?.(styleDraft);
     closeStyleModal();
   };
   const handleSaveTitle = () => {
-    const nextTitle = titleDraft.trim() || 'Untitled Screenplay';
+    const nextTitle = titleDraft.trim() || "Untitled Screenplay";
     onTitleChange(nextTitle);
     closeTitleModal();
   };
@@ -570,19 +673,23 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       ? createAfterBlockAnchor(lastBlock.id)
       : createSceneTopAnchor(lastScene.id);
   }, [context]);
-  const playbackContent = context && playbackProps ? (
-    <PlaybackPanel {...playbackProps} />
-  ) : (
-    <p className="text-[11px] text-gray-500">Generate a script to begin playback.</p>
-  );
+  const playbackContent =
+    context && playbackProps ? (
+      <PlaybackPanel {...playbackProps} />
+    ) : (
+      <p className="text-[11px] text-gray-500">
+        Generate a script to begin playback.
+      </p>
+    );
   const showPlaybackMiniPlayer = Boolean(
-    context
-    && playbackProps
-    && !isAudioDrawerOpen
-    && playbackProps.totalCount > 0
-    && (playbackProps.isPlaying || playbackProps.isPaused)
+    context &&
+    playbackProps &&
+    !isAudioDrawerOpen &&
+    playbackProps.totalCount > 0 &&
+    (playbackProps.isPlaying || playbackProps.isPaused),
   );
-  const contentWrapperClassName = 'max-w-[1240px] mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-5 h-full min-h-0 flex flex-col gap-4';
+  const contentWrapperClassName =
+    "max-w-[1240px] mx-auto w-full px-6 max-[900px]:px-4 max-[640px]:px-3 py-5 h-full min-h-0 flex flex-col gap-4";
   const handleGenerateNext = useCallback(() => {
     closeGenerateMenu();
     void scriptController.generateNextScene();
@@ -636,12 +743,18 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
             onExportTxt();
             closeExportMenu();
           }}
-          onExportPdf={onExportPdf ? () => {
-            onExportPdf();
-            closeExportMenu();
-          } : undefined}
-          onOpenTitleModal={() => openTitleModal(context.title ?? '')}
-          onOpenStyleModal={onSaveStyle ? () => openStyleModal(context.style ?? '') : undefined}
+          onExportPdf={
+            onExportPdf
+              ? () => {
+                  onExportPdf();
+                  closeExportMenu();
+                }
+              : undefined
+          }
+          onOpenTitleModal={() => openTitleModal(context.title ?? "")}
+          onOpenStyleModal={
+            onSaveStyle ? () => openStyleModal(context.style ?? "") : undefined
+          }
           onToggleExportMenu={toggleExportMenu}
           onToggleGenerateMenu={toggleGenerateMenu}
           onOpenOutline={toggleOutline}
@@ -667,9 +780,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
               {errorBanner}
 
               <div className="flex flex-col gap-3 flex-1 min-h-0 min-w-0">
-                <div className="flex-1 min-h-0 min-w-0">
-                  {previewSection}
-                </div>
+                <div className="flex-1 min-h-0 min-w-0">{previewSection}</div>
               </div>
             </m.div>
           ) : (
