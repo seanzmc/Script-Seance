@@ -743,7 +743,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
               disabled={!onEditSetup || isLoading}
               title="Edit setup and regenerate the script"
             >
-              Edit setup (regenerates script)
+              Change setup
             </Button>
             <Button
               variant="ghost"
@@ -798,7 +798,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                         }`}
                         title="Go back to Step 1"
                       >
-                        Edit Step 1
+                        Change genre
                       </button>
                     </div>
                   </m.div>
@@ -835,7 +835,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                             }`}
                             title="Go back to Step 2"
                           >
-                            Edit Step 2
+                            Change style
                           </button>
                         </div>
                       </m.div>

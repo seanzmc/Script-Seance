@@ -164,7 +164,6 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
   onPurgeAudio,
   bufferedCount,
   totalCount,
-  currentSpeaker,
   playbackSpeed,
   onPlaybackSpeedChange,
   showHighlights,
@@ -215,15 +214,6 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-300">
-          Transport
-        </h4>
-        <span className="text-[10px] text-gray-400">
-          Speaking: <span className="text-gray-300">{currentSpeaker}</span>
-        </span>
-      </div>
-
       <div className="space-y-2 rounded-xl border border-gray-800/90 bg-gray-950/35 px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-1.5">
@@ -287,7 +277,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
               title="Regenerate all script audio using current voice casting"
             >
               <RotateCcw className="w-3 h-3" />
-              Refresh
+              Rebuild audio
             </button>
             <button
               onClick={onPurgeAudio}
@@ -296,7 +286,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
               title="Clear generated playback blocks and cached audio"
             >
               <Trash2 className="w-3 h-3" />
-              Purge
+              Clear audio
             </button>
             <div className="flex items-center gap-2 rounded-md border border-gray-800 bg-gray-950/45 px-2 py-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Speed</span>

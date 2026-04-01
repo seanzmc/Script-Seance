@@ -51,7 +51,6 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className={paperPopoverLabelClassName}>Draft Composer</p>
             <h2 className={`${paperPopoverTitleClassName} mt-1`}>Next Beat</h2>
           </div>
           <div className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">

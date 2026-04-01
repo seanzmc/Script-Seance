@@ -147,7 +147,7 @@ export const VoiceCastingModal: React.FC<VoiceCastingModalProps> = ({
         name: currentVoiceId,
         gender: 'Unknown',
         category: 'Unavailable',
-        description: 'Voice assigned in draft but missing from active provider catalog.',
+        description: "This voice isn't available right now, but it's still assigned to this character.",
         labels: [],
         tags: [],
         source: 'assigned-unavailable',

@@ -172,7 +172,7 @@ describe('ScriptPane block interactions', () => {
     fireEvent.click(screen.getByTestId('insert-slot-1'));
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'A deliberate action beat.' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert as written' }));
 
     expect(onInsertAtAnchor).toHaveBeenCalledTimes(1);
     expect(onInsertAtAnchor).toHaveBeenCalledWith(
@@ -213,7 +213,7 @@ describe('ScriptPane block interactions', () => {
 
     expect(within(composer).getByText('Add a character first')).toBeTruthy();
     expect((within(composer).getByRole('button', { name: 'Generate and Insert' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((within(composer).getByRole('button', { name: 'Insert Typed Block' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(composer).getByRole('button', { name: 'Insert as written' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('dialogue generate request includes selected speaker', () => {
@@ -369,12 +369,12 @@ describe('ScriptPane block interactions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open generate menu' }));
     const generateMenu = screen.getByRole('dialog', { name: 'Generate menu' });
-    expect(generateMenu.textContent).toContain('Draft Composer');
+    expect(generateMenu.textContent).toContain('Next Beat');
     fireEvent.click(screen.getByRole('button', { name: /insert beat/i }));
 
     const composer = await screen.findByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An ending beat closes the scene.' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert as written' }));
 
     expect(onInsertAtAnchor).toHaveBeenCalledTimes(1);
     expect(onInsertAtAnchor).toHaveBeenCalledWith(
@@ -476,7 +476,7 @@ describe('ScriptPane block interactions', () => {
     expect(within(composer).getAllByRole('button').at(-1)?.textContent).toBe('Cancel');
 
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'An extra beat lands after the action.' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert as written' }));
 
     expect(onInsertAtAnchor).toHaveBeenNthCalledWith(
       1,
@@ -495,7 +495,7 @@ describe('ScriptPane block interactions', () => {
     composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.click(within(composer).getByRole('button', { name: 'Insert Before' }));
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'A setup beat lands first.' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert as written' }));
 
     expect(onInsertAtAnchor).toHaveBeenNthCalledWith(
       2,
@@ -551,7 +551,7 @@ describe('ScriptPane block interactions', () => {
     fireEvent.change(within(screen.getByRole('dialog', { name: 'Insert Block' })).getByRole('textbox'), {
       target: { value: 'A setup beat still lands first.' }
     });
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert Block' })).getByRole('button', { name: 'Insert Typed Block' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Insert Block' })).getByRole('button', { name: 'Insert as written' }));
 
     expect(onInsertAtAnchor).toHaveBeenCalledWith(
       expect.objectContaining<ScriptAnchor>({
@@ -635,7 +635,7 @@ describe('ScriptPane block interactions', () => {
 
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.change(within(composer).getByRole('textbox'), { target: { value: 'The shoreline wakes before anyone speaks.' } });
-    fireEvent.click(within(composer).getByRole('button', { name: 'Insert Typed Block' }));
+    fireEvent.click(within(composer).getByRole('button', { name: 'Insert as written' }));
 
     expect(onInsertAtAnchor).toHaveBeenCalledWith(
       expect.objectContaining<ScriptAnchor>({

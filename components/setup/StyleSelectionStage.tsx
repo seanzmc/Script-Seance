@@ -91,9 +91,8 @@ export const StyleSelectionStage: React.FC<StyleSelectionStageProps> = ({
             Shape the tone
           </h3>
           <p className={setupUi.bodyMutedText}>
-            Style stays optional. Pick a vibe if it helps, then choose
-            whether AI writes the premise or you do before moving into
-            the final setup details.
+            Pick a vibe if you want one, then let AI pitch the premise
+            or write your own.
           </p>
         </div>
         <m.div
@@ -203,7 +202,7 @@ export const StyleSelectionStage: React.FC<StyleSelectionStageProps> = ({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             ) : null}
-            Generate AI Premise
+            Let AI pitch the premise
           </button>
           <button
             ref={manualButtonRef}
@@ -213,7 +212,7 @@ export const StyleSelectionStage: React.FC<StyleSelectionStageProps> = ({
             aria-disabled={isLocked || undefined}
             className={`inline-flex items-center justify-center ${setupActionButtonBaseClass} ${focusRingClass} bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 disabled:opacity-50 disabled:pointer-events-none`}
           >
-            Write My Own Premise
+            Write the premise myself
           </button>
         </div>
 
@@ -251,7 +250,7 @@ export const StyleSelectionStage: React.FC<StyleSelectionStageProps> = ({
                         : "bg-white/[0.08] text-slate-100 hover:bg-white/[0.14]"
                     }`}
                   >
-                    Switch to Manual Premise
+                    Write it myself instead
                   </button>
                 </div>
               </div>

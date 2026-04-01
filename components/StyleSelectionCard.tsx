@@ -62,11 +62,11 @@ export const StyleSelectionCard: React.FC<StyleSelectionCardProps> = ({
             {selectedStyle.sampleLine}
           </p>
         </div>
-      ) : (
+      ) : isBlank ? (
         <p className="text-sm text-slate-300">
-          {isBlank ? 'Using default tone settings.' : 'Custom style selected.'}
+          Using default tone settings.
         </p>
-      )}
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {onShuffle && (

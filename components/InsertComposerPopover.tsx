@@ -184,7 +184,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
           onClick={onInsert}
           disabled={disableActions}
         >
-          Insert Typed Block
+          Insert as written
         </Button>
         <Button
           type="button"

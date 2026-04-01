@@ -131,7 +131,7 @@ export const VoiceManager: React.FC<VoiceManagerProps> = ({
                   ? 'bg-red-600/85 border-red-500 text-white'
                   : 'bg-gray-800/80 border-gray-700 text-gray-300 hover:text-white hover:border-indigo-500/70 hover:bg-indigo-600/70'
               }`}
-              title={previewDisabled ? 'TTS provider not configured' : (isThisPlaying ? 'Stop preview' : 'Preview voice')}
+              title={previewDisabled ? 'Voice preview unavailable' : (isThisPlaying ? 'Stop preview' : 'Preview voice')}
             >
               {isThisLoading ? (
                 <Loader className="w-3.5 h-3.5 animate-spin" />

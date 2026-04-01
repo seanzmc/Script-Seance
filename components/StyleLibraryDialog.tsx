@@ -45,7 +45,7 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
   onSelect,
   disabled = false,
   title = 'Style Library',
-  subtitle = 'Pick the same tone module used in setup.',
+  subtitle = 'Pick a tone for this script.',
   listTestId,
 }) => {
   const [search, setSearch] = useState('');

@@ -354,7 +354,7 @@ describe("SetupForm submit validation", () => {
 
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
+      screen.getByRole("button", { name: /write the premise myself/i }),
     );
 
     const button = screen.getByRole("button", {
@@ -970,7 +970,7 @@ describe("SetupForm detail reveal timing", () => {
 
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
-      screen.getByRole("button", { name: /write my own premise/i }),
+      screen.getByRole("button", { name: /write the premise myself/i }),
     );
 
     expect(screen.queryByPlaceholderText(premisePlaceholder)).not.toBeNull();
@@ -1019,7 +1019,7 @@ describe("SetupForm detail reveal timing", () => {
 
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(
-      screen.getByRole("button", { name: /generate ai premise/i }),
+      screen.getByRole("button", { name: /let ai pitch the premise/i }),
     );
 
     expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
@@ -1130,7 +1130,7 @@ describe("SetupForm detail reveal timing", () => {
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
 
     const generateButton = screen.getByRole("button", {
-      name: /generate ai premise/i,
+      name: /let ai pitch the premise/i,
     }) as HTMLButtonElement;
     fireEvent.click(generateButton);
 
@@ -1140,7 +1140,7 @@ describe("SetupForm detail reveal timing", () => {
     expect(screen.getByText(/ai premise draft came back incomplete/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /switch to manual premise/i }),
+      screen.getByRole("button", { name: /write it myself instead/i }),
     ).toBeTruthy();
     await waitFor(() => {
       expect(generateButton.disabled).toBe(false);
@@ -1171,14 +1171,14 @@ describe("SetupForm detail reveal timing", () => {
     );
 
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
-    fireEvent.click(screen.getByRole("button", { name: /generate ai premise/i }));
+    fireEvent.click(screen.getByRole("button", { name: /let ai pitch the premise/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/ai premise draft came back incomplete/i)).toBeTruthy();
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: /switch to manual premise/i }),
+      screen.getByRole("button", { name: /write it myself instead/i }),
     );
 
     await waitFor(() => {
@@ -1228,12 +1228,12 @@ describe("SetupForm detail reveal timing", () => {
     render(<SurpriseHarness />);
 
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
-    fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+    fireEvent.click(screen.getByRole("button", { name: /write the premise myself/i }));
     fireEvent.change(screen.getByPlaceholderText(premisePlaceholder), {
       target: { value: "Manual draft premise" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /edit step 2/i }));
+    fireEvent.click(screen.getByRole("button", { name: /change style/i }));
     expect(
       screen.getByRole("dialog", { name: /return to step 2/i }),
     ).toBeTruthy();
@@ -1243,7 +1243,7 @@ describe("SetupForm detail reveal timing", () => {
 
     expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /generate ai premise/i }));
+    fireEvent.click(screen.getByRole("button", { name: /let ai pitch the premise/i }));
     fireEvent.click(screen.getByRole("button", { name: /resolve in-step ai/i }));
 
     await waitFor(() => {
@@ -1273,7 +1273,7 @@ describe("SetupForm detail reveal timing", () => {
     render(<DraftHarness />);
 
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
-    fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+    fireEvent.click(screen.getByRole("button", { name: /write the premise myself/i }));
 
     fireEvent.change(screen.getByPlaceholderText(premisePlaceholder), {
       target: { value: "Manual draft premise" },
@@ -1282,7 +1282,7 @@ describe("SetupForm detail reveal timing", () => {
       target: { value: "Pilot" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /edit step 2/i }));
+    fireEvent.click(screen.getByRole("button", { name: /change style/i }));
     expect(
       screen.getByText(/going back will clear the current premise and characters/i),
     ).toBeTruthy();
@@ -1291,7 +1291,7 @@ describe("SetupForm detail reveal timing", () => {
     expect(screen.getByDisplayValue("Manual draft premise")).toBeTruthy();
     expect(screen.getByDisplayValue("Pilot")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /edit step 2/i }));
+    fireEvent.click(screen.getByRole("button", { name: /change style/i }));
     fireEvent.click(
       screen.getByRole("button", { name: /go back and clear setup details/i }),
     );
@@ -1299,7 +1299,7 @@ describe("SetupForm detail reveal timing", () => {
     expect(screen.getByText(/shape the tone/i)).toBeTruthy();
     expect(screen.queryByPlaceholderText(premisePlaceholder)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /write my own premise/i }));
+    fireEvent.click(screen.getByRole("button", { name: /write the premise myself/i }));
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText(premisePlaceholder)).toBeTruthy();

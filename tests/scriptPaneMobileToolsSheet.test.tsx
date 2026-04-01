@@ -174,9 +174,9 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     const drawer = await screen.findByTestId('audio-drawer');
     expect(drawer).toBeTruthy();
-    expect(screen.getByText('Playback and Voice Utility')).toBeTruthy();
+    expect(screen.getByText('Voice & Playback')).toBeTruthy();
     expect(screen.getByText('Voices panel body')).toBeTruthy();
-    expect(screen.getByText('Transport')).toBeTruthy();
+    expect(screen.queryByText('Transport')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Close audio drawer' }));
     await waitFor(() => {

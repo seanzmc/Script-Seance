@@ -44,8 +44,8 @@ export const WorkspaceAudioDrawer: React.FC<WorkspaceAudioDrawerProps> = ({
           <div className="flex items-start justify-between gap-3 border-b border-gray-800 px-3.5 py-3 sm:px-4">
             <div className="space-y-0.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-200/80">Audio</p>
-              <h2 className="text-base font-semibold text-white">Playback and Voice Utility</h2>
-              <p className="text-[11px] text-gray-400">Assign voices, control playback, and tune follow-along behavior.</p>
+              <h2 className="text-base font-semibold text-white">Voice & Playback</h2>
+              <p className="text-[11px] text-gray-400">Preview voices, play the draft, and follow along as it reads.</p>
             </div>
             <button
               type="button"

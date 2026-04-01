@@ -149,7 +149,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
               <span className={headerMetaItemClass}>
                 <span aria-hidden="true" className={headerMetaBulletClass}>&bull;</span>
                 <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                  <span><span className={headerMetaLabelClass}>Style:</span> {styleLabel || 'No style set'}</span>
+                  <span><span className={headerMetaLabelClass}>Style:</span> {styleLabel || 'Default tone'}</span>
                   {onOpenStyleModal && (
                     <button
                       type="button"

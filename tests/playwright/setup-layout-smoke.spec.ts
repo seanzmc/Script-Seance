@@ -74,7 +74,7 @@ test('setup desktop layout smoke', async ({ page }, testInfo) => {
 
   await page.getByTestId('setup-continue-to-style').click();
   await expect(page.getByTestId('setup-genre-summary')).toBeVisible();
-  await page.getByRole('button', { name: /Write My Own Premise/i }).click();
+  await page.getByRole('button', { name: /Write the premise myself/i }).click();
   await expect(page.getByTestId('setup-style-summary')).toBeVisible();
 
   const premisePanel = page.getByTestId('setup-premise-panel');
@@ -160,7 +160,7 @@ test('style library traps setup focus and overlays Step 2 content', async ({ pag
   await unlockIfNeeded(page);
   await openStyleStage(page);
 
-  const manualPremiseButton = page.getByRole('button', { name: /Write My Own Premise/i });
+  const manualPremiseButton = page.getByRole('button', { name: /Write the premise myself/i });
   const manualPremiseBox = await manualPremiseButton.boundingBox();
   expect(manualPremiseBox).not.toBeNull();
 
@@ -189,6 +189,6 @@ test('style library traps setup focus and overlays Step 2 content', async ({ pag
     y: (manualPremiseBox?.y ?? 0) + (manualPremiseBox?.height ?? 0) / 2,
   });
 
-  expect(overlayTarget?.text ?? '').not.toMatch(/Write My Own Premise/i);
-  expect(overlayTarget?.ariaLabel ?? '').not.toMatch(/Write My Own Premise/i);
+  expect(overlayTarget?.text ?? '').not.toMatch(/Write the premise myself/i);
+  expect(overlayTarget?.ariaLabel ?? '').not.toMatch(/Write the premise myself/i);
 });

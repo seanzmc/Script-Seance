@@ -268,7 +268,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="relative space-y-5">
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.34em] text-gray-500">Start Screen</p>
           <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white">SCRIPT SEANCE</h1>
           <p className="text-base md:text-lg text-gray-300">
             Summon a writers room to draft cinematic scenes, one beat at a time.

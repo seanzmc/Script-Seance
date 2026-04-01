@@ -139,7 +139,7 @@ describe('VoiceCastingModal', () => {
       throw new Error('Orphaned voice card not found');
     }
     const scoped = within(orphanCard as HTMLElement);
-    expect(scoped.getByText('Voice assigned in draft but missing from active provider catalog.')).toBeTruthy();
+    expect(scoped.getByText("This voice isn't available right now, but it's still assigned to this character.")).toBeTruthy();
   });
 
   it('keeps manually selectable voices visible even when they are not auto-assignable, without surfacing Hades', () => {

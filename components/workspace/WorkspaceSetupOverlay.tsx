@@ -159,8 +159,8 @@ export const WorkspaceSetupOverlay: React.FC<WorkspaceSetupOverlayProps> = ({
                     </h2>
                     <p className={SETUP_UI_TOKENS.subtitle}>
                       {showSetupHandoffLoading
-                        ? 'Locking in the opening beat and preparing the workspace.'
-                        : 'Pick a genre and let AI shape your opening spark.'}
+                        ? 'Opening scene coming up. Setting the stage.'
+                        : 'Pick a genre, then cue up your opening scene.'}
                     </p>
                   </div>
                   <div className="flex h-10 w-10 items-center justify-center">
