@@ -266,7 +266,7 @@ describe('script view style editor', () => {
     expect(screen.getByRole('dialog', { name: 'Generate menu' })).toBeTruthy();
   });
 
-  it('opens the style library as the active top layer from style editing', () => {
+  it('opens the style library inline inside the style editor', () => {
     const context: StoryContext = {
       title: 'Draft',
       genre: 'Noir',
@@ -295,8 +295,9 @@ describe('script view style editor', () => {
     fireEvent.click(screen.getByRole('button', { name: /edit style/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Browse library' }));
 
-    const dialog = screen.getByRole('dialog', { name: 'Style Library' });
-    expect(dialog.parentElement?.className).toContain('z-library');
+    const dialog = screen.getByRole('dialog', { name: 'Edit style' });
+    expect(dialog.textContent).toContain('Style Library');
+    expect(screen.queryByRole('dialog', { name: 'Style Library' })).toBeNull();
   });
 
   it('uses an inset internal scroller for the style editor shell', () => {

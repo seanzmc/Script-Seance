@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -738,6 +739,7 @@ describe("SetupForm submit validation", () => {
   });
 
   it("search filters styles by title and description", () => {
+    vi.useFakeTimers();
     render(
       <SetupForm
         value={{
@@ -756,6 +758,9 @@ describe("SetupForm submit validation", () => {
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
     });
+    act(() => {
+      vi.advanceTimersByTime(260);
+    });
 
     expect(
       screen.getByRole("button", { name: /^Shakespearean Drama/i }),
@@ -763,6 +768,73 @@ describe("SetupForm submit validation", () => {
     expect(
       screen.queryByRole("button", { name: /^Fever Dream/i }),
     ).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("shows category badges only in search mode, not while browsing by tab", () => {
+    vi.useFakeTimers();
+    render(
+      <SetupForm
+        value={{
+          ...baseValue,
+          premise: "",
+          characters: [],
+          characterVoicePreferences: [],
+        }}
+        onChange={vi.fn()}
+        isLoading={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+    fireEvent.click(screen.getByRole("button", { name: /browse/i }));
+
+    const tabbedCard = screen.getByRole("button", { name: /^1940s Noir Detective/i });
+    expect(tabbedCard.textContent).not.toContain("Genre & Format Parodies");
+
+    fireEvent.change(screen.getByLabelText(/search styles/i), {
+      target: { value: "noir" },
+    });
+    act(() => {
+      vi.advanceTimersByTime(260);
+    });
+
+    const searchResult = screen.getByRole("button", { name: /^1940s Noir Detective/i });
+    expect(searchResult.textContent).toContain("Genre & Format Parodies");
+    expect(screen.queryByRole("tablist", { name: /style categories/i })).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("supports manual keyboard activation for category tabs", () => {
+    render(
+      <SetupForm
+        value={{
+          ...baseValue,
+          premise: "",
+          characters: [],
+          characterVoicePreferences: [],
+        }}
+        onChange={vi.fn()}
+        isLoading={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("setup-continue-to-style"));
+    fireEvent.click(screen.getByRole("button", { name: /browse/i }));
+
+    const firstTab = screen.getByRole("tab", { name: "Genre & Format Parodies" });
+    firstTab.focus();
+    fireEvent.keyDown(firstTab, { key: "ArrowRight" });
+
+    const secondTab = screen.getByRole("tab", { name: "Linguistic & Dialogue Constraints" });
+    expect(document.activeElement).toBe(secondTab);
+    expect(secondTab.getAttribute("aria-selected")).toBe("false");
+
+    fireEvent.keyDown(secondTab, { key: "Enter" });
+
+    expect(secondTab.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: /^Shakespearean Drama/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^1940s Noir Detective/i })).toBeNull();
   });
 
   it("clear control clears style to an empty string", () => {
@@ -811,6 +883,7 @@ describe("SetupForm submit validation", () => {
 
   it("shuffle picks from full list even when modal search is filtered", () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.useFakeTimers();
     const styleStageValue: SetupFormState = {
       ...baseValue,
       premise: "",
@@ -839,6 +912,9 @@ describe("SetupForm submit validation", () => {
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "iambic pentameter" },
     });
+    act(() => {
+      vi.advanceTimersByTime(260);
+    });
     fireEvent.click(screen.getByRole("button", { name: /close style library/i }));
 
     fireEvent.click(screen.getByRole("button", { name: /shuffle/i }));
@@ -847,6 +923,7 @@ describe("SetupForm submit validation", () => {
       stylesLibrary[0]?.title ?? "",
     );
     expect(randomSpy).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it("scrolls the selected style row into view when shuffle changes style in the open modal", async () => {

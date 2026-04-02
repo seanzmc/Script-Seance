@@ -362,15 +362,15 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(dialog.className).toContain('max-h-[calc(100vh-8rem)]');
   });
 
-  it('surfaces the style library above the style editor when browsing', () => {
+  it('reveals the style library inline within the style editor when browsing', () => {
     render(<ScriptPane {...createProps({ onSaveStyle: vi.fn() })} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Style' }));
     fireEvent.click(screen.getByRole('button', { name: 'Browse library' }));
 
-    const libraryDialog = screen.getByRole('dialog', { name: 'Style Library' });
-    const libraryOverlay = libraryDialog.parentElement as HTMLElement;
-    expect(libraryOverlay.className).toContain('z-library');
+    const styleDialog = screen.getByRole('dialog', { name: 'Edit style' });
+    expect(styleDialog.textContent).toContain('Style Library');
+    expect(screen.queryByRole('dialog', { name: 'Style Library' })).toBeNull();
   });
 
   it('shows plot twist progress without shifting the generate button into loading mode', () => {
