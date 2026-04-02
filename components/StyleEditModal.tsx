@@ -48,6 +48,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
   }, [isOpen]);
 
   const selectedStyle = useMemo(() => resolveSelectedLibraryStyle(null, value), [value]);
+  const customToneFieldId = 'style-edit-custom-tone';
   const selectedStyleCategoryLabel = useMemo(() => {
     if (!selectedStyle) return null;
     return STYLE_CATEGORIES.find((category) => category.id === selectedStyle.category)?.label ?? null;
@@ -66,7 +67,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
             variants={overlayVariants}
           />
           <m.div
-            className={`${styleDialogShellClassName} max-w-2xl max-h-[calc(100vh-8rem)] flex flex-col sm:max-h-[calc(100vh-10rem)]`}
+            className={`${styleDialogShellClassName} max-w-4xl max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden sm:max-h-[calc(100vh-10rem)]`}
             role="dialog"
             aria-modal="true"
             aria-label="Edit style"
@@ -81,7 +82,23 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
               <p className="text-sm text-slate-300">Pick a tone from the library or write your own.</p>
             </div>
             <div className={styleDialogInsetScrollerClassName}>
-              <div className="space-y-4">
+              <div className="flex min-h-0 flex-col gap-4">
+                <div className="space-y-2">
+                  <label
+                    htmlFor={customToneFieldId}
+                    className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400"
+                  >
+                    Your own tone
+                  </label>
+                  <textarea
+                    id={customToneFieldId}
+                    rows={1}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    placeholder="e.g., Witty noir with clipped banter and escalating absurdity."
+                    className="min-h-[44px] w-full resize-y rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  />
+                </div>
                 {presets.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {presets.map((preset) => {
@@ -123,7 +140,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.18, ease: 'easeOut' }}
-                      className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-3 sm:p-4"
+                      className="min-h-0 rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-3 sm:p-4"
                     >
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="space-y-1">
@@ -135,7 +152,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
                           Hide
                         </Button>
                       </div>
-                      <div className="h-[min(52vh,32rem)]">
+                      <div className="h-[min(46vh,28rem)] min-h-[18rem] min-w-0">
                         <StyleLibrary
                           selectedStyleTitle={value}
                           onSelect={({ style }) => {
@@ -148,18 +165,6 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
                     </m.div>
                   ) : null}
                 </AnimatePresence>
-                <div className="space-y-2">
-                  <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Your own tone
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    placeholder="e.g., Witty noir with clipped banter and escalating absurdity."
-                    className="min-h-[120px] w-full rounded-xl border border-white/10 bg-slate-900 p-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  />
-                </div>
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={onClose}>
                     Close

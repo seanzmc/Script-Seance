@@ -81,7 +81,7 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
           />
           <m.div
             ref={modalRef}
-            className={`${styleDialogShellClassName} max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col sm:max-h-[88vh]`}
+            className={`${styleDialogShellClassName} max-w-4xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden sm:max-h-[88vh]`}
             role="dialog"
             aria-modal="true"
             aria-label={title}
@@ -105,7 +105,7 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="min-h-0 flex-1 px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+            <div className="min-h-0 min-w-0 flex-1 px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
               <StyleLibrary
                 selectedStyleId={selectedStyleId}
                 selectedStyleTitle={selectedStyleTitle}

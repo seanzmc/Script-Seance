@@ -121,7 +121,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -179,7 +179,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
       </div>
 
       <div
-        className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-[1.15rem] border border-white/8 bg-slate-950/72 p-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.24)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/26"
+        className="mt-3 h-[min(60vh,36rem)] min-h-[18rem] min-w-0 flex-1 overflow-y-auto overflow-x-hidden rounded-[1.15rem] border border-white/8 bg-slate-950/72 p-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.24)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/26"
         data-testid={listTestId}
       >
         <div className="p-2">
@@ -210,7 +210,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
             aria-labelledby={isSearchMode || !activeTabId ? undefined : `style-tab-${activeTabId}`}
           >
             {visibleStyles.length > 0 ? (
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2">
                 {visibleStyles.map((item) => {
                   const isSelected = selectedLibraryStyle?.id === item.id;
                   return (
@@ -223,14 +223,14 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
                       onClick={() => onSelect({ styleId: item.id, style: item.title })}
                       disabled={disabled}
                       aria-pressed={isSelected}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                      className={`w-full min-w-0 rounded-xl border px-3 py-3 text-left transition-colors ${
                         isSelected
                           ? 'border-indigo-300 bg-indigo-500/20 text-indigo-100'
                           : 'border-white/10 bg-white/[0.02] text-slate-200 hover:bg-white/[0.04]'
                       }`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="min-w-0 text-sm font-semibold leading-5 text-white">
+                        <p className="min-w-0 flex-1 break-words pr-1 text-sm font-semibold leading-5 text-white">
                           {item.title}
                         </p>
                         {isSearchMode ? (
@@ -239,10 +239,10 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 truncate text-xs text-slate-300" title={item.description}>
+                      <p className="mt-1 break-words text-xs leading-5 text-slate-300" title={item.description}>
                         {item.description}
                       </p>
-                      <p className="mt-2 truncate text-xs italic text-slate-200/85" title={item.sampleLine}>
+                      <p className="mt-2 break-words text-xs italic leading-5 text-slate-200/85" title={item.sampleLine}>
                         {item.sampleLine}
                       </p>
                     </button>

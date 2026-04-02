@@ -360,6 +360,7 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(overlay.className).toContain('top-24');
     expect(overlay.className).toContain('overflow-y-auto');
     expect(dialog.className).toContain('max-h-[calc(100vh-8rem)]');
+    expect(dialog.className).toContain('max-w-4xl');
   });
 
   it('reveals the style library inline within the style editor when browsing', () => {

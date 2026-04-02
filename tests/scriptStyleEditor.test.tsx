@@ -336,4 +336,38 @@ describe('script view style editor', () => {
     expect(scroller).toBeTruthy();
     expect(scroller?.className).toContain('overflow-y-auto');
   });
+
+  it('keeps the custom tone field compact at the top of the style editor', () => {
+    const context: StoryContext = {
+      title: 'Draft',
+      genre: 'Noir',
+      premise: 'A detective uncovers a conspiracy.',
+      characters: ['Alex', 'Sam'],
+      style: 'Unhinged',
+      scenes: [
+        {
+          id: 'scene-1',
+          heading: 'INT. OFFICE - NIGHT',
+          summary: 'Alex studies evidence.',
+          blocks: [
+            {
+              id: 'block-1',
+              type: BlockType.ACTION,
+              text: 'Alex studies the evidence board.',
+              blockRevision: 1
+            }
+          ]
+        }
+      ]
+    };
+
+    render(<ScriptPane {...createPaneProps(context, vi.fn())} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /edit style/i }));
+
+    const textarea = screen.getByLabelText(/your own tone/i);
+    expect(textarea.getAttribute('rows')).toBe('1');
+    expect(textarea.className).toContain('resize-y');
+    expect(textarea.className).toContain('min-h-[44px]');
+  });
 });
