@@ -163,7 +163,7 @@ export const DetailsStage: React.FC<DetailsStageProps> = ({
                 Premise
               </label>
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                {activePremiseSource === "ai" ? "AI draft" : "Manual draft"}
+                {activePremiseSource === "ai" ? "AI-written" : "Your draft"}
               </span>
             </div>
           </div>
@@ -216,7 +216,7 @@ export const DetailsStage: React.FC<DetailsStageProps> = ({
                       Narrator
                     </p>
                     <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                      Built in
+                      Always present
                     </p>
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export const DetailsStage: React.FC<DetailsStageProps> = ({
                     className={`min-w-0 flex-1 bg-transparent px-0 py-1 text-sm text-white placeholder-slate-500 focus:outline-none sm:text-base ${
                       isLocked ? "cursor-not-allowed text-slate-400" : ""
                     }`}
-                    placeholder={`Character ${index + 1}`}
+                    placeholder="Name"
                     disabled={isLocked}
                   />
                   {renderVoicePreferenceButton(

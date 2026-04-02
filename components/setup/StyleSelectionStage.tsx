@@ -91,8 +91,7 @@ export const StyleSelectionStage: React.FC<StyleSelectionStageProps> = ({
             Shape the tone
           </h3>
           <p className={setupUi.bodyMutedText}>
-            Pick a vibe if you want one, then let AI pitch the premise
-            or write your own.
+            Pick a tone, or skip straight to the premise.
           </p>
         </div>
         <m.div

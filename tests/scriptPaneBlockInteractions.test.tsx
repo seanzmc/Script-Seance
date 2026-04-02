@@ -211,7 +211,7 @@ describe('ScriptPane block interactions', () => {
     const composer = screen.getByRole('dialog', { name: 'Insert Block' });
     fireEvent.click(within(composer).getByRole('tab', { name: 'Dialogue' }));
 
-    expect(within(composer).getByText('Add a character first')).toBeTruthy();
+    expect(within(composer).getByText('No characters yet. Add one in setup.')).toBeTruthy();
     expect((within(composer).getByRole('button', { name: 'Generate and Insert' }) as HTMLButtonElement).disabled).toBe(true);
     expect((within(composer).getByRole('button', { name: 'Insert as written' }) as HTMLButtonElement).disabled).toBe(true);
   });

@@ -517,7 +517,7 @@ describe("SetupForm submit validation", () => {
     );
 
     expect(screen.getByText("Narrator")).toBeTruthy();
-    expect(screen.getByText("Built in")).toBeTruthy();
+    expect(screen.getByText("Always present")).toBeTruthy();
     expect(screen.queryByDisplayValue("Narrator")).toBeNull();
     expect(screen.getAllByRole("button", { name: /remove character/i })).toHaveLength(2);
   });
@@ -1152,7 +1152,7 @@ describe("SetupForm detail reveal timing", () => {
       expect(screen.getByDisplayValue(/disgraced medium/i)).toBeTruthy();
     });
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByText("AI draft")).toBeTruthy();
+    expect(screen.getByText("AI-written")).toBeTruthy();
   });
 
   it("lets the user switch to manual premise entry after AI premise failure", async () => {
@@ -1249,7 +1249,7 @@ describe("SetupForm detail reveal timing", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue(/archivist discovers/i)).toBeTruthy();
     });
-    expect(screen.getByText("AI draft")).toBeTruthy();
+    expect(screen.getByText("AI-written")).toBeTruthy();
   });
 
   it("cancels or confirms destructive Step 3 back-navigation without leaving stale details behind", async () => {
@@ -1284,7 +1284,7 @@ describe("SetupForm detail reveal timing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /change style/i }));
     expect(
-      screen.getByText(/going back will clear the current premise and characters/i),
+      screen.getByText(/your premise and characters will be cleared/i),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /cancel/i }));

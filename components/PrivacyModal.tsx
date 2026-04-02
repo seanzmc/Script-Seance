@@ -40,7 +40,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
                 </div>
                 <div>
                   <h2 id="privacy-modal-title" className="text-lg font-bold text-white">Privacy</h2>
-                  <p className="text-xs text-gray-400">How your draft and prompts are handled.</p>
+                  <p className="text-xs text-gray-400">What leaves your browser, and what doesn&apos;t.</p>
                 </div>
               </div>
               <button
@@ -64,10 +64,10 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
 
               <div>
                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">
-                  Retention
+                  Your data
                 </h3>
                 <ul className="list-disc pl-5 space-y-2 text-gray-400">
-                  <li>Drafts autosave to your browser&apos;s localStorage for recovery.</li>
+                  <li>Your draft autosaves in your browser. It stays on your device.</li>
                   <li>This app does not store your drafts on the server.</li>
                   <li>Use &quot;Clear draft&quot; to remove the local copy at any time.</li>
                 </ul>

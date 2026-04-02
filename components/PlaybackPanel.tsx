@@ -102,7 +102,7 @@ const buildPlaybackViewModel = ({
   })();
 
   const statusHeadline = (() => {
-    if (playbackState === 'playing') return 'Playback running';
+    if (playbackState === 'playing') return 'Now playing';
     if (playbackState === 'paused') return 'Playback paused';
     if (playbackState === 'error') return 'Audio error';
     if (playbackState === 'ready') return 'Ready to perform';
@@ -315,7 +315,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
           {isLoadingAudio && (
             <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
               <Loader2 className="w-3 h-3 animate-spin" />
-              Waiting for current block audio.
+              Loading audio...
             </div>
           )}
           {currentStatus === 'error' && (
@@ -342,7 +342,7 @@ export const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
           )}
           {errorCount > 0 && currentStatus !== 'error' && (
             <div className="text-[11px] text-amber-300">
-              {errorCount} block{errorCount === 1 ? '' : 's'} need attention. Jump back to retry or skip.
+              {errorCount} line{errorCount === 1 ? '' : 's'} failed. Scroll back to retry or skip.
             </div>
           )}
         </div>

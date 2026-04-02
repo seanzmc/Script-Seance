@@ -88,7 +88,7 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
               <span className="whitespace-nowrap">{sceneCountLabel}</span>
             </div>
             {promptWarning ? (
-              <span className="whitespace-nowrap text-amber-700">Trim prompts.</span>
+              <span className="whitespace-nowrap text-amber-700">Getting long.</span>
             ) : null}
           </div>
         </div>
@@ -101,7 +101,7 @@ export const DraftComposerPanel: React.FC<DraftComposerPanelProps> = ({
             className="min-w-[10rem] justify-start"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
-            Continue
+            Write Next Scene
           </Button>
           <Button
             onClick={onPlotTwist}

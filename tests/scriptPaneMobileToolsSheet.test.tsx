@@ -143,7 +143,7 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(generateMenu).toBeTruthy();
     expect(screen.getByText('Next Beat')).toBeTruthy();
     expect(screen.getByLabelText('Draft prompt')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /continue/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /write next scene/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /twist/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /insert beat/i })).toBeTruthy();
 
@@ -380,7 +380,7 @@ describe('ScriptPane header generation and audio drawer', () => {
 
     expect(screen.getByText('Generating...')).toBeTruthy();
     expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
-    expect(screen.getByRole('button', { name: /continue/i }).getAttribute('aria-busy')).toBeNull();
+    expect(screen.getByRole('button', { name: /write next scene/i }).getAttribute('aria-busy')).toBeNull();
   });
 
   it('rotates scene-generation loading copy deterministically and resets when generation stops', () => {

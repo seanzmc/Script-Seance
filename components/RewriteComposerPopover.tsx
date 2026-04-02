@@ -70,7 +70,7 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
 
       <div className="mt-2.5 space-y-1">
         <label className={paperPopoverLabelClassName}>
-          Rewrite Instructions
+          Direction
         </label>
         <textarea
           value={instructions}
@@ -84,7 +84,7 @@ export const RewriteComposerPopover: React.FC<RewriteComposerPopoverProps> = ({
       {hasCandidate && (
         <div className="mt-2.5 space-y-1">
           <p className={paperPopoverLabelClassName}>
-            Proposed Rewrite
+            Preview
           </p>
           <div className="max-h-32 overflow-y-auto rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-950 whitespace-pre-wrap">
             {candidateText}

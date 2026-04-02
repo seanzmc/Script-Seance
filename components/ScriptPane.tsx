@@ -278,7 +278,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         <p className="text-sm font-medium">{error}</p>
         {rateLimitHint && (
           <p className="text-[11px] text-red-200/70">
-            Rate limits reset after a short wait. Try again in ~30s.
+            Too many requests. Wait a moment and try again.
           </p>
         )}
       </div>
@@ -536,9 +536,6 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">
             Scene Heading
           </p>
-          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.12em] text-gray-800">
-            Edit Scene Heading
-          </h3>
         </div>
         <input
           value={headingDraft}
@@ -678,7 +675,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       <PlaybackPanel {...playbackProps} />
     ) : (
       <p className="text-[11px] text-gray-500">
-        Generate a script to begin playback.
+        Write something first.
       </p>
     );
   const showPlaybackMiniPlayer = Boolean(

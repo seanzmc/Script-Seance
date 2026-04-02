@@ -959,8 +959,8 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                       id="setup-step-reactivation-description"
                       className="text-sm leading-relaxed text-slate-300"
                     >
-                      Going back will clear the current premise and characters so
-                      you can rebuild from that earlier step.
+                      Your premise and characters will be cleared. You&apos;ll
+                      start that step fresh.
                     </p>
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                       <button

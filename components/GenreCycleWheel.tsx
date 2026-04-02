@@ -481,9 +481,9 @@ export const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
             ? "hover:border-indigo-200/32 hover:bg-white/[0.03]"
             : "hover:text-white"
       } ${disabled ? "cursor-not-allowed opacity-60" : "touch-none select-none"}`}
-      aria-label={`Genre: ${selectedValue}. Click to cycle or drag vertically.`}
+      aria-label={`Genre: ${selectedValue}`}
       aria-roledescription="genre wheel"
-      title="Click to cycle genre. Drag vertically to spin and release to glide."
+      title="Genre"
     >
       {isLarge ? (
         <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
@@ -559,11 +559,6 @@ export const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
           })}
         </span>
       </span>
-      {isLarge && (
-        <span className="mt-1 block text-xs text-slate-400 sm:text-sm">
-          Click to cycle. Drag vertically to spin and release to glide.
-        </span>
-      )}
     </button>
   );
 };

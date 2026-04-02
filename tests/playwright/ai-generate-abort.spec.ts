@@ -95,10 +95,10 @@ test('single-click surprise and generate keeps requests stable', async ({ page }
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: /Admin Login/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Sign In/i })).toBeVisible();
   await page.locator('input[type="password"]').fill(adminPassword as string);
   await page.getByRole('button', { name: 'Unlock AI' }).click();
-  await expect(page.getByRole('heading', { name: /Admin Login/i })).toBeHidden();
+  await expect(page.getByRole('heading', { name: /Sign In/i })).toBeHidden();
 
   await page.getByRole('button', { name: /Start a New Script/i }).click();
   await expect(page.getByRole('heading', { name: /Start a new script/i })).toBeVisible();

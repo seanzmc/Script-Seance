@@ -49,11 +49,6 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
             <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
               Start with a genre
             </h3>
-            <p className={setupUi.bodyMutedText}>
-              Keep one decision in front of you. Click to step
-              forward, or hold and drag vertically for a slot-style
-              scrub.
-            </p>
           </div>
           <button
             ref={continueButtonRef}

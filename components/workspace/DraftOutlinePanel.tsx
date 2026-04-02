@@ -28,7 +28,7 @@ export const DraftOutlinePanel: React.FC<DraftOutlinePanelProps> = ({
     <div className={className}>
       {scenes.length === 0 ? (
         <p className="rounded-xl border border-gray-800 bg-gray-950/30 px-3 py-3 text-sm text-gray-400">
-          Scenes will appear here once the script has content.
+          No scenes yet.
         </p>
       ) : (
         <nav aria-label="Scene outline" className="space-y-1.5">

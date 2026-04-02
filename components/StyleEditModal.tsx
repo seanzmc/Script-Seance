@@ -72,7 +72,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
             >
               <div className="relative z-[1] border-b border-white/10 px-5 py-4 space-y-1 sm:px-6">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Style</p>
-                <h2 className="text-xl font-semibold text-white">Edit writing style</h2>
+                <h2 className="text-xl font-semibold text-white">Tone &amp; style</h2>
                 <p className="text-sm text-slate-300">Pick a tone from the library or write your own.</p>
               </div>
               <div className={styleDialogInsetScrollerClassName}>
@@ -112,7 +112,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
                   />
                   <div className="space-y-2">
                     <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                      Custom style note
+                      Your own tone
                     </label>
                     <textarea
                       rows={4}

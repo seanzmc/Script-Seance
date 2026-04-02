@@ -62,7 +62,7 @@ export const WorkspaceAudioDrawer: React.FC<WorkspaceAudioDrawerProps> = ({
                 {playbackContent}
               </section>
               <section className="rounded-xl border border-gray-800/80 bg-gray-950/20 px-3 py-2.5">
-                {voicesContent ?? <p className="text-[11px] text-gray-500">Voice controls unavailable.</p>}
+                {voicesContent ?? <p className="text-[11px] text-gray-500">Voice cast not set up yet.</p>}
               </section>
             </div>
           </div>

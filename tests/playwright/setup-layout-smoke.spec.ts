@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const waitForAppReady = async (page: import('@playwright/test').Page) => {
   return expect
     .poll(async () => {
-      if (await page.getByRole('heading', { name: /Admin Login/i }).isVisible()) {
+      if (await page.getByRole('heading', { name: /Sign In/i }).isVisible()) {
         return 'login';
       }
       if (await page.getByRole('button', { name: /Start a New Script/i }).isVisible()) {
@@ -24,7 +24,7 @@ const clearDraftStorage = async (page: import('@playwright/test').Page) => {
 };
 
 const unlockIfNeeded = async (page: import('@playwright/test').Page) => {
-  const loginHeading = page.getByRole('heading', { name: /Admin Login/i });
+  const loginHeading = page.getByRole('heading', { name: /Sign In/i });
   if (await loginHeading.isVisible()) {
     const adminPassword = process.env.ADMIN_PASSWORD?.trim();
     test.skip(!adminPassword, 'ADMIN_PASSWORD is required when auth is enabled.');

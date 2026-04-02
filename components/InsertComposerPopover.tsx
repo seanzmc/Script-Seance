@@ -153,7 +153,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
             </select>
           ) : (
             <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Add a character first
+              No characters yet. Add one in setup.
             </p>
           )}
         </div>
@@ -166,7 +166,7 @@ export const InsertComposerPopover: React.FC<InsertComposerPopoverProps> = ({
         <textarea
           value={content}
           onChange={(event) => onContentChange(event.target.value)}
-          placeholder="Leave blank and use Generate and Insert, or type the block you want inserted."
+          placeholder="Optional. Leave blank to generate, or write it yourself."
           className={paperPopoverTextAreaClassName}
           disabled={isGenerating}
         />
