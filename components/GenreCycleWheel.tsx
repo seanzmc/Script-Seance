@@ -488,13 +488,8 @@ export const GenreCycleWheel: React.FC<GenreCycleWheelProps> = ({
       {isLarge ? (
         <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
       ) : null}
-      {isLarge ? (
-        <span className="block text-[10px] uppercase tracking-[0.34em] text-indigo-100/58">
-          Genre
-        </span>
-      ) : null}
       <span
-        className={`relative mt-1.5 block w-full overflow-hidden align-middle ${
+        className={`relative block w-full overflow-hidden align-middle ${
           isLarge ? "min-w-[9.5rem] max-w-full" : "min-w-[6.5rem] max-w-full"
         }`}
         style={{

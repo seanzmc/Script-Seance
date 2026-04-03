@@ -42,7 +42,7 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
       variants={stageShellVariants}
       className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_auto] lg:items-center">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
         <div className="space-y-3">
           <div className="space-y-2">
             <p className={setupUi.sectionLabel}>Step 1</p>
@@ -50,6 +50,23 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
               Start with a genre
             </h3>
           </div>
+        </div>
+        <div className="flex justify-start lg:justify-center">
+          <m.div
+            layout
+            layoutId={layoutId}
+            className={`${sharedSurfaceCardClass} w-full max-w-[24rem]`}
+          >
+            <GenreCycleWheel
+              value={genre}
+              disabled={isLocked}
+              prefersReducedMotion={prefersReducedMotion}
+              focusRingClass={focusRingClass}
+              onChange={onGenreChange}
+            />
+          </m.div>
+        </div>
+        <div className="flex justify-start lg:justify-end">
           <button
             ref={continueButtonRef}
             type="button"
@@ -64,26 +81,6 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
           >
             Continue to Style
           </button>
-        </div>
-        <div className="flex justify-start lg:justify-end">
-          <m.div
-            layout
-            layoutId={layoutId}
-            className={`${sharedSurfaceCardClass} w-full max-w-[24rem]`}
-          >
-            <p className={`${setupUi.sectionLabel} text-slate-400`}>
-              Selected genre
-            </p>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <GenreCycleWheel
-                value={genre}
-                disabled={isLocked}
-                prefersReducedMotion={prefersReducedMotion}
-                focusRingClass={focusRingClass}
-                onChange={onGenreChange}
-              />
-            </div>
-          </m.div>
         </div>
       </div>
     </m.div>
