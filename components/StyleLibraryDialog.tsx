@@ -105,7 +105,7 @@ export const StyleLibraryDialog: React.FC<StyleLibraryDialogProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="min-h-0 min-w-0 flex-1 px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+            <div className="min-h-0 min-w-0 flex flex-col flex-1 px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
               <StyleLibrary
                 selectedStyleId={selectedStyleId}
                 selectedStyleTitle={selectedStyleTitle}
