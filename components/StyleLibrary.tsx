@@ -12,6 +12,7 @@ export interface StyleLibraryProps {
   disabled?: boolean;
   listTestId?: string;
   autoFocusSearch?: boolean;
+  useInternalListScroll?: boolean;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -26,7 +27,8 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
   onSelect,
   disabled = false,
   listTestId,
-  autoFocusSearch = false
+  autoFocusSearch = false,
+  useInternalListScroll = true
 }) => {
   const selectedLibraryStyle = useMemo(
     () => resolveSelectedLibraryStyle(selectedStyleId, selectedStyleTitle),
@@ -179,7 +181,11 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
       </div>
 
       <div
-        className="mt-3 h-[min(60vh,36rem)] min-h-[18rem] min-w-0 flex-1 overflow-y-auto overflow-x-hidden rounded-[1.15rem] border border-white/8 bg-slate-950/72 p-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.24)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/26"
+        className={`mt-3 min-w-0 rounded-[1.15rem] border border-white/8 bg-slate-950/72 p-1 ${
+          useInternalListScroll
+            ? 'h-[min(60vh,36rem)] min-h-[18rem] flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.24)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/26'
+            : ''
+        }`}
         data-testid={listTestId}
       >
         <div className="p-2">

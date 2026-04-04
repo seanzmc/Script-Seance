@@ -152,7 +152,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
                           Hide
                         </Button>
                       </div>
-                      <div className="h-[min(46vh,28rem)] min-h-[18rem] min-w-0">
+                      <div className="min-w-0">
                         <StyleLibrary
                           selectedStyleTitle={value}
                           onSelect={({ style }) => {
@@ -160,6 +160,7 @@ export const StyleEditModal: React.FC<StyleEditModalProps> = ({
                             setIsLibraryVisible(false);
                           }}
                           autoFocusSearch
+                          useInternalListScroll={false}
                         />
                       </div>
                     </m.div>
