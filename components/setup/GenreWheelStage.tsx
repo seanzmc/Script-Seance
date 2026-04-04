@@ -42,46 +42,40 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
       variants={stageShellVariants}
       className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <p className={setupUi.sectionLabel}>Step 1</p>
-            <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
-              Start with a genre
-            </h3>
-          </div>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <p className={setupUi.sectionLabel}>Step 1</p>
+          <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+            Start with a genre
+          </h3>
         </div>
-        <div className="flex justify-start lg:justify-center">
-          <m.div
-            layout
-            layoutId={layoutId}
-            className={`${sharedSurfaceCardClass} w-full max-w-[24rem]`}
-          >
-            <GenreCycleWheel
-              value={genre}
-              disabled={isLocked}
-              prefersReducedMotion={prefersReducedMotion}
-              focusRingClass={focusRingClass}
-              onChange={onGenreChange}
-            />
-          </m.div>
-        </div>
-        <div className="flex justify-start lg:justify-end">
-          <button
-            ref={continueButtonRef}
-            type="button"
-            onClick={onAdvance}
+        <m.div
+          layout
+          layoutId={layoutId}
+          className={`${sharedSurfaceCardClass} flex items-center justify-center`}
+        >
+          <GenreCycleWheel
+            value={genre}
             disabled={isLocked}
-            data-testid="setup-continue-to-style"
-            className={`${setupActionButtonBaseClass} ${focusRingClass} max-w-xs ${
-              isLocked
-                ? "cursor-not-allowed bg-indigo-500/12 text-slate-400 opacity-60"
-                : "bg-indigo-600 text-white ring-1 ring-indigo-400/50 shadow-[0_12px_24px_-8px_rgba(99,102,241,0.55)] hover:bg-indigo-500"
-            }`}
-          >
-            Continue to Style
-          </button>
-        </div>
+            prefersReducedMotion={prefersReducedMotion}
+            focusRingClass={focusRingClass}
+            onChange={onGenreChange}
+          />
+        </m.div>
+        <button
+          ref={continueButtonRef}
+          type="button"
+          onClick={onAdvance}
+          disabled={isLocked}
+          data-testid="setup-continue-to-style"
+          className={`${setupActionButtonBaseClass} ${focusRingClass} ${
+            isLocked
+              ? "cursor-not-allowed bg-indigo-500/12 text-slate-400 opacity-60"
+              : "bg-indigo-600 text-white ring-1 ring-indigo-400/50 shadow-[0_12px_24px_-8px_rgba(99,102,241,0.55)] hover:bg-indigo-500"
+          }`}
+        >
+          Continue to Style
+        </button>
       </div>
     </m.div>
   );
