@@ -2,19 +2,19 @@
     "categories": [
         {
             "id": "genre_format_parody",
-            "label": "Genre & Format Parodies"
+            "label": "Genre Twist"
         },
         {
             "id": "linguistic_dialogue_constraint",
-            "label": "Linguistic & Dialogue Constraints"
+            "label": "Dialogue Rules"
         },
         {
             "id": "absurdist_mechanic",
-            "label": "Absurdist & Situational Mechanics"
+            "label": "Absurd Logic"
         },
         {
             "id": "vibe_tone",
-            "label": "Pure Vibes & Tones"
+            "label": "Vibe Focus"
         }
     ],
     "styles": [

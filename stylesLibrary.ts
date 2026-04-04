@@ -9,10 +9,10 @@ export type StyleItem = {
 };
 
 export const STYLE_CATEGORIES: Array<{ id: StyleCategory; label: string }> = [
-    { id: "genre_format_parody", label: "Genre & Format Parodies" },
-    { id: "linguistic_dialogue_constraint", label: "Linguistic & Dialogue Constraints" },
-    { id: "absurdist_mechanic", label: "Absurdist & Situational Mechanics" },
-    { id: "vibe_tone", label: "Pure Vibes & Tones" },
+    { id: "genre_format_parody", label: "Genre Twist" },
+    { id: "linguistic_dialogue_constraint", label: "Dialogue Rules" },
+    { id: "absurdist_mechanic", label: "Absurd Logic" },
+    { id: "vibe_tone", label: "Vibe Focus" },
 ];
 
 export const stylesLibrary: StyleItem[] = [

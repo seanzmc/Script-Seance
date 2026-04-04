@@ -42,15 +42,15 @@ Current catalog size is 62 styles total, not ~64.
 
 | Category | Count |
 | --- | ---: |
-| Genre & Format Parodies | 16 |
-| Linguistic & Dialogue Constraints | 16 |
-| Absurdist & Situational Mechanics | 16 |
-| Pure Vibes & Tones | 14 |
+| Genre Twist | 16 |
+| Dialogue Rules | 16 |
+| Absurd Logic | 16 |
+| Vibe Focus | 14 |
 
 Observations:
 
 - The first three categories sit exactly at the proposed per-tab target.
-- `Pure Vibes & Tones` is slightly smaller but still large enough to justify its own dedicated tab.
+- `Vibe Focus` is slightly smaller but still large enough to justify its own dedicated tab.
 - No category is so small that a tab would feel empty.
 
 ## Sample line audit

@@ -790,7 +790,7 @@ describe("SetupForm submit validation", () => {
     fireEvent.click(screen.getByRole("button", { name: /browse/i }));
 
     const tabbedCard = screen.getByRole("button", { name: /^1940s Noir Detective/i });
-    expect(tabbedCard.textContent).not.toContain("Genre & Format Parodies");
+    expect(tabbedCard.textContent).not.toContain("Genre Twist");
 
     fireEvent.change(screen.getByLabelText(/search styles/i), {
       target: { value: "noir" },
@@ -800,7 +800,7 @@ describe("SetupForm submit validation", () => {
     });
 
     const searchResult = screen.getByRole("button", { name: /^1940s Noir Detective/i });
-    expect(searchResult.textContent).toContain("Genre & Format Parodies");
+    expect(searchResult.textContent).toContain("Genre Twist");
     expect(screen.queryByRole("tablist", { name: /style categories/i })).toBeNull();
     vi.useRealTimers();
   });
@@ -822,11 +822,11 @@ describe("SetupForm submit validation", () => {
     fireEvent.click(screen.getByTestId("setup-continue-to-style"));
     fireEvent.click(screen.getByRole("button", { name: /browse/i }));
 
-    const firstTab = screen.getByRole("tab", { name: "Genre & Format Parodies" });
+    const firstTab = screen.getByRole("tab", { name: "Genre Twist" });
     firstTab.focus();
     fireEvent.keyDown(firstTab, { key: "ArrowRight" });
 
-    const secondTab = screen.getByRole("tab", { name: "Linguistic & Dialogue Constraints" });
+    const secondTab = screen.getByRole("tab", { name: "Dialogue Rules" });
     expect(document.activeElement).toBe(secondTab);
     expect(secondTab.getAttribute("aria-selected")).toBe("false");
 

@@ -137,11 +137,11 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
         </div>
         {!isSearchMode ? (
           <div
-            className="-mx-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="pb-1"
             role="tablist"
             aria-label="Style categories"
           >
-            <div className="flex min-w-max gap-2 px-1">
+            <div className="grid grid-cols-4 gap-2">
               {STYLE_CATEGORIES.map((category) => {
                 const isActive = activeTabId === category.id;
                 return (
@@ -163,7 +163,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
                     onFocus={() => setFocusedTabId(category.id)}
                     onKeyDown={(event) => handleTabKeyDown(event, category.id)}
                     disabled={disabled}
-                    className={`rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`min-w-0 rounded-full border px-2 py-2 text-center text-sm font-medium transition-colors ${
                       isActive
                         ? 'border-indigo-300/50 bg-indigo-500/18 text-indigo-100 shadow-[inset_0_-2px_0_rgba(191,219,254,0.6)]'
                         : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white'
