@@ -213,14 +213,24 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-export const buildScriptExportDocument = (scriptMarkup: string, title: string) => {
+const EXPORT_IFRAME_CLEANUP_DELAY_MS = 60_000;
+
+export const buildScriptExportDocument = (
+  scriptMarkup: string,
+  title: string,
+  options?: { baseHref?: string },
+) => {
   const safeTitle = escapeHtml(title);
+  const safeBaseHref = options?.baseHref
+    ? `<base href="${escapeHtml(options.baseHref)}" />`
+    : '';
   return `<!doctype html>
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>${safeTitle}</title>
+      ${safeBaseHref}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
       <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
@@ -228,26 +238,80 @@ export const buildScriptExportDocument = (scriptMarkup: string, title: string) =
     </head>
     <body>
       ${scriptMarkup}
-      <script>
-        window.addEventListener('load', () => {
-          const ready = document.fonts ? document.fonts.ready : Promise.resolve();
-          ready.then(() => {
-            setTimeout(() => window.print(), 60);
-          });
-        });
-      </script>
     </body>
   </html>`;
 };
 
-export const openScriptExportWindow = (scriptMarkup: string, title: string) => {
-  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
-  if (!printWindow) return false;
-  printWindow.document.open();
-  printWindow.document.write(buildScriptExportDocument(scriptMarkup, title));
-  printWindow.document.close();
-  printWindow.focus();
-  return true;
+const waitForNextFrame = (targetWindow: Window) => (
+  new Promise<void>((resolve) => {
+    targetWindow.requestAnimationFrame(() => {
+      targetWindow.requestAnimationFrame(() => resolve());
+    });
+  })
+);
+
+export const printScriptExport = async (scriptMarkup: string, title: string) => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new Error('PDF export is only available in the browser.');
+  }
+
+  const printFrame = document.createElement('iframe');
+  printFrame.setAttribute('aria-hidden', 'true');
+  printFrame.tabIndex = -1;
+  printFrame.style.position = 'fixed';
+  printFrame.style.right = '0';
+  printFrame.style.bottom = '0';
+  printFrame.style.width = '0';
+  printFrame.style.height = '0';
+  printFrame.style.border = '0';
+  printFrame.style.opacity = '0';
+  printFrame.style.pointerEvents = 'none';
+
+  document.body.appendChild(printFrame);
+
+  const cleanup = () => {
+    printFrame.remove();
+  };
+
+  try {
+    const printWindow = printFrame.contentWindow;
+    const printDocument = printWindow?.document;
+    if (!printWindow || !printDocument) {
+      cleanup();
+      throw new Error('Unable to open the print surface for PDF export.');
+    }
+
+    const cleanupAfterPrint = () => {
+      printWindow.removeEventListener('afterprint', cleanupAfterPrint);
+      cleanup();
+    };
+
+    printWindow.addEventListener('afterprint', cleanupAfterPrint, { once: true });
+    window.setTimeout(cleanupAfterPrint, EXPORT_IFRAME_CLEANUP_DELAY_MS);
+
+    printDocument.open();
+    printDocument.write(buildScriptExportDocument(scriptMarkup, title, {
+      baseHref: `${window.location.origin}/`
+    }));
+    printDocument.close();
+
+    const fontSet = printDocument.fonts;
+    if (fontSet) {
+      await fontSet.ready.catch(() => undefined);
+    }
+    await waitForNextFrame(printWindow);
+
+    if (typeof printWindow.print !== 'function') {
+      cleanupAfterPrint();
+      throw new Error('Printing is not available in this browser.');
+    }
+
+    printWindow.focus();
+    printWindow.print();
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 };
 
 export const ScriptDisplay: React.FC<ScriptDisplayProps> = ({

@@ -20,7 +20,7 @@ import { createScriptMutationController, type ScriptMutationAction } from '../se
 import { buildFallbackTitle, buildPromptStyleFingerprint, buildTitleContext, resolveSetupStyleSelection, sanitizeSuggestedTitle } from '../services/setupStyle';
 import { buildScriptTextExport } from '../services/scriptExport';
 import { normalizeCharacterName, normalizeSceneCharacters, normalizeTargetLength, resolveCharacterName } from '../services/storyContext';
-import { openScriptExportWindow, SCRIPT_EXPORT_ROOT_SELECTOR } from '../components/ScriptDisplay';
+import { printScriptExport, SCRIPT_EXPORT_ROOT_SELECTOR } from '../components/ScriptDisplay';
 
 interface ToastState {
   message: string;
@@ -1188,18 +1188,26 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }, [context, getExportMeta]);
 
-  const handleExportPdf = useCallback(() => {
+  const handleExportPdf = useCallback(async () => {
     if (!context) return;
     const exportMeta = getExportMeta();
     if (!exportMeta) return;
     const scriptRoot = document.querySelector(SCRIPT_EXPORT_ROOT_SELECTOR) as HTMLElement | null;
     if (!scriptRoot) {
-      window.alert('Unable to locate the script preview for export. Try switching to the script tab and retry.');
+      setError('Unable to prepare the current screenplay for PDF export. Reload the draft and try again.');
       return;
     }
-    const opened = openScriptExportWindow(scriptRoot.outerHTML, exportMeta.displayTitle);
-    if (!opened) {
-      window.alert('Pop-up blocked. Allow pop-ups for this site to export the PDF.');
+    try {
+      await printScriptExport(scriptRoot.outerHTML, exportMeta.displayTitle);
+      setError((previous) => (
+        previous === 'PDF export failed. Please try again.'
+          || previous === 'Unable to prepare the current screenplay for PDF export. Reload the draft and try again.'
+          ? null
+          : previous
+      ));
+    } catch (err) {
+      const { message } = getErrorMeta(err);
+      setError(message || 'PDF export failed. Please try again.');
     }
   }, [context, getExportMeta]);
 
