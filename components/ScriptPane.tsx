@@ -32,6 +32,7 @@ import {
 } from "../services/scriptController";
 import { AlertCircle, PlusCircle } from "lucide-react";
 import { fadeSlideYVariants } from "./motion/primitives";
+import { SETUP_ENTRY_CARD_LAYOUT_ID } from "./setup/setupLayoutIds";
 import { SceneOutlineDrawer } from "./workspace/SceneOutlineDrawer";
 import { WorkspaceAudioDrawer } from "./workspace/WorkspaceAudioDrawer";
 import { WorkspaceHeader } from "./workspace/WorkspaceHeader";
@@ -290,11 +291,11 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   };
   const startScreenCard = (
     <m.div
+      layoutId={SETUP_ENTRY_CARD_LAYOUT_ID}
       className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-900/80 via-gray-900/60 to-gray-900/30 p-10 md:p-12 text-center shadow-[0_0_60px_rgba(15,23,42,0.6)]"
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      variants={fadeSlideYVariants}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } }}
+      exit={{ opacity: 0, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
     >
       <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="relative space-y-5">

@@ -14,7 +14,7 @@ import { normalizeLengthValue } from "./LengthCycleWheel";
 import { StyleLibraryDialog, resolveSelectedLibraryStyle } from "./StyleLibraryDialog";
 import { DetailsStage } from "./setup/DetailsStage";
 import { GenreWheelStage } from "./setup/GenreWheelStage";
-import { GENRE_SURFACE_LAYOUT_ID, STYLE_SURFACE_LAYOUT_ID } from "./setup/setupLayoutIds";
+import { GENRE_SURFACE_LAYOUT_ID, SETUP_ENTRY_CARD_LAYOUT_ID, STYLE_SURFACE_LAYOUT_ID } from "./setup/setupLayoutIds";
 import { StyleSelectionStage } from "./setup/StyleSelectionStage";
 import {
   modalVariants,
@@ -851,6 +851,7 @@ export const SetupForm: React.FC<SetupFormProps> = ({
                     isLocked={Boolean(isLocked)}
                     prefersReducedMotion={prefersReducedMotion}
                     layoutId={genreSurfaceLayoutId}
+                    shellLayoutId={SETUP_ENTRY_CARD_LAYOUT_ID}
                     continueButtonRef={genreContinueButtonRef}
                     onGenreChange={handleGenreChange}
                     onAdvance={handleGenreAdvance}

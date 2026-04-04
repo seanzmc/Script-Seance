@@ -9,6 +9,7 @@ export interface GenreWheelStageProps {
   isLocked: boolean;
   prefersReducedMotion: boolean;
   layoutId: string | undefined;
+  shellLayoutId?: string;
   continueButtonRef: React.RefObject<HTMLButtonElement | null>;
   onGenreChange: (next: string) => void;
   onAdvance: () => void;
@@ -19,6 +20,7 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
   isLocked,
   prefersReducedMotion,
   layoutId,
+  shellLayoutId,
   continueButtonRef,
   onGenreChange,
   onAdvance,
@@ -30,18 +32,34 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
     "rounded-[24px] border border-white/10 ring-1 ring-white/5 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.92)] bg-slate-950/56 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]";
   const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow,background-color] duration-[220ms] ease-out hover:-translate-y-px active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
 
+  // When shellLayoutId is provided the outer card is a shared-layout element:
+  // position is driven by the layout animation (flying from the splash card),
+  // so we only animate opacity here and skip the y-slide entry.
+  const shellMotionProps = shellLayoutId
+    ? {
+        key: "setup-stage-genre",
+        layoutId: shellLayoutId,
+        layout: true as const,
+        initial: { opacity: 0 },
+        animate: { opacity: 1, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const } },
+        exit: { opacity: 0, transition: { duration: 0.14 } },
+      }
+    : {
+        key: "setup-stage-genre",
+        layout: "position" as const,
+        initial: "hidden" as const,
+        animate: "visible" as const,
+        exit: "exit" as const,
+        variants: stageShellVariants,
+      };
+
   return (
     <m.div
-      key="setup-stage-genre"
-      layout="position"
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      variants={stageShellVariants}
-      className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
+      {...shellMotionProps}
+      className={`${stageShellClass} mx-auto w-full max-w-2xl px-5 py-5 sm:px-6 sm:py-5`}
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-center gap-6">
           <div className="space-y-1">
             <p className={setupUi.sectionLabel}>Step 1</p>
             <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
