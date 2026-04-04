@@ -28,8 +28,6 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950";
   const stageShellClass =
     "rounded-[24px] border border-white/10 ring-1 ring-white/5 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.92)] bg-slate-950/56 shadow-[0_26px_72px_-54px_rgba(15,23,42,0.92)]";
-  const sharedSurfaceCardClass =
-    "rounded-[24px] border border-white/10 ring-1 ring-white/5 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.92)] bg-white/[0.032] px-4 py-3.5 sm:px-5 sm:py-4";
   const setupActionButtonBaseClass = `w-full py-3.5 sm:py-4 ${setupUi.buttonText} transition-[opacity,transform,box-shadow,background-color] duration-[220ms] ease-out hover:-translate-y-px active:duration-[140ms] active:ease-in-out active:translate-y-px text-center rounded-xl`;
 
   return (
@@ -43,25 +41,23 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
       className={`${stageShellClass} px-5 py-5 sm:px-6 sm:py-5`}
     >
       <div className="space-y-4">
-        <div className="space-y-1">
-          <p className={setupUi.sectionLabel}>Step 1</p>
-          <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-            Start with a genre
-          </h3>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <p className={setupUi.sectionLabel}>Step 1</p>
+            <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              Start with a genre
+            </h3>
+          </div>
+          <m.div layout layoutId={layoutId}>
+            <GenreCycleWheel
+              value={genre}
+              disabled={isLocked}
+              prefersReducedMotion={prefersReducedMotion}
+              focusRingClass={focusRingClass}
+              onChange={onGenreChange}
+            />
+          </m.div>
         </div>
-        <m.div
-          layout
-          layoutId={layoutId}
-          className={`${sharedSurfaceCardClass} flex items-center justify-center`}
-        >
-          <GenreCycleWheel
-            value={genre}
-            disabled={isLocked}
-            prefersReducedMotion={prefersReducedMotion}
-            focusRingClass={focusRingClass}
-            onChange={onGenreChange}
-          />
-        </m.div>
         <button
           ref={continueButtonRef}
           type="button"
