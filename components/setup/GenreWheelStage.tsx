@@ -59,7 +59,7 @@ export const GenreWheelStage: React.FC<GenreWheelStageProps> = ({
       className={`${stageShellClass} mx-auto w-full max-w-2xl px-5 py-5 sm:px-6 sm:py-5`}
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-center gap-6">
+        <div className="flex items-center justify-between gap-6">
           <div className="space-y-1">
             <p className={setupUi.sectionLabel}>Step 1</p>
             <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
