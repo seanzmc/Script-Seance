@@ -94,6 +94,7 @@ const getVoiceContextFingerprint = (configs: VoiceConfig[]) => (
 export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
   const [context, setContext] = useState<StoryContext | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingNextScene, setIsGeneratingNextScene] = useState(false);
   const [voiceConfigs, setVoiceConfigs] = useState<VoiceConfig[]>([]);
   const [userInstruction, setUserInstruction] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -451,6 +452,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     }
     activeGenerationScopeRef.current = null;
     setIsGenerating(false);
+    setIsGeneratingNextScene(false);
     setError(null);
   }, []);
 
@@ -769,6 +771,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
       const scopeKey = scopeKeys.generateOpeningScene(scriptIdRef.current);
       activeGenerationScopeRef.current = scopeKey;
       setIsGenerating(true);
+      setIsGeneratingNextScene(false);
       setError(null);
 
       const outcome = await orchestratorRef.current.run<Scene>({
@@ -821,11 +824,17 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
   ]);
 
   const handleGenerateNext = useCallback(async () => {
-    await scriptMutationController.generateNextScene({
-      context,
-      isGenerating,
-      userInstruction
-    });
+    if (!context || isGenerating) return;
+    setIsGeneratingNextScene(true);
+    try {
+      await scriptMutationController.generateNextScene({
+        context,
+        isGenerating,
+        userInstruction
+      });
+    } finally {
+      setIsGeneratingNextScene(false);
+    }
   }, [context, isGenerating, scriptMutationController, userInstruction]);
 
   const handleTwist = useCallback(async () => {
@@ -837,6 +846,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
       const scopeKey = scopeKeys.suggestPlotTwist(scriptIdRef.current);
       activeGenerationScopeRef.current = scopeKey;
       setIsGenerating(true);
+      setIsGeneratingNextScene(false);
       setError(null);
 
       const outcome = await orchestratorRef.current.run<string>({
@@ -1415,6 +1425,7 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     handleGenerateInsertAtAnchor,
     handleUpdateSceneHeading,
     isGenerating,
+    isGeneratingNextScene,
     isPlaying,
     cancelAiRequest,
     currentBlockId,

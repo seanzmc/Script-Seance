@@ -47,6 +47,7 @@ export default function App() {
         onGenerateInsertAtAnchor={workspace.handleGenerateInsertAtAnchor}
         onUpdateSceneHeading={workspace.handleUpdateSceneHeading}
         isGenerating={workspace.isGenerating}
+        isGeneratingNextScene={workspace.isGeneratingNextScene}
         isPlaying={workspace.isPlaying}
         onCancelGenerate={workspace.cancelAiRequest}
         currentBlockId={workspace.currentBlockId}

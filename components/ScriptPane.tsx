@@ -37,10 +37,12 @@ import { SceneOutlineDrawer } from "./workspace/SceneOutlineDrawer";
 import { WorkspaceAudioDrawer } from "./workspace/WorkspaceAudioDrawer";
 import { WorkspaceHeader } from "./workspace/WorkspaceHeader";
 import { WorkspaceSetupOverlay } from "./workspace/WorkspaceSetupOverlay";
+import { SceneGenerationLoadingCard } from "./workspace/SceneGenerationLoadingCard";
 import {
   getSceneGenerationLoadingMessages,
   SCENE_GENERATION_LOADING_COPY_INTERVAL_MS,
 } from "./workspace/sceneGenerationLoadingCopy";
+import { modalVariants, overlayVariants } from "./motion/primitives";
 
 export interface ScriptPaneProps {
   context: StoryContext | null;
@@ -90,6 +92,7 @@ export interface ScriptPaneProps {
   }) => Promise<void>;
   onUpdateSceneHeading?: (sceneId: string, heading: string) => void;
   isGenerating: boolean;
+  isGeneratingNextScene?: boolean;
   isPlaying: boolean;
   onCancelGenerate: () => void;
   currentBlockId: string | null;
@@ -151,6 +154,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   onGenerateInsertAtAnchor,
   onUpdateSceneHeading,
   isGenerating,
+  isGeneratingNextScene = false,
   isPlaying,
   onCancelGenerate,
   currentBlockId,
@@ -212,6 +216,9 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
   const showInitialGeneration = !context && isGenerating;
   const showSetupHandoffLoading = !isSetupOpen && showInitialGeneration;
   const showSetupSurface = isSetupOpen || showSetupHandoffLoading;
+  const showSceneGenerationLoadingOverlay = Boolean(
+    context && isGenerating && isGeneratingNextScene,
+  );
   const sceneGenerationLoadingMessage = isGenerating
     ? (sceneGenerationLoadingMessages[sceneGenerationLoadingCopyIndex] ??
       sceneGenerationLoadingMessages[0])
@@ -714,6 +721,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
       onCancelGenerate={onCancelGenerate}
       error={error}
       loadingMessage={sceneGenerationLoadingMessage ?? undefined}
+      showGeneratingStatus={!isGeneratingNextScene}
       insertSceneBeatDisabled={!sceneEndAnchor}
       onOpenPrivacy={onOpenPrivacy}
       sceneCountLabel={sceneCountLabel}
@@ -758,6 +766,7 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
           onOpenOutline={toggleOutline}
           onOpenAudioDrawer={openAudioDrawer}
           onCancelGenerate={onCancelGenerate}
+          showWritingIndicator={!isGeneratingNextScene}
           exportMenuRef={exportMenuRef}
           generateMenuRef={generateMenuRef}
           composerPanel={composerPanelNode}
@@ -858,6 +867,41 @@ export const ScriptPane: React.FC<ScriptPaneProps> = ({
         onSave={handleSaveStyle}
         onClose={closeStyleModal}
       />
+      <AnimatePresence initial={false}>
+        {showSceneGenerationLoadingOverlay ? (
+          <m.div
+            key="scene-generation-loading-overlay"
+            className="fixed inset-0 z-screen-overlay overflow-y-auto bg-[linear-gradient(180deg,rgba(2,6,23,0.68),rgba(2,6,23,0.8))] backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scene-generation-loading-title"
+            data-testid="scene-generation-loading-overlay"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={overlayVariants}
+          >
+            <div className="pointer-events-none absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_center,_rgba(99,102,241,0.22),_transparent_45%)]" />
+            <div className="relative flex min-h-full items-center justify-center px-4 py-6 sm:px-6 sm:py-8">
+              <m.div
+                className="w-full max-w-2xl"
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                variants={modalVariants}
+              >
+                <SceneGenerationLoadingCard
+                  title="Generating your next scene..."
+                  titleId="scene-generation-loading-title"
+                  loadingMessage={sceneGenerationLoadingMessage ?? undefined}
+                  onCancel={onCancelGenerate}
+                  className="mx-auto border-white/10 bg-slate-950/78 shadow-[0_35px_120px_rgba(2,6,23,0.72)] backdrop-blur-md"
+                />
+              </m.div>
+            </div>
+          </m.div>
+        ) : null}
+      </AnimatePresence>
       <WorkspaceSetupOverlay
         showSetupSurface={showSetupSurface}
         showSetupHandoffLoading={showSetupHandoffLoading}

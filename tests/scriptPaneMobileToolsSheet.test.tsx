@@ -97,6 +97,7 @@ const createProps = (overrides: Partial<ScriptPaneProps> = {}): ScriptPaneProps 
   onChangeSpeaker: vi.fn(),
   onInsertError: vi.fn(),
   isGenerating: false,
+  isGeneratingNextScene: false,
   isPlaying: false,
   onCancelGenerate: vi.fn(),
   currentBlockId: null,
@@ -382,6 +383,56 @@ describe('ScriptPane header generation and audio drawer', () => {
     expect(screen.getByText('Generating...')).toBeTruthy();
     expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
     expect(screen.getByRole('button', { name: /write next scene/i }).getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('does not eagerly render the next-scene loading overlay when generation is idle', () => {
+    render(<ScriptPane {...createProps()} />);
+
+    expect(screen.queryByTestId('scene-generation-loading-overlay')).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Generating your next scene...' })).toBeNull();
+  });
+
+  it('shows a centered next-scene loading overlay with rotating copy and no duplicate inline status', () => {
+    render(<ScriptPane {...createProps({ isGenerating: true, isGeneratingNextScene: true })} />);
+
+    expect(screen.getByTestId('scene-generation-loading-overlay')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Generating your next scene...' })).toBeTruthy();
+    expect(screen.getByText("The city doesn't care about your outline.")).toBeTruthy();
+    expect(screen.queryByText(/^Generating\.\.\.$/)).toBeNull();
+    expect(screen.queryByText('Writing')).toBeNull();
+  });
+
+  it('dismisses the next-scene loading overlay when scene generation completes', () => {
+    const { rerender } = render(
+      <ScriptPane {...createProps({ isGenerating: true, isGeneratingNextScene: true })} />
+    );
+
+    expect(screen.getByTestId('scene-generation-loading-overlay')).toBeTruthy();
+
+    rerender(<ScriptPane {...createProps({ isGenerating: false, isGeneratingNextScene: false })} />);
+
+    expect(screen.queryByTestId('scene-generation-loading-overlay')).toBeNull();
+  });
+
+  it('dismisses the next-scene loading overlay when scene generation fails', () => {
+    const { rerender } = render(
+      <ScriptPane {...createProps({ isGenerating: true, isGeneratingNextScene: true })} />
+    );
+
+    expect(screen.getByTestId('scene-generation-loading-overlay')).toBeTruthy();
+
+    rerender(
+      <ScriptPane
+        {...createProps({
+          isGenerating: false,
+          isGeneratingNextScene: false,
+          error: 'Failed to generate scene.'
+        })}
+      />
+    );
+
+    expect(screen.queryByTestId('scene-generation-loading-overlay')).toBeNull();
+    expect(screen.getByText('Failed to generate scene.')).toBeTruthy();
   });
 
   it('rotates scene-generation loading copy deterministically and resets when generation stops', () => {

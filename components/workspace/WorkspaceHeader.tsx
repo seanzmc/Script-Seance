@@ -59,6 +59,7 @@ export interface WorkspaceHeaderProps {
   onOpenOutline: () => void;
   onOpenAudioDrawer: () => void;
   onCancelGenerate: () => void;
+  showWritingIndicator?: boolean;
   exportMenuRef: React.RefObject<HTMLDivElement | null>;
   generateMenuRef: React.RefObject<HTMLDivElement | null>;
   composerPanel: React.ReactNode;
@@ -88,6 +89,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
   onOpenOutline,
   onOpenAudioDrawer,
   onCancelGenerate,
+  showWritingIndicator = true,
   exportMenuRef,
   generateMenuRef,
   composerPanel
@@ -319,7 +321,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
               </div>
             </div>
             <AnimatePresence initial={false}>
-              {isGenerating ? (
+              {isGenerating && showWritingIndicator ? (
                 <m.div
                   key="writing-indicator"
                   className="pointer-events-none absolute right-0 top-full z-6 mt-2 flex justify-end max-[940px]:left-1/2 max-[940px]:right-auto max-[940px]:-translate-x-1/2"
