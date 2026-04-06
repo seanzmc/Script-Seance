@@ -2,11 +2,11 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
-import { buildScriptExportDocument, printScriptExport } from '../components/ScriptDisplay';
+import { buildScriptExportDocument, printScriptExport } from '../services/scriptPdfExport';
 import { BlockType, StoryContext } from '../types';
 
-vi.mock('../components/ScriptDisplay', async () => {
-  const actual = await vi.importActual<typeof import('../components/ScriptDisplay')>('../components/ScriptDisplay');
+vi.mock('../services/scriptPdfExport', async () => {
+  const actual = await vi.importActual<typeof import('../services/scriptPdfExport')>('../services/scriptPdfExport');
   return {
     ...actual,
     printScriptExport: vi.fn()
@@ -152,6 +152,15 @@ describe('buildScriptExportDocument', () => {
 });
 
 describe('PDF export flow', () => {
+  it('does not touch the PDF export helper during startup', async () => {
+    const printScriptExportMock = vi.mocked(printScriptExport);
+    printScriptExportMock.mockResolvedValue(undefined);
+
+    await renderHydratedApp();
+
+    expect(printScriptExportMock).not.toHaveBeenCalled();
+  });
+
   it('passes the live screenplay DOM markup to the PDF export helper', async () => {
     const printScriptExportMock = vi.mocked(printScriptExport);
     printScriptExportMock.mockResolvedValue(undefined);

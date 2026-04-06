@@ -19,8 +19,8 @@ import { GenerationOrchestrator, scopeKeys, isSetupAutoSurpriseFresh, isTitleSug
 import { createScriptMutationController, type ScriptMutationAction } from '../services/scriptController';
 import { buildFallbackTitle, buildPromptStyleFingerprint, buildTitleContext, resolveSetupStyleSelection, sanitizeSuggestedTitle } from '../services/setupStyle';
 import { buildScriptTextExport } from '../services/scriptExport';
+import { printScriptExport, SCRIPT_EXPORT_ROOT_SELECTOR } from '../services/scriptPdfExport';
 import { normalizeCharacterName, normalizeSceneCharacters, normalizeTargetLength, resolveCharacterName } from '../services/storyContext';
-import { printScriptExport, SCRIPT_EXPORT_ROOT_SELECTOR } from '../components/ScriptDisplay';
 
 interface ToastState {
   message: string;
