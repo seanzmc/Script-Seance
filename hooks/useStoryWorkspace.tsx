@@ -203,7 +203,11 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     authStatus,
     authError,
     isAuthLoading,
+    authUser,
+    pendingAuthEmail,
     handleLogin,
+    handleVerifyCode,
+    handleLogout,
     requireAuthentication
   } = useAuthSession();
   const { availableVoices, voiceCatalogState } = useVoiceCatalog(authStatus);
@@ -1458,7 +1462,11 @@ export function useStoryWorkspace({ titleInputRef }: UseStoryWorkspaceParams) {
     authStatus,
     authError,
     isAuthLoading,
+    authUser,
+    pendingAuthEmail,
     handleLogin,
+    handleVerifyCode,
+    handleLogout,
     isPrivacyOpen,
     closePrivacy
   };

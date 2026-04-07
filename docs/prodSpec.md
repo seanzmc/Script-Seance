@@ -75,6 +75,12 @@ Quality bar:
 - Reduce future auth/origin rework
 - Do not implement anything
 
+Launch topology:
+	•	one HTTPS origin
+	•	Express serves dist
+	•	/api stays same-host
+	•	cookie auth remains HTTP-only and same-origin
+
 Spec 2: Design the production auth/session replacement
 
 Recommended Codex reasoning level: high
@@ -88,6 +94,11 @@ Goal:
 Produce a concrete implementation plan for production-grade auth/session handling in this repo.
 
 Important constraints:
+-	Assume launch topology is settled as same-origin
+-	Prefer server-managed sessions with HTTP-only cookies
+-	Do not recommend localStorage/sessionStorage token auth as the primary production model
+-	Do not broaden scope into CORS or multi-origin auth architecture
+-	Design for eventual multi-instance deployment, so process-local session state is not acceptable
 - Do not implement auth yet.
 - Do not rewrite large parts of the app.
 - Base the design on the actual current client/server auth flow.
@@ -104,14 +115,18 @@ What to inspect:
 - any launch assumptions from docs/productionChecklist.md and docs/Production Execution Seq.md
 
 Questions to answer:
-1. What exactly is the current auth/session model?
-2. Why is it unsafe or insufficient for production?
-3. What replacement model best fits this repo?
-4. What should be persisted server-side vs client-side?
-5. How should session expiration, logout, quota/accountability, and multi-instance behavior work?
-6. What is the smallest viable production-safe auth path for:
-   - private beta
-   - public launch
+1.	What exactly is the current auth/session model?
+2.	Why is the current shared-password + in-memory session approach unsafe for production?
+3.	What is the best production-safe same-origin auth/session model for this repo?
+4.	What session data should live:
+	•	in the cookie
+	•	in the server-side session store
+	•	nowhere at all
+5.	How should login, logout, expiry, invalidation, and restart/multi-instance behavior work?
+6.	What is the smallest viable production-safe auth path for:
+	•	private beta
+	•	public launch
+7.	What external store or persistence layer should back sessions and rate limiting?
 
 Required output format:
 Return:
@@ -126,6 +141,12 @@ Return:
 - Why it fits this repo
 - What storage/session mechanism it should use
 - How it should behave across refresh/restart/multi-instance deploys
+- cookie shape expectations
+-	session-store recommendation
+-	CSRF posture for same-origin cookie auth
+-	rate-limit/accountability implications
+-	whether private beta should use invite-only/passwordless/email-link/basic accounts/etc.
+-	whether public launch should use the same model or a migration path
 
 ## Required Backend Changes
 - Concrete list
@@ -141,6 +162,10 @@ Return:
 ## Beta vs Public Launch Scope
 - What is enough for private beta
 - What must be added for public launch
+
+Rejected Alternatives
+	•	Briefly list the auth approaches considered but not recommended for this repo
+	•	Explain why they are worse given the chosen same-origin topology
 
 Quality bar:
 - Keep it realistic

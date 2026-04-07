@@ -110,7 +110,9 @@ export default function App() {
         isOpen={workspace.authStatus === 'unauthenticated'}
         isLoading={workspace.isAuthLoading}
         error={workspace.authError}
+        pendingEmail={workspace.pendingAuthEmail}
         onLogin={workspace.handleLogin}
+        onVerifyCode={workspace.handleVerifyCode}
       />
       <PrivacyModal isOpen={workspace.isPrivacyOpen} onClose={workspace.closePrivacy} />
     </div>

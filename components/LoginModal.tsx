@@ -9,28 +9,41 @@ export interface LoginModalProps {
   isOpen: boolean;
   isLoading?: boolean;
   error?: string | null;
-  onLogin: (password: string) => void;
+  pendingEmail?: string | null;
+  onLogin: (email: string) => void;
+  onVerifyCode: (email: string, code: string) => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   isLoading,
   error,
-  onLogin
+  pendingEmail,
+  onLogin,
+  onVerifyCode
 }) => {
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setPassword('');
+      setEmail('');
+      setCode('');
     }
   }, [isOpen]);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!password.trim()) return;
-    onLogin(password);
+    if (pendingEmail) {
+      if (!code.trim()) return;
+      onVerifyCode(pendingEmail, code);
+      return;
+    }
+    if (!email.trim()) return;
+    onLogin(email);
   };
+
+  const isCodeStep = Boolean(pendingEmail);
 
   return (
     <AnimatePresence initial={false}>
@@ -59,7 +72,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white">Sign In</h2>
-                <p className="text-xs text-gray-400">Enter the password to get started.</p>
+                <p className="text-xs text-gray-400">
+                  {isCodeStep ? `Enter the code sent to ${pendingEmail}.` : 'Enter your beta invite email.'}
+                </p>
               </div>
             </div>
 
@@ -71,24 +86,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold tracking-widest text-gray-500">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                  autoFocus
-                />
-              </div>
+              {isCodeStep ? (
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold tracking-widest text-gray-500">Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold tracking-widest text-gray-500">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="w-full rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                    autoFocus
+                  />
+                </div>
+              )}
 
               <Button
                 type="submit"
                 className="w-full"
                 loading={isLoading}
-                disabled={isLoading || !password.trim()}
+                disabled={isLoading || (isCodeStep ? !code.trim() : !email.trim())}
               >
-                Unlock AI
+                {isCodeStep ? 'Verify Code' : 'Send Code'}
               </Button>
             </form>
           </m.div>

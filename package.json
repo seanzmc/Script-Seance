@@ -7,6 +7,7 @@
     "scripts": {
         "server": "node server/index.js",
         "server:debug": "SS_DEBUG_PROMPTS=1 node server/index.js",
+        "auth:migrate": "node server/auth/migrate.js",
         "dev": "vite",
         "dev:debug": "VITE_SS_DEBUG_PROMPTS=1 VITE_SS_DEBUG_AI_ABORTS=1 vite",
         "start": "concurrently -k -n server,client -c green,cyan \"pnpm run server\" \"pnpm run dev\"",
@@ -34,9 +35,12 @@
         "express": "^5.2.1",
         "lucide-react": "^0.556.0",
         "motion": "^12.38.0",
+        "nodemailer": "^8.0.5",
         "openai": "^6.22.0",
+        "pg": "^8.20.0",
         "react": "^19.2.4",
-        "react-dom": "^19.2.4"
+        "react-dom": "^19.2.4",
+        "redis": "^5.11.0"
     },
     "devDependencies": {
         "@playwright/test": "^1.58.2",

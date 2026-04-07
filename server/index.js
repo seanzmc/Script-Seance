@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
-import cookie from 'cookie';
 import {
   getOpenAIClient
 } from './llm/llmClient.js';
@@ -34,14 +33,16 @@ import {
   isAbortError,
   isRetryableUpstreamError
 } from './upstreamControl.js';
+import { resolveAuthConfig, validateAuthConfigForBoot } from './auth/config.js';
+import { createAuthRuntime } from './auth/runtime.js';
+import { createAuthHandlers, createRequireSession } from './auth/routes.js';
+import { sha256Hex } from './auth/crypto.js';
 
 const app = express();
 app.disable('x-powered-by');
 
 const BODY_LIMIT = '64kb';
 const PORT = process.env.PORT || 3001;
-const SESSION_COOKIE_NAME = 'ss_session';
-const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '..', 'dist');
@@ -61,13 +62,8 @@ const AI_UPSTREAM_RETRY_MAX_RETRIES = parseNonNegativeInt(process.env.AI_UPSTREA
 const AI_UPSTREAM_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_BASE_DELAY_MS, 250);
 const AI_UPSTREAM_RETRY_MAX_DELAY_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_MAX_DELAY_MS, 4000);
 const AI_UPSTREAM_RETRY_JITTER_MS = parseNonNegativeInt(process.env.AI_UPSTREAM_RETRY_JITTER_MS, 150);
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const RATE_LIMIT_MINUTE_MS = 60 * 1000;
 const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
-const CLEANUP_INTERVAL_MS = parsePositiveInt(process.env.MAP_CLEANUP_INTERVAL_MS, 20 * 60 * 1000);
-const LOGIN_WINDOW_MS = 10 * 60 * 1000;
-const LOGIN_MAX_ATTEMPTS = 8;
-const LOGIN_BUCKET_TTL_MS = LOGIN_WINDOW_MS * 2;
 const TTS_INWORLD_MODEL = process.env.TTS_INWORLD_MODEL || 'inworld-tts-1.5-max';
 const INWORLD_API_KEY = process.env.INWORLD_API_KEY || '';
 const INWORLD_API_SECRET = process.env.INWORLD_API_SECRET || '';
@@ -87,9 +83,6 @@ const VALID_SCENE_LENGTHS = new Set(['Short', 'Medium', 'Long']);
 const VALID_SCRIPT_ELEMENT_PURPOSES = new Set(['titleSuggestion', 'insertBlock']);
 const SCENE_DIALOGUE_BLOCK_FIELDS = new Set(['type', 'character', 'parenthetical', 'text']);
 const SCENE_NON_DIALOGUE_BLOCK_FIELDS = new Set(['type', 'text']);
-const sessions = new Map();
-const rateBuckets = new Map();
-const loginBuckets = new Map();
 const MAX_SCENE_HEADING_CHARS = 200;
 const MAX_SCENE_SUMMARY_CHARS = 2000;
 const MAX_SCENE_BLOCKS = 200;
@@ -762,8 +755,6 @@ const createAiValidationError = (kind, reason) => {
 const sendError = (res, status, message, code, details) =>
   res.status(status).json({ error: { message, code, ...(details ? { details } : {}) } });
 
-const parseCookies = (cookieHeader = '') => cookie.parse(cookieHeader);
-
 const getClientIp = (req) => {
   if (typeof req.ip === 'string' && req.ip.trim().length > 0) {
     return req.ip.trim();
@@ -774,46 +765,6 @@ const getClientIp = (req) => {
   return 'unknown';
 };
 
-const safeEqual = (left, right) => {
-  if (typeof left !== 'string' || typeof right !== 'string') return false;
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-};
-
-const createSession = () => {
-  const id = crypto.randomBytes(32).toString('hex');
-  sessions.set(id, { createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
-  return id;
-};
-
-const getSessionId = (req) => {
-  const cookies = parseCookies(req.headers.cookie || '');
-  const sessionId = cookies[SESSION_COOKIE_NAME];
-  if (!sessionId) return null;
-  const session = sessions.get(sessionId);
-  if (!session || session.expiresAt <= Date.now()) {
-    sessions.delete(sessionId);
-    return null;
-  }
-  return sessionId;
-};
-
-const setSessionCookie = (res, sessionId) => {
-  res.cookie(SESSION_COOKIE_NAME, sessionId, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: SESSION_TTL_MS,
-    path: '/'
-  });
-};
-
-const clearSessionCookie = (res) => {
-  res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
-};
-
 const ensurePromptSize = (res, size) => {
   if (size > MAX_PROMPT_CHARS) {
     sendError(res, 413, 'Prompt too large.', 'PROMPT_TOO_LARGE', { maxChars: MAX_PROMPT_CHARS });
@@ -822,150 +773,69 @@ const ensurePromptSize = (res, size) => {
   return true;
 };
 
-const checkRateLimit = (key) => {
-  if (!key) return { allowed: true };
-  const now = Date.now();
-  const bucket = rateBuckets.get(key) || {
-    minuteStart: now,
-    minuteCount: 0,
-    dayStart: now,
-    dayCount: 0,
-    lastSeen: now
-  };
+const AUTH_CONFIG = resolveAuthConfig(process.env);
+let authRuntime = createAuthRuntime(AUTH_CONFIG);
+const getAuthRuntime = () => authRuntime;
 
-  if (now - bucket.minuteStart >= RATE_LIMIT_MINUTE_MS) {
-    bucket.minuteStart = now;
-    bucket.minuteCount = 0;
+const setAuthRuntimeForTests = (nextRuntime) => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Cannot override auth runtime in production.');
   }
-  if (now - bucket.dayStart >= RATE_LIMIT_DAY_MS) {
-    bucket.dayStart = now;
-    bucket.dayCount = 0;
-  }
-  bucket.lastSeen = now;
-
-  const nextMinuteCount = bucket.minuteCount + 1;
-  const nextDayCount = bucket.dayCount + 1;
-  const exceededMinute = AI_RPM > 0 && nextMinuteCount > AI_RPM;
-  const exceededDay = AI_RPD > 0 && nextDayCount > AI_RPD;
-
-  if (exceededMinute || exceededDay) {
-    const retryAfterMs = exceededMinute
-      ? bucket.minuteStart + RATE_LIMIT_MINUTE_MS - now
-      : bucket.dayStart + RATE_LIMIT_DAY_MS - now;
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
-      scope: exceededMinute ? 'minute' : 'day'
-    };
-  }
-
-  bucket.minuteCount = nextMinuteCount;
-  bucket.dayCount = nextDayCount;
-  rateBuckets.set(key, bucket);
-  return { allowed: true };
+  authRuntime = nextRuntime;
 };
 
-const checkLoginRateLimit = (key) => {
-  if (!key) return { allowed: true };
-  const now = Date.now();
-  const bucket = loginBuckets.get(key) || {
-    windowStart: now,
-    count: 0,
-    lastSeen: now
-  };
-
-  if (now - bucket.windowStart >= LOGIN_WINDOW_MS) {
-    bucket.windowStart = now;
-    bucket.count = 0;
+const resetAuthRuntimeForTests = () => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Cannot reset auth runtime in production.');
   }
-  bucket.lastSeen = now;
-
-  const nextCount = bucket.count + 1;
-  const exceeded = LOGIN_MAX_ATTEMPTS > 0 && nextCount > LOGIN_MAX_ATTEMPTS;
-  if (exceeded) {
-    const retryAfterMs = bucket.windowStart + LOGIN_WINDOW_MS - now;
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000))
-    };
-  }
-
-  bucket.count = nextCount;
-  loginBuckets.set(key, bucket);
-  return { allowed: true };
+  authRuntime = createAuthRuntime(AUTH_CONFIG);
 };
 
-const pruneStaleEntries = (now = Date.now()) => {
-  for (const [sessionId, session] of sessions.entries()) {
-    if (!session || session.expiresAt <= now) {
-      sessions.delete(sessionId);
-    }
-  }
+const requireSession = createRequireSession({
+  getRuntime: getAuthRuntime,
+  sendError
+});
 
-  for (const [key, bucket] of rateBuckets.entries()) {
-    const lastSeen = bucket?.lastSeen ?? bucket?.dayStart ?? bucket?.minuteStart ?? 0;
-    if (!lastSeen || now - lastSeen > RATE_LIMIT_DAY_MS) {
-      rateBuckets.delete(key);
-    }
-  }
-
-  for (const [key, bucket] of loginBuckets.entries()) {
-    const lastSeen = bucket?.lastSeen ?? bucket?.windowStart ?? 0;
-    if (!lastSeen || now - lastSeen > LOGIN_BUCKET_TTL_MS) {
-      loginBuckets.delete(key);
-    }
-  }
+const getRateWindowKey = ({ userId, scope, windowMs }) => {
+  const windowId = Math.floor(Date.now() / windowMs);
+  return `ai:${scope}:${sha256Hex(userId)}:${windowId}`;
 };
 
-let cleanupTimer;
-const startCleanupTimer = () => {
-  if (cleanupTimer || CLEANUP_INTERVAL_MS <= 0) return;
-  cleanupTimer = setInterval(() => {
-    pruneStaleEntries();
-  }, CLEANUP_INTERVAL_MS);
-  if (typeof cleanupTimer.unref === 'function') {
-    cleanupTimer.unref();
-  }
-};
-
-const requireSession = (req, res, next) => {
-  if (!ADMIN_PASSWORD) {
-    return sendError(res, 500, 'Server missing ADMIN_PASSWORD.', 'CONFIG_ERROR');
-  }
-  const sessionId = getSessionId(req);
-  if (!sessionId) {
+const rateLimitAi = async (req, res, next) => {
+  const runtime = getAuthRuntime();
+  const userId = req.userId;
+  if (!userId) {
     return sendError(res, 401, 'Authentication required.', 'UNAUTHORIZED');
   }
-  req.aiSessionId = sessionId;
-  return next();
-};
 
-const rateLimitAi = (req, res, next) => {
-  const key = req.aiSessionId || getClientIp(req);
-  const result = checkRateLimit(key);
-  if (!result.allowed) {
-    res.set('Retry-After', String(result.retryAfterSeconds));
+  const minute = await runtime.rateLimiter.check({
+    key: getRateWindowKey({ userId, scope: 'minute', windowMs: RATE_LIMIT_MINUTE_MS }),
+    limit: AI_RPM,
+    windowMs: RATE_LIMIT_MINUTE_MS
+  });
+  if (!minute.allowed) {
+    res.set('Retry-After', String(minute.retryAfterSeconds));
     return sendError(res, 429, 'Rate limit exceeded. Please wait and try again.', 'RATE_LIMITED', {
-      scope: result.scope,
-      retryAfterSeconds: result.retryAfterSeconds,
-      limit: result.scope === 'minute' ? AI_RPM : AI_RPD
+      scope: 'minute',
+      retryAfterSeconds: minute.retryAfterSeconds,
+      limit: AI_RPM
     });
   }
-  return next();
-};
 
-const rateLimitLogin = (req, res, next) => {
-  const key = getClientIp(req);
-  const result = checkLoginRateLimit(key);
-  if (!result.allowed) {
-    res.set('Retry-After', String(result.retryAfterSeconds));
-    console.warn('[auth/login] Rate limited', { ip: key, retryAfterSeconds: result.retryAfterSeconds });
-    return sendError(res, 429, 'Too many login attempts. Please try again later.', 'LOGIN_RATE_LIMITED', {
-      retryAfterSeconds: result.retryAfterSeconds,
-      limit: LOGIN_MAX_ATTEMPTS,
-      windowSeconds: Math.ceil(LOGIN_WINDOW_MS / 1000)
+  const day = await runtime.rateLimiter.check({
+    key: getRateWindowKey({ userId, scope: 'day', windowMs: RATE_LIMIT_DAY_MS }),
+    limit: AI_RPD,
+    windowMs: RATE_LIMIT_DAY_MS
+  });
+  if (!day.allowed) {
+    res.set('Retry-After', String(day.retryAfterSeconds));
+    return sendError(res, 429, 'Rate limit exceeded. Please wait and try again.', 'RATE_LIMITED', {
+      scope: 'day',
+      retryAfterSeconds: day.retryAfterSeconds,
+      limit: AI_RPD
     });
   }
+
   return next();
 };
 
@@ -1011,41 +881,16 @@ const enforceAllowedOrigin = (req, res, next) => {
 
 app.use(enforceAllowedOrigin);
 
-const handleLogin = (req, res) => {
-  const password = req.body?.password;
-  if (!isNonEmptyString(password, 256)) {
-    return sendError(res, 400, 'Invalid login payload.', 'INVALID_REQUEST');
-  }
-  if (!ADMIN_PASSWORD) {
-    return sendError(res, 500, 'Server missing ADMIN_PASSWORD.', 'CONFIG_ERROR');
-  }
-  if (!safeEqual(password, ADMIN_PASSWORD)) {
-    console.warn('[auth/login] Invalid password', { ip: getClientIp(req) });
-    return sendError(res, 401, 'Invalid password.', 'UNAUTHORIZED');
-  }
-  const sessionId = createSession();
-  setSessionCookie(res, sessionId);
-  return res.json({ data: { ok: true } });
-};
-
-app.post('/api/auth/login', rateLimitLogin, handleLogin);
-
-app.post('/api/auth/logout', (req, res) => {
-  const sessionId = getSessionId(req);
-  if (sessionId) {
-    sessions.delete(sessionId);
-  }
-  clearSessionCookie(res);
-  return res.json({ data: { ok: true } });
+const authHandlers = createAuthHandlers({
+  getRuntime: getAuthRuntime,
+  getClientIp,
+  sendError
 });
 
-app.get('/api/auth/session', (req, res) => {
-  const sessionId = getSessionId(req);
-  if (!sessionId) {
-    return sendError(res, 401, 'Not authenticated.', 'UNAUTHORIZED');
-  }
-  return res.json({ data: { ok: true } });
-});
+app.post('/api/auth/login', authHandlers.handleLogin);
+app.post('/api/auth/verify', authHandlers.handleVerify);
+app.post('/api/auth/logout', authHandlers.handleLogout);
+app.get('/api/auth/session', authHandlers.handleSession);
 
 app.use('/api/ai', requireSession, rateLimitAi);
 
@@ -1482,7 +1327,7 @@ app.use((err, req, res, next) => {
 });
 
 const startServer = () => {
-  startCleanupTimer();
+  validateAuthConfigForBoot(AUTH_CONFIG);
   return app.listen(PORT, () => {
     console.log(`[api] listening on http://localhost:${PORT}`);
   });
@@ -1500,10 +1345,12 @@ if (isMain) {
 export {
   app,
   startServer,
-  pruneStaleEntries,
-  sessions,
-  rateBuckets,
-  loginBuckets,
-  handleLogin,
+  AUTH_CONFIG,
+  getAuthRuntime,
+  setAuthRuntimeForTests,
+  resetAuthRuntimeForTests,
+  validateAuthConfigForBoot,
+  authHandlers,
+  rateLimitAi,
   handleAiGenerate
 };

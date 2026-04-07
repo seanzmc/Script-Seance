@@ -32,7 +32,11 @@ const stableAuthState = {
   authStatus: 'authenticated',
   authError: null,
   isAuthLoading: false,
+  authUser: { id: 'test-user', email: 'beta@example.com', status: 'active' },
+  pendingAuthEmail: null,
   handleLogin: vi.fn(),
+  handleVerifyCode: vi.fn(),
+  handleLogout: vi.fn(),
   requireAuthentication: vi.fn()
 };
 const stableDraftPersistenceState = {

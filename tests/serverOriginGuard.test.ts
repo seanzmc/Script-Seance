@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 
 const MANAGED_ENV_KEYS = [
+  'AUTH_MODE',
   'ADMIN_PASSWORD',
   'SCRIPT_SEANCE_OPENAI_API_KEY',
   'OPENAI_MODEL',
@@ -31,6 +32,7 @@ const restoreManagedEnv = () => {
 
 const loadApp = async (overrides?: Partial<Record<ManagedEnvKey, string>>) => {
   vi.resetModules();
+  process.env.AUTH_MODE = 'dev_shared_password';
   process.env.ADMIN_PASSWORD = 'test-password';
   process.env.SCRIPT_SEANCE_OPENAI_API_KEY = 'test-openai-key';
   process.env.OPENAI_MODEL = 'gpt-5.4-test-primary';
